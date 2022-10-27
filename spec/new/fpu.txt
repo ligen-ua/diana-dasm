@@ -1,0 +1,135 @@
+F2XM1 | D9 F0
+FABS | D9 E1
+FADD m32fp | D8 /0
+FADD m64fp | DC /0
+FADD ST(0), ST(i) | D8 C0 + fpu_i
+FADD ST(i), ST(0) | DC C0 + fpu_i
+FADDP ST(i), ST(0) | DE C0 + fpu_i
+FIADD m32int | DA /0
+FIADD m16int | DE /0
+FBLD m80dec | DF /4
+FBSTP m80bcd | DF /6
+FCHS | D9 E0
+FNCLEX | DB E2
+FCMOVB ST(0), ST(i) | DA C0 + fpu_i
+FCMOVE ST(0), ST(i) | DA C8 + fpu_i
+FCMOVBE ST(0), ST(i) | DA D0 + fpu_i
+FCMOVU ST(0), ST(i) | DA D8 + fpu_i
+FCMOVNB ST(0), ST(i) | DB C0 + fpu_i
+FCMOVNE ST(0), ST(i) | DB C8 + fpu_i
+FCMOVNBE ST(0), ST(i) | DB D0 + fpu_i
+FCMOVNU ST(0), ST(i) | DB D8 + fpu_i
+FCOM m32fp | D8 /2
+FCOM m64fp | DC /2
+FCOM ST(i) | D8 D0 + fpu_i
+FCOMP m32fp | D8 /3
+FCOMP m64fp | DC /3
+FCOMP ST(i) | D8 D8 + fpu_i
+FCOMPP | DE D9
+FCOMI ST, ST(i) | DB F0 + fpu_i
+FCOMIP ST, ST(i) | DF F0 + fpu_i
+FUCOMI ST, ST(i) | DB E8 + fpu_i
+FUCOMIP ST, ST(i) | DF E8 + fpu_i
+FCOS | D9 FF
+FDECSTP | D9 F6
+FDIV m32fp | D8 /6
+FDIV m64fp | DC /6
+FDIV ST(0), ST(i) | D8 F0 + fpu_i
+FDIV ST(i), ST(0) | DC F8 + fpu_i
+FDIVP ST(i), ST(0) | DE F8 + fpu_i
+FIDIV m32int | DA /6
+FIDIV m16int | DE /6
+FDIVR m32fp | D8 /7
+FDIVR m64fp | DC /7
+FDIVR ST(0), ST(i) | D8 F8 + fpu_i
+FDIVR ST(i), ST(0) | DC F0 + fpu_i
+FDIVRP ST(i), ST(0) | DE F0 + fpu_i
+FIDIVR m32int | DA /7
+FIDIVR m16int | DE /7
+FFREE ST(i) | DD C0 + fpu_i
+FFREEP ST(i) | DF C0 + fpu_i
+FICOM m16int | DE /2
+FICOM m32int | DA /2
+FICOMP m16int | DE /3
+FICOMP m32int | DA /3
+FILD m16int | DF /0
+FILD m32int | DB /0
+FILD m64int | DF /5
+FINCSTP | D9 F7
+FNINIT | DB E3
+FLD m32fp | D9 /0
+FLD m64fp | DD /0
+FLD m80fp | DB /5
+FLD ST(i) | D9 C0 + fpu_i
+FLD1 | D9 E8
+FLDL2T | D9 E9
+FLDL2E | D9 EA
+FLDPI | D9 EB
+FLDLG2 | D9 EC
+FLDLN2 | D9 ED
+FLDZ | D9 EE
+FLDCW m2byte | D9 /5
+FLDENV m14/28byte | D9 /4
+FMUL m32fp | D8 /1
+FMUL m64fp | DC /1
+FMUL ST(0), ST(i) | D8 C8 + fpu_i
+FMUL ST(i), ST(0) | DC C8 + fpu_i
+FMULP ST(i), ST(0) | DE C8 + fpu_i
+FIMUL m32int | DA /1
+FIMUL m16int | DE /1
+FNOP | D9 D0
+FPATAN | D9 F3
+FPREM | D9 F8
+FPREM1 | D9 F5
+FPTAN | D9 F2
+FRNDINT | D9 FC
+FRSTOR m94/108byte | DD /4
+FNSAVE m94/108byte | DD /6
+FSCALE | D9 FD
+FSIN | D9 FE
+FSINCOS | D9 FB
+FSQRT | D9 FA
+FST m32fp | D9 /2
+FST m64fp | DD /2
+FST ST(i) | DD D0 + fpu_i
+FSTP m32fp | D9 /3
+FSTP m64fp | DD /3
+FSTP m80fp | DB /7
+FSTP ST(i) | DD D8 + fpu_i
+FNSTCW m2byte | D9 /7
+FNSTENV m14/28byte | D9 /6
+FNSTSW m2byte | DD /7
+FNSTSW AX | DF E0
+FSUB m32fp | D8 /4
+FSUB m64fp | DC /4
+FSUB ST(0), ST(i) | D8 E0 + fpu_i
+FSUB ST(i), ST(0) | DC E8 + fpu_i
+FSUBP ST(i), ST(0) | DE E8 + fpu_i
+FISUB m32int | DA /4
+FISUB m16int | DE /4
+FSUBR m32fp | D8 /5
+FSUBR m64fp | DC /5
+FSUBR ST(0), ST(i) | D8 E8 + fpu_i
+FSUBR ST(i), ST(0) | DC E0 + fpu_i
+FSUBRP ST(i), ST(0) | DE E0 + fpu_i
+FISUBR m32int | DA /5
+FISUBR m16int | DE /5
+FTST | D9 E4
+FUCOM ST(i) | DD E0 + fpu_i
+FUCOMP ST(i) | DD E8 + fpu_i
+FUCOMPP | DA E9
+FXAM | D9 E5
+FXCH ST(i) | D9 C8 + fpu_i
+FXRSTOR m512byte | 0F AE /1 /paligned
+FXSAVE m512byte | 0F AE /0 /paligned
+FXTRACT | D9 F4
+FYL2X   | D9 F1
+FYL2XP1 | D9 F9
+FISTTP m64int | DD /1
+FISTTP m32int | DB /1
+FISTTP m16int | DF /1
+FIST m16int | DF /2
+FIST m32int | DB /2
+FISTP m16int | DF /3
+FISTP m32int | DB /3
+FISTP m64int | DF /7

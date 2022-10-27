@@ -1,0 +1,58 @@
+[0.5.0-diana-win32-src] - 58 revision
++ amd64 support mode in emulator
++ a lot of fixes in emulator
++ disasm: incorrect push 0x68 opcode fixed for amd64 configuration
++ disasm: fixed cache behavior
++ disasm: fixed crash
++ disasm: fixed mul rcx
++ refactored streams
++ added exception support to win32 processor
+
+
+[0.2.0-diana-win32-src] - 16 revision
++ fixed minor bugs
++ added emulator (diana_9_0.sln)
++ added commands:
+
+CMPXCHG16B mem128 | 0F C7 /1
+CPUID | 0F A2
+MFENCE | 0F AE F0
+LFENCE | 0F AE E8
+SYSENTER | 0F 34
+SYSEXIT | 0F 35
+SYSRET | 0F 07
+WBINVD | 0F 09
+VMSAVE | 0F 01 DB
+VMRUN | 0F 01 D8
+VMMCALL | 0F 01 D9
+VMLOAD | 0F 01 DA
+VERW r/m16 | 0F 00 /5
+VERR r/m16 | 0F 00 /4
+UD2 | 0F 0B
+MONITOR | 0F 01 C8
+MWAIT | 0F 01 C9
+SKINIT EAX | 0F 01 DE
+
+[0.1.3-diana-win32-src]
++ added FPU support
++ added MMX/SSE/SSE2 support
++ added AMD64 support
++ added x64 build support
++ added instructions:
+RDTSC
+RDTSCP
+RDPMC
+RDMSR
+WRMSR
+CMOVcc
+
++ improved tests
+
+[0.0.3-diana-win32-src]
++ fixed setcc command parsing
+
+[0.0.2-diana-win32-src]
++ added lock/rep/repn prefixes support
++ added xadd and cmpxchg support
++ added patchers.c - module for function patching, very raw for now
++ improved tests - added integration.c

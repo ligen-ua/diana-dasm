@@ -1,0 +1,311 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectName>diana_core</ProjectName>
+    <ProjectGuid>{DDEE4514-39A8-4303-B80C-74D83D71D91A}</ProjectGuid>
+    <RootNamespace>diana_core</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>14.0.25431.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)..\lib\$(Configuration)\i386\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\i386\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)..\lib\$(Configuration)\amd64\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\amd64\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)..\lib\$(Configuration)\i386\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\i386\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)..\lib\$(Configuration)\amd64\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\amd64\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader />
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)diana_core.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader />
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)diana_core.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <AdditionalIncludeDirectories>.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader />
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)diana_core.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <AdditionalIncludeDirectories>.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader />
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)diana_core.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="diana_allocators.c" />
+    <ClCompile Include="diana_analyze.c" />
+    <ClCompile Include="diana_analyze2.c" />
+    <ClCompile Include="diana_core.c" />
+    <ClCompile Include="diana_core_gen_tags.c" />
+    <ClCompile Include="diana_core_parsers.c" />
+    <ClCompile Include="diana_core_utils.c" />
+    <ClCompile Include="diana_core_win32_context.c" />
+    <ClCompile Include="diana_gen.c" />
+    <ClCompile Include="diana_list.c" />
+    <ClCompile Include="diana_operands.c" />
+    <ClCompile Include="diana_patchers.c" />
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher.c" />
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_32.c" />
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_64.c" />
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_impl.c" />
+    <ClCompile Include="diana_pe.c" />
+    <ClCompile Include="diana_pe_analyzer.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_a.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_b.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_c.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_d.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_fpu.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_fpu_internal.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_fpu_sse.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_i.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_imul.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_internal.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_internal_xmm.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_j.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_l.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_l_xmm.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_m.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_m_xmm.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_n.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_p.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_r.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_s.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_s2.c" />
+    <ClCompile Include="diana_processor\diana_processor_commands.c" />
+    <ClCompile Include="diana_processor\diana_processor_context.c" />
+    <ClCompile Include="diana_processor\diana_processor_core.c" />
+    <ClCompile Include="diana_processor\diana_processor_core_impl.c" />
+    <ClCompile Include="diana_processor\diana_processor_core_impl_xmm.c" />
+    <ClCompile Include="diana_processor\diana_processor_streams.c" />
+    <ClCompile Include="diana_processor\diana_processor_win32_context.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloat-muladd.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloat-round-pack.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloat-specialize.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloat.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloat16.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloatx80.c" />
+    <ClCompile Include="diana_stack.c" />
+    <ClCompile Include="diana_streams.c" />
+    <ClCompile Include="diana_stream_proxy.c" />
+    <ClCompile Include="diana_tables_16.c" />
+    <ClCompile Include="diana_tables_32.c" />
+    <ClCompile Include="diana_tables_common.c" />
+    <ClCompile Include="diana_text_output_masm.c" />
+    <ClCompile Include="diana_uids.c" />
+    <ClCompile Include="diana_win32.c" />
+    <ClCompile Include="diana_win32_executable_heap.c" />
+    <ClCompile Include="diana_win32_sys_memcpy.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="diana_allocators.h" />
+    <ClInclude Include="diana_analyze.h" />
+    <ClInclude Include="diana_analyze2.h" />
+    <ClInclude Include="diana_apply_config_rules.h" />
+    <ClInclude Include="diana_config.h" />
+    <ClInclude Include="diana_core.h" />
+    <ClInclude Include="diana_core_cpp.h" />
+    <ClInclude Include="diana_core_gen_tags.h" />
+    <ClInclude Include="diana_core_parsers.h" />
+    <ClInclude Include="diana_core_utils.h" />
+    <ClInclude Include="diana_core_win32_context.h" />
+    <ClInclude Include="diana_disable_warnings.h" />
+    <ClInclude Include="diana_gen.h" />
+    <ClInclude Include="diana_list.h" />
+    <ClInclude Include="diana_operands.h" />
+    <ClInclude Include="diana_patchers.h" />
+    <ClInclude Include="diana_patchers\diana_ultimate_patcher.h" />
+    <ClInclude Include="diana_patchers\diana_ultimate_patcher_impl.h" />
+    <ClInclude Include="diana_pe.h" />
+    <ClInclude Include="diana_pe_analyzer.h" />
+    <ClInclude Include="diana_pe_cpp.h" />
+    <ClInclude Include="diana_pe_defs.h" />
+    <ClInclude Include="diana_processor.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_a.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_b.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_c.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_d.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_fpu.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_fpu_internal.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_i.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_internal.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_internal_xmm.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_j.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_l.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_l_xmm.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_m.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_m_xmm.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_n.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_p.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_r.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_s.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_s2.h" />
+    <ClInclude Include="diana_processor\diana_processor_commands.h" />
+    <ClInclude Include="diana_processor\diana_processor_context.h" />
+    <ClInclude Include="diana_processor\diana_processor_core.h" />
+    <ClInclude Include="diana_processor\diana_processor_core_impl.h" />
+    <ClInclude Include="diana_processor\diana_processor_core_impl_xmm.h" />
+    <ClInclude Include="diana_processor\diana_processor_impl_init.h" />
+    <ClInclude Include="diana_processor\diana_processor_specific.h" />
+    <ClInclude Include="diana_processor\diana_processor_specific_xmm.h" />
+    <ClInclude Include="diana_processor\diana_processor_streams.h" />
+    <ClInclude Include="diana_processor\diana_processor_win32_context.h" />
+    <ClInclude Include="diana_processor\diana_proc_gen.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat-compare.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat-macros.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat-round-pack.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat-specialize.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloatx80.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat_end.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat_start.h" />
+    <ClInclude Include="diana_processor_cpp.h" />
+    <ClInclude Include="diana_stack.h" />
+    <ClInclude Include="diana_streams.h" />
+    <ClInclude Include="diana_stream_proxy.h" />
+    <ClInclude Include="diana_tables_16.h" />
+    <ClInclude Include="diana_tables_32.h" />
+    <ClInclude Include="diana_tables_common.h" />
+    <ClInclude Include="diana_text_output_masm.h" />
+    <ClInclude Include="diana_uids.h" />
+    <ClInclude Include="diana_win32.h" />
+    <ClInclude Include="diana_win32_cpp.h" />
+    <ClInclude Include="diana_win32_executable_heap.h" />
+    <ClInclude Include="diana_win32_sys_memcpy.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="diana_custom_config.inc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="diana_processor\ReadMe.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

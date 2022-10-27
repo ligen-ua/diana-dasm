@@ -1,0 +1,8 @@
+CVTSD2SI reg32-64, xmm/mem64 | F2 0F 2D /r
+CVTSS2SI reg32-64, xmm2/mem32 | F3 0F 2D /r
+CVTTSD2SI reg32-64, xmm/mem64 | F2 0F 2C /r
+CVTTSS2SI reg32-64, xmm/mem32 | F3 0F 2C /r
+MOVD xmm, reg/mem32-64 | 66 0F 6E /r
+MOVD reg/mem32-64, xmm | 66 0F 7E /r
+MOVD mmx, reg/mem32-64 | 0F 6E /r
+MOVD reg/mem32-64, mmx | 0F 7E /r

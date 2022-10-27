@@ -1,0 +1,18 @@
+TARGETNAME=orthia_kshuttle
+TARGETPATH=..\..\..\bin\$(PROJECT_CONFIGURATION_NAME)
+TARGETTYPE=DRIVER
+DRIVERTYPE=FS
+
+MSC_WARNING_LEVEL = /W1
+
+INCLUDES=..\orthia_lib
+
+TARGETLIBS= $(ORTHIA_DDK)\lib\wnet\*\ntoskrnl.lib \
+            $(ORTHIA_DDK)\lib\wnet\*\hal.lib \
+            $(ORTHIA_DDK)\lib\wnet\*\ntstrsafe.lib \
+            $(ORTHIA_DDK)\lib\wnet\*\ndis.lib \
+            $(ORTHIA_DDK)\lib\wnet\*\tdi.lib \
+            $(ORTHIA_DDK)\lib\wnet\*\ksecdd.lib
+	
+SOURCES = \
+    drvMain.cpp

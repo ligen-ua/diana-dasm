@@ -1,0 +1,107 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<HTML>
+<HEAD>
+<TITLE>80386 Programmer's Reference Manual -- Opcode CMPXCHG</TITLE>
+</HEAD>
+<BODY>
+<B>up:</B> <A HREF="c17.htm">
+Chapter 17 -- 80386 Instruction Set</A><BR>
+<B>prev:</B><A HREF="WAIT.htm"> WAIT Wait until BUSY# Pin is Inactive (HIGH)</A><BR>
+<B>next:</B><A HREF="XLAT.htm"> XLAT/XLATB Table Look-up Translation</A>
+<P>
+<HR>
+<P>
+<H1>CMPXCHG -- Compare and Exchange</H1>
+
+<PRE>
+Opcode                 Instruction         Clocks     Description
+
+0F B0 /r /pprefixlock  CMPXCHG r/m8,r8     3          Compare AL with r/m8. If equal, ZF is set and r8 is loaded into r/m8. Else, clear ZF and load r/m8 into AL
+0F B1 /r /pprefixlock  CMPXCHG r/m16,r16   3          Compare AX with r/m16. If equal, ZF is set and r16 is loaded into r/m16. Else, clear ZF and load r/m16 into AL
+0F B1 /r /pprefixlock  CMPXCHG r/m32,r32   3          Compare EAX with r/m32. If equal, ZF is set and r32 is loaded into r/m32. Else, clear ZF and load r/m32 into AL
+</PRE>
+
+
+<H2>Operation</H2>
+
+<PRE>
+temp := DEST
+DEST := SRC
+SRC := temp
+</PRE>
+
+<H2>Description</H2>
+
+Compares the value in the AL, AX, or EAX register (depending on the size
+ of the operand) with the first operand (destination operand). If the two
+ values are equal, the second operand (source operand) is loaded into the
+destination operand. Otherwise, the destination operand is loaded into the
+AL, AX, or EAX register.
+
+<H2>Flags Affected</H2>
+
+None
+
+<H2>Protected Mode Exceptions</H2>
+
+#GP(0) if either operand is in a nonwritable segment; #GP(0) for an
+illegal memory operand effective address in the CS, DS, ES, FS, or GS
+segments; #SS(0) for an illegal address in the SS segment; #PF(fault-code)
+for a page fault
+
+<H2>Real Address Mode Exceptions</H2>
+
+Interrupt 13 if any part of the operand would lie outside of the effective
+address space from 0 to 0FFFFH
+
+<H2>Virtual 8086 Mode Exceptions</H2>
+
+Same exceptions as in Real Address Mode; #PF(fault-code) for a page
+fault
+
+
+<P>
+<HR>
+<P>
+<B>up:</B> <A HREF="c17.htm">
+Chapter 17 -- 80386 Instruction Set</A><BR>
+<B>prev:</B><A HREF="WAIT.htm"> WAIT Wait until BUSY# Pin is Inactive (HIGH)</A><BR>
+<B>next:</B><A HREF="XLAT.htm"> XLAT/XLATB Table Look-up Translation</A>
+</BODY>
+
+XCHG exchanges two operands. The operands can be in either order. If a
+memory operand is involved, BUS LOCK is asserted for the duration of the
+exchange, regardless of the presence or absence of the
+<A HREF="LOCK.htm">LOCK</A> prefix or of the
+value of the IOPL.
+
+<H2>Flags Affected</H2>
+
+None
+
+<H2>Protected Mode Exceptions</H2>
+
+#GP(0) if either operand is in a nonwritable segment; #GP(0) for an
+illegal memory operand effective address in the CS, DS, ES, FS, or GS
+segments; #SS(0) for an illegal address in the SS segment; #PF(fault-code)
+for a page fault
+
+<H2>Real Address Mode Exceptions</H2>
+
+Interrupt 13 if any part of the operand would lie outside of the effective
+address space from 0 to 0FFFFH
+
+<H2>Virtual 8086 Mode Exceptions</H2>
+
+Same exceptions as in Real Address Mode; #PF(fault-code) for a page
+fault
+
+
+<P>
+<HR>
+<P>
+<B>up:</B> <A HREF="c17.htm">
+Chapter 17 -- 80386 Instruction Set</A><BR>
+<B>prev:</B><A HREF="WAIT.htm"> WAIT Wait until BUSY# Pin is Inactive (HIGH)</A><BR>
+<B>next:</B><A HREF="XLAT.htm"> XLAT/XLATB Table Look-up Translation</A>
+</BODY>

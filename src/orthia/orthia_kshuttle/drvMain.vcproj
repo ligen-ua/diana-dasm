@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioProject
+	ProjectType="Visual C++"
+	Version="9.00"
+	Name="drvMain"
+	ProjectGUID="{E33F5B4A-0598-43AF-93DE-99A1480DAF96}"
+	TargetFrameworkVersion="0"
+	>
+	<Platforms>
+		<Platform
+			Name="Win32"
+		/>
+		<Platform
+			Name="x64"
+		/>
+	</Platforms>
+	<ToolFiles>
+	</ToolFiles>
+	<Configurations>
+		<Configuration
+			Name="Debug|Win32"
+			OutputDirectory="$(SolutionDir)..\bin\$(ConfigurationName)\i386"
+			IntermediateDirectory="$(SolutionDir)..\obj\$(ConfigurationName)\$(ProjectName)\i386"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir)"
+				ReBuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir)"
+				CleanCommandLine=""
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Debug|x64"
+			OutputDirectory="$(SolutionDir)..\bin\$(ConfigurationName)\amd64"
+			IntermediateDirectory="$(SolutionDir)..\obj\$(ConfigurationName)\$(ProjectName)\amd64"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir) x64"
+				ReBuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir) x64"
+				CleanCommandLine=""
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|Win32"
+			OutputDirectory="$(SolutionDir)..\bin\$(ConfigurationName)\i386"
+			IntermediateDirectory="$(SolutionDir)..\obj\$(ConfigurationName)\$(ProjectName)\i386"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir)"
+				ReBuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir)"
+				CleanCommandLine=""
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|x64"
+			OutputDirectory="$(SolutionDir)..\bin\$(ConfigurationName)\amd64"
+			IntermediateDirectory="$(SolutionDir)..\obj\$(ConfigurationName)\$(ProjectName)\amd64"
+			ConfigurationType="0"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir) x64"
+				ReBuildCommandLine="call $(SolutionDir)wdk_build.cmd  $(ORTHIA_DDK) $(ConfigurationName) $(ProjectDir) x64"
+				CleanCommandLine=""
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+	</Configurations>
+	<References>
+	</References>
+	<Files>
+		<Filter
+			Name="Source Files"
+			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
+			>
+			<File
+				RelativePath=".\drvMain.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc"
+			>
+		</Filter>
+		<Filter
+			Name="Resource Files"
+			Filter=".rc;.mc;.mof"
+			>
+		</Filter>
+		<File
+			RelativePath=".\Makefile"
+			>
+		</File>
+		<File
+			RelativePath=".\Sources"
+			>
+		</File>
+	</Files>
+	<Globals>
+	</Globals>
+</VisualStudioProject>

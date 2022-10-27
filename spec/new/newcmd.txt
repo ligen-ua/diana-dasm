@@ -1,0 +1,72 @@
+STMXCSR mem32 | 0F AE /3
+LDMXCSR mem32 | 0F AE /2
+RDTSC | 0F 31 /pprivileged
+RDTSCP | 0F 01 F9 /pprivileged
+RDPMC | 0F 33 /pprivileged
+RDMSR | 0F 32 /pprivileged
+WRMSR | 0F 30 /pprivileged
+CMPXCHG16B mem128 | 0F C7 /1 /pprefixlock /paligned
+CPUID | 0F A2
+SYSENTER | 0F 34
+SYSCALL | 0F 05 /pamd64
+SYSEXIT | 0F 35 /pprivileged
+SYSRET | 0F 07 /pamd64 /pprivileged
+WBINVD | 0F 09 /pprivileged
+VMSAVE | 0F 01 DB
+VMRUN | 0F 01 D8
+VMMCALL | 0F 01 D9
+VMLOAD | 0F 01 DA
+VERW r/m16 | 0F 00 /5 /pprivileged
+VERR r/m16 | 0F 00 /4 /pprivileged
+UD2 | 0F 0B
+MONITOR | 0F 01 C8 /pprivileged
+MWAIT | 0F 01 C9 /pprivileged
+SKINIT EAX | 0F 01 DE
+MOVSXD reg64, reg/mem32 | 63 /r /pamd64
+BSWAP reg32-64 | 0F C8 + ru
+PAUSE | F3 90
+INVD | 0F 08 /pprivileged
+CLGI | 0F 01 DD
+STGI | 0F 01 DC
+INVLPG m8 | 0F 01 /7 /pprivileged /*83
+INVLPGA RAX, ECX | 0F 01 DF /pprivileged
+SWAPGS | 0F 01 F8 /pprivileged
+RSM | 0F AA /pprivileged
+SALC | D6 /pundoc
+ICEBP | F1 /pundoc
+PREFETCHNTA m8 | 0F 18 /0
+PREFETCHT0 m8 | 0F 18 /1
+PREFETCHT1 m8 | 0F 18 /2
+PREFETCHT2 m8 | 0F 18 /3
+PREFETCH m8 | 0F 0D /0
+PREFETCHW m8 | 0F 0D /1
+VMREAD r/m32, r32 | 0F 78 /r /pprivileged
+VMWRITE r32, r/m32 | 0F 79 /r /pprivileged
+VMXON xmem64 | F3 0F C7 /6 /pprivileged
+VMPTRST xmem64 | 0F C7 /7 /pprivileged /*83
+VMPTRLD xmem64 | 0F C7 /6 /pprivileged /*83
+VMCLEAR xmem64 | 66 0F C7 /6 /pprivileged
+VMCALL | 0F 01 C1 /pprivileged
+VMRESUME | 0F 01 C3 /pprivileged
+VMXOFF | 0F 01 C4 /pprivileged
+VMLAUNCH | 0F 01 C2 /pprivileged
+GETSEC | 0F 37
+XGETBV | 0F 01 D0 /pprivileged
+XSETBV | 0F 01 D1 /pprivileged
+EMMS | 0F 77
+FEMMS | 0F 0E
+HINT_NOP r/m16/32/64 | 0F 1F /0
+HINT_NOP r/m16/32/64 | 0F 19 /r
+HINT_NOP r/m16/32/64 | 0F 1A /r
+HINT_NOP r/m16/32/64 | 0F 1B /r
+HINT_NOP r/m16/32/64 | 0F 1C /r
+HINT_NOP r/m16/32/64 | 0F 1D /r
+HINT_NOP r/m16/32/64 | 0F 1E /r
+TEST_CMD | 66 0F /ptest_cmd
+MFENCE | 0F AE F0
+LFENCE | 0F AE E8
+SFENCE | 0F AE F8
+XRSTOR m512byte | 0F AE /5
+CLFLUSH m8 | 0F AE /7
+RDSEED r/m16/32/64 | 0F C7 /7
+RDRAND r/m16/32/64 | 0F C7 /6

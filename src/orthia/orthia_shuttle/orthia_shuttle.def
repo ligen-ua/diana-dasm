@@ -1,0 +1,5 @@
+LIBRARY	"orthia_shuttle"
+
+EXPORTS
+     ping
+     dinkumware_map_for_each
