@@ -129,11 +129,11 @@ int DianaHook_AnalyzeCommand(DianaHook_InternalMessage * pMessage,
     return DI_SUCCESS;
 }
 
+
 static unsigned char g_farJump[] = 
 {
-    0x68, 0x66, 0x66, 0x66, 0x66,                    // push    66666666h
-    0xC7, 0x44, 0x24, 0x04, 0x77, 0x77, 0x77, 0x00,  // mov     dword ptr [rsp+4], 777777h
-    0xC3                                             // ret
+    0xff, 0x25, 0x00, 0x00, 0x00, 0x00, // jmp qword ptr [RIP + 0]
+    0x66, 0x66, 0x66, 0x66, 0x77, 0x77, 0x77, 0x77
 };
 
 static
@@ -156,8 +156,8 @@ int DianaHook_AddTailJump(DianaHook_InternalMessage * pMessage,
     DI_CHECK(DianaHook_AllocateCmd(pMessage, sizeof(g_farJump), &pCommandBuffer));
     pCommandBufferOut = (unsigned char * )pCommandBuffer;
     DIANA_MEMCPY(pCommandBufferOut, g_farJump, sizeof(g_farJump));
-    *(DI_UINT32*)(pCommandBufferOut+1) = (DI_UINT32)jmpTargetAddress;
-    *(DI_UINT32*)(pCommandBufferOut+9) = (DI_UINT32)(jmpTargetAddress>>32);
+    *(DI_UINT32*)(pCommandBufferOut+6) = (DI_UINT32)jmpTargetAddress;
+    *(DI_UINT32*)(pCommandBufferOut+10) = (DI_UINT32)(jmpTargetAddress>>32);
     return DI_SUCCESS;
 }
 static int DianaHook_CommonMove64(DianaHook_InternalMessage * pMessage, 
@@ -306,8 +306,8 @@ int DianaHook_PatchSequence64_Far(DianaHook_InternalMessage * pMessage,
 
     DI_CHECK(InitStubData(pMessage, pAllocatedAddress, stubData, &addressOfOriginal));
 
-    *(DI_UINT32*)(hook+1) = (DI_UINT32)((DI_UINT64)*pAllocatedAddress);
-    *(DI_UINT32*)(hook+9) = (DI_UINT32)(((DI_UINT64)*pAllocatedAddress)>>32);
+    *(DI_UINT32*)(hook+6) = (DI_UINT32)((DI_UINT64)*pAllocatedAddress);
+    *(DI_UINT32*)(hook+10) = (DI_UINT32)(((DI_UINT64)*pAllocatedAddress)>>32);
 
     if (pMessage->originalFunctionPointer != (DI_OPERAND_SIZE)-1)
     {

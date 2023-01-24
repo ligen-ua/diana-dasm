@@ -183,7 +183,7 @@ public:
     }
     void Init(HANDLE processHandle)
     {
-        if (m_NtSuspendProcess(m_processHandle) < 0)
+        if (m_NtSuspendProcess(processHandle) < 0)
         {
             throw std::runtime_error("Can't suspend process");
         }

@@ -53,20 +53,20 @@ ULONG CapturePid(const std::wstring & pidString)
     return pid;
 }
 static
-ULONGLONG CaptureAddress(const std::wstring & pidString)
+ULONGLONG CaptureAddress(const std::wstring & addressString)
 {
-    if (pidString.empty())
+    if (addressString.empty())
     {
         throw std::runtime_error("Invalid argument");
     }
-    ULONGLONG pid = 0;
-    if (pidString.size() > 2 && pidString[0] == '0' && pidString[0] == 'x')
+    ULONGLONG address = 0;
+    if (addressString.size() > 2 && addressString[0] == '0' && addressString[1] == 'x')
     {
-        orthia::HexStringToObject(std::wstring(pidString.begin() + 2, pidString.end()), &pid);
-        return pid;
+        orthia::HexStringToObject(std::wstring(addressString.begin() + 2, addressString.end()), &address);
+        return address;
     }
-    orthia::StringToObject(pidString, &pid);
-    return pid;
+    orthia::StringToObject(addressString, &address);
+    return address;
 }
 
 static void PrintRegionInfo(const dd::RegionInfo & info)
