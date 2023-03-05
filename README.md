@@ -1,5 +1,6 @@
-# Diana-Dasm is a small and fast disassembler, useful for Windows kernel developers.
-Diana is a C library, not a product or tool.
+# Diana-Dasm 
+Diana-Dasm is a small and fast disassembler, useful for Windows kernel developers.
+It is a C library, not a product or tool.
 Path: src/diana_core 
 
 Advantages:
