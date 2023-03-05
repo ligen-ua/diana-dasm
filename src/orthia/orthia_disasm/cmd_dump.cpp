@@ -14,6 +14,10 @@ namespace orthia
 
     static void Dump(DumpOptions& options, IToolOutputStream* streamToUse)
     {
+        if (!options.pdbFile.empty())
+        {
+            std::cerr << "PDB file parsing is not implemented yet\n";
+        }
         std::vector<char> peFile;
         orthia::LoadFileToVector(options.exeModule, peFile);
         if (peFile.empty())

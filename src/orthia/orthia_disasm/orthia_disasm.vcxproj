@@ -170,6 +170,9 @@
   <ItemGroup>
     <ClInclude Include="cmd_common.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="orthia.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

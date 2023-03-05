@@ -39,7 +39,7 @@ void HookAgent(FormatType * pData,
    
     // analyse input parameteres
     const void * pUserData = ppInputRegisters[pData->addressReg_number];
-    const DWORD userDataSize = (DWORD)ppInputRegisters[pData->sizeReg_number];
+    const DWORD userDataSize = (DWORD)(size_t)ppInputRegisters[pData->sizeReg_number];
 
     // allocate data
     const DWORD fullDataSize = userDataSize + sizeof(ListNode);
