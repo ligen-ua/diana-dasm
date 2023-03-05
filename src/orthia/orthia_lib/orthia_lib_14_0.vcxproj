@@ -142,6 +142,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="orhia_pe.cpp" />
     <ClCompile Include="orthia_allocators.cpp" />
     <ClCompile Include="orthia_common_format.cpp" />
     <ClCompile Include="orthia_common_print.cpp" />
@@ -190,9 +191,11 @@
     <ClInclude Include="orthia_files.h" />
     <ClInclude Include="orthia_interfaces.h" />
     <ClInclude Include="orthia_interfaces_vm.h" />
+    <ClInclude Include="orthia_json.h" />
     <ClInclude Include="orthia_memory_cache.h" />
     <ClInclude Include="orthia_module_manager.h" />
     <ClInclude Include="orthia_parser.h" />
+    <ClInclude Include="orthia_pe.h" />
     <ClInclude Include="orthia_plugin_interfaces.h" />
     <ClInclude Include="orthia_pointers.h" />
     <ClInclude Include="orthia_sha1.h" />
@@ -210,6 +213,7 @@
     <ClInclude Include="orthia_vmlib_api_handlers_win32.h" />
     <ClInclude Include="orthia_vmlib_shuttle.h" />
     <ClInclude Include="orthia_vmlib_utils.h" />
+    <ClInclude Include="picojson.h" />
     <ClInclude Include="sqlite3.h" />
     <ClInclude Include="sqlite3ext.h" />
     <ClInclude Include="tinyxml2.h" />

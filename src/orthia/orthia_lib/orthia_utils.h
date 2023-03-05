@@ -397,7 +397,7 @@ template<class Type>
 std::wstring ToHexString(Type * pArray, 
                          size_t count)
 {
-    return ToHexString((const char * )pArray, sizeof(obj)*count);
+    return ToHexString((const char * )pArray, sizeof(Type)*count);
 }
 template<class CharType>
 void Split(const std::basic_string<CharType> & sourceString, 
