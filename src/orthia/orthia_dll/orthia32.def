@@ -1,0 +1,44 @@
+LIBRARY	"orthia"
+
+EXPORTS
+; plugin interface
+     DebugExtensionNotify
+     DebugExtensionInitialize
+     DebugExtensionUninitialize
+; commands
+    profile
+    lm
+    reload
+    x
+    help
+    xr
+	u
+    a=?a@@YGJPAUIDebugClient4@@PBD@Z
+    exec
+    vm_help
+    vm_vm_new
+    vm_vm_del
+    vm_vm_list
+    vm_vm_info
+    vm_vm_db
+    vm_vm_dw
+    vm_vm_dd
+    vm_vm_dq
+    vm_vm_dp
+    vm_mod_load
+    vm_mod_shcall
+    vm_mod_new
+    vm_mod_del
+    vm_mod_list
+    vm_mod_info
+    vm_mod_write_bin
+    vm_mod_eb
+    vm_mod_ew
+    vm_mod_ed
+    vm_mod_eq
+    vm_mod_ep
+    vm_mod_enable
+    vm_vm_commit
+    vm_vm_call
+    vm_vm_u
+    vm_vm_def
