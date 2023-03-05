@@ -1208,7 +1208,7 @@ int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
                                         pCapturedDataEnd,
                                         &pFunctionPointer));
 
-        compareResult = DIAND_STRNCMP(pFunctionName, pFunctionPointer, pCapturedDataEnd-pFunctionPointer);
+        compareResult = DIAND_STRNICMP(pFunctionName, pFunctionPointer, pCapturedDataEnd-pFunctionPointer);
         if (!compareResult)
         {
             break;

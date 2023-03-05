@@ -14,6 +14,12 @@
 #define DIAND_STRNCMP strncmp
 #define DIANA_MEMSET memset
 
+#if defined(_WIN32) || defined(_MSC_VER)
+#define DIAND_STRNICMP _strnicmp
+#else
+#define DIAND_STRNICMP strncasecmp
+#endif
+
 #ifndef DIANA_USE_MALLOC_FREE 
 #ifndef DIANA_DONT_USE_MALLOC_FREE 
 #define DIANA_USE_MALLOC_FREE
