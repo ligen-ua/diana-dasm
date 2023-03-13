@@ -11,13 +11,17 @@
 #define DIANA_USE_C_SIZET
 #define DIANA_MEMCMP  memcmp
 #define DIANA_MEMCPY  memcpy
-#define DIAND_STRNCMP strncmp
+#define DIANA_STRNCMP strncmp
 #define DIANA_MEMSET memset
 
 #if defined(_WIN32) || defined(_MSC_VER)
-#define DIAND_STRNICMP _strnicmp
+#define DIANA_STRNICMP _strnicmp
+#define DIANA_STRICMP _stricmp
+
 #else
-#define DIAND_STRNICMP strncasecmp
+#define DIANA_STRNICMP strncasecmp
+#define DIANA_STRICMP strcasecmp
+
 #endif
 
 #ifndef DIANA_USE_MALLOC_FREE 

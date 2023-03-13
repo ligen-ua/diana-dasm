@@ -93,7 +93,7 @@ int ReadOptionalHeader(Diana_PeFile_impl * pImpl,
                        int * pDisasmMode,
                        int * pOptionalHeaderSize)
 {
-    if (DIAND_STRNCMP(pImpl->ntHeaders.Signature, "PE", 3))
+    if (DIANA_STRNCMP(pImpl->ntHeaders.Signature, "PE", 3))
     {
         return DI_INVALID_INPUT;
     }
@@ -1208,7 +1208,7 @@ int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
                                         pCapturedDataEnd,
                                         &pFunctionPointer));
 
-        compareResult = DIAND_STRNICMP(pFunctionName, pFunctionPointer, pCapturedDataEnd-pFunctionPointer);
+        compareResult = DIANA_STRNICMP(pFunctionName, pFunctionPointer, pCapturedDataEnd-pFunctionPointer);
         if (!compareResult)
         {
             break;

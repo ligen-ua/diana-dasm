@@ -1,0 +1,332 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="diana_allocators.c" />
+    <ClCompile Include="diana_analyze.c" />
+    <ClCompile Include="diana_analyze2.c" />
+    <ClCompile Include="diana_core.c" />
+    <ClCompile Include="diana_core_gen_tags.c" />
+    <ClCompile Include="diana_core_parsers.c" />
+    <ClCompile Include="diana_core_utils.c" />
+    <ClCompile Include="diana_core_win32_context.c" />
+    <ClCompile Include="diana_gen.c" />
+    <ClCompile Include="diana_list.c" />
+    <ClCompile Include="diana_operands.c" />
+    <ClCompile Include="diana_patchers.c" />
+    <ClCompile Include="diana_pdb.c" />
+    <ClCompile Include="diana_pe.c" />
+    <ClCompile Include="diana_pe_analyzer.c" />
+    <ClCompile Include="diana_stack.c" />
+    <ClCompile Include="diana_streams.c" />
+    <ClCompile Include="diana_stream_proxy.c" />
+    <ClCompile Include="diana_tables_16.c" />
+    <ClCompile Include="diana_tables_32.c" />
+    <ClCompile Include="diana_tables_common.c" />
+    <ClCompile Include="diana_text_output_masm.c" />
+    <ClCompile Include="diana_uids.c" />
+    <ClCompile Include="diana_win32.c" />
+    <ClCompile Include="diana_win32_executable_heap.c" />
+    <ClCompile Include="diana_win32_sys_memcpy.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloat.c">
+      <Filter>softfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\softfloat\softfloat16.c">
+      <Filter>softfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\softfloat\softfloat-muladd.c">
+      <Filter>softfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\softfloat\softfloat-round-pack.c">
+      <Filter>softfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\softfloat\softfloat-specialize.c">
+      <Filter>softfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\softfloat\softfloatx80.c">
+      <Filter>softfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_a.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_b.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_c.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_d.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_fpu.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_fpu_internal.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_fpu_sse.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_i.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_imul.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_internal.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_internal_xmm.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_j.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_l.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_l_xmm.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_m.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_m_xmm.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_n.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_p.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_r.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_s.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_cmd_s2.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_commands.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_context.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_core.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_core_impl.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_core_impl_xmm.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_streams.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_processor\diana_processor_win32_context.c">
+      <Filter>proc</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher.c">
+      <Filter>patcher</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_32.c">
+      <Filter>patcher</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_64.c">
+      <Filter>patcher</Filter>
+    </ClCompile>
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_impl.c">
+      <Filter>patcher</Filter>
+    </ClCompile>
+    <ClCompile Include="libpdb\pdb.c">
+      <Filter>pdb</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="diana_allocators.h" />
+    <ClInclude Include="diana_analyze.h" />
+    <ClInclude Include="diana_analyze2.h" />
+    <ClInclude Include="diana_apply_config_rules.h" />
+    <ClInclude Include="diana_config.h" />
+    <ClInclude Include="diana_core.h" />
+    <ClInclude Include="diana_core_cpp.h" />
+    <ClInclude Include="diana_core_gen_tags.h" />
+    <ClInclude Include="diana_core_parsers.h" />
+    <ClInclude Include="diana_core_utils.h" />
+    <ClInclude Include="diana_core_win32_context.h" />
+    <ClInclude Include="diana_disable_warnings.h" />
+    <ClInclude Include="diana_gen.h" />
+    <ClInclude Include="diana_list.h" />
+    <ClInclude Include="diana_operands.h" />
+    <ClInclude Include="diana_patchers.h" />
+    <ClInclude Include="diana_pdb.h" />
+    <ClInclude Include="diana_pe.h" />
+    <ClInclude Include="diana_pe_analyzer.h" />
+    <ClInclude Include="diana_pe_cpp.h" />
+    <ClInclude Include="diana_pe_defs.h" />
+    <ClInclude Include="diana_stack.h" />
+    <ClInclude Include="diana_streams.h" />
+    <ClInclude Include="diana_stream_proxy.h" />
+    <ClInclude Include="diana_tables_16.h" />
+    <ClInclude Include="diana_tables_32.h" />
+    <ClInclude Include="diana_tables_common.h" />
+    <ClInclude Include="diana_text_output_masm.h" />
+    <ClInclude Include="diana_uids.h" />
+    <ClInclude Include="diana_win32.h" />
+    <ClInclude Include="diana_win32_cpp.h" />
+    <ClInclude Include="diana_win32_executable_heap.h" />
+    <ClInclude Include="diana_win32_sys_memcpy.h" />
+    <ClInclude Include="diana_processor\softfloat\softfloat.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\softfloat\softfloat_end.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\softfloat\softfloat_start.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\softfloat\softfloat-compare.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\softfloat\softfloat-macros.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\softfloat\softfloat-round-pack.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\softfloat\softfloat-specialize.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\softfloat\softfloatx80.h">
+      <Filter>softfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_proc_gen.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_a.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_b.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_c.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_d.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_fpu.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_fpu_internal.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_i.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_internal.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_internal_xmm.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_j.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_l.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_l_xmm.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_m.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_m_xmm.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_n.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_p.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_r.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_s.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_cmd_s2.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_commands.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_context.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_core.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_core_impl.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_core_impl_xmm.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor_cpp.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_impl_init.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_specific.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_specific_xmm.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_streams.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_processor\diana_processor_win32_context.h">
+      <Filter>proc</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_patchers\diana_ultimate_patcher.h">
+      <Filter>patcher</Filter>
+    </ClInclude>
+    <ClInclude Include="diana_patchers\diana_ultimate_patcher_impl.h">
+      <Filter>patcher</Filter>
+    </ClInclude>
+    <ClInclude Include="libpdb\pdb.h">
+      <Filter>pdb</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="diana_custom_config.inc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="diana_processor\ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="softfloat">
+      <UniqueIdentifier>{7ad54d1e-7ab0-412c-afba-433abe46e04a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="proc">
+      <UniqueIdentifier>{2d4a1440-ece2-4804-a3aa-ef8ea9b145c3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="patcher">
+      <UniqueIdentifier>{633d2c9e-4df6-49ea-a66d-c83a3aba360f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="pdb">
+      <UniqueIdentifier>{23be18cc-1c0b-4443-8d41-893d12a4bfc7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

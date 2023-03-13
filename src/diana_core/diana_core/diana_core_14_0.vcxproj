@@ -176,6 +176,7 @@
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_32.c" />
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_64.c" />
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_impl.c" />
+    <ClCompile Include="diana_pdb.c" />
     <ClCompile Include="diana_pe.c" />
     <ClCompile Include="diana_pe_analyzer.c" />
     <ClCompile Include="diana_processor\diana_processor_cmd_a.c" />
@@ -223,6 +224,7 @@
     <ClCompile Include="diana_win32.c" />
     <ClCompile Include="diana_win32_executable_heap.c" />
     <ClCompile Include="diana_win32_sys_memcpy.c" />
+    <ClCompile Include="libpdb\pdb.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="diana_allocators.h" />
@@ -243,6 +245,7 @@
     <ClInclude Include="diana_patchers.h" />
     <ClInclude Include="diana_patchers\diana_ultimate_patcher.h" />
     <ClInclude Include="diana_patchers\diana_ultimate_patcher_impl.h" />
+    <ClInclude Include="diana_pdb.h" />
     <ClInclude Include="diana_pe.h" />
     <ClInclude Include="diana_pe_analyzer.h" />
     <ClInclude Include="diana_pe_cpp.h" />
@@ -299,6 +302,7 @@
     <ClInclude Include="diana_win32_cpp.h" />
     <ClInclude Include="diana_win32_executable_heap.h" />
     <ClInclude Include="diana_win32_sys_memcpy.h" />
+    <ClInclude Include="libpdb\pdb.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="diana_custom_config.inc" />
