@@ -17,6 +17,7 @@ static unsigned char lea5[] = {0x66, 0x8D, 0xBD, 0x40, 0xFF, 0xFF, 0xFF}; // lea
 static unsigned char lea6[] = {0x67, 0x66, 0x8D, 0x01};             // lea     ax,[bx+di] 
 static unsigned char lea7[] = {0x67, 0x66, 0x8D, 0xBD, 0x40, 0xFF}; // lea         di,[di+0000h] 
 static unsigned char lea8[] = {0x67, 0x45, 0x8d, 0x31};             // lea     r14d,[r9d]
+static unsigned char lea9[] = {0x48, 0x8D, 0x0D, 0x13, 0x00, 0x00, 0x00 };   // lea     r14d,[r9d]
 
 static void test_lea_impl()
 {
@@ -194,6 +195,27 @@ static void test_lea_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.index == 0);
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 4);
     }
+
+    iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE64, lea9, sizeof(lea9), Diana_GetRootLine(), &result, &read);
+    DIANA_TEST_ASSERT_IF(!iRes)
+    {
+        DIANA_TEST_ASSERT(result.iLinkedOpCount == 2);
+        DIANA_TEST_ASSERT(result.pInfo->m_operandCount == 2);
+        DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
+        DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "lea") == 0);
+        DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
+        DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_RCX);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 8);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RIP);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.dispValue == 0x13);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.dispSize == 4);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.indexed_reg == reg_none);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.index == 0);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 8);
+    }
+
 }
 
 void test_lea()

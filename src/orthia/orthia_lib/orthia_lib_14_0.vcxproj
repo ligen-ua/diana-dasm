@@ -142,7 +142,6 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="orhia_pe.cpp" />
     <ClCompile Include="orthia_allocators.cpp" />
     <ClCompile Include="orthia_common_format.cpp" />
     <ClCompile Include="orthia_common_print.cpp" />
@@ -159,11 +158,13 @@
     <ClCompile Include="orthia_memory_cache.cpp" />
     <ClCompile Include="orthia_module_manager.cpp" />
     <ClCompile Include="orthia_parser.cpp" />
+    <ClCompile Include="orthia_pe.cpp" />
     <ClCompile Include="orthia_plugin_interfaces.cpp" />
     <ClCompile Include="orthia_sha1.c" />
     <ClCompile Include="orthia_sqlite.cpp" />
     <ClCompile Include="orthia_stack_analyzer.cpp" />
     <ClCompile Include="orthia_streams.cpp" />
+    <ClCompile Include="orthia_text_manager.cpp" />
     <ClCompile Include="orthia_tokenizer.cpp" />
     <ClCompile Include="orthia_utils.cpp" />
     <ClCompile Include="orthia_vmlib.cpp" />
@@ -204,6 +205,7 @@
     <ClInclude Include="orthia_sqlite_utils.h" />
     <ClInclude Include="orthia_stack_analyzer.h" />
     <ClInclude Include="orthia_streams.h" />
+    <ClInclude Include="orthia_text_manager.h" />
     <ClInclude Include="orthia_tiny_xml.h" />
     <ClInclude Include="orthia_tokenizer.h" />
     <ClInclude Include="orthia_utils.h" />

@@ -469,7 +469,6 @@ unsigned int orthia_pcg32_random_r(orthia_pcg32_random * rng)
     return (xorshifted >> rot) | (xorshifted << ((0-rot) & 31));
 }
 
-
 static
 BOOL VerParseTranslationID(LPVOID lpData, UINT unBlockSize, WORD wLangId, DWORD* pdwId, BOOL bPrimaryEnough/*= FALSE*/)
 {
@@ -599,6 +598,129 @@ cleanup:
         FreeLibrary(hVersionDll);
     }
     return pResult;
+}
+
+// whitespace
+bool IsSpace(ORTHIA_TCHAR symbol)
+{
+    return symbol == L' ';
+}
+bool IsWhiteSpace(ORTHIA_TCHAR symbol)
+{
+    switch (symbol)
+    {
+    case L' ':
+    case 9:
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+bool IsWhiteSpace_Ansi(char symbol)
+{
+    switch (symbol)
+    {
+    case ' ':
+    case 9:
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+bool IsEOL(ORTHIA_TCHAR symbol)
+{
+    switch (symbol)
+    {
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+bool IsEOL_Ansi(char symbol)
+{
+    switch (symbol)
+    {
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+void TrimString(std::wstring& str)
+{
+    TrimStringIf(str, IsSpace);
+}
+void TrimString(std::string& str)
+{
+    TrimStringIf(str, IsSpace);
+}
+std::wstring TrimString2(const std::wstring& str)
+{
+    std::wstring str2(str);
+    TrimString(str2);
+    return str2;
+}
+std::string TrimString2(const std::string& str)
+{
+    std::string str2(str);
+    TrimString(str2);
+    return str2;
+}
+int TrimStringAllWhiteSpace(std::wstring& str)
+{
+    return TrimStringIf(str, IsWhiteSpace);
+}
+int TrimStringAllWhiteSpace(std::string& str)
+{
+    return TrimStringIf(str, IsWhiteSpace_Ansi);
+}
+
+void SplitStringWithoutWhitespace(const StringInfo& str,
+    const StringInfo& separator,
+    std::set<orthia::PlatformString_type>* pInfo)
+{
+    std::vector<StringInfo> info;
+    SplitString(str,
+        separator,
+        &info);
+
+    for (std::vector<StringInfo>::iterator it = info.begin(), it_end = info.end();
+        it != it_end;
+        ++it)
+    {
+        orthia::PlatformString_type tmp = it->ToString();
+        orthia::TrimStringAllWhiteSpace(tmp);
+        if (tmp.empty())
+            continue;
+        pInfo->insert(tmp);
+    }
+}
+
+void SplitStringWithoutWhitespace(const StringInfo& str_in,
+    const StringInfo& separator,
+    std::vector<orthia::PlatformString_type>* pInfo)
+{
+    orthia::PlatformString_type str(str_in.ToString());
+    orthia::TrimStringAllWhiteSpace(str);
+    std::vector<StringInfo> info;
+    SplitString(str,
+        separator,
+        &info);
+
+    for (std::vector<StringInfo>::iterator it = info.begin(), it_end = info.end();
+        it != it_end;
+        ++it)
+    {
+        orthia::PlatformString_type tmp = it->ToString();
+        orthia::TrimStringAllWhiteSpace(tmp);
+        if (tmp.empty())
+            continue;
+        pInfo->push_back(tmp);
+    }
+
 }
 
 }

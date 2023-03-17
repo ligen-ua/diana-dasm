@@ -1,5 +1,6 @@
 #ifndef ORTHIA_UTILS_H
 #define ORTHIA_UTILS_H
+struct IUnknown;
 
 #include "vector"
 #include "set"
@@ -18,6 +19,16 @@ namespace orthia
 {
 typedef ULONG64 Address_type;
 typedef diana::CWin32Exception CWin32Exception;
+
+#ifdef _WIN32
+
+typedef std::wstring PlatformString_type;
+typedef std::wstringstream PlatformStringStream_type;
+#define ORTHIA_TCSTR(X) L##X
+#define ORTHIA_TSTRNCMP(X1, X2, X3)  wcsncmp(X1, X2, X3)
+#define ORTHIA_TCHAR wchar_t
+
+#endif
 
 class CHandleGuard
 {
@@ -818,8 +829,205 @@ public:
     }
 };
 
+#ifdef _WIN32
+inline std::string PlatformStringToAcp(const std::wstring& wstr)
+{
+    return ToAnsiString_Silent(wstr, CP_ACP);
+}
+inline std::string PlatformStringToUtf8(const std::wstring& wstr)
+{
+    return Utf16ToUtf8(wstr);
+}
+#endif
 
 const wchar_t* QueryModuleVersion(HMODULE module);
+
+// whitespace
+template<class StringType>
+class CBaseValueListParser
+{
+public:
+    typedef StringType String_type;
+    typedef typename StringType::const_iterator ConstIterator_type;
+protected:
+    const String_type& m_name;
+    bool m_inSpecBlock;
+    ConstIterator_type m_curBlockStart;
+    String_type m_curPart;
+    int m_position;
+
+    virtual void OnDataProduced() = 0;
+
+    void Produce(ConstIterator_type it)
+    {
+        m_curPart.assign(m_curBlockStart, it);
+        orthia::TrimStringAllWhiteSpace(m_curPart);
+        if (!m_curPart.empty())
+        {
+            OnDataProduced();
+            ++m_position;
+        }
+        m_curBlockStart = it;
+        if (m_curBlockStart != m_name.end())
+        {
+            ++m_curBlockStart;
+        }
+    }
+public:
+    CBaseValueListParser(const String_type& name)
+        :
+        m_name(name),
+        m_inSpecBlock(false),
+        m_curBlockStart(name.begin()),
+        m_position(0)
+    {
+    }
+
+    virtual ~CBaseValueListParser()
+    {
+    }
+
+    void Parse()
+    {
+        for (ConstIterator_type it = m_name.begin(), it_end = m_name.end();
+            it != it_end;
+            ++it)
+        {
+            if (m_inSpecBlock)
+            {
+                if (*it == '\"')
+                {
+                    Produce(it);
+                    m_inSpecBlock = false;
+                }
+                continue;
+            }
+            // no spec block
+            if (*it == '\"' || *it == ',' || *it == ';')
+            {
+                Produce(it);
+                m_inSpecBlock = *it == '\"';
+            }
+        }
+        Produce(m_name.end());
+    }
+};
+template<class StringType>
+class CValueListParser :public CBaseValueListParser<StringType>
+{
+    std::map<StringType, int>* m_pValueList;
+
+    virtual void OnDataProduced()
+    {
+        m_pValueList->insert(std::make_pair(CBaseValueListParser<StringType>::m_curPart,
+            CBaseValueListParser<StringType>::m_position));
+    }
+public:
+    CValueListParser(const StringType& name,
+        std::map<StringType, int>* pValueList)
+        :
+        CBaseValueListParser<StringType>(name),
+        m_pValueList(pValueList)
+    {
+    }
+};
+template<class StringType>
+class CValueListParserToVector :public CBaseValueListParser<StringType>
+{
+    std::vector<StringType>* m_pValueList;
+
+    virtual void OnDataProduced()
+    {
+        m_pValueList->push_back(CBaseValueListParser<StringType>::m_curPart);
+    }
+public:
+    CValueListParserToVector(const StringType& name,
+        std::vector<StringType>* pValueList)
+        :
+        CBaseValueListParser<StringType>(name),
+        m_pValueList(pValueList)
+    {
+    }
+};
+
+template<class StringType>
+void ParseValueList(const StringType& name,
+    std::map<StringType, int>* pValueList)
+{
+    pValueList->clear();
+    CValueListParser<StringType> parser(name, pValueList);
+    parser.Parse();
+}
+template<class StringType>
+void ParseValueList(const StringType& valueList,
+    std::vector<StringType>* pValueList)
+{
+    pValueList->clear();
+    CValueListParserToVector<StringType> parser(valueList, pValueList);
+    parser.Parse();
+}
+
+bool IsSpace(ORTHIA_TCHAR symbol);
+bool IsWhiteSpace(ORTHIA_TCHAR symbol);
+bool IsWhiteSpace_Ansi(char symbol);
+bool IsEOL(ORTHIA_TCHAR symbol);
+inline bool IsEOL_Ansi(char symbol);
+
+template<class Predicate, class CharType>
+inline int TrimRightIf(std::basic_string<CharType>& str, Predicate pred)
+{
+    int count = 0;
+    for (;;)
+    {
+        if (str.empty())
+            return count;
+
+        if (!pred(*str.rbegin()))
+            break;
+
+        str.resize(str.size() - 1);
+        ++count;
+    }
+    return count;
+}
+template<class Predicate, class CharType>
+inline int TrimLeftIf(std::basic_string<CharType>& str, Predicate pred)
+{
+    int newStart = 0;
+    for (;;)
+    {
+        if (str.empty())
+            return 0;
+
+        if (!pred(str[newStart]))
+            break;
+
+        ++newStart;
+    }
+    str.erase(0, newStart);
+    return newStart;
+}
+template<class Predicate, class CharType>
+inline int TrimStringIf(std::basic_string<CharType>& str, Predicate pred)
+{
+    TrimRightIf(str, pred);
+    return TrimLeftIf(str, pred);
+}
+void TrimString(std::wstring& str);
+void TrimString(std::string& str);
+std::wstring TrimString2(const std::wstring& str);
+std::string TrimString2(const std::string& str);
+int TrimStringAllWhiteSpace(std::wstring& str);
+int TrimStringAllWhiteSpace(std::string& str);
+
+
+void SplitStringWithoutWhitespace(const StringInfo& str,
+    const StringInfo& separator,
+    std::set<orthia::PlatformString_type>* pInfo);
+
+void SplitStringWithoutWhitespace(const StringInfo& str_in,
+    const StringInfo& separator,
+    std::vector<orthia::PlatformString_type>* pInfo);
 
 }
 #endif 

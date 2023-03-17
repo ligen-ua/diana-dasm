@@ -534,11 +534,16 @@ DIANA_IMAGE_SECTION_HEADER * DianaPeFile_FindSection(Diana_PeFile * pPeFile,
                                                      int nameSize)
 {
     int i;
+    int maxSize = nameSize;
+    if (maxSize > DIANA_IMAGE_SIZEOF_SHORT_NAME)
+    {
+        maxSize = DIANA_IMAGE_SIZEOF_SHORT_NAME;
+    }
     for(i = 0; i < pPeFile->pImpl->capturedSectionCount; ++i)
     {
         DIANA_IMAGE_SECTION_HEADER * pSectionHeader = &pPeFile->pImpl->pCapturedSections[i];
         
-        if (strncmp((char*)pSectionHeader->Name, pSectionName, nameSize) == 0)
+        if (strncmp((char*)pSectionHeader->Name, pSectionName, maxSize) == 0)
         {
             return pSectionHeader;
         }
