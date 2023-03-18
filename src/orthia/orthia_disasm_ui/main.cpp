@@ -8,6 +8,16 @@ orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 
+
+class CMainWindow:public oui::Fullscreen<oui::SimpleBrush<oui::CWindow>>
+{
+public:
+    void ConstuctChilds() override
+    {
+
+    }
+};
+
 int main(int argc, const char* argv[])
 {
     std::cout << "Welcome to Orthia Disasm\n\n";
@@ -22,7 +32,7 @@ int main(int argc, const char* argv[])
 
         oui::CConsoleApp app;
 
-        auto rootWindow = std::make_shared<oui::ExitOnControlC<oui::Fullscreen<oui::SimpleBrush<oui::CWindow>>>>();
+        auto rootWindow = std::make_shared<CMainWindow>();
         rootWindow->SetForegroundColor(oui::ColorGray());
         app.Loop(rootWindow);
     }

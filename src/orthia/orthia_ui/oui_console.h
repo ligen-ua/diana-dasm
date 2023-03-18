@@ -24,7 +24,7 @@ namespace oui
         int TranslateColorEx(const Color& color, bool background);
     };
 
-    class CConsoleDrawAdapter
+    class CConsoleDrawAdapter:Noncopyable
     {
         Size m_size;
         std::vector<CHAR_INFO> m_buffer;
