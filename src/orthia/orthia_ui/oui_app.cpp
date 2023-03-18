@@ -58,21 +58,22 @@ namespace oui
 
         mainConsole.Init();
 
-        {
-            auto size = mainConsole.GetSize();
-            InputEvent initialEvent;
-            initialEvent.resizeEvent.valid = true;
-            initialEvent.resizeEvent.newWidth = size.width;
-            initialEvent.resizeEvent.newHeight = size.height;
-            rootWindow->ProcessEvent(initialEvent);
-        }
+        
+        auto consoleSize = mainConsole.GetSize();
+        InputEvent initialEvent;
+        initialEvent.resizeEvent.valid = true;
+        initialEvent.resizeEvent.newWidth = consoleSize.width;
+        initialEvent.resizeEvent.newHeight = consoleSize.height;
+        rootWindow->ProcessEvent(initialEvent);
+        
         DrawParameters parameters;
         for (; !m_pool->IsExitRequested(); )
         {
-            parameters.rect.size = mainConsole.GetSize();
-            parameters.console.StartDraw(parameters.rect.size, &mainConsole);
+            Rect rect;
+            rect.size = mainConsole.GetSize();
+            parameters.console.StartDraw(rect.size, &mainConsole);
 
-            rootWindow->DrawTo(parameters);
+            rootWindow->DrawTo(rect, parameters);
 
             if (!m_pool->GetFocus())
             {

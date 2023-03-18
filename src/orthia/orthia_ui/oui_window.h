@@ -14,6 +14,7 @@ namespace oui
         CWindowsPool();
         void RegisterWindow(std::shared_ptr<CWindow> window);
         void UnregisterWindow(CWindow* window);
+        std::shared_ptr<CWindow> GetWindow(CWindow* window);
 
         void SetFocus(std::shared_ptr<CWindow> window);
         std::shared_ptr<CWindow> GetFocus();
@@ -25,7 +26,6 @@ namespace oui
     struct InputEvent;
     struct DrawParameters
     {
-        Rect rect; 
         CConsoleDrawAdapter console;
     };
     class CWindow
@@ -40,6 +40,12 @@ namespace oui
         bool m_visible = true;
         bool m_valid = false;
 
+        std::list<std::shared_ptr<CWindow>> m_childs;
+
+        void RemoveChild(CWindow* child);
+        void AddChild(std::shared_ptr<CWindow> child);
+
+        virtual void ConstuctChilds();
     public:
         CWindow();
         virtual ~CWindow();
@@ -69,10 +75,15 @@ namespace oui
         virtual void Resize(const Size& newSize);
 
         // draw stuff
-        virtual void DrawTo(DrawParameters & parameters);
+        virtual void DrawTo(const Rect& rect, DrawParameters & parameters);
         virtual void Invalidate(bool valid = false);
         virtual bool IsValid() const;
 
         virtual bool ProcessEvent(InputEvent& evt);
+
+        // paint
+        virtual void DoPaint(const Rect& rect, DrawParameters& parameters);
+
+        std::shared_ptr<CWindow> GetPtr();
     };
 }

@@ -39,13 +39,9 @@ namespace oui
         {
             m_color = color;
         }
-        void DrawTo(DrawParameters& parameters) override
+        void DoPaint(const Rect& rect, DrawParameters& parameters) override
         {
-            if (!this->IsValid())
-            {
-                parameters.console.PaintRect(parameters.rect, m_color, false);
-                this->Invalidate(true);
-            }
+            parameters.console.PaintRect(rect, m_color, false);
         }
     };
 
