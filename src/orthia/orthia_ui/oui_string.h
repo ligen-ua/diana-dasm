@@ -6,7 +6,10 @@ namespace oui
 {
     struct String
     {
+#ifdef _WIN32
         std::wstring native;
-        std::string utf8;
+#else
+        std::string native;
+#endif
     };
 }

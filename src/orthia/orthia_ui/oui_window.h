@@ -1,6 +1,6 @@
 #pragma once
 
-#include "oui_base.h"
+#include "oui_console.h"
 
 namespace oui
 {
@@ -9,6 +9,7 @@ namespace oui
     {
         std::unordered_map<CWindow*, std::shared_ptr<CWindow>> m_allWindows;
         std::shared_ptr<CWindow> m_focused;
+        std::atomic<bool> m_exitRequested = false;
     public:
         CWindowsPool();
         void RegisterWindow(std::shared_ptr<CWindow> window);
@@ -16,11 +17,17 @@ namespace oui
 
         void SetFocus(std::shared_ptr<CWindow> window);
         std::shared_ptr<CWindow> GetFocus();
+    
+        void ExitLoop();
+        bool IsExitRequested() const;
     };
 
     struct InputEvent;
-    class CConsole;
-
+    struct DrawParameters
+    {
+        Rect rect; 
+        CConsoleDrawAdapter console;
+    };
     class CWindow
     {
     protected:
@@ -34,7 +41,7 @@ namespace oui
         bool m_valid = false;
 
     public:
-        explicit CWindow(bool visible = true);
+        CWindow();
         virtual ~CWindow();
 
         // init
@@ -62,10 +69,10 @@ namespace oui
         virtual void Resize(const Size& newSize);
 
         // draw stuff
-        virtual void DrawTo(const Rect& rect, CConsole& console);
+        virtual void DrawTo(DrawParameters & parameters);
         virtual void Invalidate(bool valid = false);
         virtual bool IsValid() const;
 
-        virtual void ProcessEvent(InputEvent& evt);
+        virtual bool ProcessEvent(InputEvent& evt);
     };
 }

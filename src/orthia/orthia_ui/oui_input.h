@@ -17,14 +17,20 @@ namespace oui
         int newHeight = 0;
     };
 
+    struct KeyboardEvent
+    {
+        bool valid = false;
+        String rawText;
+        VirtualKey virtualKey;
+    };
+
     struct InputEvent
     {
         // common fields
         KeyState keyState;
 
         // keyboard events
-        String rawText;
-        VirtualKey virtualKey;
+        KeyboardEvent keyEvent;
 
         // mouse
         MouseEvent mouse;
@@ -32,10 +38,8 @@ namespace oui
         // console 
         ResizeEvent resizeEvent;
     };
-    class CConsoleInputReader
-    {
-    public:
-        CConsoleInputReader();
-        bool Read(std::vector<InputEvent>& input);
-    };
 }
+
+#if defined(_WIN32)
+#include "oui_input_win32.h"
+#endif

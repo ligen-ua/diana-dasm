@@ -28,11 +28,17 @@ namespace oui
     {
         return m_focused;
     }
+    void CWindowsPool::ExitLoop()
+    {
+        m_exitRequested = true;
+    }
+    bool CWindowsPool::IsExitRequested() const
+    {
+        return m_exitRequested;
+    }
 
     // CWindow
-    CWindow::CWindow(bool visible)
-        :
-            m_visible(visible)
+    CWindow::CWindow()
     {
 
     }
@@ -110,7 +116,7 @@ namespace oui
     }
 
     // draw stuff
-    void CWindow::DrawTo(const Rect& rect, CConsole& console)
+    void CWindow::DrawTo(DrawParameters& parameters)
     {
 
     }
@@ -123,9 +129,9 @@ namespace oui
         return m_valid;
     }
 
-    void CWindow::ProcessEvent(InputEvent& evt)
+    bool CWindow::ProcessEvent(InputEvent& evt)
     {
-
+        return false;
     }
 
 }
