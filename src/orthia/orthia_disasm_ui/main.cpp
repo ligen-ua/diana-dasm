@@ -2,19 +2,33 @@
 #include "orthia_text_manager.h"
 #include "orthia_model.h"
 #include "oui_app.h"
+#include <iostream>
 
 orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 
-int main(int argc, const char* argv[]) 
+int main(int argc, const char* argv[])
 {
-    orthia::CProgramModel programModel;
+    std::cout << "Welcome to Orthia Disasm\n\n";
 
-    g_textManager = new orthia::CTextManager();
-    InitLanguage_EN(g_textManager);
+    try
+    {
+        orthia::CProgramModel programModel;
+        std::cout.flush();
 
-    oui::CConsoleApp app;
-    app.Loop(std::make_shared<oui::CWindow>());
+        g_textManager = new orthia::CTextManager();
+        InitLanguage_EN(g_textManager);
+
+        oui::CConsoleApp app;
+
+        auto rootWindow = std::make_shared<oui::ExitOnControlC<oui::Fullscreen<oui::SimpleBrush<oui::CWindow>>>>();
+        rootWindow->SetForegroundColor(oui::ColorGray());
+        app.Loop(rootWindow);
+    }
+    catch (const std::exception& err)
+    {
+        std::cerr << "Error: " << err.what() << "\n";
+    }
     return 0;
 }
