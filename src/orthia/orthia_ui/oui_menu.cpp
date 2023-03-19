@@ -16,12 +16,23 @@ namespace oui
 
     void CMenuButtonWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
-        MenuButtonProfile* profile = &m_menuColorProfile->normal;
-        if (m_selected)
+        auto parent = GetParent();
+        if (!parent)
         {
-            profile = &m_menuColorProfile->selected;
+            return;
         }
-
+        auto parentMenu = static_cast<CMenuWindow*>(parent.get());
+        bool menuFocused = parentMenu->IsActive();
+        MenuButtonProfile* profile = &m_menuColorProfile->normal;
+        if (menuFocused)
+        {
+            auto selectedButton = parentMenu->GetSelectedButton();
+            if (selectedButton.get() == this)
+            {
+                // oh, me is selected, this is nice 
+                profile = &m_menuColorProfile->selected;
+            }
+        }
         const auto size = GetSize();
         parameters.console.PaintRect(rect, profile->buttonBackground, false);
 
@@ -96,5 +107,42 @@ namespace oui
     std::shared_ptr<MenuColorProfile> CMenuWindow::GetColorProfile()
     {
         return m_menuColorProfile;
+    }
+
+    std::shared_ptr<CMenuButtonWindow>  CMenuWindow::GetSelectedButton()
+    {
+        if (m_selectedButtonIndex < 0 || m_selectedButtonIndex >= m_buttons.size())
+        {
+            return 0;
+        }
+        return m_buttons[m_selectedButtonIndex];
+    }
+    void CMenuWindow::SetSelectedButtonIndex(int index)
+    {
+        m_selectedButtonIndex = index;
+    }
+    int CMenuWindow::GetSelectedButtonIndex() const
+    {
+        return m_selectedButtonIndex;
+    }
+
+    bool CMenuWindow::ProcessEvent(oui::InputEvent& evt) 
+    {
+        auto pool = GetPool();
+        if (!pool)
+        {
+            return false;
+        }
+        if (evt.keyEvent.valid)
+        {
+            switch (evt.keyEvent.virtualKey)
+            {
+            case oui::VirtualKey::Escape:
+                pool->SetFocus(0);
+                Invalidate();
+                break;
+            }
+        }
+        return true;
     }
 }

@@ -16,7 +16,7 @@ namespace oui
         void UnregisterWindow(CWindow* window);
         std::shared_ptr<CWindow> GetWindow(CWindow* window);
 
-        void SetFocus(std::shared_ptr<CWindow> window);
+        void SetFocus(std::shared_ptr<CWindow> window, bool invalidate = true);
         std::shared_ptr<CWindow> GetFocus();
     
         void ExitLoop();
@@ -39,6 +39,8 @@ namespace oui
 
         bool m_visible = true;
         bool m_valid = false;
+
+        bool m_active = false;
 
         std::list<std::shared_ptr<CWindow>> m_childs;
         std::function<void()> m_onResize = nullptr;
@@ -97,5 +99,11 @@ namespace oui
         virtual void DoPaint(const Rect& rect, DrawParameters& parameters);
 
         std::shared_ptr<CWindow> GetPtr();
+        std::shared_ptr<CWindowsPool> GetPool();
+
+        virtual void Activate();
+        virtual void Deactivate();
+        virtual bool IsActive() const;
+
     };
 }

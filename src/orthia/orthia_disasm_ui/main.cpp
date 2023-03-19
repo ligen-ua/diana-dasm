@@ -21,18 +21,53 @@ public:
         m_menu = AddChild_t(std::make_shared<oui::CMenuWindow>());
         m_menu->SetBackgroundColor(oui::ColorBlack());
         
-
         m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("file")), []() {});
         m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("workspace")), []() {});
         m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("view")), []() {});
         m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("help")), []() {});
-
 
         SetOnResize([&]() { 
             
             m_menu->Dock();
         });
     }
+
+    bool ProcessEvent(oui::InputEvent& evt) override
+    {
+        auto pool = GetPool();
+        if (!pool)
+        {
+            return false;
+        }
+        oui::Fullscreen<oui::CWindow>::ProcessEvent(evt);
+        if (evt.keyEvent.valid)
+        {
+            if (auto focused = pool->GetFocus())
+            {
+                if (focused->ProcessEvent(evt))
+                {
+                    return true;
+                }
+            }
+            
+            // no focused or focused couldn't process this, check hotkeys
+            if ((evt.keyState.state & evt.keyState.AnyAlt) && !(evt.keyState.state & evt.keyState.AnyCtrl))
+            {
+                if (evt.keyEvent.rawText.native.empty())
+                {
+                    switch (evt.keyEvent.virtualKey)
+                    {
+                    case oui::VirtualKey::None:
+                        // just alt, set focus to menu
+                        pool->SetFocus(m_menu);
+                        break;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
 };
 
 int main(int argc, const char* argv[])

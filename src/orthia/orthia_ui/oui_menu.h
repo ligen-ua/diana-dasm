@@ -12,7 +12,6 @@ namespace oui
         String m_caption;
         std::function<void()> m_handler;
         int m_spaceAroundName = 2;
-        bool m_selected = false;
     public:
         CMenuButtonWindow(const String& caption,
             std::function<void()> handler,
@@ -27,9 +26,11 @@ namespace oui
     class CMenuWindow:public oui::SimpleBrush<CWindow>
     {
         std::vector<std::shared_ptr<CMenuButtonWindow>> m_buttons;
+        // ui
         int m_initialSpace = 2;
         int m_spaceBetweenButtons = 0;
-
+        
+        int m_selectedButtonIndex = 0;
         std::shared_ptr<MenuColorProfile> m_menuColorProfile;
     public:
         CMenuWindow();
@@ -39,6 +40,12 @@ namespace oui
         void Dock();
         std::shared_ptr<MenuColorProfile> GetColorProfile();
 
+        std::shared_ptr<CMenuButtonWindow>  GetSelectedButton();
+        
+        void SetSelectedButtonIndex(int index);
+        int GetSelectedButtonIndex() const;
+
+        bool ProcessEvent(oui::InputEvent& evt) override;
     };
 
 }

@@ -234,7 +234,7 @@ namespace oui
         int linesCount = rect.size.height;
         DWORD rowLength = rect.size.width;
 
-        int xend = std::min((int)rect.size.width, (int)rowLength + rect.position.x);
+        int xend = std::min((int)m_size.width, (int)rowLength + rect.position.x);
         CHAR_INFO* lineData = rawData + m_size.width * rect.position.y;
         for (int i = rect.position.y; i < linesCount; ++i, lineData += m_size.width)
         {
