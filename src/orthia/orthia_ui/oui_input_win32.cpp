@@ -118,9 +118,7 @@ namespace oui
             if (raw.Event.KeyEvent.uChar.UnicodeChar)
             {
                 evt.keyEvent.rawText.native.append(&raw.Event.KeyEvent.uChar.UnicodeChar, 1);
-                return true;
             }
-            return false;
         }
         return true;
     }

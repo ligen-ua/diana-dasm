@@ -29,9 +29,13 @@ namespace oui
         return it->second;
     }
 
-    void CWindowsPool::SetFocus(std::shared_ptr<CWindow> window)
+    void CWindowsPool::SetFocus(std::shared_ptr<CWindow> window, bool invalidate)
     {
         m_focused = window;
+        if (window)
+        {
+            window->Invalidate();
+        }
     }
     std::shared_ptr<CWindow> CWindowsPool::GetFocus()
     {
@@ -64,6 +68,11 @@ namespace oui
         {
             parent->Invalidate();
         }
+    }
+
+    std::shared_ptr<CWindowsPool> CWindow::GetPool()
+    {
+        return m_pool.lock();
     }
 
     std::shared_ptr<CWindow> CWindow::GetPtr()
@@ -118,7 +127,18 @@ namespace oui
     {
         m_visible = value;
     }
-
+    void CWindow::Activate()
+    {
+        m_active = true;
+    }
+    void CWindow::Deactivate()
+    {
+        m_active = false;
+    }
+    bool CWindow::IsActive() const
+    {
+        return m_active || IsFocused();
+    }
     bool CWindow::IsFocused() const
     {
         if (auto poolPtr = m_pool.lock())
