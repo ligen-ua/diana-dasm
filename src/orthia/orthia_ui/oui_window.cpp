@@ -217,7 +217,9 @@ namespace oui
     }
     Rect CWindow::GetClientRect() const
     {
-        return { m_position, m_size };
+        {
+            return { {0, 0}, m_size};
+        }
     }
     void CWindow::Resize(const Size& newSize)
     {
