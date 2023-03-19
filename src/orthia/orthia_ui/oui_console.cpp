@@ -256,7 +256,7 @@ namespace oui
         lineData[xend - 1].Char.UnicodeChar = L'╗';
 
         lineData += m_size.width;
-        for (int i = rect.position.y + 1; i < linesCount - 1; ++i, lineData += m_size.width)
+        for (int i = 0; i < linesCount - 2; ++i, lineData += m_size.width)
         {
             DWORD charsWritten = 0;
 

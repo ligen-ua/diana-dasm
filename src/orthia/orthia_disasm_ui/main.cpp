@@ -10,7 +10,7 @@ orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 
 
-class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
+class CMainWindow:public oui::WithBorder<oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>>
 {
     std::shared_ptr<oui::CMenuWindow> m_menu;
 public:

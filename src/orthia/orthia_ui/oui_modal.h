@@ -5,7 +5,7 @@
 
 namespace oui
 {
-    class CModalWindow:public WithBorder<CWindow>
+    class CModalWindow:public CWindow
     {
         std::weak_ptr<CWindow> m_prevFocus;
 
@@ -13,11 +13,9 @@ namespace oui
         void OnInit(std::shared_ptr<CWindowsPool> pool);
 
     public:
-        CModalWindow(const Point& position, const Size& size);
+        CModalWindow();
 
         bool ProcessEvent(oui::InputEvent& evt) override;
-        
-        void ConstuctChilds() override;
         void FinishDialog();
     };
 }

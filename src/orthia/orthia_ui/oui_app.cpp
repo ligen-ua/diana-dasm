@@ -23,7 +23,7 @@ namespace oui
 
     void CConsoleApp::Loop(std::shared_ptr<CWindow> rootWindow)
     {
-        m_pool->RegisterWindow(rootWindow);
+        m_pool->RegisterRootWindow(rootWindow);
         rootWindow->Init(m_pool);
 
         oui::CConsole mainConsole;

@@ -2,6 +2,7 @@
 
 #include "oui_window.h"
 #include "oui_win_styles.h"
+#include "oui_modal.h"
 
 namespace oui
 {
@@ -22,7 +23,12 @@ namespace oui
         void Dock();
     };
 
-    
+    class CMenuPopup:public WithBorder<SimpleBrush<CModalWindow>>
+    {
+    public:
+        CMenuPopup();
+    };
+
     class CMenuWindow:public oui::SimpleBrush<CWindow>
     {
         std::vector<std::shared_ptr<CMenuButtonWindow>> m_buttons;
@@ -34,6 +40,10 @@ namespace oui
         std::shared_ptr<MenuColorProfile> m_menuColorProfile;
     
         std::weak_ptr<CWindow> m_prevFocus;
+
+        std::shared_ptr<CMenuPopup> m_currentPopup;
+
+        void OpenPopup();
     public:
         CMenuWindow();
         void AddButton(const String& caption,

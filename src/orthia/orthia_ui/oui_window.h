@@ -10,8 +10,11 @@ namespace oui
         std::unordered_map<CWindow*, std::shared_ptr<CWindow>> m_allWindows;
         std::shared_ptr<CWindow> m_focused;
         std::atomic<bool> m_exitRequested = false;
+
+        std::shared_ptr<CWindow> m_rootWindow;
     public:
         CWindowsPool();
+        void RegisterRootWindow(std::shared_ptr<CWindow> window);
         void RegisterWindow(std::shared_ptr<CWindow> window);
         void UnregisterWindow(CWindow* window);
         std::shared_ptr<CWindow> GetWindow(CWindow* window);
@@ -21,6 +24,7 @@ namespace oui
     
         void ExitLoop();
         bool IsExitRequested() const;
+        std::shared_ptr<CWindow> GetRootWindow();
     };
 
     struct InputEvent;
@@ -46,7 +50,6 @@ namespace oui
         std::function<void()> m_onResize = nullptr;
 
         void RemoveChild(CWindow* child);
-        void AddChild(std::shared_ptr<CWindow> child);
 
         virtual void ConstuctChilds();
         virtual void OnResize();
@@ -66,6 +69,7 @@ namespace oui
 
         // init
         virtual void Init(std::shared_ptr<CWindowsPool> pool);
+        virtual void Init(std::shared_ptr<CWindow> parent);
         void SetOnResize(std::function<void()> fnc);
 
         virtual void SetParent(std::shared_ptr<CWindow> parent);
@@ -77,6 +81,7 @@ namespace oui
         virtual void SetVisible(bool value);
 
         // focused
+        virtual void SetFocus();
         virtual bool IsFocused() const;
 
         // destroy
@@ -109,5 +114,8 @@ namespace oui
         virtual void Deactivate();
         virtual bool IsActive() const;
         virtual bool IsActiveOrFocused() const;
+
+        std::shared_ptr<CWindow> GetRootWindow();
+        void AddChild(std::shared_ptr<CWindow> child);
     };
 }

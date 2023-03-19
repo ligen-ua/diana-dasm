@@ -7,6 +7,11 @@ namespace oui
     {
 
     }
+    void CWindowsPool::RegisterRootWindow(std::shared_ptr<CWindow> window)
+    {
+        m_rootWindow = window;
+        RegisterWindow(window);
+    }
     void CWindowsPool::RegisterWindow(std::shared_ptr<CWindow> window)
     {
         m_allWindows.insert(std::make_pair(window.get(), window));
@@ -55,6 +60,10 @@ namespace oui
     bool CWindowsPool::IsExitRequested() const
     {
         return m_exitRequested;
+    }
+    std::shared_ptr<CWindow> CWindowsPool::GetRootWindow()
+    {
+        return m_rootWindow;
     }
 
     // CWindow
@@ -111,6 +120,13 @@ namespace oui
     void CWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
     }
+    void CWindow::Init(std::shared_ptr<CWindow> parent)
+    {
+        if (auto pool = parent->GetPool())
+        {
+            Init(pool);
+        }
+    }
     void CWindow::Init(std::shared_ptr<CWindowsPool> pool)
     {
         m_pool = pool;
@@ -156,6 +172,16 @@ namespace oui
     {
         return m_active || IsFocused();
     }
+    void CWindow::SetFocus()
+    {
+        if (auto poolPtr = m_pool.lock())
+        {
+            if (auto me = GetPtr())
+            {
+                poolPtr->SetFocus(me);
+            }
+        }
+    }
 
     bool CWindow::IsFocused() const
     {
@@ -190,6 +216,7 @@ namespace oui
         if (auto parent = GetParent())
         {
             parent->RemoveChild(this);
+            parent->Invalidate();
         }
         if (auto poolPtr = m_pool.lock())
         {
@@ -306,6 +333,14 @@ namespace oui
     }
     void CWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
+    }
 
+    std::shared_ptr<CWindow> CWindow::GetRootWindow()
+    {
+        if (auto pool = GetPool())
+        {
+            return pool->GetRootWindow();
+        }
+        return nullptr;
     }
 }
