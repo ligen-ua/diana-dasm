@@ -53,6 +53,12 @@ namespace oui
         this->Resize(size);
     }
    
+    // CMenuPopup
+    CMenuPopup::CMenuPopup()
+    {
+
+    }
+
     // CMenuWindow
     CMenuWindow::CMenuWindow()
     {
@@ -162,8 +168,7 @@ namespace oui
             switch (evt.keyEvent.virtualKey)
             {
             case oui::VirtualKey::Escape:
-                pool->SetFocus(0);
-                Invalidate();
+                Deactivate();
                 return true;
             case oui::VirtualKey::Left:
                 ShiftSelectedButtonIndex(-1);
@@ -177,6 +182,7 @@ namespace oui
             case oui::VirtualKey::Down:
             case oui::VirtualKey::Enter:
                 // TODO: go to submenu
+                this->OpenPopup();
                 return true;
             }
         }
@@ -189,11 +195,39 @@ namespace oui
     void CMenuWindow::Deactivate()
     {
         auto pool = GetPool();
+        if (m_currentPopup)
+        {
+            m_currentPopup->Destroy();
+            m_currentPopup = nullptr;
+        }
         if (pool)
         {
             pool->SetFocus(m_prevFocus.lock());
             m_prevFocus.reset();
         }
         CWindow::Deactivate();
+    }
+    void CMenuWindow::OpenPopup()
+    {
+        std::shared_ptr<CMenuButtonWindow> selectedButton = GetSelectedButton();
+        if (!selectedButton)
+        {
+            return;
+        }
+        auto rootWindow = this->GetParent();
+        if (!rootWindow)
+        {
+            return;
+        }
+        auto myBosition = GetPosition();
+        auto buttonPosition = selectedButton->GetPosition();
+        Size size = {20, 10};
+        Point popupPosition = { buttonPosition.x, myBosition.y + 1};
+        m_currentPopup = std::make_shared<CMenuPopup>();
+        m_currentPopup->MoveTo(popupPosition);
+        m_currentPopup->Resize(size);
+        rootWindow->AddChild(m_currentPopup);
+        m_currentPopup->Init(rootWindow);
+        m_currentPopup->SetFocus();
     }
 }

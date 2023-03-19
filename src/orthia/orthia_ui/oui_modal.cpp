@@ -3,10 +3,8 @@
 namespace oui
 {
 
-    CModalWindow::CModalWindow(const Point& position, const Size& size)
+    CModalWindow::CModalWindow()
     {
-        m_position = position;
-        m_size = size;
     }
 
     void CModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
@@ -27,7 +25,7 @@ namespace oui
     }
     bool CModalWindow::ProcessEvent(oui::InputEvent& evt)
     {
-        if (!WithBorder<CWindow>::ProcessEvent(evt))
+        if (!CWindow::ProcessEvent(evt))
         {
             if (evt.keyEvent.valid)
             {
