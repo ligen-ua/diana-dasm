@@ -28,7 +28,7 @@ namespace oui
     {
         CConsoleDrawAdapter console;
     };
-    class CWindow
+    class CWindow:Noncopyable
     {
     protected:
         std::weak_ptr<CWindow> m_parent;
@@ -41,20 +41,32 @@ namespace oui
         bool m_valid = false;
 
         std::list<std::shared_ptr<CWindow>> m_childs;
+        std::function<void()> m_onResize = nullptr;
 
         void RemoveChild(CWindow* child);
         void AddChild(std::shared_ptr<CWindow> child);
 
         virtual void ConstuctChilds();
+        virtual void OnResize();
+
+        template<class Type>
+        Type AddChild_t(Type child)
+        {
+            AddChild(child);
+            return child;
+        }
+
     public:
         CWindow();
         virtual ~CWindow();
 
         // init
-        virtual void Init(std::weak_ptr<CWindowsPool> pool);
+        virtual void Init(std::shared_ptr<CWindowsPool> pool);
+        void SetOnResize(std::function<void()> fnc);
 
-        virtual void SetParent(std::weak_ptr<CWindow> parent);
-        virtual std::weak_ptr<CWindow> GetParent();
+        virtual void SetParent(std::shared_ptr<CWindow> parent);
+        virtual std::shared_ptr<CWindow> GetParent();
+
 
         // visible
         virtual bool IsVisible() const;
@@ -75,7 +87,7 @@ namespace oui
         virtual void Resize(const Size& newSize);
 
         // draw stuff
-        virtual void DrawTo(const Rect& rect, DrawParameters & parameters);
+        virtual void DrawTo(const Rect& rect, DrawParameters & parameters, bool force);
         virtual void Invalidate(bool valid = false);
         virtual bool IsValid() const;
 

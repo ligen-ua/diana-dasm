@@ -23,6 +23,7 @@ namespace oui
 
     void CConsoleApp::Loop(std::shared_ptr<CWindow> rootWindow)
     {
+        m_pool->RegisterWindow(rootWindow);
         rootWindow->Init(m_pool);
 
         oui::CConsole mainConsole;
@@ -73,7 +74,7 @@ namespace oui
             rect.size = mainConsole.GetSize();
             parameters.console.StartDraw(rect.size, &mainConsole);
 
-            rootWindow->DrawTo(rect, parameters);
+            rootWindow->DrawTo(rect, parameters, false);
 
             if (!m_pool->GetFocus())
             {

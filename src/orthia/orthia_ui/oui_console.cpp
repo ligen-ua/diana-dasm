@@ -146,6 +146,65 @@ namespace oui
     }
 
     // CConsoleDrawAdapter
+    void CConsoleDrawAdapter::PaintText(const Point& position,
+        Color textColor,
+        Color textBgColor,
+        const String& text,
+        String::char_type hotkeySymbol,
+        Color highlightTextColor,
+        Color highlightTextBgColor)
+    {
+        String::char_type hotkeySymbolTmp = hotkeySymbol;
+        if (position.x >= m_size.width)
+        {
+            return;
+        }
+        if (position.y >= m_size.height)
+        {
+            return;
+        }
+        CHAR_INFO* rawData = m_buffer.data();
+
+        const int frontColor = m_console->TranslateColorEx(textColor, false);
+        const int backColor = m_console->TranslateColorEx(textBgColor, true);
+        const int normalAttributes = frontColor | backColor;
+
+        int highFrontColor = 0; 
+        int highBackColor = 0; 
+        int highAttributes = 0; 
+
+        int currentAttributes = normalAttributes;
+
+        if (hotkeySymbol)
+        {
+            highFrontColor = m_console->TranslateColorEx(highlightTextColor, false);
+            highBackColor = m_console->TranslateColorEx(highlightTextBgColor, true);
+            highAttributes = highFrontColor | highBackColor;
+        }
+
+        CHAR_INFO* lineData = rawData + m_size.width * position.y;
+        int xend = std::min((int)m_size.width, (int)text.native.size() + position.x);
+
+        auto textPtr = text.native.c_str();
+        for (CHAR_INFO* p = lineData + position.x, *p_end = lineData + xend; p < p_end; ++p, ++textPtr)
+        {
+            if (!*textPtr)
+            {
+                break;
+            }
+            if (*textPtr == hotkeySymbolTmp)
+            {
+                hotkeySymbolTmp = 0;
+                --p;
+                currentAttributes = highAttributes;;
+                continue;
+            }
+            p->Attributes = currentAttributes;
+            p->Char.UnicodeChar = *textPtr;
+            currentAttributes = normalAttributes;
+        }
+    }
+
     void CConsoleDrawAdapter::PaintRect(const Rect& rect_in,
         Color background,
         bool keepText)

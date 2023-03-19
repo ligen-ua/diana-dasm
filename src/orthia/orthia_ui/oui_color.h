@@ -76,4 +76,18 @@ namespace oui
     Color ColorBrightMagenta();
     Color ColorBrightYellow();
     Color ColorBrightWhite();
+
+    struct MenuButtonProfile
+    {
+        Color buttonText;
+        Color buttonBackground;
+        Color buttonHotkeyText;
+    };
+    struct MenuColorProfile
+    {
+        Color backgroundColor;
+        MenuButtonProfile normal;
+        MenuButtonProfile selected;
+    };
+    void InitDefaultColorProfile(MenuColorProfile& profile);
 }

@@ -2,6 +2,8 @@
 
 #include "oui_base.h"
 #include "oui_color.h"
+#include "oui_string.h"
+
 #include "windows.h"
 
 namespace oui
@@ -33,6 +35,15 @@ namespace oui
         void PaintRect(const Rect& rect,
             Color background,
             bool keepText);
+
+        void PaintText(const Point& position,
+            Color textColor,
+            Color textBgColor,
+            const String& text,
+            String::char_type hotkeySymbol = 0,
+            Color highlightTextColor = Color(),
+            Color highlightTextBgColor = Color()
+            );
 
         void StartDraw(Size size, 
             CConsole* console);

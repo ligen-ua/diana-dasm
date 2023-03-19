@@ -11,5 +11,21 @@ namespace oui
 #else
         std::string native;
 #endif
+        typedef typename decltype(native)::value_type char_type;
+        typedef decltype(native) string_type;
+
+        String()
+        {
+        }
+        String(const string_type& str)
+            :
+            native(str)
+        {
+        }
+        String(const char_type * p)
+            :
+            native(p)
+        {
+        }
     };
 }

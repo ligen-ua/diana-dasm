@@ -35,7 +35,7 @@ namespace oui
     protected:
         Color m_color;
     public:
-        void SetForegroundColor(Color color)
+        void SetBackgroundColor(Color color)
         {
             m_color = color;
         }
