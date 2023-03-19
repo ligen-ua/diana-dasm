@@ -36,6 +36,9 @@
     <ClCompile Include="oui_menu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="oui_modal.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="oui_app.h">
@@ -72,6 +75,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_menu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="oui_modal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

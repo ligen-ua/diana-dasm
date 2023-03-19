@@ -32,6 +32,8 @@ namespace oui
         
         int m_selectedButtonIndex = 0;
         std::shared_ptr<MenuColorProfile> m_menuColorProfile;
+    
+        std::weak_ptr<CWindow> m_prevFocus;
     public:
         CMenuWindow();
         void AddButton(const String& caption,
@@ -44,8 +46,13 @@ namespace oui
         
         void SetSelectedButtonIndex(int index);
         int GetSelectedButtonIndex() const;
+        void ShiftSelectedButtonIndex(int difference);
 
         bool ProcessEvent(oui::InputEvent& evt) override;
+
+        void SetPrevFocus(std::shared_ptr<CWindow> prevFocus);
+        void Activate() override;
+        void Deactivate() override;
     };
 
 }

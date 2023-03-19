@@ -10,7 +10,7 @@ orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 
 
-class CMainWindow:public oui::Fullscreen<oui::CWindow>
+class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
 {
     std::shared_ptr<oui::CMenuWindow> m_menu;
 public:
@@ -41,15 +41,7 @@ public:
         }
         oui::Fullscreen<oui::CWindow>::ProcessEvent(evt);
         if (evt.keyEvent.valid)
-        {
-            if (auto focused = pool->GetFocus())
-            {
-                if (focused->ProcessEvent(evt))
-                {
-                    return true;
-                }
-            }
-            
+        {            
             // no focused or focused couldn't process this, check hotkeys
             if ((evt.keyState.state & evt.keyState.AnyAlt) && !(evt.keyState.state & evt.keyState.AnyCtrl))
             {
@@ -59,9 +51,24 @@ public:
                     {
                     case oui::VirtualKey::None:
                         // just alt, set focus to menu
+                        if (m_menu->IsActive())
+                        {
+                            m_menu->Deactivate();
+                            return true;
+                        }
+                        m_menu->SetPrevFocus(pool->GetFocus());
+                        m_menu->Activate();
                         pool->SetFocus(m_menu);
-                        break;
+                        return true;
                     }
+                }
+            }
+
+            if (auto focused = pool->GetFocus())
+            {
+                if (focused->ProcessEvent(evt))
+                {
+                    return true;
                 }
             }
         }

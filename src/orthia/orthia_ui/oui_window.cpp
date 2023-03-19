@@ -19,6 +19,13 @@ namespace oui
         }
         m_allWindows.erase(window);
     }
+    void PushFocus(std::shared_ptr<CWindow> window, bool invalidate)
+    {
+    }
+    void PopFocus()
+    {
+
+    }
     std::shared_ptr<CWindow> CWindowsPool::GetWindow(CWindow* window)
     {
         auto it = m_allWindows.find(window);
@@ -101,10 +108,14 @@ namespace oui
     {
         m_onResize = fnc;
     }
+    void CWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
+    {
+    }
     void CWindow::Init(std::shared_ptr<CWindowsPool> pool)
     {
         m_pool = pool;
         ConstuctChilds();
+        OnInit(pool);
         for (auto& child : m_childs)
         {
             child->Init(pool);
@@ -130,15 +141,22 @@ namespace oui
     void CWindow::Activate()
     {
         m_active = true;
+        Invalidate();
     }
     void CWindow::Deactivate()
     {
         m_active = false;
+        Invalidate();
     }
     bool CWindow::IsActive() const
     {
+        return m_active;
+    }
+    bool CWindow::IsActiveOrFocused() const
+    {
         return m_active || IsFocused();
     }
+
     bool CWindow::IsFocused() const
     {
         if (auto poolPtr = m_pool.lock())
@@ -196,6 +214,10 @@ namespace oui
     Size CWindow::GetSize() const
     {
         return m_size;
+    }
+    Rect CWindow::GetClientRect() const
+    {
+        return { m_position, m_size };
     }
     void CWindow::Resize(const Size& newSize)
     {

@@ -154,6 +154,10 @@ namespace oui
         Color highlightTextColor,
         Color highlightTextBgColor)
     {
+        if (position.x <= 0 || position.y <= 0)
+        {
+            return;
+        }
         String::char_type hotkeySymbolTmp = hotkeySymbol;
         if (position.x >= m_size.width)
         {
@@ -182,7 +186,7 @@ namespace oui
             highAttributes = highFrontColor | highBackColor;
         }
 
-        CHAR_INFO* lineData = rawData + m_size.width * position.y;
+        CHAR_INFO* lineData = rawData + (m_size.width * position.y);
         int xend = std::min((int)m_size.width, (int)text.native.size() + position.x);
 
         auto textPtr = text.native.c_str();
@@ -204,11 +208,84 @@ namespace oui
             currentAttributes = normalAttributes;
         }
     }
+    void CConsoleDrawAdapter::PaintBorder(const Rect& rect_in,
+        Color textColor,
+        Color textBgColor)
+    {
+        if (rect_in.size.height <= 0 || rect_in.size.width <= 0)
+        {
+            return;
+        }
+        Rect rect = rect_in;
+        if (rect.size.width > m_size.width)
+        {
+            rect.size.width = m_size.width;
+        }
+        if (rect.size.height > m_size.height)
+        {
+            rect.size.height = m_size.height;
+        }
+        if (rect.position.x >= m_size.width)
+        {
+            return;
+        }
+        if (rect.position.y >= m_size.height)
+        {
+            return;
+        }
+
+        CHAR_INFO* rawData = m_buffer.data();
+
+        int consoleColor = m_console->TranslateColorEx(textBgColor, true) | m_console->TranslateColorEx(textColor, false);
+          
+        DWORD rowLength = rect.size.width;
+
+        int xend = std::min((int)m_size.width, (int)rowLength + rect.position.x);
+        int linesCount = std::min(rect.size.height, (int)m_size.height - rect.position.y);
+
+        CHAR_INFO* lineData = rawData + m_size.width * rect.position.y;
+
+        lineData[rect.position.x].Char.UnicodeChar = L'╔';
+        lineData[rect.position.x].Attributes = consoleColor;
+        for (int u = rect.position.x + 1; u < xend - 1; ++u)
+        {
+            lineData[u].Char.UnicodeChar = L'═';
+            lineData[u].Attributes = consoleColor;
+        }
+        lineData[xend-1].Attributes = consoleColor;
+        lineData[xend - 1].Char.UnicodeChar = L'╗';
+
+        lineData += m_size.width;
+        for (int i = rect.position.y + 1; i < linesCount - 1; ++i, lineData += m_size.width)
+        {
+            DWORD charsWritten = 0;
+
+            lineData[rect.position.x].Char.UnicodeChar = L'║';
+            lineData[rect.position.x].Attributes = consoleColor;
+
+            lineData[xend - 1].Char.UnicodeChar = L'║';
+            lineData[xend - 1].Attributes = consoleColor;
+        }
+
+        lineData[rect.position.x].Char.UnicodeChar = L'╚';
+        lineData[rect.position.x].Attributes = consoleColor;
+        for (int u = rect.position.x + 1; u < xend - 1; ++u)
+        {
+            lineData[u].Char.UnicodeChar = L'═';
+            lineData[u].Attributes = consoleColor;
+        }
+        lineData[xend - 1].Char.UnicodeChar = L'╝';
+        lineData[xend - 1].Attributes = consoleColor;
+    }
 
     void CConsoleDrawAdapter::PaintRect(const Rect& rect_in,
         Color background,
         bool keepText)
     {
+        if (rect_in.size.height <= 0 || rect_in.size.width <= 0)
+        {
+            return;
+        }
         Rect rect = rect_in;
         if (rect.size.width > m_size.width)
         {
@@ -231,12 +308,13 @@ namespace oui
 
         int consoleColor = m_console->TranslateColorEx(background, true);
 
-        int linesCount = rect.size.height;
+        int linesCount = std::min(rect.size.height, (int)m_size.height - rect.position.y);
         DWORD rowLength = rect.size.width;
 
         int xend = std::min((int)m_size.width, (int)rowLength + rect.position.x);
+
         CHAR_INFO* lineData = rawData + m_size.width * rect.position.y;
-        for (int i = rect.position.y; i < linesCount; ++i, lineData += m_size.width)
+        for (int i = rect.position.y; i <= linesCount; ++i, lineData += m_size.width)
         {
             DWORD charsWritten = 0;
 
@@ -263,7 +341,10 @@ namespace oui
     {
         m_size = size;
         m_console = console;
-        m_buffer.resize(m_size.height * m_size.width + 4);
+        CHAR_INFO chInfo;
+        chInfo.Attributes = 0;
+        chInfo.Char.UnicodeChar = L' ';
+        m_buffer.resize(m_size.height * m_size.width + 4, chInfo);
     }
     void CConsoleDrawAdapter::FinishDraw()
     {
