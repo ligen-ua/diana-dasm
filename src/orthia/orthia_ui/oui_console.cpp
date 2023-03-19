@@ -154,7 +154,7 @@ namespace oui
         Color highlightTextColor,
         Color highlightTextBgColor)
     {
-        if (position.x <= 0 || position.y <= 0)
+        if (position.x < 0 || position.y < 0)
         {
             return;
         }
@@ -314,7 +314,7 @@ namespace oui
         int xend = std::min((int)m_size.width, (int)rowLength + rect.position.x);
 
         CHAR_INFO* lineData = rawData + m_size.width * rect.position.y;
-        for (int i = rect.position.y; i <= linesCount; ++i, lineData += m_size.width)
+        for (int i = 0; i < linesCount; ++i, lineData += m_size.width)
         {
             DWORD charsWritten = 0;
 
@@ -344,7 +344,7 @@ namespace oui
         CHAR_INFO chInfo;
         chInfo.Attributes = 0;
         chInfo.Char.UnicodeChar = L' ';
-        m_buffer.resize(m_size.height * m_size.width + 4, chInfo);
+        m_buffer.resize(m_size.height * m_size.width, chInfo);
     }
     void CConsoleDrawAdapter::FinishDraw()
     {
