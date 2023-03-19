@@ -45,6 +45,11 @@ namespace oui
             Color highlightTextBgColor = Color()
             );
 
+        void PaintBorder(const Rect & rect, 
+            Color textColor,
+            Color textBgColor);
+
+        // main
         void StartDraw(Size size, 
             CConsole* console);
         void FinishDraw();

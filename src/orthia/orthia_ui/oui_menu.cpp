@@ -22,7 +22,7 @@ namespace oui
             return;
         }
         auto parentMenu = static_cast<CMenuWindow*>(parent.get());
-        bool menuFocused = parentMenu->IsActive();
+        bool menuFocused = parentMenu->IsActiveOrFocused();
         MenuButtonProfile* profile = &m_menuColorProfile->normal;
         if (menuFocused)
         {
@@ -83,14 +83,17 @@ namespace oui
         {
             return;
         }
-        const auto parentSize = parent->GetSize();
-        if (parentSize.height <= 0)
+        Rect parentClientRect = parent->GetClientRect();
+
+        if (parentClientRect.size.height <= 0)
         {
             return;
         }
-        auto size = parentSize;
+        auto size = parentClientRect.size;
         size.height = 1;
         this->Resize(size);
+
+        this->MoveTo(parentClientRect.position);
 
         // dock buttons
         int xpos = m_initialSpace;
@@ -125,7 +128,28 @@ namespace oui
     {
         return m_selectedButtonIndex;
     }
-
+    void CMenuWindow::ShiftSelectedButtonIndex(int difference)
+    {
+        if (m_buttons.empty())
+        {
+            m_selectedButtonIndex = 0;
+            return;
+        }
+        int newIndex = m_selectedButtonIndex + difference;
+        if (newIndex >= (int)m_buttons.size())
+        {
+            newIndex = 0;
+        }
+        else if (newIndex < 0)
+        {
+            newIndex = (int)m_buttons.size() - 1;
+        }
+        m_selectedButtonIndex = newIndex;
+    }
+    void CMenuWindow::SetPrevFocus(std::shared_ptr<CWindow> prevFocus)
+    {
+        m_prevFocus = prevFocus;
+    }
     bool CMenuWindow::ProcessEvent(oui::InputEvent& evt) 
     {
         auto pool = GetPool();
@@ -140,9 +164,36 @@ namespace oui
             case oui::VirtualKey::Escape:
                 pool->SetFocus(0);
                 Invalidate();
-                break;
+                return true;
+            case oui::VirtualKey::Left:
+                ShiftSelectedButtonIndex(-1);
+                Invalidate();
+                return true;
+            case oui::VirtualKey::Right:
+                ShiftSelectedButtonIndex(1);
+                Invalidate();
+                return true;
+
+            case oui::VirtualKey::Down:
+            case oui::VirtualKey::Enter:
+                // TODO: go to submenu
+                return true;
             }
         }
-        return true;
+        return CWindow::ProcessEvent(evt);
+    }
+    void CMenuWindow::Activate()
+    {
+        CWindow::Activate();
+    }
+    void CMenuWindow::Deactivate()
+    {
+        auto pool = GetPool();
+        if (pool)
+        {
+            pool->SetFocus(m_prevFocus.lock());
+            m_prevFocus.reset();
+        }
+        CWindow::Deactivate();
     }
 }

@@ -58,6 +58,8 @@ namespace oui
             return child;
         }
 
+        virtual void OnInit(std::shared_ptr<CWindowsPool> pool);
+
     public:
         CWindow();
         virtual ~CWindow();
@@ -88,6 +90,8 @@ namespace oui
         virtual Size GetSize() const;
         virtual void Resize(const Size& newSize);
 
+        virtual Rect GetClientRect() const;
+
         // draw stuff
         virtual void DrawTo(const Rect& rect, DrawParameters & parameters, bool force);
         virtual void Invalidate(bool valid = false);
@@ -104,6 +108,6 @@ namespace oui
         virtual void Activate();
         virtual void Deactivate();
         virtual bool IsActive() const;
-
+        virtual bool IsActiveOrFocused() const;
     };
 }

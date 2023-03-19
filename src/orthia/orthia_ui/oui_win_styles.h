@@ -41,9 +41,56 @@ namespace oui
         }
         void DoPaint(const Rect& rect, DrawParameters& parameters) override
         {
-            parameters.console.PaintRect(rect, m_color, false);
+            auto paintRect = rect;
+
+            auto size = this->GetSize();
+            
+            auto clientRect = this->GetClientRect();
+
+            int rightPosX = size.width - clientRect.size.width - clientRect.position.x;
+            int bottomPosY = size.height - clientRect.size.height - clientRect.position.y;
+            paintRect.position.x += clientRect.position.x;
+            paintRect.position.y += clientRect.position.y;
+
+            paintRect.size.width -= clientRect.position.x + rightPosX;
+            paintRect.size.height -= clientRect.position.y + bottomPosY;
+
+            parameters.console.PaintRect(paintRect, m_color, false);
+            Base::DoPaint(rect, parameters);
         }
     };
+
+    template<class Base>
+    class WithBorder:public Base
+    {
+    protected:
+        Color m_frontColor, m_backgroundColor;
+    public:
+        WithBorder()
+        {
+            m_frontColor = ColorWhite();
+        }
+        void SetColors(Color frontColor, Color backgroundColor)
+        {
+            m_frontColor = frontColor;
+            m_backgroundColor = backgroundColor;
+        }
+        Rect GetClientRect() const override
+        {
+            Rect rect = Base::GetClientRect();
+            ++rect.position.x;
+            ++rect.position.y;
+            rect.size.width -= 2;
+            rect.size.height -= 2;
+            return rect;
+        }
+        void DoPaint(const Rect& rect, DrawParameters& parameters) override
+        {
+            parameters.console.PaintBorder(rect, m_frontColor, m_backgroundColor);
+            Base::DoPaint(rect, parameters);
+        }
+    };
+
 
 
     template<class Base>
