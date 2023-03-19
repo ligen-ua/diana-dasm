@@ -10,7 +10,7 @@ orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 
 
-class CMainWindow:public oui::WithBorder<oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>>
+class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
 {
     std::shared_ptr<oui::CMenuWindow> m_menu;
 public:
@@ -43,26 +43,39 @@ public:
         if (evt.keyEvent.valid)
         {            
             // no focused or focused couldn't process this, check hotkeys
-            if ((evt.keyState.state & evt.keyState.AnyAlt) && !(evt.keyState.state & evt.keyState.AnyCtrl))
+            bool activate = false;
+            bool justAlt = (evt.keyState.state & evt.keyState.AnyAlt) &&
+                           !(evt.keyState.state & evt.keyState.AnyCtrl) &&
+                           !(evt.keyState.state & evt.keyState.AnyShift);
+            bool noModifiers = !(evt.keyState.state & evt.keyState.AnyAlt & evt.keyState.AnyCtrl & evt.keyState.AnyShift);
+
+            if (evt.keyEvent.rawText.native.empty())
             {
-                if (evt.keyEvent.rawText.native.empty())
+                switch (evt.keyEvent.virtualKey)
                 {
-                    switch (evt.keyEvent.virtualKey)
+                case oui::VirtualKey::None:
+                    // just alt, set focus to menu
+                    activate = justAlt;
+                    break;
+                case oui::VirtualKey::kF10:
+                    activate = noModifiers;
+                    break;
+                }
+                
+                if (activate)
+                {
+                    if (m_menu->IsActive())
                     {
-                    case oui::VirtualKey::None:
-                        // just alt, set focus to menu
-                        if (m_menu->IsActive())
-                        {
-                            m_menu->Deactivate();
-                            return true;
-                        }
-                        m_menu->SetPrevFocus(pool->GetFocus());
-                        m_menu->Activate();
-                        pool->SetFocus(m_menu);
+                        m_menu->Deactivate();
                         return true;
                     }
+                    m_menu->SetPrevFocus(pool->GetFocus());
+                    m_menu->Activate();
+                    pool->SetFocus(m_menu);
+                    return true;
                 }
             }
+
 
             if (auto focused = pool->GetFocus())
             {
