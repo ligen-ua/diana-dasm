@@ -15,7 +15,7 @@ namespace oui
     {
         if (m_focused.get() == window)
         {
-            m_focused = window->GetParent().lock();
+            m_focused = window->GetParent();
         }
         m_allWindows.erase(window);
     }
@@ -57,7 +57,15 @@ namespace oui
     void CWindow::ConstuctChilds()
     {
     }
-    
+
+    static void InvalidateParent(CWindow* window)
+    {
+        if (auto parent = window->GetParent())
+        {
+            parent->Invalidate();
+        }
+    }
+
     std::shared_ptr<CWindow> CWindow::GetPtr()
     {
         if (auto poolPtr = m_pool.lock())
@@ -70,28 +78,36 @@ namespace oui
 
     void CWindow::AddChild(std::shared_ptr<CWindow> child)
     {
-        if (auto me = GetPtr())
+        if (auto poolPtr = m_pool.lock())
         {
-            m_childs.push_back(child);
-            child->SetParent(me);
+            if (auto me = GetPtr())
+            {
+                poolPtr->RegisterWindow(child);
+                m_childs.push_back(child);
+                child->SetParent(me);
+            }
         }
     }
-    void CWindow::Init(std::weak_ptr<CWindowsPool> pool)
+    void CWindow::SetOnResize(std::function<void()> fnc)
+    {
+        m_onResize = fnc;
+    }
+    void CWindow::Init(std::shared_ptr<CWindowsPool> pool)
     {
         m_pool = pool;
         ConstuctChilds();
-    }
-    void CWindow::SetParent(std::weak_ptr<CWindow> parent)
-    {
-        m_parent = parent;
-        if (auto ptr = m_parent.lock())
+        for (auto& child : m_childs)
         {
-            Init(ptr->m_pool);
+            child->Init(pool);
         }
     }
-    std::weak_ptr<CWindow> CWindow::GetParent()
+    void CWindow::SetParent(std::shared_ptr<CWindow> parent)
     {
-        return m_parent;
+        m_parent = parent;
+    }
+    std::shared_ptr<CWindow> CWindow::GetParent()
+    {
+        return m_parent.lock();
     }
 
     bool CWindow::IsVisible() const
@@ -128,7 +144,12 @@ namespace oui
     }
     void CWindow::Destroy()
     {
-        if (auto parent = GetParent().lock())
+        for (auto it = m_childs.begin(), it_end = m_childs.end(); it != it_end; )
+        {
+            auto oldIt = it++;
+            (*oldIt)->Destroy();
+        }
+        if (auto parent = GetParent())
         {
             parent->RemoveChild(this);
         }
@@ -137,18 +158,20 @@ namespace oui
             poolPtr->UnregisterWindow(this);
         }
     }
-
-
     Point CWindow::GetPosition() const
     {
         return m_position;
     }
     void CWindow::MoveTo(const Point& newPt)
     {
-        Invalidate();
+        if (m_position == newPt)
+        {
+            return;
+        }
+        
+        InvalidateParent(this);
         m_position = newPt;
     }
-
     // size
     Size CWindow::GetSize() const
     {
@@ -156,17 +179,32 @@ namespace oui
     }
     void CWindow::Resize(const Size& newSize)
     {
-        Invalidate();
-        m_size = newSize;
-    }
+        if (m_size == newSize)
+        {
+            return;
+        }
 
-    // draw stuff
-    void CWindow::DrawTo(const Rect& rect, DrawParameters& parameters)
+        Invalidate();
+        InvalidateParent(this);
+        m_size = newSize;
+        OnResize();
+    }
+    void CWindow::OnResize()
     {
-        if (!this->IsValid())
+        if (m_onResize)
+        {
+            m_onResize();
+        }
+    }
+    // draw stuff
+    void CWindow::DrawTo(const Rect& rect, DrawParameters& parameters, bool force_in)
+    {
+        bool force = force_in;
+        if (force || !this->IsValid())
         {
             DoPaint(rect, parameters);
             this->Invalidate(true);
+            force = true;
         }
         // draw childs anyway
         int endX = rect.position.x + rect.size.width;
@@ -206,7 +244,7 @@ namespace oui
             Rect childRect;
             childRect.position = childAbs;
             childRect.size = childSize;
-            child->DrawTo(childRect, parameters);
+            child->DrawTo(childRect, parameters, force);
         }
     }
     void CWindow::Invalidate(bool valid)

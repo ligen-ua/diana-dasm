@@ -3,10 +3,10 @@
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
 {
     textManager->RegisterNode(ORTHIA_TCSTR("ui.menu"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("file"), ORTHIA_TCSTR("File"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("workspace"), ORTHIA_TCSTR("Workspace"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("about"), ORTHIA_TCSTR("About"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("exit"), ORTHIA_TCSTR("Exit"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("file"), ORTHIA_TCSTR("&File"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("workspace"), ORTHIA_TCSTR("&Workspace"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("view"), ORTHIA_TCSTR("&View"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("help"), ORTHIA_TCSTR("&Help"))
         ;
 
     textManager->RegisterNode(ORTHIA_TCSTR("ui.modal.exit"))

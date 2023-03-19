@@ -143,12 +143,6 @@ namespace oui
         return evt.keyEvent.valid || evt.resizeEvent.valid || evt.mouse.valid;
     }
 
-    static bool IsLeadByte(wchar_t ch)
-    {
-        return (unsigned int)ch >= 0xD800 && (unsigned int)ch <= 0xDFFF;
-    }
-
-
 
     // ctrlc input
     static std::function<void()> g_ctrlCandler;

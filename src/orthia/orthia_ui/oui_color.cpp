@@ -66,4 +66,28 @@ namespace oui
     {
         return Color(ColorChannel::High, ColorChannel::High, ColorChannel::High);
     }
+
+    // color defaults
+    static MenuColorProfile g_menuColorProfile = {
+        // backgroundColor
+        ColorBlack(), 
+        
+        // button normal
+        {
+            ColorWhite(),     // buttonText
+            ColorBlack(),     // buttonBackground
+            ColorCyan(),       // buttonHotkeyText
+        },
+        // highlight
+        {
+            ColorBlack(),     // buttonHighlightedText
+            ColorGray(),      // buttonHighlightedBackground
+            ColorBlack()      // buttonHighlightedHotkeyText
+        }
+    };
+
+    void InitDefaultColorProfile(MenuColorProfile& profile)
+    {
+        profile = g_menuColorProfile;
+    }
 }
