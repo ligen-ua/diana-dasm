@@ -7,26 +7,53 @@
 namespace oui
 {
 
+    struct PopupItem
+    {
+        String text;
+        std::function<void()> handler;
+        Hotkey hotkey;
+    };
+
     class CMenuButtonWindow:public CWindow
     {
-        std::shared_ptr<MenuColorProfile> m_menuColorProfile;
         String m_caption;
         std::function<void()> m_handler;
         int m_spaceAroundName = 2;
+
+        std::vector<PopupItem> m_items;
     public:
         CMenuButtonWindow(const String& caption,
             std::function<void()> handler,
-            std::shared_ptr<MenuColorProfile> menuColorProfile);
+            std::vector<PopupItem>&& items);
 
-        void DoPaint(const Rect& rect, DrawParameters& parameters) override;
+        std::function<void()> & GetHandler();
+
+        void DoPaint(const Rect& rect, 
+            DrawParameters& parameters) override;
 
         void Dock();
+
+        std::shared_ptr<const std::vector<PopupItem>> GetPopupItems();
     };
 
-    class CMenuPopup:public WithBorder<SimpleBrush<CModalWindow>>
+    class CMenuWindow;
+    class CMenuPopup:public WithBorder<CModalWindow>
     {
+        using Parent_type = WithBorder<CModalWindow>;
+
+        std::weak_ptr<CMenuWindow> m_menuWindow;
+        std::shared_ptr<MenuColorProfile> m_menuColorProfile;
+
+        int m_selectedPosition = 0;
+        void ShiftIndex(int difference);
+
+        void FireEvent();
+
     public:
-        CMenuPopup();
+        CMenuPopup(std::shared_ptr<CMenuWindow> menuWindow);
+        bool ProcessEvent(oui::InputEvent& evt) override;
+        void Dock();
+        void DoPaint(const Rect& rect, DrawParameters& parameters) override;
     };
 
     class CMenuWindow:public oui::SimpleBrush<CWindow>
@@ -43,11 +70,12 @@ namespace oui
 
         std::shared_ptr<CMenuPopup> m_currentPopup;
 
-        void OpenPopup();
     public:
         CMenuWindow();
         void AddButton(const String& caption,
             std::function<void()> handler);
+        void AddButton(const String& caption,
+            std::vector<PopupItem>&& items);
         void ConstuctChilds() override;
         void Dock();
         std::shared_ptr<MenuColorProfile> GetColorProfile();
@@ -63,6 +91,8 @@ namespace oui
         void SetPrevFocus(std::shared_ptr<CWindow> prevFocus);
         void Activate() override;
         void Deactivate() override;
+
+        void OpenPopup();
     };
 
 }

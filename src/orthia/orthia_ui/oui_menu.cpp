@@ -6,31 +6,30 @@ namespace oui
     // CMenuButtonWindow
     CMenuButtonWindow::CMenuButtonWindow(const String& caption,
         std::function<void()> handler,
-        std::shared_ptr<MenuColorProfile> menuColorProfile)
+        std::vector<PopupItem>&& items)
         :
-            m_caption(caption),
-            m_handler(handler),
-            m_menuColorProfile(menuColorProfile)
+        m_caption(caption),
+        m_handler(handler),
+        m_items(std::move(items))
     {
     }
-
     void CMenuButtonWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
-        auto parent = GetParent();
-        if (!parent)
+        auto parentMenu = GetParent_t<CMenuWindow>(this);
+        if (!parentMenu)
         {
             return;
         }
-        auto parentMenu = static_cast<CMenuWindow*>(parent.get());
         bool menuFocused = parentMenu->IsActiveOrFocused();
-        MenuButtonProfile* profile = &m_menuColorProfile->normal;
+        auto menuColorProfile = parentMenu->GetColorProfile();
+        MenuButtonProfile* profile = &menuColorProfile->menu.normal;
         if (menuFocused)
         {
             auto selectedButton = parentMenu->GetSelectedButton();
             if (selectedButton.get() == this)
             {
                 // oh, me is selected, this is nice 
-                profile = &m_menuColorProfile->selected;
+                profile = &menuColorProfile->menu.selected;
             }
         }
         const auto size = GetSize();
@@ -38,8 +37,8 @@ namespace oui
 
         auto textPos = rect.position;
         textPos.x += m_spaceAroundName;
-        parameters.console.PaintText(textPos, 
-            profile->buttonText, 
+        parameters.console.PaintText(textPos,
+            profile->buttonText,
             profile->buttonBackground,
             m_caption,
             g_HotKeySymbol,
@@ -49,14 +48,290 @@ namespace oui
     void CMenuButtonWindow::Dock()
     {
         int symbols = CalculateSymbolsCount(m_caption.native, g_HotKeySymbol);
-        Size size = { m_spaceAroundName*2 + symbols, 1 };
+        Size size = { m_spaceAroundName * 2 + symbols, 1 };
         this->Resize(size);
     }
-   
-    // CMenuPopup
-    CMenuPopup::CMenuPopup()
-    {
 
+    std::function<void()>& CMenuButtonWindow::GetHandler()
+    {
+        return m_handler;
+    }
+
+    std::shared_ptr<const std::vector<PopupItem>> CMenuButtonWindow::GetPopupItems()
+    {
+        if (m_items.empty())
+        {
+            return nullptr;
+        }
+        auto me = this->GetPtr();
+        if (!me)
+        {
+            return nullptr;
+        }
+        return std::shared_ptr< const std::vector<PopupItem>>(me, &m_items);
+    }
+
+    // CMenuPopup
+    CMenuPopup::CMenuPopup(std::shared_ptr<CMenuWindow> menuWindow)
+        :
+        m_menuWindow(menuWindow)
+    {
+    }
+    void CMenuPopup::ShiftIndex(int difference)
+    {
+        auto menu = m_menuWindow.lock();
+        if (!menu)
+        {
+            return;
+        }
+        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
+        if (!selectedButton)
+        {
+            return;
+        }
+        auto popupItems = selectedButton->GetPopupItems();
+        if (!popupItems)
+        {
+            return;
+        }
+
+        int itemsCount = (int)popupItems->size();
+        if (!itemsCount)
+        {
+            m_selectedPosition = 0;
+            return;
+        }
+        for (int i = 0; i < 2; ++i)
+        {
+            int newIndex = m_selectedPosition + difference;
+            if (newIndex >= (int)itemsCount)
+            {
+                newIndex = 0;
+            }
+            else if (newIndex < 0)
+            {
+                newIndex = (int)itemsCount - 1;
+            }
+            m_selectedPosition = newIndex;
+
+            if ((*popupItems)[m_selectedPosition].handler)
+            {
+                break;
+            }
+        }
+    }
+    void CMenuPopup::FireEvent()
+    {
+        auto menu = m_menuWindow.lock();
+        if (!menu)
+        {
+            return;
+        }
+        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
+        if (!selectedButton)
+        {
+            return;
+        }
+        auto popupItems = selectedButton->GetPopupItems();
+        if (!popupItems)
+        {
+            return;
+        }
+
+        int itemsCount = (int)popupItems->size();
+        if (!itemsCount)
+        {
+            return;
+        }
+        auto handler = ((*popupItems)[m_selectedPosition].handler);
+        if (handler)
+        {
+            handler();
+            Destroy();
+            menu->Deactivate();
+        }
+    }
+    bool CMenuPopup::ProcessEvent(oui::InputEvent& evt)
+    {
+        auto parentMenu = m_menuWindow.lock();
+        if (parentMenu)
+        {
+            if (evt.keyEvent.valid)
+            {
+                switch (evt.keyEvent.virtualKey)
+                {
+                case oui::VirtualKey::Left:
+                    parentMenu->ShiftSelectedButtonIndex(-1);
+                    Dock();
+                    return true;
+                case oui::VirtualKey::Right:
+                    parentMenu->ShiftSelectedButtonIndex(1);
+                    Dock();
+                    return true;
+                case oui::VirtualKey::Down:
+                    ShiftIndex(1);
+                    Invalidate();
+                    return true;
+                case oui::VirtualKey::Up:
+                    ShiftIndex(-1);
+                    Invalidate();
+                    return true;
+                case oui::VirtualKey::Enter:
+                    FireEvent();
+                    return true;
+                }
+            }
+        }
+        return Parent_type::ProcessEvent(evt);
+    }
+    static int ToString(const PopupItem& item, int fixedWidth, String& result)
+    {
+        const int g_spacesBefore = 2;
+        const int g_spacesAfter = 2;
+
+        result.native.clear();
+
+        if (item.handler == nullptr)
+        {
+            // handler separator case here
+            if (fixedWidth)
+            {
+                return fixedWidth;
+            }
+            return g_spacesBefore + g_spacesAfter;
+        }
+
+        int symCount = 0;
+        // space before
+        symCount += g_spacesBefore;
+        result.native.append(g_spacesBefore, String::symSpace);
+
+        // -- 
+        symCount += CalculateSymbolsCount(item.text.native, g_HotKeySymbol);
+        result.native += item.text.native;
+
+        if (fixedWidth)
+        {
+            if (symCount < (fixedWidth - g_spacesAfter))
+            {
+                int padCount = fixedWidth - symCount - g_spacesAfter;
+                result.native.append(padCount, String::symSpace);
+            }
+        }
+
+        // space after
+        symCount += g_spacesAfter;
+        result.native.append(g_spacesAfter, String::symSpace);
+
+        return symCount;
+    }
+    void CMenuPopup::DoPaint(const Rect& rect, DrawParameters& parameters)
+    {
+        // paint border
+        Parent_type::DoPaint(rect, parameters);
+
+        // paint body
+        auto menu = m_menuWindow.lock();
+        if (!menu)
+        {
+            return;
+        }
+        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
+        if (!selectedButton)
+        {
+            return;
+        }
+        auto popupItems = selectedButton->GetPopupItems();
+        if (!popupItems)
+        {
+            return;
+        }
+        auto colorProfile = menu->GetColorProfile();
+
+        Parent_type::SetColors(colorProfile->popup.borderColor, colorProfile->popup.borderBackgroundColor);
+
+        const auto clientRect = GetClientRect();
+        Point pos = clientRect.position + rect.position;
+        String tmp;
+        int index = 0;
+
+        for (auto popup : *popupItems)
+        {
+            MenuButtonProfile* profile = &colorProfile->popup.normal;
+            int symbolsCount = ToString(popup, clientRect.size.width, tmp);
+
+            if (popup.handler == nullptr)
+            {
+                // handle separator
+                auto sepPos = pos;
+                --sepPos.x;
+                parameters.console.PaintMenuSeparator(sepPos,
+                    clientRect.size.width + 2,
+                    colorProfile->popup.borderColor, 
+                    colorProfile->popup.borderBackgroundColor);
+            }
+            else
+            {
+                if (index == m_selectedPosition)
+                {
+                    profile = &colorProfile->popup.selected;
+                }
+                parameters.console.PaintText(pos,
+                    profile->buttonText,
+                    profile->buttonBackground,
+                    tmp,
+                    g_HotKeySymbol,
+                    profile->buttonHotkeyText,
+                    profile->buttonBackground);
+            }
+            popup.text;
+            ++pos.y;
+            ++index;
+        }
+    }
+
+    void CMenuPopup::Dock()
+    {
+        m_selectedPosition = 0;
+        auto menu = m_menuWindow.lock();
+        if (!menu)
+        {
+            return;
+        }
+        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
+        if (!selectedButton)
+        {
+            return;
+        }
+        auto popupItems = selectedButton->GetPopupItems();
+        if (!popupItems)
+        {
+            Destroy();
+            menu->SetFocus();
+            return;
+        }
+
+        int maxWidth = 0;
+        String tmp;
+        for (auto popup: *popupItems)
+        {
+            int symbolsCount = ToString(popup, 0, tmp);
+            if (symbolsCount > maxWidth)
+            {
+                maxWidth = symbolsCount;
+            }
+        }
+
+        const auto borderSize = GetBorderSize(this);
+
+        auto menuPosition = menu->GetPosition();
+        auto buttonPosition = selectedButton->GetPosition();
+        const Size size = { maxWidth + borderSize.width, (int)popupItems->size() + borderSize.height};
+
+        const Point popupPosition = { buttonPosition.x, menuPosition.y + 1 };
+        MoveTo(popupPosition);
+        Resize(size);
+        Invalidate();
     }
 
     // CMenuWindow
@@ -64,16 +339,17 @@ namespace oui
     {
         m_menuColorProfile = std::make_shared<MenuColorProfile>();
         InitDefaultColorProfile(*m_menuColorProfile);
-        Color backgroundColor;
-        Color buttonText;
-        Color buttonBackground;
-        Color buttonHighlightedText;
-        Color buttonHighlightedBackground;
     }
     void CMenuWindow::AddButton(const String& caption,
         std::function<void()> handler)
     {
-        m_buttons.push_back(std::make_shared<CMenuButtonWindow>(caption, handler, m_menuColorProfile));
+        std::vector<PopupItem> empty;
+        m_buttons.push_back(std::make_shared<CMenuButtonWindow>(caption, handler, std::move(empty)));
+    }
+    void CMenuWindow::AddButton(const String& caption,
+        std::vector<PopupItem>&& items)
+    {
+        m_buttons.push_back(std::make_shared<CMenuButtonWindow>(caption, nullptr, std::move(items)));
     }
     void CMenuWindow::ConstuctChilds()
     {
@@ -118,7 +394,7 @@ namespace oui
         return m_menuColorProfile;
     }
 
-    std::shared_ptr<CMenuButtonWindow>  CMenuWindow::GetSelectedButton()
+    std::shared_ptr<CMenuButtonWindow> CMenuWindow::GetSelectedButton()
     {
         if (m_selectedButtonIndex < 0 || m_selectedButtonIndex >= m_buttons.size())
         {
@@ -158,11 +434,6 @@ namespace oui
     }
     bool CMenuWindow::ProcessEvent(oui::InputEvent& evt) 
     {
-        auto pool = GetPool();
-        if (!pool)
-        {
-            return false;
-        }
         if (evt.keyEvent.valid)
         {
             switch (evt.keyEvent.virtualKey)
@@ -219,15 +490,26 @@ namespace oui
         {
             return;
         }
-        auto myBosition = GetPosition();
-        auto buttonPosition = selectedButton->GetPosition();
-        Size size = {20, 10};
-        Point popupPosition = { buttonPosition.x, myBosition.y + 1};
-        m_currentPopup = std::make_shared<CMenuPopup>();
-        m_currentPopup->MoveTo(popupPosition);
-        m_currentPopup->Resize(size);
+        auto myPtr = Cast_t<CMenuWindow>(this->GetPtr());
+        if (!myPtr)
+        {
+            return;
+        }
+        if (!selectedButton->GetPopupItems())
+        {
+            // no popups provided, call handler if any
+            auto handler = selectedButton->GetHandler();
+            if (handler)
+            {
+                Deactivate();
+                handler();
+            }
+            return;
+        }
+        m_currentPopup = std::make_shared<CMenuPopup>(myPtr);
         rootWindow->AddChild(m_currentPopup);
         m_currentPopup->Init(rootWindow);
+        m_currentPopup->Dock();
         m_currentPopup->SetFocus();
     }
 }

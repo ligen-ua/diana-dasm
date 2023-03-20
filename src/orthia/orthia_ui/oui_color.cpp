@@ -68,21 +68,44 @@ namespace oui
     }
 
     // color defaults
-    static MenuColorProfile g_menuColorProfile = {
-        // backgroundColor
-        ColorBlack(), 
-        
-        // button normal
+    static MenuColorProfile g_menuColorProfile = 
+    {
+        // menu
         {
-            ColorWhite(),     // buttonText
-            ColorBlack(),     // buttonBackground
-            ColorCyan(),       // buttonHotkeyText
+            // backgroundColor
+            ColorBlack(),
+
+            // button normal
+            {
+                ColorWhite(),     // buttonText
+                ColorBlack(),     // buttonBackground
+                ColorCyan(),      // buttonHotkeyText
+            },
+            // highlight
+            {
+                ColorBlack(),     // buttonHighlightedText
+                ColorCyan(),      // buttonHighlightedBackground
+                ColorBlack()      // buttonHighlightedHotkeyText
+            }
         },
-        // highlight
+        // popup
         {
-            ColorBlack(),     // buttonHighlightedText
-            ColorGray(),      // buttonHighlightedBackground
-            ColorBlack()      // buttonHighlightedHotkeyText
+            // border colors
+            ColorWhite(),
+            ColorBlack(),
+
+            // button normal
+            {
+                ColorWhite(),     // buttonText
+                ColorBlack(),     // buttonBackground
+                ColorCyan(),      // buttonHotkeyText
+            },
+            // highlight
+            {
+                ColorBlack(),     // buttonHighlightedText
+                ColorCyan(),      // buttonHighlightedBackground
+                ColorBlack()      // buttonHighlightedHotkeyText
+            }
         }
     };
 

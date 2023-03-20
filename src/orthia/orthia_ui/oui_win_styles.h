@@ -92,7 +92,6 @@ namespace oui
     };
 
 
-
     template<class Base>
     class ExitOnControlC:public Base
     {

@@ -148,6 +148,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="oui_app.cpp" />
+    <ClCompile Include="oui_base.cpp" />
     <ClCompile Include="oui_color.cpp" />
     <ClCompile Include="oui_console.cpp" />
     <ClCompile Include="oui_input_win32.cpp" />

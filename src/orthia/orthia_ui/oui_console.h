@@ -13,7 +13,8 @@ namespace oui
         std::unordered_map<Color, int, ColorHash> m_colorCache;
 
         int TranslateColor(const Color& color);
-
+        void SetPalette(std::array<COLORREF, 16>& colors);
+        void SetDefaultPalette();
     public:
         CConsole();
         void Init();
@@ -31,7 +32,13 @@ namespace oui
         Size m_size;
         std::vector<CHAR_INFO> m_buffer;
         CConsole* m_console = 0;
+        std::wstring m_separator;
     public:
+        void PaintMenuSeparator(const Point& position,
+            int width,
+            Color textColor,
+            Color textBgColor);
+
         void PaintRect(const Rect& rect,
             Color background,
             bool keepText);
@@ -65,8 +72,13 @@ namespace oui
         BOOL m_restoreData = FALSE;
 
         std::vector<CHAR_INFO> m_buffer;
+
     public:
         CConsoleStateSaver();
         ~CConsoleStateSaver();
+
+        CONSOLE_SCREEN_BUFFER_INFOEX& GetScreenInfo() {
+            return m_screenInfo;
+        }
     };
 }

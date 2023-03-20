@@ -21,11 +21,66 @@ public:
         m_menu = AddChild_t(std::make_shared<oui::CMenuWindow>());
         m_menu->SetBackgroundColor(oui::ColorBlack());
         
-        m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("file")), []() {});
-        m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("workspace")), []() {});
-        m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("view")), []() {});
-        m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("help")), []() {});
+        {
+            std::vector<oui::PopupItem> file =
+            {
+                {
+                    ORTHIA_TCSTR("Open &Executable"),
+                    []() {}
+                },
+                {
+                    ORTHIA_TCSTR("Open &Process"),
+                    []() {}
+                },
+                {
+                    orthia::PlatformString_type(),
+                    nullptr
+                },
+                {
+                    ORTHIA_TCSTR("E&xit"),
+                    [&]()
+                    {
+                        if (auto pool = this->m_pool.lock())
+                        {
+                            pool->ExitLoop();
+                        }
+                    }
+                }
+            };
+            m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("file")),
+                std::move(file)
+            );
+        }
 
+
+        {
+            std::vector<oui::PopupItem> view =
+            {
+                {
+                    L"Test5",
+                    []() {}
+                }
+            };
+            m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("view")),
+                std::move(view)
+            );
+        }
+        {
+            std::vector<oui::PopupItem> help =
+            {
+                {
+                    L"&Help",
+                    []() {}
+                },
+                {
+                    L"&About",
+                    []() {}
+                }
+            };
+            m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("help")),
+                std::move(help)
+            );
+        }
         SetOnResize([&]() { 
             
             m_menu->Dock();
@@ -48,7 +103,7 @@ public:
                            !(evt.keyState.state & evt.keyState.AnyCtrl) &&
                            !(evt.keyState.state & evt.keyState.AnyShift);
             bool noModifiers = !(evt.keyState.state & evt.keyState.AnyAlt & evt.keyState.AnyCtrl & evt.keyState.AnyShift);
-
+            bool openPopup = false;
             if (evt.keyEvent.rawText.native.empty())
             {
                 switch (evt.keyEvent.virtualKey)
@@ -59,6 +114,7 @@ public:
                     break;
                 case oui::VirtualKey::kF10:
                     activate = noModifiers;
+                    openPopup = true;
                     break;
                 }
                 
@@ -72,6 +128,10 @@ public:
                     m_menu->SetPrevFocus(pool->GetFocus());
                     m_menu->Activate();
                     pool->SetFocus(m_menu);
+                    if (openPopup)
+                    {
+                        m_menu->OpenPopup();
+                    }
                     return true;
                 }
             }

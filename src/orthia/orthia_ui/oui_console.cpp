@@ -59,6 +59,21 @@ namespace oui
     {
 
     }
+    void CConsole::SetPalette(std::array<COLORREF, 16>& colors)
+    {
+        CConsoleStateSaver saver;
+        std::copy(colors.begin(), colors.end(), saver.GetScreenInfo().ColorTable);
+    }
+    void CConsole::SetDefaultPalette()
+    {
+        std::array<COLORREF, 16> colors;
+        for (int i = 0; i < 16; ++i)
+        {
+            auto& color = g_defaultPalette[i].color;
+            colors[i] = RGB(color.Red(), color.Green(), color.Blue());
+        }
+        SetPalette(colors);
+    }
     void CConsole::Init()
     {
         DWORD mode = 0;
@@ -71,6 +86,7 @@ namespace oui
             SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode);
         }
         FixupAfterResize();
+        SetDefaultPalette();
     }
     void CConsole::HideCursor()
     {
@@ -146,6 +162,25 @@ namespace oui
     }
 
     // CConsoleDrawAdapter
+    void CConsoleDrawAdapter::PaintMenuSeparator(const Point& position,
+        int width,
+        Color textColor,
+        Color textBgColor)
+    {
+        if (width <= 0)
+        {
+            return;
+        }
+        if (!m_separator.empty())
+        {
+            m_separator[0] = L'─';
+            m_separator[m_separator.size() - 1] = L'─';
+        }
+        m_separator.resize(width, L'─');
+        m_separator[0] = L'╟';
+        m_separator[m_separator.size() - 1] = L'╢';
+        PaintText(position, textColor, textBgColor, m_separator);
+    }
     void CConsoleDrawAdapter::PaintText(const Point& position,
         Color textColor,
         Color textBgColor,
@@ -200,12 +235,13 @@ namespace oui
             {
                 hotkeySymbolTmp = 0;
                 --p;
-                currentAttributes = highAttributes;;
+                currentAttributes = highAttributes;
                 continue;
             }
             p->Attributes = currentAttributes;
             p->Char.UnicodeChar = *textPtr;
             currentAttributes = normalAttributes;
+            hotkeySymbolTmp = hotkeySymbol;
         }
     }
     void CConsoleDrawAdapter::PaintBorder(const Rect& rect_in,
@@ -252,7 +288,8 @@ namespace oui
             lineData[u].Char.UnicodeChar = L'═';
             lineData[u].Attributes = consoleColor;
         }
-        lineData[xend-1].Attributes = consoleColor;
+
+        lineData[xend - 1].Attributes = consoleColor;
         lineData[xend - 1].Char.UnicodeChar = L'╗';
 
         lineData += m_size.width;
@@ -394,6 +431,7 @@ namespace oui
         {
             if (SetConsoleScreenBufferInfoEx(GetStdHandle(STD_OUTPUT_HANDLE), &m_screenInfo))
             {
+                SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), TRUE, &m_screenInfo.srWindow);
                 if (m_restoreData)
                 {
                     COORD bufferCoord = { (SHORT)0, (SHORT)0 };

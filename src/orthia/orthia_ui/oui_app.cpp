@@ -59,7 +59,6 @@ namespace oui
 
         mainConsole.Init();
 
-        
         auto consoleSize = mainConsole.GetSize();
         InputEvent initialEvent;
         initialEvent.resizeEvent.valid = true;
