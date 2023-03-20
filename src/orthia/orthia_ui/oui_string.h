@@ -13,6 +13,7 @@ namespace oui
 #endif
         typedef typename decltype(native)::value_type char_type;
         typedef decltype(native) string_type;
+        const static char_type symSpace = (char_type)' ';
 
         String()
         {

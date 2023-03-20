@@ -38,6 +38,12 @@ namespace oui
         // console 
         ResizeEvent resizeEvent;
     };
+
+    struct Hotkey
+    {
+        KeyState keyState;
+        VirtualKey hotkey;
+    };
 }
 
 #if defined(_WIN32)

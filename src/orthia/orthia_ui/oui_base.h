@@ -9,6 +9,7 @@
 #include <functional>
 #include <atomic>
 #include <algorithm>
+#include <array>
 
 struct IUnknown;
 namespace oui
@@ -19,7 +20,13 @@ namespace oui
         int x = 0;
         int y = 0;
     };
-
+    inline Point operator + (const Point& pt1, const Point& pt2)
+    {
+        Point res = pt1;
+        res.x += pt2.x;
+        res.y += pt2.y;
+        return res;
+    }
     inline bool operator == (const Point& pt1, const Point& pt2)
     {
         return pt1.x == pt2.x && pt1.y == pt2.y;
@@ -60,17 +67,17 @@ namespace oui
     template <class T>
     inline void hash_combine(std::size_t& seed, T * arr, size_t size)
     {
-        constexpr size_t FNV_prime = 1099511628211ul;
-        constexpr size_t FNV_offset = 14695981039346656037ul;
+        constexpr unsigned long long FNV_prime = 1099511628211ul;
+        constexpr unsigned long long FNV_offset = 14695981039346656037ul;
 
-        size_t hashed = FNV_offset;
+        unsigned long long hashed = FNV_offset;
         T* p = arr;
         for (size_t i = 0; i < size; ++i, ++p)
         {
             hashed ^= (size_t)*p;
             hashed *= FNV_prime;
         }
-        seed ^= hashed;
+        seed ^= (size_t)hashed;
     }
 
 
@@ -82,36 +89,13 @@ namespace oui
     {
         return (ch & 0xC0) != 0x80;
     }
-    inline int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in)
-    {
-        wchar_t exceptSym = exceptSym_in;
-        int charCount = 0;
-        const wchar_t* pEnd = pStart + sizeInWchars;
-        for (const wchar_t* p = pStart; p < pEnd; ++p)
-        {
-            wchar_t ch = *p;
-            if (ch == exceptSym)
-            {
-                exceptSym = 0;
-                continue;
-            }
-            ++charCount;
-            if (IsLeadByte(ch))
-            {
-                ++p;
-                if (p >= pEnd)
-                {
-                    break;
-                }
-            }
-        }
-        return charCount;
-    }
+    int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in);
 
     template<class Type>
     int CalculateSymbolsCount(const Type& str, const wchar_t exceptSym_in)
     {
         return CalculateSymbolsCount(str.c_str(), str.size(), exceptSym_in);
     }
+
 
 }

@@ -118,4 +118,38 @@ namespace oui
         std::shared_ptr<CWindow> GetRootWindow();
         void AddChild(std::shared_ptr<CWindow> child);
     };
+
+    template<class Type>
+    std::shared_ptr<Type> Cast_t(std::shared_ptr<CWindow> window)
+    {
+        return std::static_pointer_cast<Type>(window);
+    }
+    template<class Type>
+    std::shared_ptr<Type> GetParent_t(std::shared_ptr<CWindow> window)
+    {
+        auto parent = window->GetParent();
+        if (!parent)
+        {
+            return nullptr;
+        }
+        return Cast_t<Type>(parent);
+    }
+    template<class Type>
+    std::shared_ptr<Type> GetParent_t(CWindow* window)
+    {
+        auto parent = window->GetParent();
+        if (!parent)
+        {
+            return nullptr;
+        }
+        return Cast_t<Type>(parent);
+    }
+
+    template<class Type>
+    Size GetBorderSize(Type ptr)
+    {
+        auto size = ptr->GetSize();
+        auto clientRect = ptr->GetClientRect();
+        return { size.width - clientRect.size.width, size.height - clientRect.size.height };
+    }
 }

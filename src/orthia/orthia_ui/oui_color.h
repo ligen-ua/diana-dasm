@@ -83,11 +83,23 @@ namespace oui
         Color buttonBackground;
         Color buttonHotkeyText;
     };
-    struct MenuColorProfile
+    struct MenuSectionColorProfile
     {
         Color backgroundColor;
         MenuButtonProfile normal;
         MenuButtonProfile selected;
+    };
+    struct MenuPopupColorProfile
+    {
+        Color borderColor;
+        Color borderBackgroundColor;
+        MenuButtonProfile normal;
+        MenuButtonProfile selected;
+    };
+    struct MenuColorProfile
+    {
+        MenuSectionColorProfile menu;
+        MenuPopupColorProfile popup;
     };
     void InitDefaultColorProfile(MenuColorProfile& profile);
 }
