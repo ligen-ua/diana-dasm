@@ -3,6 +3,7 @@
 namespace oui
 {
     static const auto g_HotKeySymbol = String::char_type('&');
+
     // CMenuButtonWindow
     CMenuButtonWindow::CMenuButtonWindow(const String& caption,
         std::function<void()> handler,
@@ -12,6 +13,47 @@ namespace oui
         m_handler(handler),
         m_items(std::move(items))
     {
+    }
+    bool CMenuButtonWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    {
+        auto parentMenu = GetParent_t<CMenuWindow>(this);
+        if (!parentMenu)
+        {
+            return false;
+        }
+        auto me = Cast_t<CMenuButtonWindow>(GetPtr());
+        if (!me)
+        {
+            return false;
+        }
+
+        // handle move only if menu is already open
+        if (evt.mouseEvent.button == MouseButton::Move)
+        {
+            if (!parentMenu->IsActiveOrFocused())
+            {
+                return true;
+            }
+        }
+        else
+        {
+            if (evt.mouseEvent.button != MouseButton::Left)
+            {
+                return true;
+            }
+            else
+            {
+                // check if already open
+                if (parentMenu->GetSelectedButton().get() == this &&
+                    parentMenu->PopupIsOpen())
+                {
+                    parentMenu->Deactivate();
+                    return true;
+                }
+            }
+        }
+        parentMenu->SelectAndOpenPopup(me);
+        return true;
     }
     void CMenuButtonWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
@@ -76,6 +118,49 @@ namespace oui
         :
         m_menuWindow(menuWindow)
     {
+    }
+
+
+    bool CMenuPopup::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    {
+        auto menu = m_menuWindow.lock();
+        if (!menu)
+        {
+            return false;
+        }
+        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
+        if (!selectedButton)
+        {
+            return false;
+        }
+        auto popupItems = selectedButton->GetPopupItems();
+        if (!popupItems)
+        {
+            return false;
+        }
+
+        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+        if (relativePoint.x < 0 || relativePoint.y < 0 || relativePoint.y >= popupItems->size())
+        {
+            return false;
+        }
+        int index = relativePoint.y;
+        if (!(*popupItems)[index].handler)
+        {
+            // separator found
+            return true;
+        }
+        switch (evt.mouseEvent.button)
+        {
+        case MouseButton::Move:
+            m_selectedPosition = index;
+            Invalidate();
+            break;
+        case MouseButton::Left:
+            FireEvent();
+            break;
+        }
+        return true;
     }
     void CMenuPopup::ShiftIndex(int difference)
     {
@@ -156,6 +241,10 @@ namespace oui
         auto parentMenu = m_menuWindow.lock();
         if (parentMenu)
         {
+            if (m_hotkeys.ProcessEvent(evt))
+            {
+                return true;
+            }
             if (evt.keyEvent.valid)
             {
                 switch (evt.keyEvent.virtualKey)
@@ -178,6 +267,13 @@ namespace oui
                     return true;
                 case oui::VirtualKey::Enter:
                     FireEvent();
+                    return true;
+
+                case oui::VirtualKey::Escape:
+                    if (auto menu = m_menuWindow.lock())
+                    {
+                        menu->Deactivate();
+                    }
                     return true;
                 }
             }
@@ -290,6 +386,23 @@ namespace oui
         }
     }
 
+    void CMenuPopup::UpdateHotkeys(std::shared_ptr<CWindow> menu,
+        const std::vector<PopupItem>& items)
+    {
+        m_hotkeys.Clear();
+        for (auto& item : items)
+        {
+            if (item.hotkey.hotkey != VirtualKey::None)
+            {
+                m_hotkeys.Register(item.hotkey,
+                    [handler = item.handler, this, menu]() {
+                        handler();
+                        Destroy();
+                        menu->Deactivate();
+                });
+            }
+        }
+    }
     void CMenuPopup::Dock()
     {
         m_selectedPosition = 0;
@@ -310,6 +423,7 @@ namespace oui
             menu->SetFocus();
             return;
         }
+        UpdateHotkeys(menu, *popupItems);
 
         int maxWidth = 0;
         String tmp;
@@ -340,16 +454,18 @@ namespace oui
         m_menuColorProfile = std::make_shared<MenuColorProfile>();
         InitDefaultColorProfile(*m_menuColorProfile);
     }
-    void CMenuWindow::AddButton(const String& caption,
+    std::shared_ptr<CMenuButtonWindow> CMenuWindow::AddButton(const String& caption,
         std::function<void()> handler)
     {
         std::vector<PopupItem> empty;
         m_buttons.push_back(std::make_shared<CMenuButtonWindow>(caption, handler, std::move(empty)));
+        return m_buttons.back();
     }
-    void CMenuWindow::AddButton(const String& caption,
+    std::shared_ptr<CMenuButtonWindow> CMenuWindow::AddButton(const String& caption,
         std::vector<PopupItem>&& items)
     {
         m_buttons.push_back(std::make_shared<CMenuButtonWindow>(caption, nullptr, std::move(items)));
+        return m_buttons.back();
     }
     void CMenuWindow::ConstuctChilds()
     {
@@ -461,7 +577,22 @@ namespace oui
     }
     void CMenuWindow::Activate()
     {
+        if (IsActive())
+        {
+            return;
+        }
         CWindow::Activate();
+
+        auto pool = GetPool();
+        if (!pool)
+        {
+            return;
+        }
+        if (pool->GetFocus().get() != this)
+        {
+            SetPrevFocus(pool->GetFocus());
+            SetFocus();
+        }
     }
     void CMenuWindow::Deactivate()
     {
@@ -478,8 +609,28 @@ namespace oui
         }
         CWindow::Deactivate();
     }
+    void CMenuWindow::SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button)
+    {
+        auto it = std::find(m_buttons.begin(), m_buttons.end(), button);
+        if (it == m_buttons.end())
+        {
+            return;
+        }
+        m_selectedButtonIndex = (int)(it - m_buttons.begin());
+        Activate();
+        OpenPopup();
+    }
+    bool CMenuWindow::PopupIsOpen() const 
+    {
+        return m_currentPopup.get();
+    }
     void CMenuWindow::OpenPopup()
     {
+        if (m_currentPopup)
+        {
+            m_currentPopup->Destroy();
+            m_currentPopup = nullptr;
+        }
         std::shared_ptr<CMenuButtonWindow> selectedButton = GetSelectedButton();
         if (!selectedButton)
         {

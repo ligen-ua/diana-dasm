@@ -46,6 +46,7 @@ namespace oui
         Point position;
         Size size;
     };
+    bool IsInside(const Rect& rect, Point& pt);
 
     class Noncopyable {
     public:
@@ -97,5 +98,10 @@ namespace oui
         return CalculateSymbolsCount(str.c_str(), str.size(), exceptSym_in);
     }
 
+    template<class Type>
+    wchar_t QueryFirstSymbol(const Type& str, const wchar_t exceptSym_in)
+    {
+        return QueryFirstSymbol(str.c_str(), str.size(), exceptSym_in);
+    }
 
 }

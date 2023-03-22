@@ -53,7 +53,6 @@ namespace oui
         }
         return charCount;
     }
-
     int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in)
     {
         if (g_consoleSupportsUTF16)
@@ -61,5 +60,24 @@ namespace oui
             return CalculateSymbolsCountUTF16(pStart, sizeInWchars, exceptSym_in);
         }
         return CalculateSymbolsCountUCS2(pStart, sizeInWchars, exceptSym_in);
+    }
+
+    bool IsInside(const Rect& rect, Point& pt)
+    {
+        if (pt.x < rect.position.x)
+            return false;
+        if (pt.y < rect.position.y)
+            return false;
+        int xend = rect.position.x + rect.size.width;
+        int yend = rect.position.y + rect.size.height;
+        if (pt.x >= xend)
+        {
+            return false;
+        }
+        if (pt.y >= yend)
+        {
+            return false;
+        }
+        return true;
     }
 }

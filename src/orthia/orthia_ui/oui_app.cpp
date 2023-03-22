@@ -27,7 +27,6 @@ namespace oui
         rootWindow->Init(m_pool);
 
         oui::CConsole mainConsole;
-
         try
         {
             oui::CConsoleStateSaver stateSaver;

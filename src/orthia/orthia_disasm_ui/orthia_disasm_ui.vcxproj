@@ -180,9 +180,12 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="orthia_model.cpp" />
     <ClCompile Include="ui_en.cpp" />
+    <ClCompile Include="ui_main_window.cpp" />
+    <ClCompile Include="ui_menu.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h" />
+    <ClInclude Include="ui_main_window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

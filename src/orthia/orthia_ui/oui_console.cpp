@@ -77,13 +77,12 @@ namespace oui
     void CConsole::Init()
     {
         DWORD mode = 0;
-        if (GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode))
-        {
-            mode |= ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
-
-            mode &= ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | OUI_ENABLE_VIRTUAL_TERMINAL_INPUT);
-
-            SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode);
+        auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
+        if (GetConsoleMode(inputHandle, &mode))
+        {            
+            mode &= ~(ENABLE_QUICK_EDIT_MODE | ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | OUI_ENABLE_VIRTUAL_TERMINAL_INPUT);
+            mode |= ENABLE_EXTENDED_FLAGS| ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+            SetConsoleMode(inputHandle, mode);
         }
         FixupAfterResize();
         SetDefaultPalette();

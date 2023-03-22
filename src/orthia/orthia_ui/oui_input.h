@@ -4,10 +4,31 @@
 
 namespace oui
 {
+    
+    enum class MouseButton 
+    {
+        None = 0,
+        Move = 1,
+        Left = 2,
+        Middle = 3,
+        Right = 4,
+        WheelUp = 5,
+        WheelDown = 6
+    };
+
+    enum class MouseState
+    {
+        None = 0,
+        Pressed = 1,
+        Released = 2
+    };
+
     struct MouseEvent
     {
         bool valid = false;
         Point point;
+        MouseButton button = MouseButton::None;
+        MouseState state = MouseState::None;
     };
 
     struct ResizeEvent
@@ -21,7 +42,7 @@ namespace oui
     {
         bool valid = false;
         String rawText;
-        VirtualKey virtualKey;
+        VirtualKey virtualKey = VirtualKey::None;
     };
 
     struct InputEvent
@@ -33,7 +54,7 @@ namespace oui
         KeyboardEvent keyEvent;
 
         // mouse
-        MouseEvent mouse;
+        MouseEvent mouseEvent;
         
         // console 
         ResizeEvent resizeEvent;
@@ -43,6 +64,38 @@ namespace oui
     {
         KeyState keyState;
         VirtualKey hotkey;
+
+        Hotkey()
+        {
+        }
+        Hotkey(const KeyState& keyState_in,
+               const VirtualKey& hotkey_in)
+            :
+                keyState(keyState_in),
+                hotkey(hotkey_in)
+        {
+        }
+        Hotkey(const VirtualKey& hotkey_in)
+            :
+            hotkey(hotkey_in)
+        {
+        }
+    };
+
+    inline bool operator == (const Hotkey& k1, const Hotkey& k2)
+    {
+        return k1.hotkey == k2.hotkey && k1.keyState.state == k2.keyState.state;
+    }
+
+    struct HotkeyHash
+    {
+        std::size_t operator()(const Hotkey& k) const
+        {
+            std::size_t seed = 0;
+            hash_combine(seed, k.keyState.state);
+            hash_combine(seed, k.hotkey);
+            return seed;
+        }
     };
 }
 
