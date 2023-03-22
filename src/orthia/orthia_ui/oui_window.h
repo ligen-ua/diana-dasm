@@ -60,9 +60,12 @@ namespace oui
             AddChild(child);
             return child;
         }
+        virtual bool HandleMouseEvent(const Rect& rect, InputEvent& evt);
+
+        virtual bool ProcessMouseEvent(const Rect& rect, InputEvent& evt);
 
         virtual void OnInit(std::shared_ptr<CWindowsPool> pool);
-
+        void RenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler);
     public:
         CWindow();
         virtual ~CWindow();
@@ -152,4 +155,7 @@ namespace oui
         auto clientRect = ptr->GetClientRect();
         return { size.width - clientRect.size.width, size.height - clientRect.size.height };
     }
+
+    Point GetRelativeMousePoint(const Rect& rect, const Point& point);
+    Point GetClientMousePoint(CWindow* pWindow, const Rect& rect, const Point& point);
 }

@@ -151,6 +151,7 @@
     <ClCompile Include="oui_base.cpp" />
     <ClCompile Include="oui_color.cpp" />
     <ClCompile Include="oui_console.cpp" />
+    <ClCompile Include="oui_hotkey.cpp" />
     <ClCompile Include="oui_input_win32.cpp" />
     <ClCompile Include="oui_menu.cpp" />
     <ClCompile Include="oui_modal.cpp" />
@@ -163,6 +164,7 @@
     <ClInclude Include="oui_color.h" />
     <ClInclude Include="oui_console.h" />
     <ClInclude Include="oui_containers.h" />
+    <ClInclude Include="oui_hotkey.h" />
     <ClInclude Include="oui_input.h" />
     <ClInclude Include="oui_input_win32.h" />
     <ClInclude Include="oui_keyboard.h" />

@@ -15,10 +15,58 @@ namespace oui
         const static int RightShift = 0x0400;
 
         int state = 0;
+        KeyState()
+        {
+        }
+        KeyState(int state_in)
+            :
+                state(state_in)
+        {
+        }
+        bool HasModifiers() const
+        {
+            return state & (AnyAlt | AnyCtrl | AnyShift);
+        }
     };
     enum class VirtualKey
     {
-        None,
+        None = 0,
+        kA = 1,
+        kB = 2,
+        kС = 3,
+        kD = 4,
+        kE = 5,
+        kF = 6,
+        kG = 7,
+        kH = 8,
+        kI = 9,
+        kJ = 10,
+        kK = 11,
+        kL = 12,
+        kM = 13,
+        kN = 14,
+        kO = 15,
+        kP = 16,
+        kQ = 17,
+        kR = 18,
+        kS = 19,
+        kT = 20,
+        kU = 21,
+        kV = 22,
+        kW = 23,
+        kX = 24,
+        kY = 25,
+        kZ = 26,
+        k0 = 27,
+        k1 = 28,
+        k2 = 29,
+        k3 = 30,
+        k4 = 31,
+        k5 = 32,
+        k6 = 33,
+        k7 = 34,
+        k8 = 35,
+        k9 = 36,
         Escape,
         kF1,
         kF2,

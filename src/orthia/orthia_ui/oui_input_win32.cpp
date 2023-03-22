@@ -44,7 +44,14 @@ namespace oui
         {
             return (VirtualKey)((int)VirtualKey::kF1 + (wVirtualKeyCode - VK_F1));
         }
-
+        if (wVirtualKeyCode >= 'A' && wVirtualKeyCode <= 'Z')
+        {
+            return (VirtualKey)((int)VirtualKey::kA + (wVirtualKeyCode - 'A'));
+        }
+        if (wVirtualKeyCode >= '0' && wVirtualKeyCode <= '9')
+        {
+            return (VirtualKey)((int)VirtualKey::k0 + (wVirtualKeyCode - '0'));
+        }
         if ((state.state & state.AnyCtrl) && !(state.state& state.AnyAlt))
         {
             if (wVirtualKeyCode == 'C')
@@ -102,10 +109,20 @@ namespace oui
         }
         return VirtualKey::None;
     }
-    static bool TranslateKeyEvent(INPUT_RECORD& raw, InputEvent& evt)
+    bool CConsoleInputReader::TranslateKeyEvent(INPUT_RECORD& raw, InputEvent& evt)
     {
         if (!raw.Event.KeyEvent.bKeyDown)
         {
+            // handle the case when user just presses ALT
+            if (raw.Event.KeyEvent.wVirtualKeyCode == VK_MENU && !evt.keyState.state)
+            {
+                if (!m_altHotkeyHappened)
+                {
+                    evt.keyState.state |= evt.keyState.LeftAlt | evt.keyState.AnyAlt;
+                    evt.keyEvent.virtualKey = VirtualKey::None;
+                    return true;
+                }
+            }
             return false;
         }
 
@@ -115,30 +132,78 @@ namespace oui
         evt.keyEvent.virtualKey = TranslateVirtualKey(raw.Event.KeyEvent.wVirtualKeyCode, evt.keyState);
         if (evt.keyEvent.virtualKey == VirtualKey::None)
         {
-            if (raw.Event.KeyEvent.uChar.UnicodeChar)
+            if (raw.Event.KeyEvent.wVirtualKeyCode == VK_MENU && 
+                !((KeyState::AnyCtrl | KeyState::AnyShift) & evt.keyState.state))
             {
-                evt.keyEvent.rawText.native.append(&raw.Event.KeyEvent.uChar.UnicodeChar, 1);
+                // we will handle this at up
+                return false;
             }
+            m_altHotkeyHappened = false;
+        }
+        else
+        {
+            m_altHotkeyHappened = evt.keyState.state & evt.keyState.AnyAlt;
+        }
+        if (raw.Event.KeyEvent.uChar.UnicodeChar)
+        {
+            evt.keyEvent.rawText.native.append(&raw.Event.KeyEvent.uChar.UnicodeChar, 1);
         }
         return true;
     }
-    static bool TranslateEvent(INPUT_RECORD& raw, InputEvent& evt)
+
+    static MouseButton GetMouseButton(MOUSE_EVENT_RECORD& mouseEvent)
     {
-        if (raw.EventType & KEY_EVENT)
+        if (mouseEvent.dwEventFlags == MOUSE_MOVED)
         {
+            return MouseButton::Move;
+        }
+        if (mouseEvent.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED)
+        {
+            return MouseButton::Left;
+        }
+        if (mouseEvent.dwButtonState & RIGHTMOST_BUTTON_PRESSED)
+        {
+            return MouseButton::Right;
+        }
+        return MouseButton::None;
+    }
+    static MouseState GetMouseState(MOUSE_EVENT_RECORD& mouseEvent)
+    {
+        return MouseState::Pressed;
+    }
+    bool CConsoleInputReader::TranslateEvent(INPUT_RECORD& raw, InputEvent& evt)
+    {
+        switch (raw.EventType)
+        {
+        case FOCUS_EVENT:
+            return false;
+
+        case KEY_EVENT:
             evt.keyEvent.valid = TranslateKeyEvent(raw, evt);
-        }
-        if (raw.EventType & MOUSE_EVENT)
-        {
-            evt.keyState = TranslateKeyState(raw.Event.MouseEvent.dwControlKeyState);
-        }
-        if (raw.EventType & WINDOW_BUFFER_SIZE_EVENT)
-        {
-            evt.resizeEvent.valid = true;
-            evt.resizeEvent.newWidth = raw.Event.WindowBufferSizeEvent.dwSize.X;
-            evt.resizeEvent.newHeight = raw.Event.WindowBufferSizeEvent.dwSize.Y;
-        }
-        return evt.keyEvent.valid || evt.resizeEvent.valid || evt.mouse.valid;
+            break;
+
+        case MOUSE_EVENT:
+            {
+                evt.keyState = TranslateKeyState(raw.Event.MouseEvent.dwControlKeyState);
+                evt.mouseEvent.button = GetMouseButton(raw.Event.MouseEvent);
+                evt.mouseEvent.state = GetMouseState(raw.Event.MouseEvent);
+                if (evt.mouseEvent.button != MouseButton::None && evt.mouseEvent.state != MouseState::None)
+                {
+                    evt.mouseEvent.valid = true;
+                    evt.mouseEvent.point.x = raw.Event.MouseEvent.dwMousePosition.X;
+                    evt.mouseEvent.point.y = raw.Event.MouseEvent.dwMousePosition.Y;
+                }
+                break;
+            }
+        case WINDOW_BUFFER_SIZE_EVENT:
+            {
+                evt.resizeEvent.valid = true;
+                evt.resizeEvent.newWidth = raw.Event.WindowBufferSizeEvent.dwSize.X;
+                evt.resizeEvent.newHeight = raw.Event.WindowBufferSizeEvent.dwSize.Y;
+                break;
+            }
+        };
+        return evt.keyEvent.valid || evt.resizeEvent.valid || evt.mouseEvent.valid;
     }
 
 
@@ -236,7 +301,6 @@ namespace oui
                     continue;
                 }
                 if (event.keyEvent.valid &&
-                    event.keyEvent.virtualKey == VirtualKey::None &&
                     event.keyEvent.rawText.native.size() == 1)
                 {
                     if (IsLeadByte(event.keyEvent.rawText.native[0]))

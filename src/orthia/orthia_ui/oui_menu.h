@@ -3,6 +3,7 @@
 #include "oui_window.h"
 #include "oui_win_styles.h"
 #include "oui_modal.h"
+#include "oui_hotkey.h"
 
 namespace oui
 {
@@ -31,8 +32,8 @@ namespace oui
         void DoPaint(const Rect& rect, 
             DrawParameters& parameters) override;
 
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         void Dock();
-
         std::shared_ptr<const std::vector<PopupItem>> GetPopupItems();
     };
 
@@ -43,17 +44,18 @@ namespace oui
 
         std::weak_ptr<CMenuWindow> m_menuWindow;
         std::shared_ptr<MenuColorProfile> m_menuColorProfile;
+        CHotkeyStorage m_hotkeys;
 
         int m_selectedPosition = 0;
         void ShiftIndex(int difference);
-
         void FireEvent();
-
+        void UpdateHotkeys(std::shared_ptr<CWindow> menu, const std::vector<PopupItem>& items);
     public:
         CMenuPopup(std::shared_ptr<CMenuWindow> menuWindow);
         bool ProcessEvent(oui::InputEvent& evt) override;
         void Dock();
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
     };
 
     class CMenuWindow:public oui::SimpleBrush<CWindow>
@@ -72,15 +74,15 @@ namespace oui
 
     public:
         CMenuWindow();
-        void AddButton(const String& caption,
+        std::shared_ptr<CMenuButtonWindow> AddButton(const String& caption,
             std::function<void()> handler);
-        void AddButton(const String& caption,
+        std::shared_ptr<CMenuButtonWindow> AddButton(const String& caption,
             std::vector<PopupItem>&& items);
         void ConstuctChilds() override;
         void Dock();
         std::shared_ptr<MenuColorProfile> GetColorProfile();
 
-        std::shared_ptr<CMenuButtonWindow>  GetSelectedButton();
+        std::shared_ptr<CMenuButtonWindow> GetSelectedButton();
         
         void SetSelectedButtonIndex(int index);
         int GetSelectedButtonIndex() const;
@@ -93,6 +95,9 @@ namespace oui
         void Deactivate() override;
 
         void OpenPopup();
+
+        bool PopupIsOpen() const;
+        void SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button);
     };
 
 }

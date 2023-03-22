@@ -1,4 +1,5 @@
 #include "oui_window.h"
+#include "oui_input.h"
 
 namespace oui
 {
@@ -277,6 +278,15 @@ namespace oui
             this->Invalidate(true);
             force = true;
         }
+
+        RenderChilds(rect, [&](std::shared_ptr<CWindow> child, const Rect& childRect) {
+            child->DrawTo(childRect, parameters, force);
+            return true;
+        });
+    }
+
+    void CWindow::RenderChilds(const Rect& rect, std::function<bool (std::shared_ptr<CWindow> child, const Rect& childRect)> handler)
+    {
         // draw childs anyway
         int endX = rect.position.x + rect.size.width;
         int endY = rect.position.y + rect.size.height;
@@ -315,7 +325,10 @@ namespace oui
             Rect childRect;
             childRect.position = childAbs;
             childRect.size = childSize;
-            child->DrawTo(childRect, parameters, force);
+            if (!handler(child, childRect))
+            {
+                break;
+            }
         }
     }
     void CWindow::Invalidate(bool valid)
@@ -326,9 +339,49 @@ namespace oui
     {
         return m_valid;
     }
+    bool CWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    {
+        return false;
+    }
+
+    bool CWindow::ProcessMouseEvent(const Rect& rect, InputEvent& evt)
+    {
+        bool handled = false;
+        RenderChilds(rect, [&](std::shared_ptr<CWindow> child, const Rect& childRect) {
+
+            if (IsInside(childRect, evt.mouseEvent.point))
+            {
+                handled = child->ProcessMouseEvent(childRect, evt);
+                if (handled)
+                {
+                    return false;
+                }
+            }
+            return true;
+        });
+        if (handled)
+        {
+            return true;
+        }
+        if (!IsInside(rect, evt.mouseEvent.point))
+        {
+            return false;
+        }
+        return HandleMouseEvent(rect, evt);
+    }
 
     bool CWindow::ProcessEvent(InputEvent& evt)
     {
+        if (evt.mouseEvent.valid)
+        {
+            Rect rect;
+            rect.size = this->GetSize();
+
+            if (ProcessMouseEvent(rect, evt))
+            {
+                return true;
+            }
+        }
         return false;
     }
     void CWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
@@ -342,5 +395,15 @@ namespace oui
             return pool->GetRootWindow();
         }
         return nullptr;
+    }
+    Point GetClientMousePoint(CWindow* pWindow, const Rect& rect, const Point& point)
+    {
+        auto relPoint = GetRelativeMousePoint(rect, point);
+        auto clientRect = pWindow->GetClientRect();
+        return { relPoint.x - clientRect.position.x, relPoint.y - clientRect.position.y };
+    }
+    Point GetRelativeMousePoint(const Rect& rect, const Point& point)
+    {
+        return Point{ point.x - rect.position.x, point.y - rect.position.y };
     }
 }
