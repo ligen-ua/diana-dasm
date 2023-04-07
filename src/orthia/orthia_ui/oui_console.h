@@ -25,7 +25,20 @@ namespace oui
             bool keepText);
         void HideCursor();
         int TranslateColorEx(const Color& color, bool background);
+        HWND GetRealWindow();
     };
+
+    struct PanelBorderSymbols
+    {
+        oui::String::char_type vertical;
+        oui::String::char_type horizontal;
+        oui::String::char_type left_top;
+        oui::String::char_type right_top;
+        oui::String::char_type left_bottom;
+        oui::String::char_type right_bottom;
+    };
+
+    PanelBorderSymbols GetPanelBorderSymbols();
 
     class CConsoleDrawAdapter:Noncopyable
     {
@@ -37,7 +50,8 @@ namespace oui
         void PaintMenuSeparator(const Point& position,
             int width,
             Color textColor,
-            Color textBgColor);
+            Color textBgColor,
+            BorderStyle style);
 
         void PaintRect(const Rect& rect,
             Color background,
@@ -54,7 +68,8 @@ namespace oui
 
         void PaintBorder(const Rect & rect, 
             Color textColor,
-            Color textBgColor);
+            Color textBgColor,
+            BorderStyle style);
 
         // main
         void StartDraw(Size size, 

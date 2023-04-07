@@ -47,15 +47,19 @@ namespace oui
         CHotkeyStorage m_hotkeys;
 
         int m_selectedPosition = 0;
+        bool m_destroyed = false;
         void ShiftIndex(int difference);
         void FireEvent();
         void UpdateHotkeys(std::shared_ptr<CWindow> menu, const std::vector<PopupItem>& items);
     public:
         CMenuPopup(std::shared_ptr<CMenuWindow> menuWindow);
-        bool ProcessEvent(oui::InputEvent& evt) override;
+        bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void Dock();
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        void Destroy() override;
+        void Detach();
+        bool IsPopup() const override { return true; }
     };
 
     class CMenuWindow:public oui::SimpleBrush<CWindow>
@@ -88,7 +92,7 @@ namespace oui
         int GetSelectedButtonIndex() const;
         void ShiftSelectedButtonIndex(int difference);
 
-        bool ProcessEvent(oui::InputEvent& evt) override;
+        bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
 
         void SetPrevFocus(std::shared_ptr<CWindow> prevFocus);
         void Activate() override;

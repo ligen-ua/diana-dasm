@@ -101,5 +101,25 @@ namespace oui
         MenuSectionColorProfile menu;
         MenuPopupColorProfile popup;
     };
-    void InitDefaultColorProfile(MenuColorProfile& profile);
+    
+    void QueryDefaultColorProfile(MenuColorProfile& profile);
+
+
+    struct PanelCaptionProfile
+    {
+        Color text;
+        Color background;
+        Color hotkeyText;
+    };
+    struct PanelColorProfile
+    {
+        Color borderText;
+        Color borderBackground;
+
+        PanelCaptionProfile normal;
+        PanelCaptionProfile selected;
+        PanelCaptionProfile mouseHighlight;
+    };
+    void QueryDefaultColorProfile(PanelColorProfile& profile);
+
 }

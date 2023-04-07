@@ -53,6 +53,44 @@ namespace oui
         }
         return charCount;
     }
+
+    static int CutStringUTF16(std::wstring& str, int maxCharsCount)
+    {
+        int charCount = 0;
+        const wchar_t* pEnd = str.c_str() + str.size();
+        for (const wchar_t* p = str.c_str(); p < pEnd; ++p)
+        {
+            wchar_t ch = *p;
+            if (charCount >= maxCharsCount)
+            {
+                str.resize(p - str.c_str());
+                break;
+            }
+            ++charCount;
+            if (IsLeadByte(ch))
+            {
+                ++p;
+                if (p >= pEnd)
+                {
+                    break;
+                }
+            }
+        }
+        return charCount;
+    }
+    int CutString(std::wstring& str, int maxCharsCount)
+    {
+        if (g_consoleSupportsUTF16)
+        {
+            return CutStringUTF16(str, maxCharsCount);
+        }
+        if (str.size() > maxCharsCount)
+        {
+            str.resize(maxCharsCount);
+            return maxCharsCount;
+        }
+        return (int)str.size();
+    }
     int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in)
     {
         if (g_consoleSupportsUTF16)
@@ -62,6 +100,10 @@ namespace oui
         return CalculateSymbolsCountUCS2(pStart, sizeInWchars, exceptSym_in);
     }
 
+    bool IsInside(const Range& range, int value)
+    {
+        return value >= range.begin && value < range.end;
+    }
     bool IsInside(const Rect& rect, Point& pt)
     {
         if (pt.x < rect.position.x)

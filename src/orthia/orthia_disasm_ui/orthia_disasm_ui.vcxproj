@@ -179,13 +179,17 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="orthia_model.cpp" />
+    <ClCompile Include="ui_disasm_window.cpp" />
     <ClCompile Include="ui_en.cpp" />
     <ClCompile Include="ui_main_window.cpp" />
     <ClCompile Include="ui_menu.cpp" />
+    <ClCompile Include="ui_output_window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h" />
+    <ClInclude Include="ui_disasm_window.h" />
     <ClInclude Include="ui_main_window.h" />
+    <ClInclude Include="ui_output_window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

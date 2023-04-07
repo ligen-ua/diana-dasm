@@ -10,6 +10,7 @@
 #include <atomic>
 #include <algorithm>
 #include <array>
+#include <utility>
 
 struct IUnknown;
 namespace oui
@@ -41,6 +42,14 @@ namespace oui
     {
         return size1.width == size2.width && size1.height == size2.height;
     }
+
+    struct Range
+    {
+        int begin = 0;
+        int end = 0;
+    };
+    bool IsInside(const Range& range, int value);
+
     struct Rect
     {
         Point position;
@@ -90,6 +99,7 @@ namespace oui
     {
         return (ch & 0xC0) != 0x80;
     }
+    int CutString(std::wstring & str, int maxCharsCount);
     int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in);
 
     template<class Type>
@@ -104,4 +114,9 @@ namespace oui
         return QueryFirstSymbol(str.c_str(), str.size(), exceptSym_in);
     }
 
+    enum class BorderStyle
+    {
+        Thin,
+        Thick
+    };
 }

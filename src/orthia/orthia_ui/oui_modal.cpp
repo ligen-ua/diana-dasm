@@ -23,9 +23,9 @@ namespace oui
         }
         Destroy();
     }
-    bool CModalWindow::ProcessEvent(oui::InputEvent& evt)
+    bool CModalWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
-        if (!CWindow::ProcessEvent(evt))
+        if (!CWindow::ProcessEvent(evt, evtContext))
         {
             if (evt.keyEvent.valid)
             {

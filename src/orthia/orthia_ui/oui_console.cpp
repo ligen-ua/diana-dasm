@@ -74,18 +74,45 @@ namespace oui
         }
         SetPalette(colors);
     }
+    HWND CConsole::GetRealWindow()
+    {
+        HWND hWnd = GetConsoleWindow();
+
+        wchar_t className[MAX_PATH];
+        int size = GetClassName(hWnd, className, (int)std::size(className));
+        if (size)
+        {
+            if (wcsncmp(className, L"PseudoConsoleWindow", size) == 0)
+            {
+                if (auto owner = GetWindow(hWnd, GW_OWNER))
+                    return owner;
+            }
+        }
+        return hWnd;
+    }
+
     void CConsole::Init()
     {
+        SetConsoleCP(CP_UTF8);
+        SetConsoleOutputCP(CP_UTF8);
+        setlocale(LC_ALL, ".utf8");
+
         DWORD mode = 0;
         auto inputHandle = GetStdHandle(STD_INPUT_HANDLE);
         if (GetConsoleMode(inputHandle, &mode))
-        {            
+        {
             mode &= ~(ENABLE_QUICK_EDIT_MODE | ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | OUI_ENABLE_VIRTUAL_TERMINAL_INPUT);
-            mode |= ENABLE_EXTENDED_FLAGS| ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+            mode |= ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
             SetConsoleMode(inputHandle, mode);
         }
         FixupAfterResize();
         SetDefaultPalette();
+
+        auto wnd = GetRealWindow();
+        if (IsWindowVisible(wnd))
+        {
+            SendMessage(wnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+        }
     }
     void CConsole::HideCursor()
     {
@@ -102,7 +129,7 @@ namespace oui
         if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), 
                                 &screenBufferInfo))
         {
-            return Size{ screenBufferInfo.srWindow.Right - screenBufferInfo.srWindow.Left + 1,
+           return Size{ screenBufferInfo.srWindow.Right - screenBufferInfo.srWindow.Left + 1,
                         screenBufferInfo.srWindow.Bottom - screenBufferInfo.srWindow.Top + 1 };
         }
         return result;
@@ -161,23 +188,46 @@ namespace oui
     }
 
     // CConsoleDrawAdapter
+    const wchar_t g_symsOfSeparatorThick[] = L"─╟╢";
+    const wchar_t g_symsOfSeparatorThin[] = L"─├┤";
+    const wchar_t g_symsOfBorderThick[] = L"╔═╗║╚═╝";
+    const wchar_t g_symsOfBorderThin[] = L"┌─┐│└─┘";
+
+    PanelBorderSymbols GetPanelBorderSymbols()
+    {
+        PanelBorderSymbols symbols;
+        symbols.vertical = g_symsOfBorderThin[3];
+        symbols.horizontal = g_symsOfBorderThin[1];
+        symbols.left_top = g_symsOfBorderThin[0];
+        symbols.right_top = g_symsOfBorderThin[2];
+        symbols.left_bottom = g_symsOfBorderThin[4];
+        symbols.right_bottom = g_symsOfBorderThin[6];
+        return symbols;
+    }
+
     void CConsoleDrawAdapter::PaintMenuSeparator(const Point& position,
         int width,
         Color textColor,
-        Color textBgColor)
+        Color textBgColor,
+        BorderStyle style)
     {
+        auto syms = g_symsOfSeparatorThick;
+        if (style == BorderStyle::Thin)
+        {
+            syms = g_symsOfSeparatorThin;
+        }
         if (width <= 0)
         {
             return;
         }
         if (!m_separator.empty())
         {
-            m_separator[0] = L'─';
-            m_separator[m_separator.size() - 1] = L'─';
+            m_separator[0] = syms[0];
+            m_separator[m_separator.size() - 1] = syms[0];
         }
-        m_separator.resize(width, L'─');
-        m_separator[0] = L'╟';
-        m_separator[m_separator.size() - 1] = L'╢';
+        m_separator.resize(width, syms[0]);
+        m_separator[0] = syms[1];
+        m_separator[m_separator.size() - 1] = syms[2];
         PaintText(position, textColor, textBgColor, m_separator);
     }
     void CConsoleDrawAdapter::PaintText(const Point& position,
@@ -245,8 +295,15 @@ namespace oui
     }
     void CConsoleDrawAdapter::PaintBorder(const Rect& rect_in,
         Color textColor,
-        Color textBgColor)
+        Color textBgColor,
+        BorderStyle style)
     {
+        auto syms = g_symsOfBorderThick;
+        if (style == BorderStyle::Thin)
+        {
+            syms = g_symsOfBorderThin;
+        }
+
         if (rect_in.size.height <= 0 || rect_in.size.width <= 0)
         {
             return;
@@ -280,37 +337,37 @@ namespace oui
 
         CHAR_INFO* lineData = rawData + m_size.width * rect.position.y;
 
-        lineData[rect.position.x].Char.UnicodeChar = L'╔';
+        lineData[rect.position.x].Char.UnicodeChar = syms[0];
         lineData[rect.position.x].Attributes = consoleColor;
         for (int u = rect.position.x + 1; u < xend - 1; ++u)
         {
-            lineData[u].Char.UnicodeChar = L'═';
+            lineData[u].Char.UnicodeChar = syms[1];
             lineData[u].Attributes = consoleColor;
         }
 
         lineData[xend - 1].Attributes = consoleColor;
-        lineData[xend - 1].Char.UnicodeChar = L'╗';
+        lineData[xend - 1].Char.UnicodeChar = syms[2];
 
         lineData += m_size.width;
         for (int i = 0; i < linesCount - 2; ++i, lineData += m_size.width)
         {
             DWORD charsWritten = 0;
 
-            lineData[rect.position.x].Char.UnicodeChar = L'║';
+            lineData[rect.position.x].Char.UnicodeChar = syms[3];
             lineData[rect.position.x].Attributes = consoleColor;
 
-            lineData[xend - 1].Char.UnicodeChar = L'║';
+            lineData[xend - 1].Char.UnicodeChar = syms[3];
             lineData[xend - 1].Attributes = consoleColor;
         }
 
-        lineData[rect.position.x].Char.UnicodeChar = L'╚';
+        lineData[rect.position.x].Char.UnicodeChar = syms[4];
         lineData[rect.position.x].Attributes = consoleColor;
         for (int u = rect.position.x + 1; u < xend - 1; ++u)
         {
-            lineData[u].Char.UnicodeChar = L'═';
+            lineData[u].Char.UnicodeChar = syms[5];
             lineData[u].Attributes = consoleColor;
         }
-        lineData[xend - 1].Char.UnicodeChar = L'╝';
+        lineData[xend - 1].Char.UnicodeChar = syms[6];
         lineData[xend - 1].Attributes = consoleColor;
     }
 

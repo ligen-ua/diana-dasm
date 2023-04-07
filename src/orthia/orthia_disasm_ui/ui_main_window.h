@@ -4,6 +4,9 @@
 #include "oui_app.h"
 #include "oui_menu.h"
 #include "oui_hotkey.h"
+#include "oui_containers.h"
+#include "ui_disasm_window.h"
+#include "ui_output_window.h"
 
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
@@ -11,6 +14,10 @@ extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
 {
     std::shared_ptr<oui::CMenuWindow> m_menu;
+    std::shared_ptr<oui::CPanelContainerWindow> m_panelContainerWindow;
+    std::shared_ptr<CDisasmWindow> m_disasmWindow;
+    std::shared_ptr<COutputWindow> m_outputWindow;
+
     oui::CHotkeyStorage m_hotkeys;
 
     void ConstuctMenu();
@@ -18,5 +25,5 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
 
 public:
     void ConstuctChilds() override;
-    bool ProcessEvent(oui::InputEvent& evt) override;
+    bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
 };

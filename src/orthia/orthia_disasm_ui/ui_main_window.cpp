@@ -4,15 +4,40 @@ void CMainWindow::ConstuctChilds()
 {
     CMainWindow::ConstuctMenu();
 
-    SetOnResize([&]() {
+    // construct panels
+    m_panelContainerWindow = AddChild_t(std::make_shared<oui::CPanelContainerWindow>());
+    {
+        auto disasmNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.disasm"));
+        m_disasmWindow = std::make_shared<CDisasmWindow>([=]() {  return disasmNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+        m_panelContainerWindow->AddPanel({}, m_disasmWindow, oui::PanelInfo());
+    }
+    {
+        auto outputNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.output"));
+        m_outputWindow = std::make_shared<COutputWindow>([=]() {  return outputNode->QueryValue(ORTHIA_TCSTR("caption"));  });
 
+        oui::PanelInfo panelInfo;
+        panelInfo.fixedHeight = 10;
+        m_panelContainerWindow->AddPanel({ oui::PanelOrientation::Bottom}, m_outputWindow, panelInfo);
+    }
+
+    SetOnResize([&]() {
+        
         m_menu->Dock();
+        const auto menuSize = m_menu->GetSize();
+
+        oui::Rect сlientRect = GetClientRect();
+        
+        oui::Size panelSize = сlientRect.size;
+        panelSize.height -= menuSize.height;
+        
+        m_panelContainerWindow->MoveTo({0, menuSize.height });
+        m_panelContainerWindow->Resize(panelSize);
     });
 }
 
-bool CMainWindow::ProcessEvent(oui::InputEvent& evt)
+bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
 {
-    if (oui::Fullscreen<oui::CWindow>::ProcessEvent(evt))
+    if (oui::Fullscreen<oui::CWindow>::ProcessEvent(evt, evtContext))
     {
         return true;
     }
@@ -34,7 +59,7 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt)
         {
             if (focused.get() != this)
             {
-                if (focused->ProcessEvent(evt))
+                if (focused->ProcessEvent(evt, evtContext))
                 {
                     return true;
                 }

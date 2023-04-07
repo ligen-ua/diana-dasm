@@ -109,8 +109,43 @@ namespace oui
         }
     };
 
-    void InitDefaultColorProfile(MenuColorProfile& profile)
+    void QueryDefaultColorProfile(MenuColorProfile& profile)
     {
         profile = g_menuColorProfile;
+    }
+
+    // PanelColorProfile
+    static PanelColorProfile g_panelColorProfile =
+    {
+        // border
+        {
+            ColorWhite() // borderText
+        },
+        {
+            ColorBlack() // borderBackground
+        },
+        // button normal
+        {
+            ColorWhite(),     // buttonText
+            ColorBlack(),     // buttonBackground
+            ColorCyan(),      // buttonHotkeyText
+        },
+        // selected
+        {
+            ColorCyan(),     // buttonHighlightedText
+            ColorBlack(),    // buttonHighlightedBackground
+            ColorCyan()      // buttonHighlightedHotkeyText
+        },
+        // highlight
+        {
+            ColorBlack(),     // buttonHighlightedText
+            ColorCyan(),      // buttonHighlightedBackground
+            ColorBlack()      // buttonHighlightedHotkeyText
+        }
+    };
+
+    void QueryDefaultColorProfile(PanelColorProfile& profile)
+    {
+        profile = g_panelColorProfile;
     }
 }
