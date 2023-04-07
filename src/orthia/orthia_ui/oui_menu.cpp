@@ -119,8 +119,24 @@ namespace oui
         m_menuWindow(menuWindow)
     {
     }
-
-
+    void CMenuPopup::Detach()
+    {
+        m_menuWindow.reset();
+    }
+    void CMenuPopup::Destroy()
+    {
+        if (m_destroyed)
+        {
+            return;
+        }
+        m_destroyed = true;
+        auto menu = m_menuWindow.lock();
+        Parent_type::Destroy();
+        if (menu)
+        {
+            menu->Deactivate();
+        }
+    }
     bool CMenuPopup::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
         auto menu = m_menuWindow.lock();
@@ -142,7 +158,7 @@ namespace oui
         auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
         if (relativePoint.x < 0 || relativePoint.y < 0 || relativePoint.y >= popupItems->size())
         {
-            return false;
+            return true;
         }
         int index = relativePoint.y;
         if (!(*popupItems)[index].handler)
@@ -233,10 +249,9 @@ namespace oui
         {
             handler();
             Destroy();
-            menu->Deactivate();
         }
     }
-    bool CMenuPopup::ProcessEvent(oui::InputEvent& evt)
+    bool CMenuPopup::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
         auto parentMenu = m_menuWindow.lock();
         if (parentMenu)
@@ -278,7 +293,7 @@ namespace oui
                 }
             }
         }
-        return Parent_type::ProcessEvent(evt);
+        return Parent_type::ProcessEvent(evt, evtContext);
     }
     static int ToString(const PopupItem& item, int fixedWidth, String& result)
     {
@@ -364,7 +379,8 @@ namespace oui
                 parameters.console.PaintMenuSeparator(sepPos,
                     clientRect.size.width + 2,
                     colorProfile->popup.borderColor, 
-                    colorProfile->popup.borderBackgroundColor);
+                    colorProfile->popup.borderBackgroundColor,
+                    BorderStyle::Thick);
             }
             else
             {
@@ -398,7 +414,6 @@ namespace oui
                     [handler = item.handler, this, menu]() {
                         handler();
                         Destroy();
-                        menu->Deactivate();
                 });
             }
         }
@@ -452,7 +467,7 @@ namespace oui
     CMenuWindow::CMenuWindow()
     {
         m_menuColorProfile = std::make_shared<MenuColorProfile>();
-        InitDefaultColorProfile(*m_menuColorProfile);
+        QueryDefaultColorProfile(*m_menuColorProfile);
     }
     std::shared_ptr<CMenuButtonWindow> CMenuWindow::AddButton(const String& caption,
         std::function<void()> handler)
@@ -482,7 +497,6 @@ namespace oui
             return;
         }
         Rect parentClientRect = parent->GetClientRect();
-
         if (parentClientRect.size.height <= 0)
         {
             return;
@@ -548,7 +562,7 @@ namespace oui
     {
         m_prevFocus = prevFocus;
     }
-    bool CMenuWindow::ProcessEvent(oui::InputEvent& evt) 
+    bool CMenuWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
         if (evt.keyEvent.valid)
         {
@@ -573,7 +587,7 @@ namespace oui
                 return true;
             }
         }
-        return CWindow::ProcessEvent(evt);
+        return CWindow::ProcessEvent(evt, evtContext);
     }
     void CMenuWindow::Activate()
     {
@@ -599,6 +613,7 @@ namespace oui
         auto pool = GetPool();
         if (m_currentPopup)
         {
+            m_currentPopup->Detach();
             m_currentPopup->Destroy();
             m_currentPopup = nullptr;
         }
@@ -628,6 +643,7 @@ namespace oui
     {
         if (m_currentPopup)
         {
+            m_currentPopup->Detach();
             m_currentPopup->Destroy();
             m_currentPopup = nullptr;
         }

@@ -63,7 +63,8 @@ namespace oui
         initialEvent.resizeEvent.valid = true;
         initialEvent.resizeEvent.newWidth = consoleSize.width;
         initialEvent.resizeEvent.newHeight = consoleSize.height;
-        rootWindow->ProcessEvent(initialEvent);
+        WindowEventContext evtContext;
+        rootWindow->ProcessEvent(initialEvent, evtContext);
         
         DrawParameters parameters;
         for (; !m_pool->IsExitRequested(); )
@@ -73,26 +74,48 @@ namespace oui
             parameters.console.StartDraw(rect.size, &mainConsole);
 
             rootWindow->DrawTo(rect, parameters, false);
-
             if (!m_pool->GetFocus())
             {
                 mainConsole.HideCursor();
             }
 
             parameters.console.FinishDraw();
-
             if (!reader.Read(data))
             {
                 return;
             }
             // process event
+            std::shared_ptr<CWindow> mouseHandler;
             for (auto& evt : data)
             {
+                WindowEventContext evtContext;
+                evtContext.onMouseEventCallback = [&](auto wnd) {
+                    if (!mouseHandler)
+                    {
+                        mouseHandler = wnd;
+                    }
+                };
+
                 if (evt.resizeEvent.valid)
                 {
                     mainConsole.FixupAfterResize();
                 }
-                rootWindow->ProcessEvent(evt);
+                rootWindow->ProcessEvent(evt, evtContext);
+
+                // generate on mouse leave
+                if (mouseHandler)
+                {
+                    auto prev = m_pool->GetLastMouseWindow();
+                    if (mouseHandler != prev)
+                    {
+                        m_pool->SetLastMouseWindow(mouseHandler);
+                        if (prev)
+                        {
+                            prev->OnMouseLeave();
+                        }
+                        mouseHandler->OnMouseEnter();
+                    }
+                }
             }
         }
     }

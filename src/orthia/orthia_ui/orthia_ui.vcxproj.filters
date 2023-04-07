@@ -45,6 +45,9 @@
     <ClCompile Include="oui_hotkey.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="oui_containers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="oui_app.h">
@@ -87,6 +90,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_hotkey.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="oui_base_win32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

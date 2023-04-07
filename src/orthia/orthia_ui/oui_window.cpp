@@ -23,14 +23,11 @@ namespace oui
         {
             m_focused = window->GetParent();
         }
+        if (m_lastMouseWindow.get() == window)
+        {
+            m_lastMouseWindow = 0;
+        }
         m_allWindows.erase(window);
-    }
-    void PushFocus(std::shared_ptr<CWindow> window, bool invalidate)
-    {
-    }
-    void PopFocus()
-    {
-
     }
     std::shared_ptr<CWindow> CWindowsPool::GetWindow(CWindow* window)
     {
@@ -44,10 +41,26 @@ namespace oui
 
     void CWindowsPool::SetFocus(std::shared_ptr<CWindow> window, bool invalidate)
     {
-        m_focused = window;
-        if (window)
+        auto oldFocused = m_focused;
+
+        if (m_focused != window)
         {
-            window->Invalidate();
+            m_focused = window;
+        }
+        if (invalidate)
+        {
+            if (window)
+            {
+                window->Invalidate();
+            }
+            if (oldFocused)
+            {
+                oldFocused->Invalidate();
+            }
+        }
+        if (oldFocused && oldFocused->IsPopup())
+        {
+            oldFocused->Destroy();
         }
     }
     std::shared_ptr<CWindow> CWindowsPool::GetFocus()
@@ -66,6 +79,14 @@ namespace oui
     {
         return m_rootWindow;
     }
+    void CWindowsPool::SetLastMouseWindow(std::shared_ptr<CWindow> window)
+    {
+        m_lastMouseWindow = window;
+    }
+    std::shared_ptr<CWindow> CWindowsPool::GetLastMouseWindow()
+    {
+        return m_lastMouseWindow;
+    }
 
     // CWindow
     CWindow::CWindow()
@@ -79,6 +100,16 @@ namespace oui
     {
     }
 
+    void CWindow::OnMouseLeave() 
+    { 
+        Invalidate(false);  
+        m_mouseIsOn = false; 
+    }
+    void CWindow::OnMouseEnter() 
+    { 
+        Invalidate(false);  
+        m_mouseIsOn = true; 
+    }
     static void InvalidateParent(CWindow* window)
     {
         if (auto parent = window->GetParent())
@@ -285,54 +316,93 @@ namespace oui
         });
     }
 
-    void CWindow::RenderChilds(const Rect& rect, std::function<bool (std::shared_ptr<CWindow> child, const Rect& childRect)> handler)
+    void CWindow::RenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler)
     {
         // draw childs anyway
         int endX = rect.position.x + rect.size.width;
         int endY = rect.position.y + rect.size.height;
         for (auto& child : m_childs)
         {
-            if (!child->IsVisible())
-            {
-                continue;
-            }
-            // prepare child offset
-            auto childOffset = child->GetPosition();
-
-            auto childAbs = childOffset;
-            childAbs.x = rect.position.x + childOffset.x;
-            childAbs.y = rect.position.y + childOffset.y;
-
-            // prepare child position
-            auto childSize = child->GetSize();
-            int childEndX = childAbs.x + childSize.width;
-            int childEndY = childAbs.y + childSize.height;
-
-            if (childEndX > endX)
-            {
-                childSize.width -= childEndX - endX;
-            }
-            if (childEndY > endY)
-            {
-                childSize.height -= childEndY - endY;
-            }
-
-            if (childSize.width <= 0 || childSize.height <= 0)
-            {
-                continue;
-            }
-
-            Rect childRect;
-            childRect.position = childAbs;
-            childRect.size = childSize;
-            if (!handler(child, childRect))
+            if (!RenderChild(child, rect, handler, endX, endY))
             {
                 break;
             }
         }
     }
+    void CWindow::ReverseRenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler)
+    {
+        // draw childs anyway
+        int endX = rect.position.x + rect.size.width;
+        int endY = rect.position.y + rect.size.height;
+
+        for (auto rit = m_childs.rbegin(), rend = m_childs.rend(); rit != rend; ++rit)
+        {
+            if (!RenderChild(*rit, rect, handler, endX, endY))
+            {
+                break;
+            }
+        }
+    }
+    bool CWindow::RenderChild(std::shared_ptr<CWindow> child,
+        const Rect& rect,
+        std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler,
+        int endX,
+        int endY)
+    {
+        if (!child->IsVisible())
+        {
+            return true;
+        }
+        // prepare child offset
+        auto childOffset = child->GetPosition();
+
+        auto childAbs = childOffset;
+        childAbs.x = rect.position.x + childOffset.x;
+        childAbs.y = rect.position.y + childOffset.y;
+
+        // prepare child position
+        auto childSize = child->GetSize();
+        int childEndX = childAbs.x + childSize.width;
+        int childEndY = childAbs.y + childSize.height;
+
+        if (childEndX > endX)
+        {
+            childSize.width -= childEndX - endX;
+        }
+        if (childEndY > endY)
+        {
+            childSize.height -= childEndY - endY;
+        }
+
+        if (childSize.width <= 0 || childSize.height <= 0)
+        {
+            return true;
+        }
+
+        Rect childRect;
+        childRect.position = childAbs;
+        childRect.size = childSize;
+        if (!handler(child, childRect))
+        {
+            return false;
+        }
+        return true;
+    }
     void CWindow::Invalidate(bool valid)
     {
+        if (!valid)
+        {
+            if (auto pool = GetPool())
+            {
+                if (auto focused = pool->GetFocus())
+                {
+                    if (focused.get() != this)
+                    {
+                        focused->Invalidate();
+                    }
+                }
+            }
+        }
         m_valid = valid;
     }
     bool CWindow::IsValid() const
@@ -344,14 +414,14 @@ namespace oui
         return false;
     }
 
-    bool CWindow::ProcessMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CWindow::ProcessMouseEvent(const Rect& rect, InputEvent& evt, WindowEventContext& evtContext)
     {
         bool handled = false;
-        RenderChilds(rect, [&](std::shared_ptr<CWindow> child, const Rect& childRect) {
+        ReverseRenderChilds(rect, [&](std::shared_ptr<CWindow> child, const Rect& childRect) {
 
             if (IsInside(childRect, evt.mouseEvent.point))
             {
-                handled = child->ProcessMouseEvent(childRect, evt);
+                handled = child->ProcessMouseEvent(childRect, evt, evtContext);
                 if (handled)
                 {
                     return false;
@@ -367,17 +437,26 @@ namespace oui
         {
             return false;
         }
-        return HandleMouseEvent(rect, evt);
+        
+        handled = HandleMouseEvent(rect, evt);
+        if (handled && evtContext.onMouseEventCallback)
+        {
+            if (auto me = GetPtr())
+            {
+                evtContext.onMouseEventCallback(me);
+            }
+        }
+        return handled;
     }
 
-    bool CWindow::ProcessEvent(InputEvent& evt)
+    bool CWindow::ProcessEvent(InputEvent& evt, WindowEventContext& evtContext)
     {
         if (evt.mouseEvent.valid)
         {
             Rect rect;
             rect.size = this->GetSize();
 
-            if (ProcessMouseEvent(rect, evt))
+            if (ProcessMouseEvent(rect, evt, evtContext))
             {
                 return true;
             }
@@ -405,5 +484,23 @@ namespace oui
     Point GetRelativeMousePoint(const Rect& rect, const Point& point)
     {
         return Point{ point.x - rect.position.x, point.y - rect.position.y };
+    }
+    Rect GetAbsoluteClientRect(CWindow* pWindow, const Rect& rect)
+    {
+        auto paintRect = rect;
+
+        auto size = pWindow->GetSize();
+
+        auto clientRect = pWindow->GetClientRect();
+
+        int rightPosX = size.width - clientRect.size.width - clientRect.position.x;
+        int bottomPosY = size.height - clientRect.size.height - clientRect.position.y;
+        paintRect.position.x += clientRect.position.x;
+        paintRect.position.y += clientRect.position.y;
+
+        paintRect.size.width -= clientRect.position.x + rightPosX;
+        paintRect.size.height -= clientRect.position.y + bottomPosY;
+
+        return paintRect;
     }
 }

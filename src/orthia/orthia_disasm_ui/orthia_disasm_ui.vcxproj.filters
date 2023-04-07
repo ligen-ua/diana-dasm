@@ -35,12 +35,24 @@
     <ClCompile Include="ui_main_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ui_disasm_window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_output_window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_main_window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ui_disasm_window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ui_output_window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

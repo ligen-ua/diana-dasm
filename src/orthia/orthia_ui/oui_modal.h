@@ -15,7 +15,7 @@ namespace oui
     public:
         CModalWindow();
 
-        bool ProcessEvent(oui::InputEvent& evt) override;
+        bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void FinishDialog();
     };
 }

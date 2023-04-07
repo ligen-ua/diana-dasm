@@ -2,14 +2,20 @@
 
 #include "oui_base.h"
 
+
 namespace oui
+
 {
     struct String
     {
 #ifdef _WIN32
         std::wstring native;
+#define OUI_TCSTR(X) L##X
+
 #else
         std::string native;
+#define OUI_TCSTR(X) X
+
 #endif
         typedef typename decltype(native)::value_type char_type;
         typedef decltype(native) string_type;

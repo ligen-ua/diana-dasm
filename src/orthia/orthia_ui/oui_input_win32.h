@@ -1,5 +1,7 @@
 #pragma once
-#include <windows.h>
+
+#include "oui_base_win32.h"
+
 namespace oui
 {
     class CConsoleInputReader:Noncopyable

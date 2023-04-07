@@ -16,7 +16,7 @@ namespace oui
             // do nothing
         }
 
-        bool ProcessEvent(InputEvent& evt) override
+        bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override
         {
             if (evt.resizeEvent.valid)
             {
@@ -25,7 +25,7 @@ namespace oui
                 size.height = evt.resizeEvent.newHeight;
                 this->Resize(size);
             }
-            return Base::ProcessEvent(evt);
+            return Base::ProcessEvent(evt, evtContext);
         }
     };
 
@@ -35,6 +35,15 @@ namespace oui
     protected:
         Color m_color;
     public:
+        SimpleBrush()
+        {
+        }
+        template<class Type>
+        SimpleBrush(Type&& obj)
+            :
+            Base(std::forward<Type>(obj))
+        {
+        }
         void SetBackgroundColor(Color color)
         {
             m_color = color;
@@ -42,9 +51,7 @@ namespace oui
         void DoPaint(const Rect& rect, DrawParameters& parameters) override
         {
             auto paintRect = rect;
-
             auto size = this->GetSize();
-            
             auto clientRect = this->GetClientRect();
 
             int rightPosX = size.width - clientRect.size.width - clientRect.position.x;
@@ -65,15 +72,26 @@ namespace oui
     {
     protected:
         Color m_frontColor, m_backgroundColor;
+        BorderStyle m_style = BorderStyle::Thick;
     public:
         WithBorder()
         {
             m_frontColor = ColorWhite();
         }
+        template<class Type>
+        WithBorder(Type && obj)
+            :
+                Base(std::forward<Type>(obj))
+        {
+        }
         void SetColors(Color frontColor, Color backgroundColor)
         {
             m_frontColor = frontColor;
             m_backgroundColor = backgroundColor;
+        }
+        void SetBorderStyle(BorderStyle style)
+        {
+            m_style = style;
         }
         Rect GetClientRect() const override
         {
@@ -86,7 +104,7 @@ namespace oui
         }
         void DoPaint(const Rect& rect, DrawParameters& parameters) override
         {
-            parameters.console.PaintBorder(rect, m_frontColor, m_backgroundColor);
+            parameters.console.PaintBorder(rect, m_frontColor, m_backgroundColor, this->m_style);
             Base::DoPaint(rect, parameters);
         }
     };
@@ -96,7 +114,7 @@ namespace oui
     class ExitOnControlC:public Base
     {
     public:
-        bool ProcessEvent(InputEvent& evt) override
+        bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override
         {
             if (evt.keyEvent.valid && evt.keyEvent.virtualKey == VirtualKey::CtrlC)
             {
@@ -105,7 +123,7 @@ namespace oui
                     pool->ExitLoop();
                 }
             }
-            return Base::ProcessEvent(evt);
+            return Base::ProcessEvent(evt, evtContext);
         }
     };
 }
