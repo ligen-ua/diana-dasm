@@ -165,7 +165,7 @@ namespace oui
         {
             return MouseButton::Right;
         }
-        return MouseButton::None;
+        return MouseButton::Move;
     }
     static MouseState GetMouseState(MOUSE_EVENT_RECORD& mouseEvent)
     {
@@ -175,7 +175,10 @@ namespace oui
         }
         if (mouseEvent.dwButtonState == 0)
         {
-            return MouseState::None;
+            if (mouseEvent.dwEventFlags == 0)
+                return MouseState::Released;
+            else
+                return MouseState::None;
         }
         return MouseState::Pressed;
     }
@@ -197,7 +200,7 @@ namespace oui
                 evt.keyState = TranslateKeyState(raw.Event.MouseEvent.dwControlKeyState);
                 evt.mouseEvent.button = GetMouseButton(raw.Event.MouseEvent);
                 evt.mouseEvent.state = GetMouseState(raw.Event.MouseEvent);
-                if (evt.mouseEvent.button != MouseButton::None && evt.mouseEvent.state != MouseState::None)
+                if (evt.mouseEvent.button != MouseButton::None || evt.mouseEvent.state != MouseState::None)
                 {
                     evt.mouseEvent.valid = true;
                     evt.mouseEvent.point.x = raw.Event.MouseEvent.dwMousePosition.X;

@@ -17,9 +17,9 @@ void CMainWindow::ConstuctChilds()
 
         oui::PanelInfo panelInfo;
         panelInfo.fixedHeight = 10;
+        panelInfo.fixedWidth = 20;
         m_panelContainerWindow->AddPanel({ oui::PanelOrientation::Bottom}, m_outputWindow, panelInfo);
     }
-
     // we need to set focus somewhere
     SetOnResize([&]() {
         

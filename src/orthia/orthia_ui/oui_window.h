@@ -4,7 +4,21 @@
 
 namespace oui
 {
+    struct InputEvent;
     class CWindow;
+
+    enum class DragEvent
+    {
+        None = 0,
+        Progress,
+        Drop,
+        Cancel
+    };
+    using DragHandler_type = std::function<bool(DragEvent event, 
+        const Point& initialPoint, 
+        const Point& currentPoint,
+        std::shared_ptr<CWindow> wnd)>;
+
     class CWindowsPool
     {
         std::unordered_map<CWindow*, std::shared_ptr<CWindow>> m_allWindows;
@@ -12,8 +26,12 @@ namespace oui
         std::atomic<bool> m_exitRequested = false;
 
         std::shared_ptr<CWindow> m_rootWindow;
-
         std::shared_ptr<CWindow> m_lastMouseWindow;
+
+        std::shared_ptr<CWindow> m_dragCaller;
+        Point m_dragInitialPoint; 
+        DragHandler_type m_dragHandler;
+
     public:
         CWindowsPool();
         void RegisterRootWindow(std::shared_ptr<CWindow> window);
@@ -30,9 +48,12 @@ namespace oui
 
         void SetLastMouseWindow(std::shared_ptr<CWindow> window);
         std::shared_ptr<CWindow> GetLastMouseWindow();
+
+        bool RegisterDragEvent(std::shared_ptr<CWindow> caller, const Point& pt, DragHandler_type handler);
+        bool HandleDragEvent(InputEvent& evt);
+        void CancelDragEvent();
     };
 
-    struct InputEvent;
     struct DrawParameters
     {
         CConsoleDrawAdapter console;
@@ -124,6 +145,7 @@ namespace oui
         // size
         virtual Size GetSize() const;
         virtual void Resize(const Size& newSize);
+        void ForceResize();
 
         virtual Rect GetClientRect() const;
 
@@ -147,6 +169,8 @@ namespace oui
 
         std::shared_ptr<CWindow> GetRootWindow();
         void AddChild(std::shared_ptr<CWindow> child);
+
+        bool RegisterDragEvent(const Point& pt, DragHandler_type handler);
     };
 
     template<class Type>
@@ -193,6 +217,7 @@ namespace oui
         auto clientRect = ptr->GetClientRect();
         return { size.width - clientRect.size.width, size.height - clientRect.size.height };
     }
+    void InvalidateParent(CWindow* window);
 
     Rect GetAbsoluteClientRect(CWindow* pWindow, const Rect& rect);
     Point GetRelativeMousePoint(const Rect& rect, const Point& point);

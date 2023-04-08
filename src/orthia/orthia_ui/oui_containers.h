@@ -34,6 +34,18 @@ namespace oui
     
     class CPanelGroupWindow:public CWindow
     {
+        struct ResizeState
+        {
+            int fixedWidth = 0;
+            int fixedHeight = 0;
+            std::shared_ptr<CPanelGroupWindow> resizeTarget;
+            std::shared_ptr<CPanelGroupWindow> applyTarget;
+            
+            bool SaveState();
+        };
+        void ApplyState(const ResizeState& state);
+        ResizeState GetHeaderResizeState();
+
         friend class CPanelContainerWindow;
         PanelOrientation m_childOrintation = PanelOrientation::None;
         std::shared_ptr<CPanelGroupWindow> m_child;
@@ -58,6 +70,13 @@ namespace oui
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
 
         void ReserveTitleSpace(CWindow* wnd, Point& position, Size& size);
+
+        // drag handlers
+        bool Drag_ResizeHandler_TopBottom(DragEvent event,
+            const Point& initialPoint,
+            const Point& currentPoint,
+            std::shared_ptr<CWindow> wnd,
+            const ResizeState& originalState);
     public:
         CPanelGroupWindow(std::shared_ptr<PanelColorProfile> panelColorProfile,
             std::shared_ptr<CPanelCommonContext> panelCommonContext);
@@ -72,6 +91,7 @@ namespace oui
         void Activate() override;
         std::shared_ptr<CPanelWindow> GetActivePanel();
         std::shared_ptr<CPanelCommonContext> GetPanelCommonContext();
+        bool SwitchPanel(int index);
     };
     class CPanelCommonContext
     {

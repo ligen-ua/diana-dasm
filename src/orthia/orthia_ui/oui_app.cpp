@@ -88,6 +88,13 @@ namespace oui
             std::shared_ptr<CWindow> mouseHandler;
             for (auto& evt : data)
             {
+
+                // check drag logic
+                if (m_pool->HandleDragEvent(evt))
+                {
+                    continue;
+                }
+                // go regular event loop
                 WindowEventContext evtContext;
                 evtContext.onMouseEventCallback = [&](auto wnd) {
                     if (!mouseHandler)
@@ -118,10 +125,16 @@ namespace oui
                 }
 
                 // check focus
-                if (evt.focusEvent.valid &&
-                    evt.focusEvent.focusSet)
+                if (evt.focusEvent.valid)
                 {
-                    forceRedrewNext = true;
+                    if (evt.focusEvent.focusSet)
+                    {
+                        forceRedrewNext = true;
+                    }
+                    else
+                    {
+                        m_pool->CancelDragEvent();
+                    }
                 }
             }
         }
