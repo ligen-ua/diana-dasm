@@ -28,12 +28,15 @@ namespace oui
     }
     void CPanelWindow::Activate()
     {
-        if (auto parent = GetParent_t<CPanelGroupWindow>(this))
+        if (!IsActive())
         {
-            parent->GetPanelCommonContext()->OnActivate(GetPtr_t<CPanelWindow>(this));
-            parent->Invalidate();
+            CWindow::Activate();
+            if (auto parent = GetParent_t<CPanelGroupWindow>(this))
+            {
+                parent->GetPanelCommonContext()->OnActivate(GetPtr_t<CPanelWindow>(this));
+                parent->Activate();
+            }
         }
-        CWindow::Activate();
         CWindow::SetFocus();
     }
     void CPanelWindow::Deactivate()
@@ -65,8 +68,23 @@ namespace oui
             m_panelCommonContext(panelCommonContext)
     {
     }
+    void CPanelGroupWindow::Activate()
+    {
+        if (!IsActive())
+        {
+            CWindow::Activate();
+            auto activePanel = GetActivePanel();
+            if (activePanel)
+            {
+                activePanel->Activate();
+            }
+            GetPanelCommonContext()->OnActivate(GetPtr_t<CPanelGroupWindow>(this));
+        }
+    }
     void CPanelGroupWindow::ConstuctChilds()
     {
+        m_panelCommonContext->Register(GetPtr_t<CPanelGroupWindow>(this));
+
         if (m_child)
         {
             AddChild(m_child);
@@ -88,7 +106,7 @@ namespace oui
         m_fixedHeight = std::max(info.fixedHeight, m_fixedHeight);
         m_panels.push_back(panel);
     }
-    bool CPanelGroupWindow::HasTitle() const
+    bool CPanelGroupWindow::HasPanels() const
     {
         return !m_panels.empty();
     }
@@ -211,6 +229,15 @@ namespace oui
         bottom->MoveTo(bottomPosition);
         bottom->Resize(readyBottomSize);
     }
+    std::shared_ptr<CPanelWindow> CPanelGroupWindow::GetActivePanel()
+    {
+        auto size = m_panels.size();
+        if (m_activePanelIndex < 0 || m_activePanelIndex >= size)
+        {
+            return 0;
+        }
+        return m_panels[m_activePanelIndex];
+    }
 
     void CPanelGroupWindow::OnResize()
     {
@@ -229,9 +256,9 @@ namespace oui
             return;
         }
 
-        // got some panesl
-        auto activePanel = m_panels[m_activePanelIndex];
-        if (m_childOrintation == PanelOrientation::None) 
+        // got some panel
+        auto activePanel = GetActivePanel(); 
+        if (m_childOrintation == PanelOrientation::None)
         {
             Rect clientRectWithTitle = clientRect;
             ++clientRectWithTitle.position.y;
@@ -268,7 +295,7 @@ namespace oui
     }
     bool CPanelGroupWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
-        if (!HasTitle())
+        if (!HasPanels())
         {
             return false;
         }
@@ -293,6 +320,18 @@ namespace oui
         }
         Invalidate(false);
         return true;
+    }
+    bool CPanelGroupWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
+    {
+        if (evt.keyEvent.valid)
+        {
+            if (evt.keyEvent.virtualKey == VirtualKey::Tab)
+            {
+                m_panelCommonContext->ActivateNextGroup(GetPtr_t<CPanelGroupWindow>(this));
+                return true;
+            }
+        }
+        return CWindow::ProcessEvent(evt, evtContext);
     }
     void CPanelGroupWindow::PaintTitle(const Rect& rect, DrawParameters& parameters)
     {
@@ -429,16 +468,61 @@ namespace oui
     }
     void CPanelGroupWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
-        if (HasTitle())
+        if (HasPanels())
         {
             PaintTitle(rect, parameters);
         }
         CWindow::DoPaint(rect, parameters);
     }
     // CPanelCommonContext
-
     CPanelCommonContext::CPanelCommonContext()
     {
+    }
+    void CPanelCommonContext::Register(std::shared_ptr<CPanelGroupWindow> group)
+    {
+        m_allGroups.insert(group);
+    }
+    void CPanelCommonContext::ActivateNextGroup(std::shared_ptr<CPanelGroupWindow> caller)
+    {
+        if (m_allGroups.empty())
+        {
+            return;
+        }
+        auto it = m_allGroups.find(caller);
+
+        for (int i = 0; i < m_allGroups.size(); ++i)
+        {
+            if (it == m_allGroups.end())
+            {
+                it = m_allGroups.begin();
+            }
+            else
+            {
+                ++it;
+                if (it == m_allGroups.end())
+                {
+                    it = m_allGroups.begin();
+                }
+            }
+            auto group = *it;
+            if (group->HasPanels())
+            {
+                group->Activate();
+                return;
+            }
+        }
+    }
+    void CPanelCommonContext::OnActivate(std::shared_ptr<CPanelGroupWindow> group)
+    {
+        auto currentActiveGroup = m_currentActiveGroup.lock();
+        if (currentActiveGroup != group)
+        {
+            if (currentActiveGroup)
+            {
+                currentActiveGroup->Deactivate();
+            }
+        }
+        m_currentActiveGroup = group;
     }
     void CPanelCommonContext::OnActivate(std::shared_ptr<CPanelWindow> panel)
     {

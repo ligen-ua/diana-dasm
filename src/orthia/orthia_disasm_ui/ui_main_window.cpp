@@ -20,6 +20,7 @@ void CMainWindow::ConstuctChilds()
         m_panelContainerWindow->AddPanel({ oui::PanelOrientation::Bottom}, m_outputWindow, panelInfo);
     }
 
+    // we need to set focus somewhere
     SetOnResize([&]() {
         
         m_menu->Dock();
@@ -35,6 +36,10 @@ void CMainWindow::ConstuctChilds()
     });
 }
 
+void CMainWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
+{
+    m_disasmWindow->Activate();
+}
 bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
 {
     if (oui::Fullscreen<oui::CWindow>::ProcessEvent(evt, evtContext))
@@ -55,14 +60,18 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
         {
             return false;
         }
-        if (auto focused = pool->GetFocus())
+        if (auto ptr = pool->GetFocus())
         {
-            if (focused.get() != this)
+            for (; ptr;)
             {
-                if (focused->ProcessEvent(evt, evtContext))
+                if (ptr.get() != this)
                 {
-                    return true;
+                    if (ptr->ProcessEvent(evt, evtContext))
+                    {
+                        return true;
+                    }
                 }
+                ptr = ptr->GetParent();
             }
         }
 

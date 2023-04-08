@@ -61,22 +61,35 @@ namespace oui
     public:
         CPanelGroupWindow(std::shared_ptr<PanelColorProfile> panelColorProfile,
             std::shared_ptr<CPanelCommonContext> panelCommonContext);
-        bool HasTitle() const;
+        bool HasPanels() const;
         Rect GetClientRect() const;
         void ConstuctChilds() override;
+        bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void AddPanel(std::shared_ptr<CPanelWindow> panel,
             const PanelInfo& info);
         void OnResize() override;
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
-
+        void Activate() override;
+        std::shared_ptr<CPanelWindow> GetActivePanel();
         std::shared_ptr<CPanelCommonContext> GetPanelCommonContext();
     };
     class CPanelCommonContext
     {
+        std::set<std::shared_ptr<CPanelGroupWindow>> m_allGroups;
+
         std::weak_ptr<CPanelWindow> m_currentActivePanel;
+        std::weak_ptr<CPanelGroupWindow> m_currentActiveGroup;
     public:
         CPanelCommonContext();
+
+        // context switching 
+        void Register(std::shared_ptr<CPanelGroupWindow> group);
+        void ActivateNextGroup(std::shared_ptr<CPanelGroupWindow> caller);
+
+        // deactivation logic
+        void OnActivate(std::shared_ptr<CPanelGroupWindow> group);
         void OnActivate(std::shared_ptr<CPanelWindow> panel);
+
     };
 
     class CPanelContainerWindow:public oui::WithBorder<oui::SimpleBrush<CWindow>>
