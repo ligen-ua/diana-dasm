@@ -52,7 +52,7 @@ namespace oui
         {
             return (VirtualKey)((int)VirtualKey::k0 + (wVirtualKeyCode - '0'));
         }
-        if ((state.state & state.AnyCtrl) && !(state.state& state.AnyAlt))
+        if ((state.state & state.AnyCtrl) && !(state.state & state.AnyAlt))
         {
             if (wVirtualKeyCode == 'C')
             {
@@ -82,7 +82,7 @@ namespace oui
 
         case VK_RETURN:
             return VirtualKey::Enter;
-        
+
         case VK_BACK:
             return VirtualKey::Backspace;
 
@@ -97,7 +97,7 @@ namespace oui
 
         case VK_END:
             return VirtualKey::End;
-        
+
         case VK_PRIOR:
             return VirtualKey::PageUp;
 
@@ -132,7 +132,7 @@ namespace oui
         evt.keyEvent.virtualKey = TranslateVirtualKey(raw.Event.KeyEvent.wVirtualKeyCode, evt.keyState);
         if (evt.keyEvent.virtualKey == VirtualKey::None)
         {
-            if (raw.Event.KeyEvent.wVirtualKeyCode == VK_MENU && 
+            if (raw.Event.KeyEvent.wVirtualKeyCode == VK_MENU &&
                 !((KeyState::AnyCtrl | KeyState::AnyShift) & evt.keyState.state))
             {
                 // we will handle this at up
@@ -169,6 +169,14 @@ namespace oui
     }
     static MouseState GetMouseState(MOUSE_EVENT_RECORD& mouseEvent)
     {
+        if (mouseEvent.dwEventFlags & DOUBLE_CLICK)
+        {
+            return MouseState::DoubleClick;
+        }
+        if (mouseEvent.dwButtonState == 0)
+        {
+            return MouseState::None;
+        }
         return MouseState::Pressed;
     }
     bool CConsoleInputReader::TranslateEvent(INPUT_RECORD& raw, InputEvent& evt)
@@ -176,7 +184,9 @@ namespace oui
         switch (raw.EventType)
         {
         case FOCUS_EVENT:
-            return false;
+            evt.focusEvent.valid = true;
+            evt.focusEvent.focusSet = raw.Event.FocusEvent.bSetFocus;
+            break;
 
         case KEY_EVENT:
             evt.keyEvent.valid = TranslateKeyEvent(raw, evt);
@@ -203,7 +213,7 @@ namespace oui
                 break;
             }
         };
-        return evt.keyEvent.valid || evt.resizeEvent.valid || evt.mouseEvent.valid;
+        return evt.keyEvent.valid || evt.resizeEvent.valid || evt.mouseEvent.valid || evt.focusEvent.valid;
     }
 
 

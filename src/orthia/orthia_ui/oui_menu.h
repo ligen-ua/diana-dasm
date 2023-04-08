@@ -64,6 +64,8 @@ namespace oui
 
     class CMenuWindow:public oui::SimpleBrush<CWindow>
     {
+        using Parent_type = oui::SimpleBrush<CWindow>;
+
         std::vector<std::shared_ptr<CMenuButtonWindow>> m_buttons;
         // ui
         int m_initialSpace = 2;
@@ -102,6 +104,7 @@ namespace oui
 
         bool PopupIsOpen() const;
         void SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button);
+        void OnFocusLost() override;
     };
 
 }

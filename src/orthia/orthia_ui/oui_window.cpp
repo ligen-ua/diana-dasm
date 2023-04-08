@@ -58,9 +58,9 @@ namespace oui
                 oldFocused->Invalidate();
             }
         }
-        if (oldFocused && oldFocused->IsPopup())
+        if (oldFocused)
         {
-            oldFocused->Destroy();
+            oldFocused->OnFocusLost();
         }
     }
     std::shared_ptr<CWindow> CWindowsPool::GetFocus()
@@ -100,15 +100,15 @@ namespace oui
     {
     }
 
-    void CWindow::OnMouseLeave() 
-    { 
-        Invalidate(false);  
-        m_mouseIsOn = false; 
+    void CWindow::OnMouseLeave()
+    {
+        Invalidate(false);
+        m_mouseIsOn = false;
     }
-    void CWindow::OnMouseEnter() 
-    { 
-        Invalidate(false);  
-        m_mouseIsOn = true; 
+    void CWindow::OnMouseEnter()
+    {
+        Invalidate(false);
+        m_mouseIsOn = true;
     }
     static void InvalidateParent(CWindow* window)
     {
@@ -212,6 +212,13 @@ namespace oui
             {
                 poolPtr->SetFocus(me);
             }
+        }
+    }
+    void CWindow::OnFocusLost()
+    {
+        if (IsPopup())
+        {
+            Destroy();
         }
     }
 
