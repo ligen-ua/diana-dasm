@@ -497,24 +497,35 @@ namespace oui
     {
         if (evt.keyEvent.valid)
         {
-            if (evt.keyEvent.virtualKey == VirtualKey::Tab && !evt.keyState.HasModifiers())
+            switch (evt.keyEvent.virtualKey)
             {
-                m_panelCommonContext->ActivateNextGroup(GetPtr_t<CPanelGroupWindow>(this));
-                return true;
-            }
-            if (evt.keyEvent.virtualKey == VirtualKey::Tab &&
-                (evt.keyState.state & (evt.keyState.AnyShift | evt.keyState.AnyCtrl)) !=0)
-            {
-                if (!m_panels.empty())
+                // TODO: Add Ctrl + for resizing
+            //case VirtualKey::Up:
+            //case VirtualKey::Down:
+
+            case VirtualKey::Tab:
+                // switch groups
+                if (!evt.keyState.HasModifiers())
                 {
-                    int newIndex = m_activePanelIndex + 1;
-                    if (newIndex >= (int)m_panels.size())
-                    {
-                        newIndex = 0;
-                    }
-                    this->SwitchPanel(newIndex);
+                    m_panelCommonContext->ActivateNextGroup(GetPtr_t<CPanelGroupWindow>(this));
                     return true;
                 }
+
+                // switch panels
+                if ((evt.keyState.state & (evt.keyState.AnyShift | evt.keyState.AnyCtrl)) != 0)
+                {
+                    if (!m_panels.empty())
+                    {
+                        int newIndex = m_activePanelIndex + 1;
+                        if (newIndex >= (int)m_panels.size())
+                        {
+                            newIndex = 0;
+                        }
+                        this->SwitchPanel(newIndex);
+                        return true;
+                    }
+                }
+                break;
             }
         }
         return CWindow::ProcessEvent(evt, evtContext);
