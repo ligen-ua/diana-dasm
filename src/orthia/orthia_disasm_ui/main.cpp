@@ -8,7 +8,6 @@ int main(int argc, const char* argv[])
 {
    // MessageBox(0, 0, 0, 0);
     std::cout << "Welcome to Orthia Disasm\n\n";
-
     try
     {
         orthia::CProgramModel programModel;

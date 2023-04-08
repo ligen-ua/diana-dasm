@@ -1,15 +1,5 @@
 #include "oui_containers.h"
 
-// Common Concepts
-// ----
-// 1. CPanelWindow is actually a tab
-// 2. CPanelGroupWindow is a composite window which is rendered like this:
-//   [-------TOP-----------]
-//   [-------BOTTOM--------] 
-//  or
-//   [---LEFT----|---------]
-//   [-----------|--RIGHT--] 
-
 namespace oui
 {
     static const auto g_left = String::char_type('<');
@@ -41,11 +31,14 @@ namespace oui
     }
     void CPanelWindow::Deactivate()
     {
-        if (auto parent = GetParent())
+        if (IsActive())
         {
-            parent->Invalidate();
+            CWindow::Deactivate();
+            if (auto parent = GetParent())
+            {
+                parent->Invalidate();
+            }
         }
-        CWindow::Deactivate();
     }
     bool CPanelWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
@@ -257,7 +250,7 @@ namespace oui
         }
 
         // got some panel
-        auto activePanel = GetActivePanel(); 
+        auto activePanel = GetActivePanel();
         if (m_childOrintation == PanelOrientation::None)
         {
             Rect clientRectWithTitle = clientRect;
@@ -293,6 +286,135 @@ namespace oui
             break;
         }
     }
+    void CPanelGroupWindow::ApplyState(const ResizeState& state)
+    {
+        auto newState = state;
+        if (newState.fixedHeight <= 0)
+        {
+            newState.fixedHeight = 1;
+        }
+        if (newState.fixedWidth <= 0)
+        {
+            newState.fixedWidth = 1;
+        }
+        state.resizeTarget->m_fixedHeight = newState.fixedHeight;
+        state.resizeTarget->m_fixedWidth = newState.fixedWidth;
+        
+        state.applyTarget->ForceResize();
+    }
+
+    bool CPanelGroupWindow::ResizeState::SaveState()
+    {
+        if (resizeTarget && applyTarget)
+        {
+            fixedWidth = resizeTarget->m_fixedWidth;
+            fixedHeight = resizeTarget->m_fixedHeight;
+            return true;
+        }
+        return false;
+    }
+
+    CPanelGroupWindow::ResizeState CPanelGroupWindow::GetHeaderResizeState()
+    {
+        CPanelGroupWindow::ResizeState result;
+
+        // trivial case
+        if (m_childOrintation == PanelOrientation::Top)
+        {
+            // [child]
+            // [  me ]
+            if (m_fixedHeight || m_fixedWidth)
+            {
+                result.resizeTarget = GetPtr_t<CPanelGroupWindow>(this);
+                result.applyTarget = result.resizeTarget;
+            }
+            else
+            {
+                result.resizeTarget = m_child;
+                result.applyTarget = GetPtr_t<CPanelGroupWindow>(this);
+            }
+            return result;
+        }
+
+        // scan for parent at the top
+        auto ptr = GetPtr_t<CPanelGroupWindow>(this);
+        if (!ptr)
+        {
+            return result;
+        }
+
+        bool firstLevel = true;
+        std::shared_ptr<CPanelGroupWindow> lastSameLevel;
+        if (ptr->m_fixedWidth || ptr->m_fixedHeight)
+        {
+            lastSameLevel = ptr;
+        }
+        for (; ;)
+        {
+            auto parent = GetParent_t<CPanelGroupWindow>(ptr);
+            if (!parent || parent->m_childOrintation == PanelOrientation::None)
+            {
+                // none found
+                break;
+            }
+            if (firstLevel && (parent->m_childOrintation == PanelOrientation::Left ||
+                     parent->m_childOrintation == PanelOrientation::Right))
+            {
+                if (parent->m_fixedWidth || parent->m_fixedHeight)
+                {
+                    lastSameLevel = parent;
+                }
+            }
+            else
+            {
+                firstLevel = false;
+                if (parent->m_childOrintation == PanelOrientation::Bottom)
+                {
+                    // found window above
+                    if (parent->m_fixedHeight || parent->m_fixedWidth)
+                    {
+                        result.resizeTarget = parent;
+                        result.applyTarget = parent;
+                        return result;
+                    }
+                    break;
+                }
+            }
+            ptr = parent;
+        }
+        if (lastSameLevel)
+        {
+            result.resizeTarget = lastSameLevel;
+            result.applyTarget = GetParent_t<CPanelGroupWindow>(lastSameLevel);
+        }
+        return result;
+    }
+
+    bool CPanelGroupWindow::Drag_ResizeHandler_TopBottom(DragEvent event,
+        const Point& initialPoint,
+        const Point& currentPoint,
+        std::shared_ptr<CWindow> wnd,
+        const ResizeState& originalState)
+    {
+        switch (event)
+        {
+        default:
+            return false;
+
+        case DragEvent::Progress:
+        case DragEvent::Drop:
+            {
+                int differenceY = initialPoint.y - currentPoint.y;
+                auto newState = originalState;
+                newState.fixedHeight += differenceY;
+                ApplyState(newState);
+            }
+            break;
+        case DragEvent::Cancel:
+            ApplyState(originalState);
+        }
+        return true;
+    }
     bool CPanelGroupWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
         if (!HasPanels())
@@ -307,28 +429,92 @@ namespace oui
         if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
         {
             int index = 0;
+            bool captionClick = false;
             for (auto& range : m_lastTabRanges)
             {
                 if (IsInside(range, evt.mouseEvent.point.x))
                 {
-                    m_activePanelIndex = index;
+                    captionClick = true;
                     break;
                 }
                 ++index;
             }
-            m_panels[m_activePanelIndex]->Activate();
+            if (captionClick)
+            {
+
+            }
+            else
+            {
+                ResizeState resiseState = GetHeaderResizeState();
+                if (resiseState.SaveState())
+                {
+                    RegisterDragEvent(m_lastMouseMovePoint, [this, resiseState = resiseState](DragEvent evt,
+                        const Point& initialPoint,
+                        const Point& currentPoint,
+                        std::shared_ptr<CWindow> wnd) {
+                        return Drag_ResizeHandler_TopBottom(evt,
+                        initialPoint,
+                        currentPoint,
+                        wnd,
+                        resiseState);
+                    });
+                }
+            }
+            if (index != m_activePanelIndex)
+            {
+                SwitchPanel(index);
+            }
+            else
+            {
+                m_panels[m_activePanelIndex]->Activate();
+            }
         }
         Invalidate(false);
+        return true;
+    }
+    bool CPanelGroupWindow::SwitchPanel(int index)
+    {
+        if (m_activePanelIndex == index)
+        {
+            return true;
+        }
+        if (index < 0 || index >= (int)m_panels.size())
+        {
+            return false;
+        }
+        auto oldPanel = m_panels[m_activePanelIndex];
+        auto newPanel = m_panels[index];
+
+        newPanel->MoveTo(oldPanel->GetPosition());
+        newPanel->Resize(oldPanel->GetSize());
+        oldPanel->SetVisible(false);
+        newPanel->SetVisible(true);
+        m_activePanelIndex = index;
+        newPanel->Activate();
         return true;
     }
     bool CPanelGroupWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
         if (evt.keyEvent.valid)
         {
-            if (evt.keyEvent.virtualKey == VirtualKey::Tab)
+            if (evt.keyEvent.virtualKey == VirtualKey::Tab && !evt.keyState.HasModifiers())
             {
                 m_panelCommonContext->ActivateNextGroup(GetPtr_t<CPanelGroupWindow>(this));
                 return true;
+            }
+            if (evt.keyEvent.virtualKey == VirtualKey::Tab &&
+                (evt.keyState.state & (evt.keyState.AnyShift | evt.keyState.AnyCtrl)) !=0)
+            {
+                if (!m_panels.empty())
+                {
+                    int newIndex = m_activePanelIndex + 1;
+                    if (newIndex >= (int)m_panels.size())
+                    {
+                        newIndex = 0;
+                    }
+                    this->SwitchPanel(newIndex);
+                    return true;
+                }
             }
         }
         return CWindow::ProcessEvent(evt, evtContext);
@@ -402,6 +588,7 @@ namespace oui
             const bool selected = (m_activePanelIndex == index);
 
             m_chunk.native.clear();
+            m_chunk.native.append(1, String::symSpace);
             m_chunk.native.append(1, g_braceLeft);
             
             if (selected)
@@ -417,6 +604,8 @@ namespace oui
             else
                 m_chunk.native.append(1, String::symSpace);
             m_chunk.native.append(1, g_braceRight);
+            m_chunk.native.append(1, String::symSpace);
+
 
             PanelCaptionProfile* currentColors = &m_panelColorProfile->normal;
             if (m_activePanelIndex == index && panel->IsActiveOrFocused())

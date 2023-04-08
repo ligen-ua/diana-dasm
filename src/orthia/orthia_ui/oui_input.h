@@ -20,7 +20,8 @@ namespace oui
     {
         None = 0,
         Pressed = 1,
-        DoubleClick = 2
+        DoubleClick = 2,
+        Released = 3,
     };
 
     struct MouseEvent

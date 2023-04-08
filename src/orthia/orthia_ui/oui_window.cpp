@@ -87,6 +87,67 @@ namespace oui
     {
         return m_lastMouseWindow;
     }
+    bool CWindowsPool::RegisterDragEvent(std::shared_ptr<CWindow> caller, const Point& pt, DragHandler_type handler)
+    {
+        if (m_dragCaller)
+        {
+            return false;
+        }
+        m_dragCaller = caller;
+        m_dragInitialPoint = pt;
+        m_dragHandler = handler;
+        return true;
+    }
+    bool CWindowsPool::HandleDragEvent(InputEvent& evt)
+    {
+        if (!m_dragCaller)
+        {
+            return false;
+        }
+        if (evt.keyEvent.valid && 
+            evt.keyEvent.virtualKey == oui::VirtualKey::Escape)
+        {
+            CancelDragEvent();
+            return true;
+        }
+        if (!evt.mouseEvent.valid)
+        {
+            return false;
+        }
+        DragEvent event = DragEvent::None;
+        bool finalEvent = false;
+        if (evt.mouseEvent.state == MouseState::Released)
+        {
+            finalEvent = true;
+            event = DragEvent::Drop;
+        }
+        else
+        {
+            event = DragEvent::Progress;
+        }
+
+        if (!m_dragHandler(event, m_dragInitialPoint, evt.mouseEvent.point, m_dragCaller))
+        {
+            finalEvent = true;
+        }
+        if (finalEvent)
+        {
+            m_dragCaller = nullptr;
+            m_dragInitialPoint = Point();
+            m_dragHandler = nullptr;
+        }
+        return true;
+    }
+    void CWindowsPool::CancelDragEvent()
+    {
+        if (m_dragCaller && m_dragHandler)
+        {
+            m_dragHandler(DragEvent::Cancel, m_dragInitialPoint, m_dragInitialPoint, m_dragCaller);
+        }
+        m_dragCaller = nullptr;
+        m_dragInitialPoint = Point();
+        m_dragHandler = nullptr;
+    }
 
     // CWindow
     CWindow::CWindow()
@@ -110,7 +171,7 @@ namespace oui
         Invalidate(false);
         m_mouseIsOn = true;
     }
-    static void InvalidateParent(CWindow* window)
+    void InvalidateParent(CWindow* window)
     {
         if (auto parent = window->GetParent())
         {
@@ -144,6 +205,21 @@ namespace oui
                 child->SetParent(me);
             }
         }
+    }
+
+    bool CWindow::RegisterDragEvent(const Point& pt, DragHandler_type handler)
+    {
+        auto poolPtr = m_pool.lock();
+        if (!poolPtr)
+        {
+            return false;
+        }
+        auto me = GetPtr();
+        if (!me)
+        {
+            return false;
+        }
+        return poolPtr->RegisterDragEvent(me, pt, handler);
     }
     void CWindow::SetOnResize(std::function<void()> fnc)
     {
@@ -301,6 +377,12 @@ namespace oui
         Invalidate();
         InvalidateParent(this);
         m_size = newSize;
+        OnResize();
+    }
+    void CWindow::ForceResize()
+    {
+        Invalidate();
+        InvalidateParent(this);
         OnResize();
     }
     void CWindow::OnResize()
