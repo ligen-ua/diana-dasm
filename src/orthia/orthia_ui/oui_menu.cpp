@@ -639,6 +639,17 @@ namespace oui
     {
         return m_currentPopup.get();
     }
+    void CMenuWindow::OnFocusLost()
+    {
+        if (!m_currentPopup)
+        {
+            if (IsActive())
+            {
+                Deactivate();
+            }
+        }
+        Parent_type::OnFocusLost();
+    }
     void CMenuWindow::OpenPopup()
     {
         if (m_currentPopup)

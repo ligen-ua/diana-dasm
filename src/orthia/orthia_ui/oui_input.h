@@ -20,7 +20,7 @@ namespace oui
     {
         None = 0,
         Pressed = 1,
-        Released = 2
+        DoubleClick = 2
     };
 
     struct MouseEvent
@@ -44,7 +44,11 @@ namespace oui
         String rawText;
         VirtualKey virtualKey = VirtualKey::None;
     };
-
+    struct FocusEvent
+    {
+        bool valid = false;
+        bool focusSet = false;
+    };
     struct InputEvent
     {
         // common fields
@@ -58,6 +62,9 @@ namespace oui
         
         // console 
         ResizeEvent resizeEvent;
+
+        // focus
+        FocusEvent focusEvent;
     };
 
     struct Hotkey

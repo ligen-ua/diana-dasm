@@ -110,6 +110,7 @@ namespace oui
         // focused
         virtual void SetFocus();
         virtual bool IsFocused() const;
+        virtual void OnFocusLost();
 
         // destroy
         virtual void Destroy();

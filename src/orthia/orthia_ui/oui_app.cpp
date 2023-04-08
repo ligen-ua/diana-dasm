@@ -52,6 +52,8 @@ namespace oui
 
     void CConsoleApp::DoMainLoop(std::shared_ptr<CWindow> rootWindow, oui::CConsole &mainConsole)
     {
+        mainConsole.HideCursor();
+
         oui::CConsoleInputReader reader;
 
         std::vector<InputEvent> data;
@@ -67,19 +69,17 @@ namespace oui
         rootWindow->ProcessEvent(initialEvent, evtContext);
         
         DrawParameters parameters;
+        bool forceRedrewNext = true;
         for (; !m_pool->IsExitRequested(); )
         {
             Rect rect;
             rect.size = mainConsole.GetSize();
             parameters.console.StartDraw(rect.size, &mainConsole);
 
-            rootWindow->DrawTo(rect, parameters, false);
-            if (!m_pool->GetFocus())
-            {
-                mainConsole.HideCursor();
-            }
-
+            rootWindow->DrawTo(rect, parameters, forceRedrewNext);
             parameters.console.FinishDraw();
+            forceRedrewNext = false;
+
             if (!reader.Read(data))
             {
                 return;
@@ -115,6 +115,13 @@ namespace oui
                         }
                         mouseHandler->OnMouseEnter();
                     }
+                }
+
+                // check focus
+                if (evt.focusEvent.valid &&
+                    evt.focusEvent.focusSet)
+                {
+                    forceRedrewNext = true;
                 }
             }
         }
