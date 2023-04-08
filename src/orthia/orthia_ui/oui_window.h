@@ -78,6 +78,8 @@ namespace oui
         virtual bool ProcessMouseEvent(const Rect& rect, InputEvent& evt, WindowEventContext& evtContext);
 
         virtual void OnInit(std::shared_ptr<CWindowsPool> pool);
+        virtual void OnAfterInit(std::shared_ptr<CWindowsPool> pool);
+            
         void RenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler);
         void ReverseRenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler);
 

@@ -152,6 +152,9 @@ namespace oui
     void CWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
     }
+    void CWindow::OnAfterInit(std::shared_ptr<CWindowsPool> pool)
+    {
+    }
     void CWindow::Init(std::shared_ptr<CWindow> parent)
     {
         if (auto pool = parent->GetPool())
@@ -168,6 +171,7 @@ namespace oui
         {
             child->Init(pool);
         }
+        OnAfterInit(pool);
     }
     void CWindow::SetParent(std::shared_ptr<CWindow> parent)
     {
