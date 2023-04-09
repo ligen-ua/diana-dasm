@@ -8,12 +8,16 @@ namespace oui
     class CPanelWindow:public CWindow
     {
         std::function<String()> m_getCaption;
+        Size m_preferredSize;
     public:
         CPanelWindow(std::function<String()> getCaption);
         String GetCaption() const;
         void Activate() override;
         void Deactivate() override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+
+        void SetPreferredSize(const Size& preferredSize);
+        Size GetPreferredSize() const;
     };
     enum class PanelOrientation
     {
@@ -23,10 +27,13 @@ namespace oui
         Top,
         Bottom
     };
+
+    PanelOrientation Reverse(const PanelOrientation& panelOrientation);
+
     struct PanelInfo
     {
-        int fixedWidth = 0;
-        int fixedHeight = 0;
+        int preferredWidth = 0;
+        int preferredHeight = 0;
         PanelInfo()
         {
         }
@@ -36,8 +43,7 @@ namespace oui
     {
         struct ResizeState
         {
-            int fixedWidth = 0;
-            int fixedHeight = 0;
+            Size panelSize;
             std::shared_ptr<CPanelGroupWindow> resizeTarget;
             std::shared_ptr<CPanelGroupWindow> applyTarget;
             
@@ -50,8 +56,8 @@ namespace oui
         PanelOrientation m_childOrintation = PanelOrientation::None;
         std::shared_ptr<CPanelGroupWindow> m_child;
         std::vector<std::shared_ptr<CPanelWindow>> m_panels;
-        int m_fixedWidth = 0;
-        int m_fixedHeight = 0;
+        
+        Size m_precalcSize;
         bool m_drawLeftBorder = false; 
         String m_chunk;
         std::shared_ptr<PanelColorProfile> m_panelColorProfile;
@@ -70,6 +76,8 @@ namespace oui
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
 
         void ReserveTitleSpace(CWindow* wnd, Point& position, Size& size);
+        void CalcSize();
+        bool HasPreferredSize();
 
         // drag handlers
         bool Drag_ResizeHandler_TopBottom(DragEvent event,
@@ -124,7 +132,10 @@ namespace oui
     public:
         CPanelContainerWindow();
         void ConstuctChilds() override;
-        bool AddPanel(const std::vector<PanelOrientation>& location, 
+        std::shared_ptr<CPanelGroupWindow> AddGroup(std::shared_ptr<CPanelGroupWindow> rootGroup,
+            const PanelOrientation& location);
+        void AddPanel(std::shared_ptr<CPanelGroupWindow> group,
+            const PanelOrientation& location,
             std::shared_ptr<CPanelWindow> panel,
             const PanelInfo& info);
         void OnResize() override;
