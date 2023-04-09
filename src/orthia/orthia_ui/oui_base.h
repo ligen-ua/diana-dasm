@@ -55,6 +55,7 @@ namespace oui
         Point position;
         Size size;
     };
+
     bool IsInside(const Rect& rect, Point& pt);
 
     class Noncopyable {

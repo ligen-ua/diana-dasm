@@ -93,6 +93,8 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -108,6 +110,8 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -123,6 +127,8 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -138,6 +144,8 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,6 +155,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="gtest\gtest-all.cc" />
     <ClCompile Include="oui_app.cpp" />
     <ClCompile Include="oui_base.cpp" />
     <ClCompile Include="oui_color.cpp" />
@@ -154,6 +163,8 @@
     <ClCompile Include="oui_containers.cpp" />
     <ClCompile Include="oui_hotkey.cpp" />
     <ClCompile Include="oui_input_win32.cpp" />
+    <ClCompile Include="oui_layouts.cpp" />
+    <ClCompile Include="oui_layouts_calc.cpp" />
     <ClCompile Include="oui_menu.cpp" />
     <ClCompile Include="oui_modal.cpp" />
     <ClCompile Include="oui_screen.cpp" />
@@ -170,6 +181,8 @@
     <ClInclude Include="oui_input.h" />
     <ClInclude Include="oui_input_win32.h" />
     <ClInclude Include="oui_keyboard.h" />
+    <ClInclude Include="oui_layouts.h" />
+    <ClInclude Include="oui_layouts_calc.h" />
     <ClInclude Include="oui_menu.h" />
     <ClInclude Include="oui_modal.h" />
     <ClInclude Include="oui_string.h" />

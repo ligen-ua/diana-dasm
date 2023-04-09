@@ -3,10 +3,19 @@
 
 orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
+int RunTests();
 
-int main(int argc, const char* argv[])
+int wmain(int argc, const wchar_t* argv[])
 {
    // MessageBox(0, 0, 0, 0);
+
+    if (argc == 2)
+    {
+        if (wcscmp(argv[1], L"--run-tests") == 0)
+        {
+            return RunTests();
+        }
+    }
     std::cout << "Welcome to Orthia Disasm\n\n";
     try
     {
