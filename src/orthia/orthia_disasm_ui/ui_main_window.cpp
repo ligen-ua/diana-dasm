@@ -9,17 +9,29 @@ void CMainWindow::ConstuctChilds()
     {
         auto disasmNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.disasm"));
         m_disasmWindow = std::make_shared<CDisasmWindow>([=]() {  return disasmNode->QueryValue(ORTHIA_TCSTR("caption"));  });
-        m_panelContainerWindow->AddPanel({}, m_disasmWindow, oui::PanelInfo());
+        m_panelContainerWindow->AddPanel(nullptr, oui::PanelOrientation::None, m_disasmWindow, oui::PanelInfo());
     }
+
     {
         auto outputNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.output"));
-        m_outputWindow = std::make_shared<COutputWindow>([=]() {  return outputNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+        m_outputWindow2 = std::make_shared<COutputWindow>([=]() {  return outputNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+        m_outputWindow2->SetBackgroundColor(oui::ColorBlue());
 
         oui::PanelInfo panelInfo;
-        panelInfo.fixedHeight = 10;
-        panelInfo.fixedWidth = 20;
-        m_panelContainerWindow->AddPanel({ oui::PanelOrientation::Bottom}, m_outputWindow, panelInfo);
+        panelInfo.preferredHeight = 10;
+        panelInfo.preferredWidth = 20;
+        m_panelContainerWindow->AddPanel(nullptr, oui::PanelOrientation::Bottom, m_outputWindow2, panelInfo);
     }
+    {
+      auto outputNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.output"));
+      m_outputWindow = std::make_shared<COutputWindow>([=]() {  return outputNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+
+      oui::PanelInfo panelInfo;
+      panelInfo.preferredHeight = 10;
+      panelInfo.preferredWidth = 20;
+      m_panelContainerWindow->AddPanel(nullptr, oui::PanelOrientation::Top, m_outputWindow, panelInfo);
+  }
+
     // we need to set focus somewhere
     SetOnResize([&]() {
         

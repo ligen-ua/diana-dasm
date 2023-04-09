@@ -16,7 +16,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     std::shared_ptr<oui::CMenuWindow> m_menu;
     std::shared_ptr<oui::CPanelContainerWindow> m_panelContainerWindow;
     std::shared_ptr<CDisasmWindow> m_disasmWindow;
-    std::shared_ptr<COutputWindow> m_outputWindow;
+    std::shared_ptr<COutputWindow> m_outputWindow, m_outputWindow2;
 
     oui::CHotkeyStorage m_hotkeys;
 
