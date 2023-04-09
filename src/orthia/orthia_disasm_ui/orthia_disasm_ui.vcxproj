@@ -184,6 +184,7 @@
     <ClCompile Include="ui_main_window.cpp" />
     <ClCompile Include="ui_menu.cpp" />
     <ClCompile Include="ui_output_window.cpp" />
+    <ClCompile Include="ui_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h" />

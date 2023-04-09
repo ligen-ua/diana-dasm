@@ -6,41 +6,31 @@ void CMainWindow::ConstuctChilds()
 
     // construct panels
     m_panelContainerWindow = AddChild_t(std::make_shared<oui::CPanelContainerWindow>());
+    auto defaultGroup = m_panelContainerWindow->CreateDefaultGroup();
     {
         auto disasmNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.disasm"));
         m_disasmWindow = std::make_shared<CDisasmWindow>([=]() {  return disasmNode->QueryValue(ORTHIA_TCSTR("caption"));  });
-        m_panelContainerWindow->AddPanel(nullptr, oui::PanelOrientation::None, m_disasmWindow, oui::PanelInfo());
+        defaultGroup->AddPanel(m_disasmWindow);
     }
 
     {
+        auto bottomPanel = m_panelContainerWindow->AttachNewGroup(defaultGroup, oui::GroupLocation::Bottom, oui::GroupAttachMode::Sibling);
+
         auto outputNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.output"));
-        m_outputWindow2 = std::make_shared<COutputWindow>([=]() {  return outputNode->QueryValue(ORTHIA_TCSTR("caption"));  });
-        m_outputWindow2->SetBackgroundColor(oui::ColorBlue());
+        m_outputWindow = std::make_shared<COutputWindow>([=]() {  return outputNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+        // m_outputWindow->SetBackgroundColor(oui::ColorBlue());
 
-        oui::PanelInfo panelInfo;
-        panelInfo.preferredHeight = 10;
-        panelInfo.preferredWidth = 20;
-        m_panelContainerWindow->AddPanel(nullptr, oui::PanelOrientation::Bottom, m_outputWindow2, panelInfo);
+        bottomPanel->AddPanel(m_outputWindow);
     }
-    {
-      auto outputNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.output"));
-      m_outputWindow = std::make_shared<COutputWindow>([=]() {  return outputNode->QueryValue(ORTHIA_TCSTR("caption"));  });
-
-      oui::PanelInfo panelInfo;
-      panelInfo.preferredHeight = 10;
-      panelInfo.preferredWidth = 20;
-      m_panelContainerWindow->AddPanel(nullptr, oui::PanelOrientation::Top, m_outputWindow, panelInfo);
-  }
-
     // we need to set focus somewhere
     SetOnResize([&]() {
         
         m_menu->Dock();
         const auto menuSize = m_menu->GetSize();
 
-        oui::Rect сlientRect = GetClientRect();
+        oui::Rect clientRect = GetClientRect();
         
-        oui::Size panelSize = сlientRect.size;
+        oui::Size panelSize = clientRect.size;
         panelSize.height -= menuSize.height;
         
         m_panelContainerWindow->MoveTo({0, menuSize.height });

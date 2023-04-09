@@ -33,7 +33,7 @@ namespace oui
         None = 0,
         kA = 1,
         kB = 2,
-        kС = 3,
+        kC = 3,
         kD = 4,
         kE = 5,
         kF = 6,

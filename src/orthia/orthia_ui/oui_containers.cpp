@@ -1,4 +1,5 @@
 #include "oui_containers.h"
+#include "oui_layouts_calc.h"
 
 namespace oui
 {
@@ -7,26 +8,12 @@ namespace oui
     static const auto g_braceLeft = String::char_type('[');
     static const auto g_braceRight = String::char_type(']');
 
-    PanelOrientation Reverse(const PanelOrientation& panelOrientation)
-    {
-        switch (panelOrientation)
-        {
-        case PanelOrientation::Left:
-            return PanelOrientation::Right;
-        case PanelOrientation::Right:
-            return PanelOrientation::Left;
-        case PanelOrientation::Top:
-            return PanelOrientation::Bottom;
-        case PanelOrientation::Bottom:
-            return PanelOrientation::Top;
-        default:
-            return panelOrientation;
-        }
-    }
+    int g_defaultPreferredWidth = 20;
+    int g_defaultPreferredHeight = 10;
 
     CPanelWindow::CPanelWindow(std::function<String()> getCaption)
         :
-            m_getCaption(getCaption)
+        m_getCaption(getCaption)
     {
     }
     String CPanelWindow::GetCaption() const
@@ -57,14 +44,6 @@ namespace oui
             }
         }
     }
-    void CPanelWindow::SetPreferredSize(const Size& preferredSize)
-    {
-        m_preferredSize = preferredSize;
-    }
-    Size CPanelWindow::GetPreferredSize() const
-    {
-        return m_preferredSize;
-    }
     bool CPanelWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
         if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
@@ -82,8 +61,8 @@ namespace oui
     CPanelGroupWindow::CPanelGroupWindow(std::shared_ptr<PanelColorProfile> panelColorProfile,
         std::shared_ptr<CPanelCommonContext> panelCommonContext)
         :
-            m_panelColorProfile(panelColorProfile),
-            m_panelCommonContext(panelCommonContext)
+        m_panelColorProfile(panelColorProfile),
+        m_panelCommonContext(panelCommonContext)
     {
     }
     void CPanelGroupWindow::Activate()
@@ -101,13 +80,6 @@ namespace oui
     }
     void CPanelGroupWindow::ConstuctChilds()
     {
-        m_panelCommonContext->Register(GetPtr_t<CPanelGroupWindow>(this));
-
-        if (m_child)
-        {
-            AddChild(m_child);
-        }
-        
         // first panel should be visible
         bool visiblePanel = true;
         for (auto& panel : m_panels)
@@ -117,15 +89,34 @@ namespace oui
             visiblePanel = false;
         }
     }
-    void CPanelGroupWindow::AddPanel(std::shared_ptr<CPanelWindow> panel,
-        const PanelInfo& info)
+    void CPanelGroupWindow::AddPanel(std::shared_ptr<CPanelWindow> panel)
     {
-        panel->SetPreferredSize({info.preferredWidth, info.preferredHeight});
         m_panels.push_back(panel);
     }
     bool CPanelGroupWindow::HasPanels() const
     {
         return !m_panels.empty();
+    }
+    void CPanelGroupWindow::SetPreferredSize(const Size& size)
+    {
+        m_groupInfo.preferredSize = size;
+    }
+    CPanelGroupWindow& CPanelGroupWindow::SetInfo(const GroupInfo& panelInfo)
+    {
+        m_groupInfo = panelInfo;
+        return *this;
+    }
+    void CPanelGroupWindow::SetLayout(std::shared_ptr<PanelLayout> layout)
+    {
+        m_layout = layout;
+    }
+    const GroupInfo& CPanelGroupWindow::Info() const
+    {
+        return m_groupInfo;
+    }
+    GroupInfo& CPanelGroupWindow::Info()
+    {
+        return m_groupInfo;
     }
     Rect CPanelGroupWindow::GetClientRect() const
     {
@@ -133,119 +124,6 @@ namespace oui
         return rect;
     }
 
-    void CPanelGroupWindow::ReserveTitleSpace(CWindow* wnd, Point& position, Size& size)
-    {
-        if (wnd != m_child.get())
-        {
-            // reserve space for title
-            ++position.y;
-            --size.height;
-        }
-    }
-    void CPanelGroupWindow::AdjustHorizontally(const Rect& clientRect, CWindow* left, CWindow* right, int leftWidth, int rightWidth)
-    {
-        const int availableWidth = clientRect.size.width;
-
-        auto leftSize = left->GetSize();
-        auto readyLeftSize = leftSize;
-        readyLeftSize.height = clientRect.size.height;
-
-        auto rightSize = right->GetSize();
-        auto readyRightSize = rightSize;
-        readyRightSize.height = clientRect.size.height;
-
-        if (leftWidth)
-        {
-            if (leftWidth <= availableWidth)
-            {
-                // enough space
-                readyLeftSize.width = leftWidth;
-            }
-            else
-            {
-                readyLeftSize.width = availableWidth;
-            }
-            // adjust flexible space
-            readyRightSize.width = availableWidth - readyLeftSize.width;
-        }
-        else
-        if (rightWidth)
-        {
-            if (rightWidth <= availableWidth)
-            {
-                // enough space
-                readyRightSize.width = rightWidth;
-            }
-            else
-            {
-                readyRightSize.width = availableWidth;
-            }
-            // adjust flexible space
-            readyLeftSize.width = availableWidth - readyRightSize.width;
-        }
-
-        auto leftPos = clientRect.position;
-        ReserveTitleSpace(left, leftPos, readyLeftSize);
-        left->MoveTo(leftPos);
-        left->Resize(readyLeftSize);
-
-        Point rightPosition = { clientRect.position.x + readyLeftSize.width, clientRect.position.y};
-        ReserveTitleSpace(right, rightPosition, readyRightSize);
-        right->MoveTo(rightPosition);
-        right->Resize(readyRightSize);
-    }
-    void CPanelGroupWindow::AdjustVertically(const Rect& clientRect, CWindow* top, CWindow* bottom, int topHeight, int bottomHeight)
-    {
-        const int availableHeight = clientRect.size.height;
-        
-        auto topSize = top->GetSize();
-        auto readyTopSize = topSize;
-        readyTopSize.width = clientRect.size.width;
-
-        auto bottomSize = bottom->GetSize();
-        auto readyBottomSize = bottomSize;
-        readyBottomSize.width = clientRect.size.width;
-
-        if (topHeight)
-        {
-            if (topHeight <= availableHeight)
-            {
-                // enough space
-                readyTopSize.height = topHeight;
-            }
-            else
-            {
-                readyTopSize.height = availableHeight;
-            }
-            // adjust flexible space
-            readyBottomSize.height = availableHeight - readyTopSize.height;
-        }
-        else
-        if (bottomHeight)
-        {
-            if (bottomHeight <= availableHeight)
-            {
-                // enough space
-                readyBottomSize.height = bottomHeight;
-            }
-            else
-            {
-                readyBottomSize.height = availableHeight;
-            }
-            // adjust flexible space
-            readyTopSize.height = availableHeight - readyBottomSize.height;
-        }
-
-        auto topPos = clientRect.position;
-        ReserveTitleSpace(top, topPos, readyTopSize);
-        top->MoveTo(topPos);
-        top->Resize(readyTopSize);
-
-        Point bottomPosition = { topPos.x, topPos.y + readyTopSize.height };
-        ReserveTitleSpace(bottom, bottomPosition, readyBottomSize);
-        bottom->MoveTo(bottomPosition);
-        bottom->Resize(readyBottomSize);
-    }
     std::shared_ptr<CPanelWindow> CPanelGroupWindow::GetActivePanel()
     {
         auto size = m_panels.size();
@@ -255,65 +133,16 @@ namespace oui
         }
         return m_panels[m_activePanelIndex];
     }
-    void CPanelGroupWindow::CalcSize()
-    {
-        if (m_child)
-        {
-            m_child->CalcSize();
-        }
-
-        auto panel = GetActivePanel();
-        if (panel)
-        {
-            m_precalcSize = panel->GetPreferredSize();
-            if (m_precalcSize.height || m_precalcSize.width)
-            {
-                if (m_child)
-                {
-                    switch (m_childOrintation)
-                    {
-                    case PanelOrientation::Left:
-                    case PanelOrientation::Right:
-                        m_precalcSize.width += m_child->m_precalcSize.width;
-                        break;
-                    case PanelOrientation::Top:
-                    case PanelOrientation::Bottom:
-                        m_precalcSize.height += m_child->m_precalcSize.height;
-                        break;
-                    }
-                }
-            }
-        }
-        else
-        {
-            if (m_child)
-            {
-                m_precalcSize = m_child->m_precalcSize;
-            }
-        }
-    }
 
     void CPanelGroupWindow::OnResize()
     {
-        CalcSize();
         // resize childs
         const auto size = GetSize();
         const Rect clientRect = GetClientRect();
 
-        // check corner cases
-        if (m_panels.empty())
-        {
-            if (m_child)
-            {
-                m_child->MoveTo(clientRect.position);
-                m_child->Resize(clientRect.size);
-            }
-            return;
-        }
-
         // got some panel
         auto activePanel = GetActivePanel();
-        if (m_childOrintation == PanelOrientation::None)
+        if (activePanel)
         {
             Rect clientRectWithTitle = clientRect;
             ++clientRectWithTitle.position.y;
@@ -321,31 +150,6 @@ namespace oui
             activePanel->MoveTo(clientRectWithTitle.position);
             activePanel->Resize(clientRectWithTitle.size);
             return;
-        }
-
-        switch (m_childOrintation)
-        {
-        case PanelOrientation::Left:
-        {
-            m_child->m_drawLeftBorder = false;
-            m_drawLeftBorder = true;
-            AdjustHorizontally(clientRect, m_child.get(), activePanel.get(), m_child->m_precalcSize.width, m_precalcSize.width);
-            break;
-        }
-        case PanelOrientation::Right:
-        {
-            m_child->m_drawLeftBorder = true;
-            m_drawLeftBorder = false;
-            AdjustHorizontally(clientRect, activePanel.get(), m_child.get(), m_precalcSize.width, m_child->m_precalcSize.width);
-            break;
-        }
-        case PanelOrientation::Top:
-            AdjustVertically(clientRect, m_child.get(), activePanel.get(), m_child->m_precalcSize.height, m_precalcSize.height);
-            break;
-
-        case PanelOrientation::Bottom:
-            AdjustVertically(clientRect, activePanel.get(), m_child.get(), m_precalcSize.height, m_child->m_precalcSize.height);
-            break;
         }
     }
     void CPanelGroupWindow::ApplyState(const ResizeState& state)
@@ -359,10 +163,8 @@ namespace oui
         {
             newState.panelSize.height = 1;
         }
-        if (auto activePanel = state.resizeTarget->GetActivePanel())
-        {
-            activePanel->SetPreferredSize(newState.panelSize);
-        }        
+
+        ResizeLayoutY(state.resizeTarget, newState.panelSize.height, state.resizeTargetIsMe);
         state.applyTarget->ForceResize();
     }
 
@@ -370,20 +172,8 @@ namespace oui
     {
         if (resizeTarget && applyTarget)
         {
-            if (auto activePanel = resizeTarget->GetActivePanel())
-            {
-                panelSize = activePanel->GetPreferredSize();
-                return true;
-            }
-        }
-        return false;
-    }
-    bool CPanelGroupWindow::HasPreferredSize()
-    {
-        if (auto activePanel = GetActivePanel())
-        {
-            auto panelSize = activePanel->GetPreferredSize();
-            return panelSize.width || panelSize.height;
+            panelSize = resizeTarget->rect.size;
+            return true;
         }
         return false;
     }
@@ -391,78 +181,64 @@ namespace oui
     {
         CPanelGroupWindow::ResizeState result;
 
-        // trivial case
-        if (m_childOrintation == PanelOrientation::Top)
-        {
-            // [child]
-            // [  me ]
-            if (HasPreferredSize())
-            {
-                result.resizeTarget = GetPtr_t<CPanelGroupWindow>(this);
-                result.applyTarget = result.resizeTarget;
-            }
-            else
-            {
-                result.resizeTarget = m_child;
-                result.applyTarget = GetPtr_t<CPanelGroupWindow>(this);
-            }
-            return result;
-        }
-
-        // scan for parent at the top
-        auto ptr = GetPtr_t<CPanelGroupWindow>(this);
-        if (!ptr)
+        auto layout = m_layout.lock();
+        if (!layout)
         {
             return result;
         }
 
-        bool firstLevel = true;
-        std::shared_ptr<CPanelGroupWindow> lastSameLevel;
-        if (ptr->HasPreferredSize())
+        // climb up for a proper layout
+        bool resizeTargetIsMe = true;
+        for (;;)
         {
-            lastSameLevel = ptr;
-        }
-        for (; ;)
-        {
-            auto parent = GetParent_t<CPanelGroupWindow>(ptr);
-            if (!parent || parent->m_childOrintation == PanelOrientation::None)
+            auto parentLayout = layout->parentLayout.lock();
+            if (!parentLayout)
             {
-                // none found
-                break;
+                return result;
             }
-            if (firstLevel && (parent->m_childOrintation == PanelOrientation::Left ||
-                     parent->m_childOrintation == PanelOrientation::Right))
+
+            auto it = parentLayout->data.begin(), it_end = parentLayout->data.end();
+            for (;
+                it != it_end;
+                ++it)
             {
-                if (parent->HasPreferredSize())
+                if (*it == layout)
                 {
-                    lastSameLevel = parent;
-                }
-            }
-            else
-            {
-                if (parent->m_childOrintation == PanelOrientation::Bottom)
-                {
-                    if (firstLevel && lastSameLevel && (lastSameLevel->HasPreferredSize()))
-                    {
-                        break;
-                    }
-                    // found window above
-                    if (parent->HasPreferredSize())
-                    {
-                        result.resizeTarget = parent;
-                        result.applyTarget = parent;
-                        return result;
-                    }
                     break;
                 }
-                firstLevel = false;
             }
-            ptr = parent;
-        }
-        if (lastSameLevel)
-        {
-            result.resizeTarget = lastSameLevel;
-            result.applyTarget = GetParent_t<CPanelGroupWindow>(lastSameLevel);
+            if (it == parentLayout->data.end())
+            {
+                return result;
+            }
+            const auto myIt = it;
+            if (!(*myIt)->stretchHeight)
+            {
+                result.resizeTarget = (*myIt);
+                result.resizeTargetIsMe = resizeTargetIsMe;
+                result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                return result;
+            }
+            if (parentLayout->type == PanelItemType::Vertical)
+            {
+                // my layout is auto stretched, its size doesn't matter
+                // check on above
+                it = myIt;
+                if (it != parentLayout->data.begin())
+                {
+                    --it;
+                    if (!(*it)->stretchHeight)
+                    {
+                        result.resizeTargetIsMe = false;
+                        result.resizeTarget = (*it);
+                        result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                        return result;
+                    }
+                }
+                return result;
+            }
+            resizeTargetIsMe = false;
+            layout = parentLayout;
         }
         return result;
     }
@@ -480,17 +256,17 @@ namespace oui
 
         case DragEvent::Progress:
         case DragEvent::Drop:
-            {
-                int differenceY = currentPoint.y - initialPoint.y;
-                auto newState = originalState;
+        {
+            int differenceY = currentPoint.y - initialPoint.y;
+            auto newState = originalState;
 
-                if (originalState.resizeTarget == wnd)
-                    differenceY = -differenceY;
+            if (originalState.resizeTargetIsMe)
+                differenceY = -differenceY;
 
-                newState.panelSize.height += differenceY;
-                ApplyState(newState);
-            }
-            break;
+            newState.panelSize.height += differenceY;
+            ApplyState(newState);
+        }
+        break;
         case DragEvent::Cancel:
             ApplyState(originalState);
         }
@@ -522,7 +298,7 @@ namespace oui
             }
             if (captionClick)
             {
-
+                // TODO handle caption drag-n-drop
             }
             else
             {
@@ -682,12 +458,12 @@ namespace oui
             m_chunk.native.clear();
             m_chunk.native.append(1, String::symSpace);
             m_chunk.native.append(1, g_braceLeft);
-            
+
             if (selected)
                 m_chunk.native.append(1, g_braceLeft);
             else
                 m_chunk.native.append(1, String::symSpace);
-            
+
             m_chunk.native.append(1, String::symSpace);
             m_chunk.native.append(panel->GetCaption().native);
             m_chunk.native.append(1, String::symSpace);
@@ -709,7 +485,7 @@ namespace oui
                 break;
             }
             int tableCharsCount = CutString(m_chunk.native, symbolsLeft);
-            
+
             if (IsMouseOn() &&
                 m_lastMouseMovePoint.y == target.y &&
                 m_lastMouseMovePoint.x >= target.x &&
@@ -758,6 +534,22 @@ namespace oui
     // CPanelCommonContext
     CPanelCommonContext::CPanelCommonContext()
     {
+    }
+    void CPanelCommonContext::SetRootLayout(std::shared_ptr<PanelLayout> layout)
+    {
+        m_rootLayout = layout;
+    }
+    void CPanelCommonContext::Register(std::shared_ptr<CPanelContainerWindow> containerWindow)
+    {
+        m_panelContainerWindow = containerWindow;
+    }
+    std::shared_ptr<CPanelContainerWindow> CPanelCommonContext::GetContainerWindow()
+    {
+        return m_panelContainerWindow.lock();
+    }
+    std::shared_ptr<PanelLayout> CPanelCommonContext::GetRootLayout()
+    {
+        return m_rootLayout;
     }
     void CPanelCommonContext::Register(std::shared_ptr<CPanelGroupWindow> group)
     {
@@ -817,6 +609,7 @@ namespace oui
         }
         m_currentActivePanel = panel;
     }
+
     // CPanelContainerWindow
     CPanelContainerWindow::CPanelContainerWindow()
     {
@@ -826,46 +619,228 @@ namespace oui
 
         m_panelCommonContext = std::make_shared<CPanelCommonContext>();
     }
-
-    std::shared_ptr<CPanelGroupWindow> CPanelContainerWindow::AddGroup(std::shared_ptr<CPanelGroupWindow> group,
-        const PanelOrientation& location)
+    std::shared_ptr<CPanelGroupWindow> CPanelContainerWindow::CreateDefaultGroup()
     {
-        if (!m_rootGroup)
+        if (m_panelCommonContext->GetRootLayout())
         {
-            m_rootGroup = std::make_shared<CPanelGroupWindow>(m_panelColorProfile, m_panelCommonContext);
+            return nullptr;
         }
-        if (!group)
-        {
-            group = m_rootGroup;
-        }
-
-        auto currentOrientation = group->m_childOrintation;
-        auto currentChild = group->m_child;
-        group->m_child = std::make_shared<CPanelGroupWindow>(m_panelColorProfile, m_panelCommonContext);
-        group->m_child->m_childOrintation = currentOrientation;
-        group->m_child->m_child = currentChild;
-        group->m_childOrintation = Reverse(location);
-        group->m_panels.swap(group->m_child->m_panels);
+        auto group = std::make_shared<CPanelGroupWindow>(m_panelColorProfile, m_panelCommonContext);
+        auto rootLayout = std::make_shared<PanelLayout>(group);
+        m_panelCommonContext->SetRootLayout(rootLayout);
+        ++m_groupsCount;
+        group->SetInfo(GroupInfo(GroupInfo::StretchAll()));
+        m_defaultGroup = group;
         return group;
     }
-    void CPanelContainerWindow::AddPanel(std::shared_ptr<CPanelGroupWindow> group,
-        const PanelOrientation& location,
-        std::shared_ptr<CPanelWindow> panel,
-        const PanelInfo& info)
+    std::shared_ptr<CPanelGroupWindow> CPanelContainerWindow::AttachPanelImpl(std::shared_ptr<PanelLayout> layout,
+        GroupLocation location,
+        std::function<void(std::shared_ptr<PanelLayout>)> replaceLayout)
     {
-        AddGroup(group, location)->AddPanel(panel, info);
+        auto rootLayout = layout;
+        if (rootLayout->type == PanelItemType::None)
+        {
+            auto newGroup = std::make_shared<CPanelGroupWindow>(m_panelColorProfile, m_panelCommonContext);
+            switch (location)
+            {
+            case GroupLocation::Left:
+                rootLayout->ResetType(PanelItemType::Horizontal);
+                rootLayout->data.push_front(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+
+            case GroupLocation::Right:
+                rootLayout->ResetType(PanelItemType::Horizontal);
+                rootLayout->data.push_back(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+
+            case GroupLocation::Top:
+                rootLayout->ResetType(PanelItemType::Vertical);
+                rootLayout->data.push_front(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+
+            case GroupLocation::Bottom:
+                rootLayout->ResetType(PanelItemType::Vertical);
+                rootLayout->data.push_back(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+            }
+            return nullptr;
+        }
+
+        // not none
+        if (rootLayout->type == PanelItemType::Vertical)
+        {
+            auto newGroup = std::make_shared<CPanelGroupWindow>(m_panelColorProfile, m_panelCommonContext);
+
+            switch (location)
+            {
+            case GroupLocation::Top:
+                rootLayout->data.push_front(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+
+            case GroupLocation::Bottom:
+                rootLayout->data.push_back(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+            }
+        }
+        else
+        {
+            auto newGroup = std::make_shared<CPanelGroupWindow>(m_panelColorProfile, m_panelCommonContext);
+            // horizontal
+            switch (location)
+            {
+            case GroupLocation::Left:
+                rootLayout->data.push_front(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+
+            case GroupLocation::Right:
+                rootLayout->data.push_back(std::make_shared<PanelLayout>(newGroup));
+                return newGroup;
+            }
+        }
+
+        if (!replaceLayout)
+        {
+            return nullptr;
+        }
+        // here we've need to replace root
+        auto newRootLayout = std::make_shared<PanelLayout>();
+        newRootLayout->data.push_back(rootLayout);
+        replaceLayout(newRootLayout);
+        return AttachPanelImpl(newRootLayout,
+            location,
+            nullptr);
+    }
+    bool CPanelContainerWindow::QueryContextImpl(std::shared_ptr<CPanelGroupWindow> group,
+        decltype(PanelLayout::data)::iterator parentIt,
+        GroupLocationContext& ctx,
+        int level)
+    {
+        if (level > 50)
+        {
+            return false;
+        }
+        auto parent = *parentIt;
+        
+        for (auto it = parent->data.begin(), it_end = parent->data.end();
+            it != it_end;
+            ++it)
+        {
+            if ((*it)->group == group)
+            {
+                ctx.layout = *it;
+                ctx.parentLayout = *parentIt;
+                ctx.replaceParentLayout = [=](auto newLayout) {   *parentIt = newLayout; };
+                ctx.replaceLayout = [=](auto newLayout) {  *it = newLayout; };
+                return true;
+            }
+            if (QueryContextImpl(group, it, ctx, level+1))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool CPanelContainerWindow::QueryContextImpl(std::shared_ptr<CPanelGroupWindow> group,
+        GroupLocationContext& ctx)
+    {
+        auto rootLayout = m_panelCommonContext->GetRootLayout();
+        if (!rootLayout)
+        {
+            return false;
+        }
+        if (group == nullptr || rootLayout->group == group)
+        {
+            // root
+            ctx.layout = rootLayout;
+            ctx.parentLayout = rootLayout;
+            ctx.replaceParentLayout = [=](auto newLayout) {  m_panelCommonContext->SetRootLayout(newLayout); };
+            ctx.replaceLayout = ctx.replaceParentLayout;
+            return true;
+        }
+        
+        auto it = std::find_if(rootLayout->data.begin(), rootLayout->data.end(), [=](auto& value) {  return value->group == group; });
+        if (it != rootLayout->data.end())
+        {
+            ctx.layout = *it;
+            ctx.parentLayout = rootLayout;
+            ctx.replaceParentLayout = [=](auto newLayout) {  m_panelCommonContext->SetRootLayout(newLayout); };
+            ctx.replaceLayout = [=](auto newLayout) {  *it = newLayout; };
+            return true;
+        }
+
+        for (auto it = rootLayout->data.begin(), it_end = rootLayout->data.end();
+            it != it_end;
+            ++it)
+        {
+            if (QueryContextImpl(group, it, ctx, 0))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    std::shared_ptr<CPanelGroupWindow> CPanelContainerWindow::AttachNewGroup(std::shared_ptr<CPanelGroupWindow> where,
+        GroupLocation location,
+        GroupAttachMode mode)
+    {
+        // check
+        GroupLocationContext context;
+        if (!QueryContextImpl(where, context))
+        {
+            return nullptr;
+        }
+
+        decltype (context.layout) layout = context.layout;
+        decltype (context.replaceLayout) replace = context.replaceLayout;
+        if (mode == GroupAttachMode::Sibling)
+        {
+            layout = context.parentLayout;
+            replace = context.replaceParentLayout;
+        }
+        auto result = AttachPanelImpl(layout, location, replace);
+        switch(location)
+        {
+            case GroupLocation::Left:
+            case GroupLocation::Right:
+                result->Info().stretchHeight = true;
+                break;
+
+            case GroupLocation::Top:
+            case GroupLocation::Bottom:
+                result->Info().stretchWidth = true;
+        }
+        if (result)
+        {
+            ++m_groupsCount;
+        }
+        return result;
     }
     void CPanelContainerWindow::ConstuctChilds()
     {
-        if (m_rootGroup)
+        m_panelCommonContext->Register(GetPtr_t<CPanelContainerWindow>(this));
+
+        // register child to common context
+        std::vector<oui::String::string_type> tags;
+        oui::CLayoutIterator iterator;
+        iterator.InitStart(m_panelCommonContext->GetRootLayout());
+        for (; iterator.MoveNext();)
         {
-            AddChild(m_rootGroup);
+            auto layout = iterator.GetLayout();
+            m_panelCommonContext->Register(layout->group);
+        }        
+        // and register childs
+        for (auto it = m_panelCommonContext->GroupBegin(), it_end = m_panelCommonContext->GroupEnd();
+            it != it_end;
+            ++it)
+        {
+            AddChild(*it);
         }
     }
     bool CPanelContainerWindow::HasPanels() const
     {
-        return !m_childs.empty();
+        return m_groupsCount !=0;
     }
+
     void CPanelContainerWindow::OnResize()
     {
         if (!HasPanels())
@@ -873,9 +848,14 @@ namespace oui
             Parent_type::OnResize();
             return;
         }
+        // here render happens
         Rect rect = GetClientRect();
-        m_rootGroup->Resize(rect.size);
+        auto rootLayout = m_panelCommonContext->GetRootLayout();
+
+        oui::RepositionLayout(rootLayout, rect, !m_repositionCacheValid, true);
+        m_repositionCacheValid = true;
     }
+
     Rect CPanelContainerWindow::GetClientRect() const
     {
         if (!HasPanels())
