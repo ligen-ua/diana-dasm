@@ -44,24 +44,25 @@ void CMainWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
 }
 bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
 {
+    auto pool = GetPool();
+    if (!pool)
+    {
+        return false;
+    }
+    if (auto modalWindow = pool->GetModalWindow())
+    {
+        if (!evt.resizeEvent.valid)
+        {
+            return modalWindow->ProcessEvent(evt, evtContext);
+        }
+    }
     if (oui::Fullscreen<oui::CWindow>::ProcessEvent(evt, evtContext))
     {
         return true;
     }
     if (evt.keyEvent.valid)
-    {
-        // check hotkeys
-        if (m_hotkeys.ProcessEvent(evt))
-        {
-            return true;
-        }
-        
+    {       
         // check focused
-        auto pool = GetPool();
-        if (!pool)
-        {
-            return false;
-        }
         if (auto ptr = pool->GetFocus())
         {
             for (; ptr;)
@@ -75,6 +76,12 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
                 }
                 ptr = ptr->GetParent();
             }
+        }
+
+        // check hotkeys
+        if (m_hotkeys.ProcessEvent(evt))
+        {
+            return true;
         }
 
         // no focused or focused couldn't process this, check alt menu

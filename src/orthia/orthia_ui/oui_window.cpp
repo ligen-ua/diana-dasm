@@ -8,6 +8,14 @@ namespace oui
     {
 
     }
+    void CWindowsPool::SetModalWindow(std::shared_ptr<CWindow> window)
+    {
+        m_modalWindow = window;
+    }
+    std::shared_ptr<CWindow> CWindowsPool::GetModalWindow()
+    {
+        return m_modalWindow;
+    }
     void CWindowsPool::RegisterRootWindow(std::shared_ptr<CWindow> window)
     {
         m_rootWindow = window;
@@ -377,6 +385,14 @@ namespace oui
         Invalidate();
         InvalidateParent(this);
         m_size = newSize;
+        if (m_size.width < 0)
+        {
+            m_size.width = 0;
+        }
+        if (m_size.height < 0)
+        {
+            m_size.height = 0;
+        }
         OnResize();
     }
     void CWindow::ForceResize()

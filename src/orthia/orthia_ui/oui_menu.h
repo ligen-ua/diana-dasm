@@ -38,9 +38,9 @@ namespace oui
     };
 
     class CMenuWindow;
-    class CMenuPopup:public WithBorder<CModalWindow>
+    class CMenuPopup:public WithBorder<CBaseModalWindow>
     {
-        using Parent_type = WithBorder<CModalWindow>;
+        using Parent_type = WithBorder<CBaseModalWindow>;
 
         std::weak_ptr<CMenuWindow> m_menuWindow;
         std::shared_ptr<MenuColorProfile> m_menuColorProfile;

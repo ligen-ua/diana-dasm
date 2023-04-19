@@ -23,6 +23,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     void ConstuctMenu();
     void ToggleMenu(bool openPopup);
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
+    void OpenExecutable();
 
 public:
     void ConstuctChilds() override;

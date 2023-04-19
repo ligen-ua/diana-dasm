@@ -32,9 +32,11 @@ namespace oui
         Point m_dragInitialPoint; 
         DragHandler_type m_dragHandler;
 
+        std::shared_ptr<CWindow> m_modalWindow;
     public:
         CWindowsPool();
         void RegisterRootWindow(std::shared_ptr<CWindow> window);
+
         void RegisterWindow(std::shared_ptr<CWindow> window);
         void UnregisterWindow(CWindow* window);
         std::shared_ptr<CWindow> GetWindow(CWindow* window);
@@ -52,6 +54,9 @@ namespace oui
         bool RegisterDragEvent(std::shared_ptr<CWindow> caller, const Point& pt, DragHandler_type handler);
         bool HandleDragEvent(InputEvent& evt);
         void CancelDragEvent();
+
+        void SetModalWindow(std::shared_ptr<CWindow> window);
+        std::shared_ptr<CWindow> GetModalWindow();
     };
 
     struct DrawParameters
@@ -92,6 +97,18 @@ namespace oui
         Type AddChild_t(Type child)
         {
             AddChild(child);
+            return child;
+        }
+        template<class Type>
+        Type AddChildAndInit_t(Type child)
+        {
+            auto ptr = GetPtr();
+            if (!ptr)
+            {
+                return nullptr;
+            }
+            AddChild(child);
+            child->Init(ptr);
             return child;
         }
         virtual bool HandleMouseEvent(const Rect& rect, InputEvent& evt);

@@ -3,17 +3,18 @@
 namespace oui
 {
 
-    CModalWindow::CModalWindow()
+    CBaseModalWindow::CBaseModalWindow()
     {
     }
 
-    void CModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
+    void CBaseModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
         m_prevFocus = pool->GetFocus();
         Activate();
     }
-    void CModalWindow::FinishDialog()
+    void CBaseModalWindow::FinishDialog()
     {
+        OnFinishDialog();
         Deactivate();
         auto pool = GetPool();
         if (pool)
@@ -23,7 +24,7 @@ namespace oui
         }
         Destroy();
     }
-    bool CModalWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
+    bool CBaseModalWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
         if (!CWindow::ProcessEvent(evt, evtContext))
         {
@@ -37,7 +38,46 @@ namespace oui
                 }
             }
         }
-        return false;
+        // non-popup modal dialogs showdn't allow global hotkeys to flee
+        return !IsPopup();
     }
+
+
+    // CModalWindow
+    void CModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
+    {
+        m_lastModalWindow = pool->GetModalWindow();
+        pool->SetModalWindow(GetPtr());
+        Parent_type::OnInit(pool);
+    }
+    void CModalWindow::OnFinishDialog() 
+    {
+        auto pool = GetPool();
+        if (!pool)
+        {
+            return;
+        }
+        pool->SetModalWindow(m_lastModalWindow);
+        m_lastModalWindow = nullptr;
+    }
+    void CModalWindow::Dock()
+    {
+        auto parent = GetParent();
+        if (!parent)
+        {
+            return;
+        }
+        const auto parentRect = parent->GetClientRect();
+        int xBorder = parentRect.size.width / 6;
+        int yBorder = parentRect.size.height / 6;
+        Rect rect = parentRect;
+        rect.position.x += xBorder;
+        rect.position.y += yBorder;
+        rect.size.width -= xBorder*2;
+        rect.size.height -= yBorder*2;
+        this->MoveTo(rect.position);
+        this->Resize(rect.size);
+    }
+
 
 }
