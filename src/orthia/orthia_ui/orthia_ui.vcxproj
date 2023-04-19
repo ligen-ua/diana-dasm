@@ -167,6 +167,7 @@
     <ClCompile Include="oui_layouts_calc.cpp" />
     <ClCompile Include="oui_menu.cpp" />
     <ClCompile Include="oui_modal.cpp" />
+    <ClCompile Include="oui_open_file_dialog.cpp" />
     <ClCompile Include="oui_screen.cpp" />
     <ClCompile Include="oui_window.cpp" />
   </ItemGroup>
@@ -185,6 +186,7 @@
     <ClInclude Include="oui_layouts_calc.h" />
     <ClInclude Include="oui_menu.h" />
     <ClInclude Include="oui_modal.h" />
+    <ClInclude Include="oui_open_file_dialog.h" />
     <ClInclude Include="oui_string.h" />
     <ClInclude Include="oui_window.h" />
     <ClInclude Include="oui_win_styles.h" />

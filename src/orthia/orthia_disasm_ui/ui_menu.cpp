@@ -1,5 +1,5 @@
 #include "ui_main_window.h"
-
+#include "oui_open_file_dialog.h"
 void CMainWindow::ToggleMenu(bool openPopup)
 {
     if (m_menu->IsActive())
@@ -12,6 +12,11 @@ void CMainWindow::ToggleMenu(bool openPopup)
     {
         m_menu->OpenPopup();
     }
+}
+void CMainWindow::OpenExecutable()
+{
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>());
+    dialog->Dock();
 }
 void CMainWindow::ConstuctMenu()
 {
@@ -30,7 +35,7 @@ void CMainWindow::ConstuctMenu()
         {
             {
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_executable")),
-                []() {},
+                [this]() { OpenExecutable();  },
                 oui::Hotkey(oui::VirtualKey::kE)
             },
             {

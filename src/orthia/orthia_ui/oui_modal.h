@@ -5,17 +5,29 @@
 
 namespace oui
 {
-    class CModalWindow:public CWindow
+    class CBaseModalWindow:public CWindow
     {
-        std::weak_ptr<CWindow> m_prevFocus;
-
     protected:
+        std::weak_ptr<CWindow> m_prevFocus;
         void OnInit(std::shared_ptr<CWindowsPool> pool);
-
+        virtual void OnFinishDialog() {}
     public:
-        CModalWindow();
+        CBaseModalWindow();
 
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void FinishDialog();
+    };
+
+
+    class CModalWindow:public WithBorder<CBaseModalWindow>
+    {
+        std::shared_ptr<CWindow> m_lastModalWindow;
+
+        using Parent_type = WithBorder<CBaseModalWindow>;
+        void OnInit(std::shared_ptr<CWindowsPool> pool) override;
+        void OnFinishDialog() override;
+    public:
+        void Dock(); 
+        bool IsPopup() const override { return false; }
     };
 }
