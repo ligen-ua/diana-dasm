@@ -39,7 +39,10 @@ namespace oui
         
         Size m_precalcSize;
         bool m_drawLeftBorder = false; 
-        String m_chunk;
+        
+        // temporary data for title painting
+        static String m_chunk;
+        
         std::shared_ptr<PanelColorProfile> m_panelColorProfile;
         int m_activePanelIndex = 0;
         Point m_lastMouseMovePoint;

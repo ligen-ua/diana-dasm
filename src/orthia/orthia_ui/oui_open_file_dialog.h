@@ -4,8 +4,9 @@
 
 namespace oui
 {
-    class COpenFileDialog:public CModalWindow
+    class COpenFileDialog:public oui::SimpleBrush<CModalWindow>
     {
+        using Parent_type = oui::SimpleBrush<CModalWindow>;
     public:
         COpenFileDialog();
     };

@@ -387,6 +387,8 @@ namespace oui
         }
         return CWindow::ProcessEvent(evt, evtContext);
     }
+
+    String CPanelGroupWindow::m_chunk;
     void CPanelGroupWindow::PaintTitle(const Rect& rect, DrawParameters& parameters)
     {
         if (rect.size.width <= 0 || rect.size.height <= 0)
@@ -410,8 +412,6 @@ namespace oui
         absClientRect.position.x += rect.position.x;
         absClientRect.position.y += rect.position.y;
         m_lastTabY = absClientRect.position.y;
-
-        PanelCaptionProfile* profile = &m_panelColorProfile->normal;
 
         int index = 0;
         Point target = absClientRect.position;

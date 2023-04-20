@@ -44,6 +44,180 @@ namespace oui
 
 
     // CModalWindow
+    CModalWindow::CModalWindow()
+    {
+        m_panelColorProfile = std::make_shared<PanelColorProfile>();
+        QueryDefaultColorProfile(*m_panelColorProfile);
+    }
+    void CModalWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
+    {
+        Parent_type::DoPaint(rect, parameters);
+        PaintTitle(rect, parameters);
+    }
+
+    String CModalWindow::m_chunk;
+    static const auto g_braceLeft = String::char_type('[');
+    static const auto g_braceRight = String::char_type(']');
+    static const auto g_closeSign = String::char_type('x');
+
+    void CModalWindow::PaintTitle(const Rect& rect, DrawParameters& parameters)
+    {
+        m_captionRange = Range();
+        m_closeRange = Range();
+
+        if (rect.size.width <= 0 || rect.size.height <= 0)
+        {
+            return;
+        }
+
+        const auto absClientRect = GetAbsoluteClientRect(this, rect);
+        int symbolsLeft = absClientRect.size.width;
+        Point target = absClientRect.position;
+        --target.y;
+        
+        // skip some space from left
+        target.x += 3;
+        symbolsLeft -= 3;
+
+        // and right
+        symbolsLeft -= 5;
+
+        if (!m_caption.native.empty())
+        {
+            // compose header
+            m_chunk.native.clear();
+            m_chunk.native.append(1, String::symSpace);
+            m_chunk.native.append(1, g_braceLeft);
+            m_chunk.native.append(1, g_braceLeft);
+
+            m_chunk.native.append(1, String::symSpace);
+            m_chunk.native.append(GetCaption().native);
+            m_chunk.native.append(1, String::symSpace);
+
+            m_chunk.native.append(1, g_braceRight);
+            m_chunk.native.append(1, g_braceRight);
+            m_chunk.native.append(1, String::symSpace);
+
+            {
+                PanelCaptionProfile* currentColors = &m_panelColorProfile->normal;
+                if (IsActiveOrFocused())
+                {
+                    currentColors = &m_panelColorProfile->selected;
+                }
+                if (symbolsLeft > 0)
+                {
+                    int tableCharsCount = CutString(m_chunk.native, symbolsLeft);
+
+                    if (IsMouseOn() &&
+                        m_lastMouseMovePoint.y == target.y &&
+                        m_lastMouseMovePoint.x >= target.x &&
+                        m_lastMouseMovePoint.x < (target.x + tableCharsCount))
+                    {
+                        currentColors = &m_panelColorProfile->mouseHighlight;
+                    }
+
+                    m_captionRange = Range{ target.x, (target.x + tableCharsCount) };
+                    parameters.console.PaintText(target,
+                        currentColors->text,
+                        currentColors->background,
+                        m_chunk.native);
+
+                    target.x += tableCharsCount;
+                    symbolsLeft -= tableCharsCount;
+                }
+            }
+        }
+
+        // write x cross for close
+        if (absClientRect.size.width > 5)
+        {
+            const int rightCornerX = absClientRect.position.x + absClientRect.size.width;
+            target.x = rightCornerX - 5;
+            m_chunk.native.clear();
+            m_chunk.native.append(1, String::symSpace);
+            m_chunk.native.append(1, g_closeSign);
+            m_chunk.native.append(1, String::symSpace);
+
+            PanelCaptionProfile* currentColors = &m_panelColorProfile->normal;
+
+            m_closeRange = Range{ target.x, (target.x + (int)m_chunk.native.size()) };
+
+            if (IsMouseOn() &&
+                m_lastMouseMovePoint.y == target.y &&
+                m_lastMouseMovePoint.x >= m_closeRange.begin &&
+                m_lastMouseMovePoint.x < m_closeRange.end)
+            {
+                currentColors = &m_panelColorProfile->mouseHighlight;
+            }
+
+            parameters.console.PaintText(target,
+                currentColors->text,
+                currentColors->background,
+                m_chunk.native);
+        }
+    }
+
+    bool CModalWindow::Drag_MoveHandler(DragEvent event,
+        const Point& initialPoint,
+        const Point& currentPoint,
+        std::shared_ptr<CWindow> wnd,
+        const Rect& initialRect)
+    {
+        switch (event)
+        {
+        default:
+            return false;
+
+        case DragEvent::Progress:
+        case DragEvent::Drop:
+        {
+            int differenceX = currentPoint.x - initialPoint.x;
+            int differenceY = currentPoint.y - initialPoint.y;
+            auto newState = initialRect;
+
+            newState.position.x += differenceX;
+            newState.position.y += differenceY;
+
+            this->MoveTo(newState.position);
+        }
+        break;
+        case DragEvent::Cancel:
+            this->MoveTo(initialRect.position);
+        }
+        return true;
+    }
+    bool CModalWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    {
+        m_lastMouseMovePoint = evt.mouseEvent.point;
+
+        if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
+        {
+            if (IsInside(m_closeRange, evt.mouseEvent.point.x))
+            {
+                this->FinishDialog();
+                return true;
+            }
+            // user must be able to move window by dragging its caption
+            if (IsInside(m_captionRange, evt.mouseEvent.point.x))
+            {
+                // register move handler
+                Rect initialRect = GetWndRect();
+
+                RegisterDragEvent(m_lastMouseMovePoint, [this, initialRect = initialRect](DragEvent evt,
+                    const Point& initialPoint,
+                    const Point& currentPoint,
+                    std::shared_ptr<CWindow> wnd) {
+                    return Drag_MoveHandler(evt,
+                    initialPoint,
+                    currentPoint,
+                    wnd,
+                    initialRect);
+                });
+            }
+        }
+        Invalidate(false);
+        return true;
+    }
     void CModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
         m_lastModalWindow = pool->GetModalWindow();
@@ -59,6 +233,14 @@ namespace oui
         }
         pool->SetModalWindow(m_lastModalWindow);
         m_lastModalWindow = nullptr;
+    }
+    void CModalWindow::SetCaption(const String& caption)
+    {
+        m_caption = caption;
+    }
+    String CModalWindow::GetCaption() const
+    {
+        return m_caption;
     }
     void CModalWindow::Dock()
     {

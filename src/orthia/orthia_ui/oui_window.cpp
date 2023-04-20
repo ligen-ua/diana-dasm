@@ -363,8 +363,21 @@ namespace oui
         
         InvalidateParent(this);
         m_position = newPt;
+
+        if (m_position.x < 0)
+        {
+            m_position.x = 0;
+        }
+        if (m_position.y < 0)
+        {
+            m_position.y = 0;
+        }
     }
     // size
+    Rect CWindow::GetWndRect() const
+    {
+        return { GetPosition(), GetSize() };
+    }
     Size CWindow::GetSize() const
     {
         return m_size;
@@ -562,8 +575,7 @@ namespace oui
     {
         if (evt.mouseEvent.valid)
         {
-            Rect rect;
-            rect.size = this->GetSize();
+            Rect rect = this->GetWndRect();
 
             if (ProcessMouseEvent(rect, evt, evtContext))
             {
