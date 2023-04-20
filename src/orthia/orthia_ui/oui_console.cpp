@@ -437,7 +437,7 @@ namespace oui
         CHAR_INFO chInfo;
         chInfo.Attributes = 0;
         chInfo.Char.UnicodeChar = L' ';
-        m_buffer.resize(m_size.height * m_size.width, chInfo);
+        m_buffer.resize((m_size.height + 1)* m_size.width, chInfo);
     }
     void CConsoleDrawAdapter::FinishDraw()
     {

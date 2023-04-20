@@ -15,7 +15,10 @@ void CMainWindow::ToggleMenu(bool openPopup)
 }
 void CMainWindow::OpenExecutable()
 {
+    auto openFileNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.openfile"));
+
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>());
+    dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
     dialog->Dock();
 }
 void CMainWindow::ConstuctMenu()

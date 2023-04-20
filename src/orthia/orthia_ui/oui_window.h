@@ -164,6 +164,7 @@ namespace oui
         virtual void Resize(const Size& newSize);
         void ForceResize();
 
+        Rect GetWndRect() const;
         virtual Rect GetClientRect() const;
 
         // draw stuff
