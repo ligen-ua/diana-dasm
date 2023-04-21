@@ -11,6 +11,14 @@
 #include <algorithm>
 #include <array>
 #include <utility>
+#include <condition_variable>
+#include <mutex>
+
+#if defined(_WIN32) || (_MSC_VER)
+
+#define OUI_SYS_WINDOWS
+
+#endif
 
 struct IUnknown;
 namespace oui
@@ -119,5 +127,29 @@ namespace oui
     {
         Thin,
         Thick
+    };
+
+
+    class ScopedGuard:Noncopyable
+    {
+        std::function<void()> m_handler;
+    public:
+        template<class T>
+        ScopedGuard(T&& value)
+            :
+                m_handler(std::forward<T>(value))
+        {
+        }
+        ~ScopedGuard()
+        {
+            if (m_handler) 
+            {
+                m_handler();
+            }
+        }
+        void Release()
+        {
+            m_handler = nullptr;
+        }
     };
 }

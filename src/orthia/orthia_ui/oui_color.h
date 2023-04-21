@@ -122,4 +122,34 @@ namespace oui
     };
     void QueryDefaultColorProfile(PanelColorProfile& profile);
 
+    // label
+    struct LabelColorState
+    {
+        Color text;
+        Color background;
+    };
+    struct LabelColorProfile
+    {
+        LabelColorState normal;
+        LabelColorState mouseHighlight;
+    };
+    void QueryDefaultColorProfile(LabelColorProfile& profile);
+
+    // listbox
+    struct ListBoxColorProfile
+    {
+        LabelColorState normalText;
+        LabelColorState selectedText;
+        Color borderColor;
+    };
+    void QueryDefaultColorProfile(ListBoxColorProfile& profile);
+
+    // dialog
+    struct DialogColorProfile
+    {
+        LabelColorProfile label;
+        ListBoxColorProfile listBox;
+    };
+    void QueryDefaultColorProfile(DialogColorProfile& profile);
+
 }

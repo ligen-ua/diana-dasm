@@ -8,11 +8,12 @@
 #include "ui_disasm_window.h"
 #include "ui_output_window.h"
 
-
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
 class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
 {
+    std::shared_ptr<orthia::CProgramModel> m_model;
+
     std::shared_ptr<oui::CMenuWindow> m_menu;
     std::shared_ptr<oui::CPanelContainerWindow> m_panelContainerWindow;
     std::shared_ptr<CDisasmWindow> m_disasmWindow;
@@ -26,6 +27,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     void OpenExecutable();
 
 public:
-    void ConstuctChilds() override;
+    CMainWindow(std::shared_ptr<orthia::CProgramModel> model);
+    void ConstructChilds() override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
 };

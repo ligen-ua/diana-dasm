@@ -81,7 +81,7 @@ namespace oui
 
         bool HasPanels() const;
         Rect GetClientRect() const;
-        void ConstuctChilds() override;
+        void ConstructChilds() override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void AddPanel(std::shared_ptr<CPanelWindow> panel);
         void OnResize() override;
@@ -169,7 +169,7 @@ namespace oui
 
     public:
         CPanelContainerWindow();
-        void ConstuctChilds() override;
+        void ConstructChilds() override;
         int GetGroupsCount() const { return m_groupsCount; }
 
         std::shared_ptr<CPanelGroupWindow> CreateDefaultGroup();

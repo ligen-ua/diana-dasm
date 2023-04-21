@@ -37,7 +37,8 @@ namespace oui
         }
         else
         {
-            if (evt.mouseEvent.button != MouseButton::Left)
+            if (evt.mouseEvent.button != MouseButton::Left ||
+                evt.mouseEvent.state != MouseState::Pressed)
             {
                 return true;
             }
@@ -173,7 +174,10 @@ namespace oui
             Invalidate();
             break;
         case MouseButton::Left:
-            FireEvent();
+            if (evt.mouseEvent.state == MouseState::Pressed)
+            {
+                FireEvent();
+            }
             break;
         }
         return true;
@@ -482,7 +486,7 @@ namespace oui
         m_buttons.push_back(std::make_shared<CMenuButtonWindow>(caption, nullptr, std::move(items)));
         return m_buttons.back();
     }
-    void CMenuWindow::ConstuctChilds()
+    void CMenuWindow::ConstructChilds()
     {
         for (auto& button : m_buttons)
         {

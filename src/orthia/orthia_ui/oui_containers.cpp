@@ -78,7 +78,7 @@ namespace oui
             GetPanelCommonContext()->OnActivate(GetPtr_t<CPanelGroupWindow>(this));
         }
     }
-    void CPanelGroupWindow::ConstuctChilds()
+    void CPanelGroupWindow::ConstructChilds()
     {
         // first panel should be visible
         bool visiblePanel = true;
@@ -815,7 +815,7 @@ namespace oui
         }
         return result;
     }
-    void CPanelContainerWindow::ConstuctChilds()
+    void CPanelContainerWindow::ConstructChilds()
     {
         m_panelCommonContext->Register(GetPtr_t<CPanelContainerWindow>(this));
 

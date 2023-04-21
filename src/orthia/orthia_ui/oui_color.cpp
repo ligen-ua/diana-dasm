@@ -68,7 +68,7 @@ namespace oui
     }
 
     // color defaults
-    static MenuColorProfile g_menuColorProfile = 
+    static MenuColorProfile g_menuColorProfile =
     {
         // menu
         {
@@ -148,4 +148,48 @@ namespace oui
     {
         profile = g_panelColorProfile;
     }
+
+    // label
+    static LabelColorProfile g_labelColorProfile =
+    {
+        {
+            ColorWhite(),     // text
+            ColorBlack(),     // background
+        },
+        {
+            ColorWhite(),     // text
+            ColorBlack(),     // background
+        }
+    };
+    void QueryDefaultColorProfile(LabelColorProfile& profile)
+    {
+        profile = g_labelColorProfile;
+    }
+
+    // listbox
+    static ListBoxColorProfile g_listBoxColorProfile =
+    {
+        {
+            ColorWhite(),     // text
+            ColorBlack(),     // background
+        },
+        {
+            ColorWhite(),     // text
+            ColorCyan(),     // background
+        },
+        ColorGray()
+    };
+    void QueryDefaultColorProfile(ListBoxColorProfile& profile)
+    {
+        profile = g_listBoxColorProfile;
+    }
+
+    // dialog
+    void QueryDefaultColorProfile(DialogColorProfile& profile)
+    {
+        QueryDefaultColorProfile(profile.label);
+        QueryDefaultColorProfile(profile.listBox);
+
+    }
+
 }

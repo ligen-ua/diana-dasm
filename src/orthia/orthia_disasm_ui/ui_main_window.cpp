@@ -1,6 +1,11 @@
 #include "ui_main_window.h"
 
-void CMainWindow::ConstuctChilds()
+CMainWindow::CMainWindow(std::shared_ptr<orthia::CProgramModel> model)
+    :
+        m_model(model)
+{
+}
+void CMainWindow::ConstructChilds()
 {
     CMainWindow::ConstuctMenu();
 

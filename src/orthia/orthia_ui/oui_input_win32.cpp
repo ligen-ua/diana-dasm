@@ -200,8 +200,24 @@ namespace oui
                 evt.keyState = TranslateKeyState(raw.Event.MouseEvent.dwControlKeyState);
                 evt.mouseEvent.button = GetMouseButton(raw.Event.MouseEvent);
                 evt.mouseEvent.state = GetMouseState(raw.Event.MouseEvent);
+
+                // console api returns Move + Released this is frustrating
+                // I would rather like to have mouse button there
+                if (evt.mouseEvent.button == MouseButton::Move &&
+                    evt.mouseEvent.state == MouseState::Released)
+                {
+                    if (m_lastMouseButton != MouseButton::None)
+                    {
+                        evt.mouseEvent.button = m_lastMouseButton;
+                        m_lastMouseButton = MouseButton::None;
+                    }
+                }
                 if (evt.mouseEvent.button != MouseButton::None || evt.mouseEvent.state != MouseState::None)
                 {
+                    if (evt.mouseEvent.button != MouseButton::Move)
+                    {
+                        m_lastMouseButton = evt.mouseEvent.button;
+                    }
                     evt.mouseEvent.valid = true;
                     evt.mouseEvent.point.x = raw.Event.MouseEvent.dwMousePosition.X;
                     evt.mouseEvent.point.y = raw.Event.MouseEvent.dwMousePosition.Y;
@@ -243,6 +259,8 @@ namespace oui
     }
 
     CConsoleInputReader::CConsoleInputReader()
+        :
+           m_jobEvent(EventType::Auto)
     {
         SetCtrlcHandler([&] {
 
@@ -268,6 +286,10 @@ namespace oui
         input.push_back(event);
         return true;
     }
+    void CConsoleInputReader::Interrupt()
+    {
+        m_jobEvent.Set();
+    }
     bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
     {
         for (;;)
@@ -281,9 +303,9 @@ namespace oui
             auto conHandle = GetStdHandle(STD_INPUT_HANDLE);
             for (;;)
             {
-                if (WAIT_OBJECT_0 == WaitForSingleObject(conHandle, msToWait))
+                HANDLE handles[] = {m_jobEvent.GetHandle(), conHandle};
+                if (WAIT_TIMEOUT != WaitForMultipleObjects(2, handles, FALSE, msToWait))
                 {
-                    // there is data
                     break;
                 }
                 if (m_gotCtrlC)

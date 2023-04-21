@@ -161,15 +161,22 @@
     <ClCompile Include="oui_color.cpp" />
     <ClCompile Include="oui_console.cpp" />
     <ClCompile Include="oui_containers.cpp" />
+    <ClCompile Include="oui_edit_box.cpp" />
+    <ClCompile Include="oui_filesystem.cpp" />
+    <ClCompile Include="oui_filesystem_win32.cpp" />
     <ClCompile Include="oui_hotkey.cpp" />
     <ClCompile Include="oui_input_win32.cpp" />
+    <ClCompile Include="oui_label.cpp" />
     <ClCompile Include="oui_layouts.cpp" />
     <ClCompile Include="oui_layouts_calc.cpp" />
+    <ClCompile Include="oui_listbox.cpp" />
     <ClCompile Include="oui_menu.cpp" />
     <ClCompile Include="oui_modal.cpp" />
     <ClCompile Include="oui_open_file_dialog.cpp" />
     <ClCompile Include="oui_screen.cpp" />
+    <ClCompile Include="oui_threadpool.cpp" />
     <ClCompile Include="oui_window.cpp" />
+    <ClCompile Include="oui_window_thread.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="oui_app.h" />
@@ -178,18 +185,24 @@
     <ClInclude Include="oui_color.h" />
     <ClInclude Include="oui_console.h" />
     <ClInclude Include="oui_containers.h" />
+    <ClInclude Include="oui_edit_box.h" />
+    <ClInclude Include="oui_filesystem.h" />
     <ClInclude Include="oui_hotkey.h" />
     <ClInclude Include="oui_input.h" />
     <ClInclude Include="oui_input_win32.h" />
     <ClInclude Include="oui_keyboard.h" />
+    <ClInclude Include="oui_label.h" />
     <ClInclude Include="oui_layouts.h" />
     <ClInclude Include="oui_layouts_calc.h" />
+    <ClInclude Include="oui_listbox.h" />
     <ClInclude Include="oui_menu.h" />
     <ClInclude Include="oui_modal.h" />
     <ClInclude Include="oui_open_file_dialog.h" />
     <ClInclude Include="oui_string.h" />
+    <ClInclude Include="oui_threadpool.h" />
     <ClInclude Include="oui_window.h" />
     <ClInclude Include="oui_win_styles.h" />
+    <ClInclude Include="oui_window_thread.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

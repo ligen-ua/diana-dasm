@@ -17,17 +17,18 @@ int wmain(int argc, const wchar_t* argv[])
         }
     }
     std::cout << "Welcome to Orthia Disasm\n\n";
+    std::cout.flush();
+
     try
     {
-        orthia::CProgramModel programModel;
-        std::cout.flush();
+        auto programModel = std::make_shared<orthia::CProgramModel>();
 
         g_textManager = new orthia::CTextManager();
         InitLanguage_EN(g_textManager);
 
         oui::CConsoleApp app;
 
-        auto rootWindow = std::make_shared<CMainWindow>();
+        auto rootWindow = std::make_shared<CMainWindow>(programModel);
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

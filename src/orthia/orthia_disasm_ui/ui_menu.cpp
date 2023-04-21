@@ -17,7 +17,9 @@ void CMainWindow::OpenExecutable()
 {
     auto openFileNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.openfile"));
 
-    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>());
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>(oui::String(), 
+        nullptr, 
+        m_model->GetFileSystem()));
     dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
     dialog->Dock();
 }
