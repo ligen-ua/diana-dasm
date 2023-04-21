@@ -16,9 +16,16 @@ namespace oui
     {
         return m_modalWindow;
     }
-    void CWindowsPool::RegisterRootWindow(std::shared_ptr<CWindow> window)
+    std::shared_ptr<CWindowThread> CWindowsPool::GetThread()
+    {
+        return m_thread;
+    }
+    void CWindowsPool::RegisterRootWindow(std::shared_ptr<CWindow> window,
+        std::shared_ptr<CWindowThread> thread)
     {
         m_rootWindow = window;
+        m_thread = thread;
+
         RegisterWindow(window);
     }
     void CWindowsPool::RegisterWindow(std::shared_ptr<CWindow> window)
@@ -165,8 +172,9 @@ namespace oui
     CWindow::~CWindow()
     {
     }
-    void CWindow::ConstuctChilds()
+    void CWindow::ConstructChilds()
     {
+        // this MUST be empty here
     }
 
     void CWindow::OnMouseLeave()
@@ -215,6 +223,16 @@ namespace oui
         }
     }
 
+    std::shared_ptr<CWindowThread> CWindow::GetThread()
+    {
+        auto poolPtr = m_pool.lock();
+        if (!poolPtr)
+        {
+            return nullptr;
+        }
+        return poolPtr->GetThread();
+    }
+
     bool CWindow::RegisterDragEvent(const Point& pt, DragHandler_type handler)
     {
         auto poolPtr = m_pool.lock();
@@ -249,7 +267,7 @@ namespace oui
     void CWindow::Init(std::shared_ptr<CWindowsPool> pool)
     {
         m_pool = pool;
-        ConstuctChilds();
+        ConstructChilds();
         OnInit(pool);
         for (auto& child : m_childs)
         {

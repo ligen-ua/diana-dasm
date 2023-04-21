@@ -1,6 +1,7 @@
 #pragma once
 
 #include "oui_console.h"
+#include "oui_window_thread.h"
 
 namespace oui
 {
@@ -19,7 +20,7 @@ namespace oui
         const Point& currentPoint,
         std::shared_ptr<CWindow> wnd)>;
 
-    class CWindowsPool
+    class CWindowsPool:Noncopyable
     {
         std::unordered_map<CWindow*, std::shared_ptr<CWindow>> m_allWindows;
         std::shared_ptr<CWindow> m_focused;
@@ -33,9 +34,12 @@ namespace oui
         DragHandler_type m_dragHandler;
 
         std::shared_ptr<CWindow> m_modalWindow;
+        std::shared_ptr<CWindowThread> m_thread;
     public:
         CWindowsPool();
-        void RegisterRootWindow(std::shared_ptr<CWindow> window);
+        void RegisterRootWindow(std::shared_ptr<CWindow> window,
+            std::shared_ptr<CWindowThread> thread);
+        std::shared_ptr<CWindowThread> GetThread();
 
         void RegisterWindow(std::shared_ptr<CWindow> window);
         void UnregisterWindow(CWindow* window);
@@ -90,7 +94,7 @@ namespace oui
         void RemoveChild(CWindow* child);
         bool IsMouseOn() const { return m_mouseIsOn;  }
 
-        virtual void ConstuctChilds();
+        virtual void ConstructChilds();
         virtual void OnResize();
 
         template<class Type>
@@ -189,6 +193,8 @@ namespace oui
         void AddChild(std::shared_ptr<CWindow> child);
 
         bool RegisterDragEvent(const Point& pt, DragHandler_type handler);
+
+        std::shared_ptr<CWindowThread> GetThread();
     };
 
     template<class Type>

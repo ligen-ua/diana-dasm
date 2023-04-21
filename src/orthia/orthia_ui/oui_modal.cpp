@@ -190,15 +190,19 @@ namespace oui
     {
         m_lastMouseMovePoint = evt.mouseEvent.point;
 
-        if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
+        if (evt.mouseEvent.button == MouseButton::Left)
         {
-            if (IsInside(m_closeRange, evt.mouseEvent.point.x))
+            if (evt.mouseEvent.state == MouseState::Released)
             {
-                this->FinishDialog();
-                return true;
+                if (IsInside(m_closeRange, evt.mouseEvent.point.x))
+                {
+                    this->FinishDialog();
+                    return true;
+                }
             }
             // user must be able to move window by dragging its caption
-            if (IsInside(m_captionRange, evt.mouseEvent.point.x))
+            if (evt.mouseEvent.state == MouseState::Pressed && 
+                IsInside(m_captionRange, evt.mouseEvent.point.x))
             {
                 // register move handler
                 Rect initialRect = GetWndRect();

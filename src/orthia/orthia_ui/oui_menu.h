@@ -84,7 +84,7 @@ namespace oui
             std::function<void()> handler);
         std::shared_ptr<CMenuButtonWindow> AddButton(const String& caption,
             std::vector<PopupItem>&& items);
-        void ConstuctChilds() override;
+        void ConstructChilds() override;
         void Dock();
         std::shared_ptr<MenuColorProfile> GetColorProfile();
 

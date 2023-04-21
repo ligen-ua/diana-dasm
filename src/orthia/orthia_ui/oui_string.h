@@ -8,7 +8,7 @@ namespace oui
 {
     struct String
     {
-#ifdef _WIN32
+#ifdef OUI_SYS_WINDOWS
         std::wstring native;
 #define OUI_TCSTR(X) L##X
 #define OUI_STR(X) std::wstring(OUI_TCSTR(X))

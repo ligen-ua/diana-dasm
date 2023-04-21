@@ -23,7 +23,8 @@ namespace oui
 
     void CConsoleApp::Loop(std::shared_ptr<CWindow> rootWindow)
     {
-        m_pool->RegisterRootWindow(rootWindow);
+        auto thread = std::make_shared<CWindowThread>();
+        m_pool->RegisterRootWindow(rootWindow, thread);
         rootWindow->Init(m_pool);
 
         oui::CConsole mainConsole;
@@ -56,8 +57,11 @@ namespace oui
 
         oui::CConsoleInputReader reader;
 
-        std::vector<InputEvent> data;
+        // init wakeup handler
+        m_pool->GetThread()->SetWakeupHandler([&]() { reader.Interrupt(); });
+        oui::ScopedGuard wakeupHandlerGuard([&]() { m_pool->GetThread()->SetWakeupHandler(nullptr); });
 
+        std::vector<InputEvent> data;
         mainConsole.Init();
 
         auto consoleSize = mainConsole.GetSize();
@@ -84,6 +88,9 @@ namespace oui
             {
                 return;
             }
+            // call handlers
+            m_pool->GetThread()->GUI_ProcessTasks();
+
             // process event
             std::shared_ptr<CWindow> mouseHandler;
             for (auto& evt : data)
