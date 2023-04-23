@@ -18,6 +18,7 @@ namespace oui
         void SetWakeupHandler(std::function<void()> addTaskHandler);
         void AddTask(std::function<void()> task);
         void GUI_ProcessTasks();
+        void WakeUpUI();
     };
 
 
@@ -28,12 +29,14 @@ namespace oui
     template<class HandlerType>
     class Operation:public BaseOperation
     {
+        std::shared_ptr<CWindowThread> m_thread;
         HandlerType m_handler;
         std::atomic_bool m_cancelled = false;
     public:
         template<class Type>
-        Operation(Type&& value)
+        Operation(std::shared_ptr<CWindowThread> thread, Type&& value)
             :
+                m_thread(thread),
                 m_handler(std::forward<Type>(value))
         {
         }
@@ -51,7 +54,15 @@ namespace oui
         {
             if (IsCancelled())
                 return false;
-            m_handler(std::forward<Args>(args)...);
+
+            if (!m_thread)
+                return false;
+
+            auto params = std::make_tuple(std::forward<Args>(args)...);
+
+            m_thread->AddTask([=, params = std::move(params)]() {
+                std::apply(m_handler, params);
+            });
             return true;
         }
     };

@@ -18,6 +18,10 @@ namespace oui
             std::lock_guard<std::mutex> guard(m_taskLock);
             m_tasks.push_back(task);
         }
+        WakeUpUI();
+    }
+    void CWindowThread::WakeUpUI()
+    {
         std::lock_guard<std::mutex> guard(m_handlerLock);
         if (m_addTaskHandler)
         {

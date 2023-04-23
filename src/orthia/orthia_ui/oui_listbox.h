@@ -16,7 +16,6 @@ namespace oui
     struct IListBoxOwner
     {
         virtual ~IListBoxOwner() {}
-        virtual void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size) = 0;
         virtual void CancelAllQueries() = 0;
     };
 
@@ -35,7 +34,13 @@ namespace oui
         // page state
         int m_offset = 0;
         int m_size = 0;
-        std::vector<ListBoxItem> m_pageState;
+        std::vector<ListBoxItem> m_pageItems;
+
+        // temporary data for painting
+        static String m_chunk;
+
+        void InitSize();
+
     protected:
         void OnResize() override;
         void DoPaintListMode(const Rect& rect, DrawParameters& parameters);
@@ -67,6 +72,10 @@ namespace oui
             const ColumnParam& param13 = ColumnParam(),
             const ColumnParam& param14 = ColumnParam());
 
+        void Clear();
+        int GetVisibleSize() const;
+        int GetOffset() const;
+        std::vector<ListBoxItem>& GetItems();
     };
 
 }

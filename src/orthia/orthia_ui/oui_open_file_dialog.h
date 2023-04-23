@@ -34,8 +34,10 @@ namespace oui
         std::shared_ptr<IFileSystem> m_fileSystem;
         const String m_rootFile;
 
+        bool m_firstResult = false;
         OperationPtr_type<QueryFilesHandler_type> m_currentOperation;
         std::vector<FileDialogInfo> m_currentFiles;
+        FileUnifiedId m_currentFolderId;
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
             const FileUnifiedId& folderId,

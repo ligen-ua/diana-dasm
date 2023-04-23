@@ -87,7 +87,6 @@ namespace oui
             path = p;
 
             FileInfo info;
-            info.id = FileUnifiedId(path);
             info.fileName = path;
             info.flags = FileInfo::flag_disk;
             result.push_back(std::move(info));
@@ -133,21 +132,15 @@ namespace oui
             oui::ScopedGuard guard([=]() { FindClose(hSearch); });
 
             FileInfo info;
-            std::wstring fullPath, path;
+            std::wstring path;
             ULARGE_INTEGER size;
             for (;;)
             {
                 path = win32Info.cFileName;
-
-                fullPath.clear();
-                fullPath.append(fileId.fullFileName.native);
-                fullPath.append(L"\\");
-                fullPath.append(win32Info.cFileName);
                 
                 size.HighPart = win32Info.nFileSizeHigh;
                 size.LowPart = win32Info.nFileSizeLow;
 
-                info.id = FileUnifiedId(fullPath);
                 info.fileName = path;
                 info.flags = 0;
                 info.size = size.QuadPart;
