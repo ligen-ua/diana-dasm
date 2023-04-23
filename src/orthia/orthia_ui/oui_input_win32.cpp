@@ -292,32 +292,26 @@ namespace oui
     }
     bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
     {
-        for (;;)
+        input.clear();
+
+        const int pageSize = 256;
+        m_buffer.resize(sizeof(INPUT_RECORD) * pageSize);
+
+        auto conHandle = GetStdHandle(STD_INPUT_HANDLE);
+
+        bool readInput = false;
         {
-            input.clear();
+            HANDLE handles[] = { conHandle, m_jobEvent.GetHandle()};
+            DWORD status = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+            readInput = status == WAIT_OBJECT_0;
+        }
 
-            const int msToWait = 500;
-            const int pageSize = 256;
-            m_buffer.resize(sizeof(INPUT_RECORD) * pageSize);
+        EmulateCtrlc(input);
 
-            auto conHandle = GetStdHandle(STD_INPUT_HANDLE);
-            for (;;)
-            {
-                HANDLE handles[] = {m_jobEvent.GetHandle(), conHandle};
-                if (WAIT_TIMEOUT != WaitForMultipleObjects(2, handles, FALSE, msToWait))
-                {
-                    break;
-                }
-                if (m_gotCtrlC)
-                {
-                    break;
-                }
-            }
-
-            EmulateCtrlc(input);
-
-            PINPUT_RECORD bufferStart = (PINPUT_RECORD)m_buffer.data();
-            DWORD eventsCount = 0;
+        PINPUT_RECORD bufferStart = (PINPUT_RECORD)m_buffer.data();
+        DWORD eventsCount = 0;
+        if (readInput)
+        {
             BOOL res = ReadConsoleInputW(GetStdHandle(STD_INPUT_HANDLE),
                 bufferStart,
                 pageSize,
@@ -326,41 +320,38 @@ namespace oui
             {
                 return false;
             }
+        }
 
-            PINPUT_RECORD currentItem = bufferStart;
-            for (DWORD i = 0; i < eventsCount; ++i, ++currentItem)
+        PINPUT_RECORD currentItem = bufferStart;
+        for (DWORD i = 0; i < eventsCount; ++i, ++currentItem)
+        {
+            InputEvent event;
+            if (!TranslateEvent(*currentItem, event))
             {
-                InputEvent event;
-                if (!TranslateEvent(*currentItem, event))
+                continue;
+            }
+            if (event.keyEvent.valid &&
+                event.keyEvent.rawText.native.size() == 1)
+            {
+                if (IsLeadByte(event.keyEvent.rawText.native[0]))
                 {
+                    m_notCompleted = std::move(event);
                     continue;
                 }
-                if (event.keyEvent.valid &&
-                    event.keyEvent.rawText.native.size() == 1)
+                else
                 {
-                    if (IsLeadByte(event.keyEvent.rawText.native[0]))
+                    if (m_notCompleted.keyEvent.valid)
                     {
-                        m_notCompleted = std::move(event);
+                        m_notCompleted.keyEvent.rawText.native += event.keyEvent.rawText.native;
+                        input.push_back(event);
+                        m_notCompleted.keyEvent.valid = false;
                         continue;
                     }
-                    else
-                    {
-                        if (m_notCompleted.keyEvent.valid)
-                        {
-                            m_notCompleted.keyEvent.rawText.native += event.keyEvent.rawText.native;
-                            input.push_back(event);
-                            m_notCompleted.keyEvent.valid = false;
-                            continue;
-                        }
-                    }
                 }
-                input.push_back(event);
             }
-            if (!input.empty())
-            {
-                return true;
-            }
+            input.push_back(event);
         }
+        return true;
     }
 
 

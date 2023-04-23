@@ -78,14 +78,61 @@ namespace oui
         {
             return;
         }
-        m_currentFiles.reserve(m_currentFiles.size() + data.size());
-        for (auto & info : data)
+        if (error && data.empty())
+        {
+            return;
+        }
+        if (m_firstResult)
+        {
+            m_filesBox->Clear();
+
+            m_currentFolderId = folderId;
+            m_currentFiles.clear();
+            m_currentFiles.reserve(data.size() + 1);
+            m_firstResult = false;
+
+            FileInfo info;
+            info.fileName = OUI_STR("..");
+            info.flags |= info.flag_directory;
+            m_currentFiles.push_back(info);
+        }
+        else
+        {
+            m_currentFiles.reserve(m_currentFiles.size() + data.size());
+        }
+
+        for (auto& info : data)
         {
             m_currentFiles.push_back(info);
             GenSortKey(m_currentFiles.back());
         }
 
         std::sort(m_currentFiles.begin(), m_currentFiles.end());
+
+        // update visible items
+        const auto offset = m_filesBox->GetOffset();
+        const auto visibleSize = m_filesBox->GetVisibleSize();
+        auto& visibleItems = m_filesBox->GetItems();
+        const int maxSize = (int)m_currentFiles.size();
+        if (offset >= maxSize)
+        {
+            visibleItems.clear();
+            m_filesBox->Invalidate();
+            return;
+        }
+
+        auto sizeToProceed = std::min(maxSize - offset, visibleSize);
+        visibleItems.resize(sizeToProceed);
+
+        auto it = m_currentFiles.begin() + offset;
+        auto it_end = it + sizeToProceed;
+        auto vit = visibleItems.begin();
+        for (; it != it_end; ++it, ++vit)
+        {
+            vit->text.clear();
+            vit->text.push_back(it->info.fileName);
+        }
+        m_filesBox->Invalidate();
     }
     void COpenFileDialog::OnDefaultRoot(const String& name, int error)
     {
@@ -97,7 +144,13 @@ namespace oui
     }
     void COpenFileDialog::ChangeFolder(const String& name)
     {
+        if (m_currentOperation)
+        {
+            m_currentOperation->Cancel();
+            m_currentOperation = nullptr;
+        }
         auto operation = std::make_shared<Operation<QueryFilesHandler_type>>(
+            this->GetThread(),
             std::bind(&COpenFileDialog::OnOpCompleted, this, 
                 std::placeholders::_1,
                 std::placeholders::_2, 
@@ -106,6 +159,7 @@ namespace oui
 
         m_currentFiles.clear();
         m_currentOperation = operation;
+
         m_fileSystem->AsyncStartQueryFiles(this->GetThread(), name, operation);
     }
 

@@ -440,9 +440,8 @@ namespace oui
         }
     }
     // draw stuff
-    void CWindow::DrawTo(const Rect& rect, DrawParameters& parameters, bool force_in)
+    void CWindow::DrawTo(const Rect& rect, DrawParameters& parameters, bool& force)
     {
-        bool force = force_in;
         if (force || !this->IsValid())
         {
             DoPaint(rect, parameters);
@@ -530,20 +529,14 @@ namespace oui
     }
     void CWindow::Invalidate(bool valid)
     {
+        m_valid = valid;
         if (!valid)
         {
-            if (auto pool = GetPool())
+            if (auto thread = GetThread())
             {
-                if (auto focused = pool->GetFocus())
-                {
-                    if (focused.get() != this)
-                    {
-                        focused->Invalidate();
-                    }
-                }
+                thread->WakeUpUI();
             }
         }
-        m_valid = valid;
     }
     bool CWindow::IsValid() const
     {

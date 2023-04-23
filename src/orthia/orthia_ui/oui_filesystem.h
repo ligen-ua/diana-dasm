@@ -34,7 +34,6 @@ namespace oui
         static const int flag_directory = 1;
         static const int flag_disk      = 3;
 
-        FileUnifiedId id;
         String fileName;
         int flags = 0;
         unsigned long long size = 0;

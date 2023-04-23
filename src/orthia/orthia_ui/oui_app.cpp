@@ -95,7 +95,6 @@ namespace oui
             std::shared_ptr<CWindow> mouseHandler;
             for (auto& evt : data)
             {
-
                 // check drag logic
                 if (m_pool->HandleDragEvent(evt))
                 {

@@ -172,7 +172,7 @@ namespace oui
         virtual Rect GetClientRect() const;
 
         // draw stuff
-        virtual void DrawTo(const Rect& rect, DrawParameters & parameters, bool force);
+        virtual void DrawTo(const Rect& rect, DrawParameters & parameters, bool& force);
         virtual void Invalidate(bool valid = false);
         virtual bool IsValid() const;
 
