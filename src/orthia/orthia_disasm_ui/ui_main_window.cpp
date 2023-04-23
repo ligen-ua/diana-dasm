@@ -54,11 +54,14 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
     {
         return false;
     }
-    if (auto modalWindow = pool->GetModalWindow())
+    if (!pool->GetFocus())
     {
-        if (!evt.resizeEvent.valid)
+        if (auto modalWindow = pool->GetModalWindow())
         {
-            return modalWindow->ProcessEvent(evt, evtContext);
+            if (!evt.resizeEvent.valid)
+            {
+                return modalWindow->ProcessEvent(evt, evtContext);
+            }
         }
     }
     if (oui::Fullscreen<oui::CWindow>::ProcessEvent(evt, evtContext))

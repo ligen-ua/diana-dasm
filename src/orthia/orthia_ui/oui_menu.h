@@ -60,6 +60,7 @@ namespace oui
         void Destroy() override;
         void Detach();
         bool IsPopup() const override { return true; }
+        void OnFocusLost() override;
     };
 
     class CMenuWindow:public oui::SimpleBrush<CWindow>
@@ -78,6 +79,7 @@ namespace oui
 
         std::shared_ptr<CMenuPopup> m_currentPopup;
 
+        bool m_setFocusOnDeactivate = true;
     public:
         CMenuWindow();
         std::shared_ptr<CMenuButtonWindow> AddButton(const String& caption,
@@ -105,6 +107,9 @@ namespace oui
         bool PopupIsOpen() const;
         void SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button);
         void OnFocusLost() override;
+
+        void DontSetFocusOnDeactivate();
+
     };
 
 }

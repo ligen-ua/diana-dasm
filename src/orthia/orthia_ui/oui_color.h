@@ -149,6 +149,7 @@ namespace oui
     {
         LabelColorProfile label;
         ListBoxColorProfile listBox;
+        Color listBoxFolders;
     };
     void QueryDefaultColorProfile(DialogColorProfile& profile);
 

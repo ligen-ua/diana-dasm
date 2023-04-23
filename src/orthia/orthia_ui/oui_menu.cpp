@@ -405,7 +405,15 @@ namespace oui
             ++index;
         }
     }
-
+    void CMenuPopup::OnFocusLost()
+    {
+        auto menu = m_menuWindow.lock();
+        if (menu)
+        {
+            menu->DontSetFocusOnDeactivate();
+        }
+        Parent_type::OnFocusLost();
+    }
     void CMenuPopup::UpdateHotkeys(std::shared_ptr<CWindow> menu,
         const std::vector<PopupItem>& items)
     {
@@ -612,6 +620,10 @@ namespace oui
             SetFocus();
         }
     }
+    void CMenuWindow::DontSetFocusOnDeactivate()
+    {
+        m_setFocusOnDeactivate = false;
+    }
     void CMenuWindow::Deactivate()
     {
         auto pool = GetPool();
@@ -621,7 +633,7 @@ namespace oui
             m_currentPopup->Destroy();
             m_currentPopup = nullptr;
         }
-        if (pool)
+        if (m_setFocusOnDeactivate && pool)
         {
             pool->SetFocus(m_prevFocus.lock());
             m_prevFocus.reset();

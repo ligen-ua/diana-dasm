@@ -23,6 +23,7 @@ namespace oui
 
         auto currentItem = m_pageItems.begin();
         String tmpStr;
+        int pos = 0;
         for (int i = 0; i < m_columnsCount; ++i)
         {
             int relRightX = ((i + 1) * absClientRect.size.width) / m_columnsCount;
@@ -43,8 +44,10 @@ namespace oui
 
                 int symbolsCount = size - 1;
                 bool cutHappens = false;
+                decltype(ListBoxItem::colorsHandler) colorsHandler;
                 if (currentItem != m_pageItems.end())
                 {
+                    colorsHandler = currentItem->colorsHandler;
                     tmpStr = currentItem->text.empty() ? String() : currentItem->text[0];
                     auto prevSize = tmpStr.native.size();
                     CutString(tmpStr.native, symbolsCount);
@@ -57,23 +60,41 @@ namespace oui
                 if ((i + 1) != m_columnsCount)
                 {
                     // not a last item, put vertical here
+                    m_chunk.native.back() = String::char_type('/');
                     if (cutHappens)
                     {
-                        m_chunk.native.back() = String::char_type('}');
+                        m_chunk.native.push_back(String::char_type('}'));
                     }
                     else
                     {
-                        m_chunk.native.back() = symbols.vertical;
+                        m_chunk.native.push_back(symbols.vertical);
                     }
                 }
 
                 auto color = &colorProfile.normalText;
+                LabelColorState customColor;
+                if (m_selectedPosition == pos)
+                {
+                    color = &colorProfile.selectedText;
+                }
+                else
+                {
+                    if (colorsHandler)
+                    {
+                        customColor = colorsHandler();
+                        color = &customColor;
+                    }
+                }
 
                 Point pt{ leftX, yPos };
                 parameters.console.PaintText(pt, 
                     color->text,
                     color->background,
-                    m_chunk.native);
+                    m_chunk.native,
+                    String::char_type('/'),
+                    colorProfile.borderColor,
+                    Color());
+                ++pos;
             }
             leftX = rightX;
         }
@@ -146,11 +167,95 @@ namespace oui
     {
         return m_offset;
     }
+    void CListBox::SetOffset(int offset)
+    {
+        m_offset = offset;
+    }
+    int CListBox::GetSelectedPosition() const
+    {
+        return m_selectedPosition;
+    }
+    void CListBox::SetSelectedPosition(int selectedPosition)
+    {
+        m_selectedPosition = selectedPosition;
+    }
     std::vector<ListBoxItem> & CListBox::GetItems()
     {
         return m_pageItems;
     }
+    bool CListBox::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
+    {
+        if (evt.keyEvent.valid)
+        {
+            int newOffset = m_offset;
+            int newPosition = m_selectedPosition;
+            switch (evt.keyEvent.virtualKey)
+            {
+            case VirtualKey::PageUp:
+                newOffset -= GetVisibleSize();
+                break;
 
+            case VirtualKey::PageDown:
+                newOffset += GetVisibleSize();
+                break;
+
+            case VirtualKey::Home:
+                newOffset = 0;
+                break;
+
+            case VirtualKey::End:
+                newOffset = m_owner->GetTotalCount();
+                break;
+
+            // arrows
+            case VirtualKey::Left:
+                newPosition -= GetVisibleSize() / 2;
+                break;
+
+            case VirtualKey::Right:
+                newPosition += GetVisibleSize() / 2;
+                break;
+
+            case VirtualKey::Up:
+                --newPosition;
+                break;
+
+            case VirtualKey::Down:
+                ++newPosition;
+                break;
+            default:
+                return false;
+            }
+
+            if (newOffset == m_offset)
+            {
+                const int diff = newPosition - m_selectedPosition;
+                newOffset = m_offset + diff;
+            }
+            else
+            {
+                const int diff = newOffset - m_offset;
+                newPosition = m_selectedPosition + diff;
+            }
+            if (newPosition == m_selectedPosition)
+            {
+                return true;
+            }
+            const int windowSize = (int)m_pageItems.size();
+
+            if (newPosition < 0 || newPosition >= windowSize)
+            {
+                m_owner->ShiftViewWindow(newOffset);
+            }
+            else
+            {
+                m_selectedPosition = newPosition;
+            }
+            Invalidate();
+            return true;
+        }
+        return Parent_type::ProcessEvent(evt, evtContext);
+    }
     void CListBox::InitColumns(const ColumnParam& param1,
         const ColumnParam& param2,
         const ColumnParam& param3,

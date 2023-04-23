@@ -32,6 +32,7 @@ namespace oui
         std::shared_ptr<CWindowThread> m_thread;
         HandlerType m_handler;
         std::atomic_bool m_cancelled = false;
+
     public:
         template<class Type>
         Operation(std::shared_ptr<CWindowThread> thread, Type&& value)
@@ -48,7 +49,6 @@ namespace oui
         {
             return m_cancelled;
         }
-
         template<class... Args>
         bool Reply(Args&&... args)
         {
