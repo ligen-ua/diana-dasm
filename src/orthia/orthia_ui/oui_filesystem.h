@@ -12,21 +12,38 @@ namespace oui
         virtual ~IFile() {}
     };
 
-    struct FileInfo
-    {
-        std::vector<char> fileId;
-        String fileName;
-        bool isDirectory = false;
-    };
-
     struct FileUnifiedId
     {
         std::vector<char> fileId;
         String fullFileName;
+        FileUnifiedId()
+        {
+        }
+        FileUnifiedId(const String& fullFileName_in)
+            :
+            fullFileName(fullFileName_in)
+        {
+        }
+        bool IsEmpty() const
+        {
+            return fileId.empty() && fullFileName.native.empty();
+        }
     };
+    struct FileInfo
+    {
+        static const int flag_directory = 1;
+        static const int flag_disk      = 3;
+
+        FileUnifiedId id;
+        String fileName;
+        int flags = 0;
+        unsigned long long size = 0;
+    };
+
     using ThreadPtr_type = std::shared_ptr<CWindowThread>;
     using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile>, int error)>;
-    using QueryFilesHandler_type = std::function<bool(const FileUnifiedId& folderId, const std::vector<FileInfo>& data, int error)>;
+    using QueryFilesHandler_type = std::function<void(std::shared_ptr<BaseOperation> operation, const FileUnifiedId& folderId, 
+        const std::vector<FileInfo>& data, int error)>;
     using QueryDefaultRootHandler_type = std::function<void(const String& name, int error)>;
 
     struct IFileSystem

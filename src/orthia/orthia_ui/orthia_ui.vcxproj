@@ -173,6 +173,7 @@
     <ClCompile Include="oui_menu.cpp" />
     <ClCompile Include="oui_modal.cpp" />
     <ClCompile Include="oui_open_file_dialog.cpp" />
+    <ClCompile Include="oui_param.cpp" />
     <ClCompile Include="oui_screen.cpp" />
     <ClCompile Include="oui_threadpool.cpp" />
     <ClCompile Include="oui_window.cpp" />
@@ -183,6 +184,7 @@
     <ClInclude Include="oui_base.h" />
     <ClInclude Include="oui_base_win32.h" />
     <ClInclude Include="oui_color.h" />
+    <ClInclude Include="oui_column_param.h" />
     <ClInclude Include="oui_console.h" />
     <ClInclude Include="oui_containers.h" />
     <ClInclude Include="oui_edit_box.h" />
@@ -198,6 +200,7 @@
     <ClInclude Include="oui_menu.h" />
     <ClInclude Include="oui_modal.h" />
     <ClInclude Include="oui_open_file_dialog.h" />
+    <ClInclude Include="oui_param.h" />
     <ClInclude Include="oui_string.h" />
     <ClInclude Include="oui_threadpool.h" />
     <ClInclude Include="oui_window.h" />

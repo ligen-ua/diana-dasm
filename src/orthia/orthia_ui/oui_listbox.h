@@ -2,19 +2,21 @@
 
 #include "oui_window.h"
 #include "oui_win_styles.h"
+#include "oui_column_param.h"
 
 namespace oui
 {
     struct ListBoxItem
     {
-        String text;
+        std::vector<String> text;
         std::function<void()> openHandler;
     };
 
+    class CListBox;
     struct IListBoxOwner
     {
         virtual ~IListBoxOwner() {}
-        virtual void AsyncQuery(std::function<void(const ListBoxItem*, int)> handler, int offset, int size) = 0;
+        virtual void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size) = 0;
         virtual void CancelAllQueries() = 0;
     };
 
@@ -25,6 +27,10 @@ namespace oui
         std::shared_ptr<DialogColorProfile> m_colorProfile;
         Rect m_lastRect;
         IListBoxOwner* m_owner;
+        
+        // columnts
+        std::vector<ColumnParam> m_columns;
+        int m_columnsCount = 0;
 
         // page state
         int m_offset = 0;
@@ -32,11 +38,35 @@ namespace oui
         std::vector<ListBoxItem> m_pageState;
     protected:
         void OnResize() override;
+        void DoPaintListMode(const Rect& rect, DrawParameters& parameters);
+
     public:
         CListBox(std::shared_ptr<DialogColorProfile> colorProfile, IListBoxOwner* owner);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         void Destroy() override;
+
+        int GetColumnsCount() const;
+
+        // list mode
+        void InitColumns(int columnsCount);
+
+        // report mode
+        void InitColumns(const ColumnParam& param1 = ColumnParam(),
+            const ColumnParam& param2 = ColumnParam(),
+            const ColumnParam& param3 = ColumnParam(),
+            const ColumnParam& param4 = ColumnParam(),
+            const ColumnParam& param5 = ColumnParam(),
+            const ColumnParam& param6 = ColumnParam(),
+            const ColumnParam& param7 = ColumnParam(),
+            const ColumnParam& param8 = ColumnParam(),
+            const ColumnParam& param9 = ColumnParam(),
+            const ColumnParam& param10 = ColumnParam(),
+            const ColumnParam& param11 = ColumnParam(),
+            const ColumnParam& param12 = ColumnParam(),
+            const ColumnParam& param13 = ColumnParam(),
+            const ColumnParam& param14 = ColumnParam());
+
     };
 
 }
