@@ -48,14 +48,21 @@ namespace oui
     protected:
         void OnResize() override;
         void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size);
-        void CancelAllQueries();
+
+        void CancelAllQueries() override;
+
         void ConstructChilds() override;
         void OnDefaultRoot(const String& name, int error);
+        void UpdateVisibleItems();
+        void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
 
     public:
         COpenFileDialog(const String& rootFile,
             FileRecipientHandler_type resultCallback,
             std::shared_ptr<IFileSystem> fileSystem);
+
+        void ShiftViewWindow(int newPosition) override;
+        int GetTotalCount() const override;
     };
 
 }

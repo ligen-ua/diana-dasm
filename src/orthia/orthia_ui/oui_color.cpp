@@ -179,6 +179,8 @@ namespace oui
         },
         ColorGray()
     };
+    static Color g_listBoxFolders = ColorBrightWhite();
+
     void QueryDefaultColorProfile(ListBoxColorProfile& profile)
     {
         profile = g_listBoxColorProfile;
@@ -189,7 +191,7 @@ namespace oui
     {
         QueryDefaultColorProfile(profile.label);
         QueryDefaultColorProfile(profile.listBox);
-
+        profile.listBoxFolders = g_listBoxFolders;
     }
 
 }

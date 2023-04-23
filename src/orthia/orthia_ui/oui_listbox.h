@@ -10,13 +10,16 @@ namespace oui
     {
         std::vector<String> text;
         std::function<void()> openHandler;
+        std::function<LabelColorState()> colorsHandler;
     };
 
     class CListBox;
     struct IListBoxOwner
     {
         virtual ~IListBoxOwner() {}
+        virtual int GetTotalCount() const = 0;
         virtual void CancelAllQueries() = 0;
+        virtual void ShiftViewWindow(int newOffset) = 0;
     };
 
     class CListBox:public WithBorder<CWindow>
@@ -32,6 +35,7 @@ namespace oui
         int m_columnsCount = 0;
 
         // page state
+        int m_selectedPosition = 0;
         int m_offset = 0;
         int m_size = 0;
         std::vector<ListBoxItem> m_pageItems;
@@ -52,6 +56,8 @@ namespace oui
         void Destroy() override;
 
         int GetColumnsCount() const;
+
+        bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
 
         // list mode
         void InitColumns(int columnsCount);
@@ -75,6 +81,9 @@ namespace oui
         void Clear();
         int GetVisibleSize() const;
         int GetOffset() const;
+        void SetOffset(int offset);
+        int GetSelectedPosition() const;
+        void SetSelectedPosition(int selectedPosition);
         std::vector<ListBoxItem>& GetItems();
     };
 

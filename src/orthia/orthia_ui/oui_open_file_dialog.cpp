@@ -109,16 +109,32 @@ namespace oui
 
         std::sort(m_currentFiles.begin(), m_currentFiles.end());
 
+        UpdateVisibleItems();
+    }
+    void COpenFileDialog::UpdateVisibleItems()
+    {
         // update visible items
-        const auto offset = m_filesBox->GetOffset();
         const auto visibleSize = m_filesBox->GetVisibleSize();
         auto& visibleItems = m_filesBox->GetItems();
         const int maxSize = (int)m_currentFiles.size();
+
+        auto offset = m_filesBox->GetOffset();
         if (offset >= maxSize)
         {
+            // set to the last file here
             visibleItems.clear();
-            m_filesBox->Invalidate();
-            return;
+            if (m_currentFiles.empty())
+            {
+                m_filesBox->Invalidate();
+                return;
+            }
+            // we have some files, show last page
+            offset = (int)m_currentFiles.size() - visibleSize;
+            if (offset < 0)
+            {
+                offset = 0;
+            }
+            m_filesBox->SetOffset(offset);
         }
 
         auto sizeToProceed = std::min(maxSize - offset, visibleSize);
@@ -131,6 +147,10 @@ namespace oui
         {
             vit->text.clear();
             vit->text.push_back(it->info.fileName);
+            if (it->info.flags & it->info.flag_directory)
+            {
+                vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
+            }
         }
         m_filesBox->Invalidate();
     }
@@ -157,8 +177,8 @@ namespace oui
                 std::placeholders::_3,
                 std::placeholders::_4));
 
-        m_currentFiles.clear();
         m_currentOperation = operation;
+        m_firstResult = true;
 
         m_fileSystem->AsyncStartQueryFiles(this->GetThread(), name, operation);
     }
@@ -178,6 +198,11 @@ namespace oui
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
         m_filesBox->InitColumns(2);
     }
+
+    void COpenFileDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
+    {
+        m_filesBox->SetFocus();
+    }
     void COpenFileDialog::ConstructChilds()
     {
         AddChild(m_filesBox);
@@ -194,4 +219,31 @@ namespace oui
             OnDefaultRoot(m_rootFile, 0);
         }
     }
+    void COpenFileDialog::ShiftViewWindow(int newOffset)
+    {
+        const int visibleSize = m_filesBox->GetVisibleSize();
+        const int totalFilesAvailable = (int)m_currentFiles.size();
+        int newSelectedPositon = m_filesBox->GetSelectedPosition();
+        if (newOffset >= totalFilesAvailable - visibleSize)
+        {
+            newOffset = totalFilesAvailable - visibleSize;
+            if (visibleSize)
+            {
+                newSelectedPositon = visibleSize - 1;
+            }
+        }
+        if (newOffset < 0)
+        {
+            newOffset = 0;
+            newSelectedPositon = 0;
+        }
+        m_filesBox->SetSelectedPosition(newSelectedPositon);
+        m_filesBox->SetOffset(newOffset);
+        UpdateVisibleItems();
+    }
+    int COpenFileDialog::GetTotalCount() const
+    {
+        return (int)m_currentFiles.size();
+    }
+
 }
