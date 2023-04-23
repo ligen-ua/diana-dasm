@@ -21,8 +21,12 @@ namespace oui
     };
 
 
+    class BaseOperation:public Noncopyable
+    {
+    public:
+    };
     template<class HandlerType>
-    class Operation
+    class Operation:public BaseOperation
     {
         HandlerType m_handler;
         std::atomic_bool m_cancelled = false;

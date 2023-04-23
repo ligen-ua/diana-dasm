@@ -6,6 +6,23 @@
 
 namespace oui
 {
+    struct FileDialogInfo
+    {
+        FileInfo info;
+        String sortKey;
+
+        FileDialogInfo()
+        {
+        }
+        FileDialogInfo(const FileInfo& info_in)
+            :   info(info_in)
+        {
+        }
+    };
+    inline bool operator < (const FileDialogInfo& info1, const FileDialogInfo& info2)
+    {
+        return info1.sortKey.native < info2.sortKey.native;
+    }
 
     class COpenFileDialog:public oui::SimpleBrush<CModalWindow>, IListBoxOwner
     {
@@ -15,11 +32,20 @@ namespace oui
         std::shared_ptr<CListBox> m_filesBox;
         FileRecipientHandler_type m_resultCallback;
         std::shared_ptr<IFileSystem> m_fileSystem;
-
         const String m_rootFile;
+
+        OperationPtr_type<QueryFilesHandler_type> m_currentOperation;
+        std::vector<FileDialogInfo> m_currentFiles;
+
+        void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
+            const FileUnifiedId& folderId,
+            const std::vector<FileInfo>& data,
+            int error);
+        void ChangeFolder(const String& name);
+
     protected:
         void OnResize() override;
-        void AsyncQuery(std::function<void(const ListBoxItem*, int)> handler, int offset, int size);
+        void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size);
         void CancelAllQueries();
         void ConstructChilds() override;
         void OnDefaultRoot(const String& name, int error);

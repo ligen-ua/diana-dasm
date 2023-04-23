@@ -2,6 +2,37 @@
 
 namespace oui
 {
+
+    static std::wstring Uppercase_Silent(const std::wstring& str)
+    {
+        if (str.empty())
+            return std::wstring();
+
+        std::vector<wchar_t> temp(str.c_str(), str.c_str() + str.size());
+        DWORD dwSize = (DWORD)(str.size());
+        if (CharUpperBuffW(&temp.front(), dwSize) != dwSize)
+        {
+            return str;
+        }
+        return std::wstring(&temp.front(), &temp.front() + dwSize);
+    }
+    static void GenSortKey(FileDialogInfo& fileInfo)
+    {
+        auto& info = fileInfo.info;
+        fileInfo.sortKey.native.clear();
+        fileInfo.sortKey.native.reserve(10 + info.fileName.native.size()*2);
+        if (info.flags & info.flag_directory)
+        {
+            fileInfo.sortKey.native.append(L"0|");
+        }
+        else
+        {
+            fileInfo.sortKey.native.append(L"1|");
+        }
+        fileInfo.sortKey.native.append(Uppercase_Silent(info.fileName.native));
+        fileInfo.sortKey.native.append(L"|");
+        fileInfo.sortKey.native.append(info.fileName.native);
+    }
     void COpenFileDialog::OnResize()
     {
         const auto clientRect = GetClientRect();
@@ -24,15 +55,58 @@ namespace oui
 
         Parent_type::OnResize();
     }
-    void COpenFileDialog::AsyncQuery(std::function<void(const ListBoxItem*, int)> handler, int offset, int size)
+    void COpenFileDialog::AsyncQuery(CListBox* listBox, 
+        std::function<void(const ListBoxItem*, int)> handler, 
+        int offset, int size)
     {
     }
     void COpenFileDialog::CancelAllQueries()
     {
+        if (m_currentOperation)
+        {
+            m_currentOperation->Cancel();
+            m_currentOperation = nullptr;
+            return;
+        }
+    }
+    void COpenFileDialog::OnOpCompleted(std::shared_ptr<BaseOperation> operation,
+        const FileUnifiedId& folderId,
+        const std::vector<FileInfo>& data,
+        int error)
+    {
+        if (operation != m_currentOperation)
+        {
+            return;
+        }
+        m_currentFiles.reserve(m_currentFiles.size() + data.size());
+        for (auto & info : data)
+        {
+            m_currentFiles.push_back(info);
+            GenSortKey(m_currentFiles.back());
+        }
+
+        std::sort(m_currentFiles.begin(), m_currentFiles.end());
     }
     void COpenFileDialog::OnDefaultRoot(const String& name, int error)
     {
+        if (error)
+        {
+            return;
+        }
+        ChangeFolder(name);
+    }
+    void COpenFileDialog::ChangeFolder(const String& name)
+    {
+        auto operation = std::make_shared<Operation<QueryFilesHandler_type>>(
+            std::bind(&COpenFileDialog::OnOpCompleted, this, 
+                std::placeholders::_1,
+                std::placeholders::_2, 
+                std::placeholders::_3,
+                std::placeholders::_4));
 
+        m_currentFiles.clear();
+        m_currentOperation = operation;
+        m_fileSystem->AsyncStartQueryFiles(this->GetThread(), name, operation);
     }
 
     COpenFileDialog::COpenFileDialog(const String& rootFile, 
@@ -48,6 +122,7 @@ namespace oui
 
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
+        m_filesBox->InitColumns(2);
     }
     void COpenFileDialog::ConstructChilds()
     {
