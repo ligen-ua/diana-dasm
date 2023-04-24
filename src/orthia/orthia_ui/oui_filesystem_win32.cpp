@@ -9,6 +9,22 @@ namespace oui
         return (ch == L'\\' || ch == L'/');
     }
 
+    static bool SplitFullPathName(const std::wstring& str,
+        std::wstring& path,
+        std::wstring& name)
+    {
+        for (int i = (int)str.size() - 1; i >= 0; --i)
+        {
+            if (IsFileNameSeparator(str[i]))
+            {
+                name = std::wstring(str.begin() + i + 1, str.end());
+                path = std::wstring(str.begin(), str.begin() + i);
+                return true;
+            }
+        }
+        return false;
+    }
+
     static void EraseLastSlash(std::wstring& str)
     {
         for (;;)
@@ -29,6 +45,13 @@ namespace oui
             fullPath.insert(0, L"\\\\?\\");
         }
     }
+    static void ErasePrefix(std::wstring& fullPath)
+    {
+        if (wcsncmp(fullPath.c_str(), L"\\\\?\\", 4) == 0)
+        {
+            fullPath.erase(0, 4);
+        }
+    }
     static void Normalize(std::wstring& fullPath)
     {
         // remove the possible duplications and switch to windows style slash
@@ -40,7 +63,7 @@ namespace oui
             fullPath[0] = '\\';
 
         int delta = 0;
-        for (size_t i = 1; i < size; ++i)
+        for (size_t i = 2; i < size; ++i)
         {
             if (fullPath[i] == '/')
                 fullPath[i] = '\\';
@@ -63,11 +86,46 @@ namespace oui
         }
         if (fullPath.back() == L':')
         {
+            ErasePrefix(fullPath);
             return;
         }
 
         // append prefix
         InsertPrefix(fullPath);
+    }
+    static void ApplyFlags(std::wstring& fullPath, const std::wstring& argument, int queryFlags, std::wstring& highlightName)
+    {
+        highlightName.clear();
+        if (queryFlags & IFileSystem::queryFlags_OpenChild)
+        {
+            // transition from root -> disk
+            if (fullPath.empty())
+            {
+                fullPath = argument;
+                Normalize(fullPath);
+                return;
+            }
+            // regular case
+            fullPath.append(L"\\");
+            fullPath.append(argument);
+            return;
+        }
+        if (queryFlags & IFileSystem::queryFlags_OpenParent)
+        {
+            if (fullPath.empty())
+            {
+                return;
+            }
+            std::wstring path;
+            if (!SplitFullPathName(fullPath, path, highlightName))
+            {
+                fullPath.clear();
+                return;
+            }
+            fullPath = path;
+            Normalize(fullPath);
+            return;
+        }
     }
 
     static int QueryDisks(const FileUnifiedId& fileId,
@@ -90,6 +148,7 @@ namespace oui
             info.fileName = path;
             info.flags = FileInfo::flag_disk;
             result.push_back(std::move(info));
+            p += path.size();
         }
         return 0;
     }
@@ -104,10 +163,15 @@ namespace oui
         }
         void AsyncStartQueryFiles(ThreadPtr_type targetThread,
             const FileUnifiedId& fileId_in,
+            const String& argument,
+            int queryFlags,
             OperationPtr_type<QueryFilesHandler_type> handler) override
         {
             FileUnifiedId fileId = fileId_in;
             Normalize(fileId.fullFileName.native);
+
+            std::wstring highlightName;
+            ApplyFlags(fileId.fullFileName.native, argument.native, queryFlags, highlightName);
 
             const int pageSize = 30;
             std::vector<FileInfo> result;
@@ -137,7 +201,14 @@ namespace oui
             for (;;)
             {
                 path = win32Info.cFileName;
-                
+                if (path == L"." || path == L"..")
+                {
+                    if (!FindNextFileW(hSearch, &win32Info))
+                    {
+                        break;
+                    }
+                    continue;
+                }
                 size.HighPart = win32Info.nFileSizeHigh;
                 size.LowPart = win32Info.nFileSizeLow;
 
@@ -146,8 +217,11 @@ namespace oui
                 info.size = size.QuadPart;
                 if (win32Info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                    info.flags = FileInfo::flag_directory;
-
+                    info.flags |= FileInfo::flag_directory;
+                }
+                if (highlightName == path)
+                {
+                    info.flags |= FileInfo::flag_highlight;
                 }
                 result.push_back(info);
 

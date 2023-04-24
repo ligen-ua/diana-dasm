@@ -33,6 +33,8 @@ namespace oui
     {
         static const int flag_directory = 1;
         static const int flag_disk      = 3;
+        static const int flag_uplink    = 4;
+        static const int flag_highlight = 8;
 
         String fileName;
         int flags = 0;
@@ -47,9 +49,16 @@ namespace oui
 
     struct IFileSystem
     {
+        const static int queryFlags_OpenParent = 0x0001;
+        const static int queryFlags_OpenChild  = 0x0002;
+
         virtual ~IFileSystem() {}
         virtual void AsyncOpenFile(ThreadPtr_type targetThread, const FileUnifiedId& fileId, FileRecipientHandler_type handler) = 0;
-        virtual void AsyncStartQueryFiles(ThreadPtr_type targetThread, const FileUnifiedId& fileId, OperationPtr_type<QueryFilesHandler_type> handler) = 0;
+        virtual void AsyncStartQueryFiles(ThreadPtr_type targetThread, 
+            const FileUnifiedId& fileId, 
+            const String& argument,
+            int queryFlags, 
+            OperationPtr_type<QueryFilesHandler_type> handler) = 0;
         virtual void AsyncQueryDefaultRoot(ThreadPtr_type targetThread, QueryDefaultRootHandler_type handler) = 0;
     };
 
@@ -68,6 +77,8 @@ namespace oui
 
         void AsyncStartQueryFiles(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId,
+            const String& argument,
+            int queryFlags,
             OperationPtr_type<QueryFilesHandler_type> handler) override;
 
         // root

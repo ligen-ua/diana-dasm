@@ -91,24 +91,42 @@ namespace oui
             m_currentFiles.reserve(data.size() + 1);
             m_firstResult = false;
 
-            FileInfo info;
-            info.fileName = OUI_STR("..");
-            info.flags |= info.flag_directory;
-            m_currentFiles.push_back(info);
+            if (!m_currentFolderId.fullFileName.native.empty())
+            {
+                FileInfo info;
+                info.fileName = OUI_STR("..");
+                info.flags |= info.flag_directory | info.flag_uplink;
+                m_currentFiles.push_back(info);
+            }
+            m_filesBox->SetSelectedPosition(0);
         }
         else
         {
             m_currentFiles.reserve(m_currentFiles.size() + data.size());
         }
 
+
+        String highlighName;
         for (auto& info : data)
         {
             m_currentFiles.push_back(info);
             GenSortKey(m_currentFiles.back());
+
+            if (info.flags & info.flag_highlight)
+            {
+                highlighName = info.fileName;
+            }
         }
 
         std::sort(m_currentFiles.begin(), m_currentFiles.end());
 
+        if (!highlighName.native.empty())
+        {
+            // TODO: improve selection
+            auto it = std::find_if(m_currentFiles.begin(), m_currentFiles.end(), [&](auto& value) { return value.info.fileName.native == highlighName.native;  });
+            size_t offset = it - m_currentFiles.begin();
+            m_filesBox->SetOffset((int)offset);
+        }
         UpdateVisibleItems();
     }
     void COpenFileDialog::UpdateVisibleItems()
@@ -147,6 +165,23 @@ namespace oui
         {
             vit->text.clear();
             vit->text.push_back(it->info.fileName);
+            if (it->info.flags & it->info.flag_uplink)
+            {
+                vit->openHandler = [=]() { 
+                    ChangeFolder(m_currentFolderId, 
+                        String(),
+                        IFileSystem::queryFlags_OpenParent);  
+                };
+            }
+            else
+            {
+                vit->openHandler = [=, fileName = it->info.fileName]() {
+                    ChangeFolder(m_currentFolderId,
+                        fileName,
+                        IFileSystem::queryFlags_OpenChild);
+                };
+            }
+
             if (it->info.flags & it->info.flag_directory)
             {
                 vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
@@ -164,9 +199,9 @@ namespace oui
         {
             return;
         }
-        ChangeFolder(name);
+        ChangeFolder(name, String(), 0);
     }
-    void COpenFileDialog::ChangeFolder(const String& name)
+    void COpenFileDialog::ChangeFolder(const FileUnifiedId& fileId, const String& argument, int flags)
     {
         if (m_currentOperation)
         {
@@ -184,7 +219,7 @@ namespace oui
         m_currentOperation = operation;
         m_firstResult = true;
 
-        m_fileSystem->AsyncStartQueryFiles(this->GetThread(), name, operation);
+        m_fileSystem->AsyncStartQueryFiles(this->GetThread(), fileId, argument, flags, operation);
     }
 
     COpenFileDialog::COpenFileDialog(const String& rootFile, 

@@ -45,6 +45,7 @@ namespace oui
 
         void InitSize();
         void UIShiftWindow(int newOffset, int newPosition);
+        void OpenSelectedItem();
 
     protected:
         void OnResize() override;
