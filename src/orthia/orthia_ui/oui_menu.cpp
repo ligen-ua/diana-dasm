@@ -28,23 +28,28 @@ namespace oui
         }
 
         // handle move only if menu is already open
-        if (evt.mouseEvent.button == MouseButton::Move)
+        bool treatAsMove = (evt.mouseEvent.button != MouseButton::Left ||
+            evt.mouseEvent.state != MouseState::Released);
+
+        bool enterState = false;
+        if (treatAsMove)
         {
             if (!parentMenu->IsActiveOrFocused())
             {
-                return true;
+                // if just move, return, if presses activate fast
+                if (evt.mouseEvent.state != MouseState::Pressed)
+                {
+                    return true;
+                }
+                enterState = true;
             }
         }
         else
         {
-            if (evt.mouseEvent.button != MouseButton::Left ||
-                evt.mouseEvent.state != MouseState::Pressed)
+            // check if already open
+            bool wasEnterState = parentMenu->ClearEnterState(me);
+            if (!wasEnterState)
             {
-                return true;
-            }
-            else
-            {
-                // check if already open
                 if (parentMenu->GetSelectedButton().get() == this &&
                     parentMenu->PopupIsOpen())
                 {
@@ -53,7 +58,7 @@ namespace oui
                 }
             }
         }
-        parentMenu->SelectAndOpenPopup(me);
+        parentMenu->SelectAndOpenPopup(me, enterState);
         return true;
     }
     void CMenuButtonWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
@@ -169,16 +174,18 @@ namespace oui
         }
         switch (evt.mouseEvent.button)
         {
+        case MouseButton::Left:
+            if (evt.mouseEvent.state == MouseState::Released)
+            {
+                FireEvent();
+                break;
+            }
+            // go to move
         case MouseButton::Move:
             m_selectedPosition = index;
             Invalidate();
             break;
-        case MouseButton::Left:
-            if (evt.mouseEvent.state == MouseState::Pressed)
-            {
-                FireEvent();
-            }
-            break;
+
         }
         return true;
     }
@@ -640,7 +647,24 @@ namespace oui
         }
         CWindow::Deactivate();
     }
-    void CMenuWindow::SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button)
+    bool CMenuWindow::ClearEnterState(std::shared_ptr<CMenuButtonWindow> button)
+    {
+        if (m_enterStateIndex == -1)
+        {
+            return false;
+        }
+        auto it = std::find(m_buttons.begin(), m_buttons.end(), button);
+        if (it == m_buttons.end())
+        {
+            return false;
+        }
+        auto selectedButtonIndex = (int)(it - m_buttons.begin());
+        bool prevState = selectedButtonIndex == m_enterStateIndex;
+        m_enterStateIndex = -1;
+        return prevState;
+    }
+    void CMenuWindow::SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button,
+        bool enterState)
     {
         auto it = std::find(m_buttons.begin(), m_buttons.end(), button);
         if (it == m_buttons.end())
@@ -648,6 +672,15 @@ namespace oui
             return;
         }
         m_selectedButtonIndex = (int)(it - m_buttons.begin());
+
+        if (enterState)
+        {
+            m_enterStateIndex = m_selectedButtonIndex;
+        }
+        else
+        {
+            m_enterStateIndex = -1;
+        }
         Activate();
         OpenPopup();
     }

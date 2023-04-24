@@ -80,6 +80,8 @@ namespace oui
         std::shared_ptr<CMenuPopup> m_currentPopup;
 
         bool m_setFocusOnDeactivate = true;
+
+        int m_enterStateIndex = -1;
     public:
         CMenuWindow();
         std::shared_ptr<CMenuButtonWindow> AddButton(const String& caption,
@@ -105,10 +107,14 @@ namespace oui
         void OpenPopup();
 
         bool PopupIsOpen() const;
-        void SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button);
+
+        // enter state means: do not close on mouse release
+        void SelectAndOpenPopup(std::shared_ptr<CMenuButtonWindow> button, bool setEnterState = true);
         void OnFocusLost() override;
 
         void DontSetFocusOnDeactivate();
+
+        bool ClearEnterState(std::shared_ptr<CMenuButtonWindow> button);
 
     };
 

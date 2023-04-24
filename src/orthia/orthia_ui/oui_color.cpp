@@ -170,16 +170,16 @@ namespace oui
     static ListBoxColorProfile g_listBoxColorProfile =
     {
         {
-            ColorWhite(),     // text
+            ColorGray(),     // text
             ColorBlack(),     // background
         },
         {
-            ColorWhite(),     // text
+            ColorBrightWhite(),     // text
             ColorCyan(),     // background
         },
         ColorGray()
     };
-    static Color g_listBoxFolders = ColorBrightWhite();
+    static Color g_listBoxFolders = ColorWhite();
 
     void QueryDefaultColorProfile(ListBoxColorProfile& profile)
     {

@@ -204,12 +204,16 @@ namespace oui
                 // console api returns Move + Released this is frustrating
                 // I would rather like to have mouse button there
                 if (evt.mouseEvent.button == MouseButton::Move &&
-                    evt.mouseEvent.state == MouseState::Released)
+                    (evt.mouseEvent.state == MouseState::Pressed ||
+                    evt.mouseEvent.state == MouseState::Released))
                 {
                     if (m_lastMouseButton != MouseButton::None)
                     {
                         evt.mouseEvent.button = m_lastMouseButton;
-                        m_lastMouseButton = MouseButton::None;
+                        if (evt.mouseEvent.state == MouseState::Released)
+                        {
+                            m_lastMouseButton = MouseButton::None;
+                        }
                     }
                 }
                 if (evt.mouseEvent.button != MouseButton::None || evt.mouseEvent.state != MouseState::None)
