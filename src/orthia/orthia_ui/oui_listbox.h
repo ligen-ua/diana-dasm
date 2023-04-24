@@ -37,13 +37,14 @@ namespace oui
         // page state
         int m_selectedPosition = 0;
         int m_offset = 0;
-        int m_size = 0;
+        int m_visibleSize = 0;
         std::vector<ListBoxItem> m_pageItems;
 
         // temporary data for painting
         static String m_chunk;
 
         void InitSize();
+        void UIShiftWindow(int newOffset, int newPosition);
 
     protected:
         void OnResize() override;

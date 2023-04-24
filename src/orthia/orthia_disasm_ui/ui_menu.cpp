@@ -68,7 +68,7 @@ void CMainWindow::ConstuctMenu()
             std::move(file)
         );
         m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
-            oui::VirtualKey::kF), [=]() { m_menu->SelectAndOpenPopup(button);  });
+            oui::VirtualKey::kF), [=]() { m_menu->SelectAndOpenPopup(button, false);  });
     }
 
 

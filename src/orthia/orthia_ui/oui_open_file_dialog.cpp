@@ -151,6 +151,10 @@ namespace oui
             {
                 vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
             }
+            else
+            {
+                vit->colorsHandler = nullptr;
+            }
         }
         m_filesBox->Invalidate();
     }
@@ -224,13 +228,15 @@ namespace oui
         const int visibleSize = m_filesBox->GetVisibleSize();
         const int totalFilesAvailable = (int)m_currentFiles.size();
         int newSelectedPositon = m_filesBox->GetSelectedPosition();
-        if (newOffset >= totalFilesAvailable - visibleSize)
+
+        int maxOffset = totalFilesAvailable - visibleSize;
+        if (newOffset >= maxOffset)
         {
-            newOffset = totalFilesAvailable - visibleSize;
-            if (visibleSize)
+            if (visibleSize && (newOffset + newSelectedPositon) >= maxOffset)
             {
                 newSelectedPositon = visibleSize - 1;
             }
+            newOffset = maxOffset;
         }
         if (newOffset < 0)
         {

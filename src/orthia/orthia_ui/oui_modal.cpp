@@ -202,7 +202,8 @@ namespace oui
             }
             // user must be able to move window by dragging its caption
             if (evt.mouseEvent.state == MouseState::Pressed && 
-                IsInside(m_captionRange, evt.mouseEvent.point.x))
+                IsInside(m_captionRange, evt.mouseEvent.point.x) &&
+                evt.mouseEvent.point.y == m_position.y)
             {
                 // register move handler
                 Rect initialRect = GetWndRect();

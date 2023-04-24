@@ -310,12 +310,51 @@ namespace oui
     {
         return m_active || IsFocused();
     }
+
+
+    static bool CheckModalInput(std::shared_ptr<CWindowsPool> poolPtr,
+        std::shared_ptr<CWindow> me)
+    {
+        if (auto modal = poolPtr->GetModalWindow())
+        {
+            if (!modal->IsPopup())
+            {
+                bool found = false;
+                auto ptr = me;
+                for (; ptr;)
+                {
+                    if (ptr == modal)
+                    {
+                        found = true;
+                        break;
+                    }
+                    ptr = ptr->GetParent();
+                }
+                if (!found)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     void CWindow::SetFocus()
     {
         if (auto poolPtr = m_pool.lock())
         {
             if (auto me = GetPtr())
             {
+                if (!IsVisible())
+                {
+                    return;
+                }
+
+                // don't try to focus inactive items
+                if (!CheckModalInput(poolPtr, me))
+                {
+                    return;
+                }
                 poolPtr->SetFocus(me);
             }
         }
@@ -560,8 +599,24 @@ namespace oui
                     return false;
                 }
             }
+            else
+            {
+                // check if child is a modal dialog
+                if (auto poolPtr = m_pool.lock())
+                {
+                    if (auto modal = poolPtr->GetModalWindow())
+                    {
+                        if ((!modal->IsPopup()) && child == modal)
+                        {
+                            // no more mouse processing
+                            return false;
+                        }
+                    }
+                }
+            }
             return true;
         });
+
         if (handled)
         {
             return true;
@@ -570,7 +625,7 @@ namespace oui
         {
             return false;
         }
-        
+
         handled = HandleMouseEvent(rect, evt);
         if (handled && evtContext.onMouseEventCallback)
         {

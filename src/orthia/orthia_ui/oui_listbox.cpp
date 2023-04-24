@@ -125,6 +125,66 @@ namespace oui
     }
     bool CListBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
+        if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
+        {
+            auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+            int newPosition = 0;
+            if (m_columnsCount)
+            {
+                // list mode
+                const auto absClientRect = GetAbsoluteClientRect(this, rect);
+                int relLeftX = (0 * absClientRect.size.width) / m_columnsCount;
+                int leftX = absClientRect.position.x + relLeftX;
+                int targetColumn = -1;
+                for (int i = 0; i < m_columnsCount; ++i)
+                {
+                    int relRightX = ((i + 1) * absClientRect.size.width) / m_columnsCount;
+                    int rightX = absClientRect.position.x + relRightX;
+
+                    if (evt.mouseEvent.point.x == rightX)
+                    {
+                        // click on separator, do nothing
+                        return true;
+                    }
+                    if (evt.mouseEvent.point.x < rightX)
+                    {
+                        targetColumn = i;
+                        break;
+                    }
+                    leftX = rightX;
+                }
+                if (targetColumn == -1)
+                {
+                    return true;
+                }
+                newPosition = (targetColumn * absClientRect.size.height) + relativePoint.y;
+
+                if (relativePoint.y < 0 && targetColumn == 0)
+                {
+                    UIShiftWindow(m_offset, m_selectedPosition - 1);
+                    return true;
+                }
+                if (newPosition >= m_visibleSize && targetColumn == m_columnsCount - 1)
+                {
+                    UIShiftWindow(m_offset, m_selectedPosition+1);
+                    return true;
+                }
+            }
+            else
+            {
+                // report mode
+                if (relativePoint.x < 0 || relativePoint.y < 0)
+                {
+                    return true;
+                }
+                newPosition = relativePoint.y;
+            }
+            if (newPosition < m_visibleSize)
+            {
+                m_selectedPosition = newPosition;
+            }
+            Invalidate();
+        }
         return true;
     }
     int CListBox::GetColumnsCount() const
@@ -146,12 +206,12 @@ namespace oui
         if (m_columnsCount)
         {
             // list mode
-            m_size = rect.size.height * m_columnsCount;
+            m_visibleSize = rect.size.height * m_columnsCount;
         }
         else
         {
             // report mode
-            m_size = rect.size.height * (int)m_columns.size();
+            m_visibleSize = rect.size.height * (int)m_columns.size();
         }
     }
     void CListBox::Clear()
@@ -161,7 +221,7 @@ namespace oui
     }
     int CListBox::GetVisibleSize() const
     {
-        return m_size;
+        return m_visibleSize;
     }
     int CListBox::GetOffset() const
     {
@@ -227,34 +287,38 @@ namespace oui
                 return false;
             }
 
-            if (newOffset == m_offset)
-            {
-                const int diff = newPosition - m_selectedPosition;
-                newOffset = m_offset + diff;
-            }
-            else
-            {
-                const int diff = newOffset - m_offset;
-                newPosition = m_selectedPosition + diff;
-            }
-            if (newPosition == m_selectedPosition)
-            {
-                return true;
-            }
-            const int windowSize = (int)m_pageItems.size();
-
-            if (newPosition < 0 || newPosition >= windowSize)
-            {
-                m_owner->ShiftViewWindow(newOffset);
-            }
-            else
-            {
-                m_selectedPosition = newPosition;
-            }
-            Invalidate();
+            UIShiftWindow(newOffset, newPosition);
             return true;
         }
         return Parent_type::ProcessEvent(evt, evtContext);
+    }
+    void CListBox::UIShiftWindow(int newOffset, int newPosition)
+    {
+        if (newOffset == m_offset)
+        {
+            const int diff = newPosition - m_selectedPosition;
+            newOffset = m_offset + diff;
+        }
+        else
+        {
+            const int diff = newOffset - m_offset;
+            newPosition = m_selectedPosition + diff;
+        }
+        if (newPosition == m_selectedPosition)
+        {
+            return;
+        }
+        const int windowSize = (int)m_pageItems.size();
+
+        if (newPosition < 0 || newPosition >= windowSize)
+        {
+            m_owner->ShiftViewWindow(newOffset);
+        }
+        else
+        {
+            m_selectedPosition = newPosition;
+        }
+        Invalidate();
     }
     void CListBox::InitColumns(const ColumnParam& param1,
         const ColumnParam& param2,
