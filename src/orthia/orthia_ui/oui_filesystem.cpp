@@ -25,6 +25,8 @@ namespace oui
 
     void CFileSystem::AsyncStartQueryFiles(ThreadPtr_type targetThread, 
         const FileUnifiedId& fileId,
+        const String& argument,
+        int queryFlags,
         OperationPtr_type<QueryFilesHandler_type> handler)
     {
         if (!targetThread)
@@ -32,7 +34,7 @@ namespace oui
             return;
         }
         m_pool.AddTask([=, handler = std::move(handler)]() {
-            m_fsImpl->AsyncStartQueryFiles(targetThread, fileId, handler);
+            m_fsImpl->AsyncStartQueryFiles(targetThread, fileId, argument, queryFlags, handler);
         });
     }
  

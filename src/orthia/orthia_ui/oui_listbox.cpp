@@ -243,6 +243,18 @@ namespace oui
     {
         return m_pageItems;
     }
+    void CListBox::OpenSelectedItem()
+    {
+        if (m_selectedPosition >=0 && m_selectedPosition < (int)m_pageItems.size())
+        {
+            auto& item = m_pageItems[m_selectedPosition];
+            auto openHandler = item.openHandler;
+            if (openHandler)
+            {
+                openHandler();
+            }
+        }
+    }
     bool CListBox::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
         if (evt.keyEvent.valid)
@@ -251,6 +263,10 @@ namespace oui
             int newPosition = m_selectedPosition;
             switch (evt.keyEvent.virtualKey)
             {
+            case VirtualKey::Enter:
+                OpenSelectedItem();
+                return true;
+
             case VirtualKey::PageUp:
                 newOffset -= GetVisibleSize();
                 break;

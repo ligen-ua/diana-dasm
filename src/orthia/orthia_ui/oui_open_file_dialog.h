@@ -43,7 +43,7 @@ namespace oui
             const FileUnifiedId& folderId,
             const std::vector<FileInfo>& data,
             int error);
-        void ChangeFolder(const String& name);
+        void ChangeFolder(const FileUnifiedId& fileId, const String& argument, int flags);
 
     protected:
         void OnResize() override;
