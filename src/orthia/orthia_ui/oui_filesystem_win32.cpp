@@ -165,6 +165,7 @@ namespace oui
             const FileUnifiedId& fileId_in,
             const String& argument,
             int queryFlags,
+            const String& tag,
             OperationPtr_type<QueryFilesHandler_type> handler) override
         {
             FileUnifiedId fileId = fileId_in;
@@ -181,7 +182,7 @@ namespace oui
             {
                 // query disks
                 error = QueryDisks(fileId, result);
-                handler->Reply(handler, fileId, result, error);
+                handler->Reply(handler, fileId, result, error, tag);
                 return;
             }
             std::wstring searchParam = fileId.fullFileName.native + L"\\*";
@@ -190,7 +191,7 @@ namespace oui
             HANDLE hSearch = FindFirstFileW(searchParam.c_str(), &win32Info);
             if (hSearch == INVALID_HANDLE_VALUE)
             {
-                handler->Reply(handler, fileId, result, error);
+                handler->Reply(handler, fileId, result, error, tag);
                 return;
             }
             oui::ScopedGuard guard([=]() { FindClose(hSearch); });
@@ -228,7 +229,7 @@ namespace oui
                 // flush the data if ready
                 if (result.size() >= pageSize)
                 {
-                    if (!handler->Reply(handler, fileId, result, 0))
+                    if (!handler->Reply(handler, fileId, result, 0, tag))
                     {
                         return;
                     }
@@ -242,8 +243,19 @@ namespace oui
             }
             if (!result.empty())
             {
-                handler->Reply(handler, fileId, result, 0);
+                handler->Reply(handler, fileId, result, 0, tag);
             }
+        }
+        String AppendSlash(const String& file_in) override
+        {
+            String file = file_in;
+            EraseLastSlash(file.native);
+            if (!file.native.empty())
+            {
+                file.native.append(L"\\");
+            }
+            ErasePrefix(file.native);
+            return file;
         }
         void AsyncQueryDefaultRoot(ThreadPtr_type targetThread, 
             QueryDefaultRootHandler_type handler) override

@@ -119,7 +119,7 @@ namespace oui
     {
         // border
         {
-            ColorWhite() // borderText
+            ColorGray() // borderText
         },
         {
             ColorBlack() // borderBackground
@@ -186,12 +186,32 @@ namespace oui
         profile = g_listBoxColorProfile;
     }
 
+    // editbox
+    static EditBoxColorProfile g_editBoxColorProfile =
+    {
+        {
+            ColorWhite(),     // text
+            ColorBlack(),      // background
+        },
+        {
+            ColorBlack(),     // text
+            ColorYellow(),     // background
+        }
+    };
+
+    void QueryDefaultColorProfile(EditBoxColorProfile& profile)
+    {
+        profile = g_editBoxColorProfile;
+    }
+
     // dialog
     void QueryDefaultColorProfile(DialogColorProfile& profile)
     {
         QueryDefaultColorProfile(profile.label);
         QueryDefaultColorProfile(profile.listBox);
         profile.listBoxFolders = g_listBoxFolders;
+        QueryDefaultColorProfile(profile.editBox);
+
     }
 
 }

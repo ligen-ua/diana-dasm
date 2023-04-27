@@ -153,4 +153,15 @@ namespace oui
             m_handler = nullptr;
         }
     };
+
+    // symbols
+    struct SymbolInfo
+    {
+        int charOffset = 0;
+        int sizeInTChars = 0;
+    };
+    int CalculateSymbolsCount(const wchar_t* pStart, 
+        size_t sizeInWchars,
+        std::vector<SymbolInfo>& symbols);
+
 }

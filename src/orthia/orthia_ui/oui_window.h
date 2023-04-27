@@ -20,6 +20,7 @@ namespace oui
         const Point& currentPoint,
         std::shared_ptr<CWindow> wnd)>;
 
+    class CConsole;
     class CWindowsPool:Noncopyable
     {
         std::unordered_map<CWindow*, std::shared_ptr<CWindow>> m_allWindows;
@@ -35,8 +36,13 @@ namespace oui
 
         std::shared_ptr<CWindow> m_modalWindow;
         std::shared_ptr<CWindowThread> m_thread;
+        CConsole* m_pConsole = 0;
     public:
         CWindowsPool();
+
+        void RegisterConsole(CConsole* pConsole);
+        CConsole* GetConsole();
+
         void RegisterRootWindow(std::shared_ptr<CWindow> window,
             std::shared_ptr<CWindowThread> thread);
         std::shared_ptr<CWindowThread> GetThread();
@@ -121,7 +127,8 @@ namespace oui
 
         virtual void OnInit(std::shared_ptr<CWindowsPool> pool);
         virtual void OnAfterInit(std::shared_ptr<CWindowsPool> pool);
-            
+        virtual void OnHandleMouseEvent(bool result, const Rect& rect, InputEvent& evt);
+
         void RenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler);
         void ReverseRenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler);
 
@@ -155,6 +162,7 @@ namespace oui
         virtual void SetFocus();
         virtual bool IsFocused() const;
         virtual void OnFocusLost();
+        virtual void OnFocusEnter();
 
         // destroy
         virtual void Destroy();

@@ -13,13 +13,14 @@ namespace oui
 #define OUI_TCSTR(X) L##X
 #define OUI_STR(X) std::wstring(OUI_TCSTR(X))
 #define OUI_TO_STR(X) std::to_wstring(X)
-
+#define OUI_SCANF swscanf
 
 #else
         std::string native;
 #define OUI_TCSTR(X) X
 #define OUI_STR(X) std::string(X)
 #define OUI_TO_STR(X) std::to_string(X)
+#define OUI_SCANF sscanf
 
 #endif
         typedef typename decltype(native)::value_type char_type;

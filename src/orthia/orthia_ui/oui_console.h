@@ -15,6 +15,7 @@ namespace oui
         int TranslateColor(const Color& color);
         void SetPalette(std::array<COLORREF, 16>& colors);
         void SetDefaultPalette();
+        short GetYDifference() const;
     public:
         CConsole();
         void Init();
@@ -23,9 +24,13 @@ namespace oui
         void PaintRect(const Rect& rect, 
             Color background,
             bool keepText);
+        void ShowCursor();
         void HideCursor();
         int TranslateColorEx(const Color& color, bool background);
         HWND GetRealWindow();
+
+        void SetCursorPositon(const Point& pt);
+        Point GetCursorPositon();
     };
 
     struct PanelBorderSymbols

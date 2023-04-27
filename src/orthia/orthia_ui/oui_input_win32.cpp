@@ -167,8 +167,20 @@ namespace oui
         }
         return MouseButton::Move;
     }
-    static MouseState GetMouseState(MOUSE_EVENT_RECORD& mouseEvent)
+    static MouseState GetMouseState(MOUSE_EVENT_RECORD& mouseEvent, MouseButton& button)
     {
+        if (mouseEvent.dwEventFlags & MOUSE_WHEELED)
+        {
+            if (0xff000000 & mouseEvent.dwButtonState)
+            {
+                button = MouseButton::WheelDown;
+            }
+            else
+            {
+                button = MouseButton::WheelUp;
+            }
+            return MouseState::Pressed;
+        }
         if (mouseEvent.dwEventFlags & DOUBLE_CLICK)
         {
             return MouseState::DoubleClick;
@@ -198,9 +210,13 @@ namespace oui
         case MOUSE_EVENT:
             {
                 evt.keyState = TranslateKeyState(raw.Event.MouseEvent.dwControlKeyState);
-                evt.mouseEvent.button = GetMouseButton(raw.Event.MouseEvent);
-                evt.mouseEvent.state = GetMouseState(raw.Event.MouseEvent);
 
+                evt.mouseEvent.button = MouseButton::None;
+                evt.mouseEvent.state = GetMouseState(raw.Event.MouseEvent, evt.mouseEvent.button);
+                if (evt.mouseEvent.button == MouseButton::None)
+                {
+                    evt.mouseEvent.button = GetMouseButton(raw.Event.MouseEvent);
+                }
                 // console api returns Move + Released this is frustrating
                 // I would rather like to have mouse button there
                 if (evt.mouseEvent.button == MouseButton::Move &&

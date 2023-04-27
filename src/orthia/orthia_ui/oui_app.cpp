@@ -28,6 +28,9 @@ namespace oui
         rootWindow->Init(m_pool);
 
         oui::CConsole mainConsole;
+        m_pool->RegisterConsole(&mainConsole);
+        oui::ScopedGuard consoleGuard([&]() {  m_pool->RegisterConsole(0);  });
+
         try
         {
             oui::CConsoleStateSaver stateSaver;
