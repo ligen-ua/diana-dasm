@@ -126,4 +126,26 @@ namespace oui
             return Base::ProcessEvent(evt, evtContext);
         }
     };
+
+    template<class Base>
+    class MouseFocusable:public Base
+    {
+    public:
+        void OnHandleMouseEvent(bool res, const Rect& rect, InputEvent& evt) override
+        {
+            if (res)
+            {
+                if (evt.mouseEvent.state == MouseState::Pressed)
+                {
+                    if (!this->IsFocused())
+                    {
+                        this->SetFocus();
+                    }
+                }
+            }
+            Base::OnHandleMouseEvent(res, rect, evt);
+        }
+
+    };
+
 }

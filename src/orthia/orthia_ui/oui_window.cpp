@@ -20,6 +20,14 @@ namespace oui
     {
         return m_thread;
     }
+    void CWindowsPool::RegisterConsole(CConsole* pConsole)
+    {
+        m_pConsole = pConsole;
+    }
+    CConsole* CWindowsPool::GetConsole()
+    {
+        return m_pConsole;
+    }
     void CWindowsPool::RegisterRootWindow(std::shared_ptr<CWindow> window,
         std::shared_ptr<CWindowThread> thread)
     {
@@ -76,6 +84,10 @@ namespace oui
         if (oldFocused)
         {
             oldFocused->OnFocusLost();
+        }
+        if (auto focused = m_focused)
+        {
+            focused->OnFocusEnter();
         }
     }
     std::shared_ptr<CWindow> CWindowsPool::GetFocus()
@@ -366,6 +378,9 @@ namespace oui
             Destroy();
         }
     }
+    void CWindow::OnFocusEnter()
+    {
+    }
 
     bool CWindow::IsFocused() const
     {
@@ -581,6 +596,9 @@ namespace oui
     {
         return m_valid;
     }
+    void CWindow::OnHandleMouseEvent(bool result, const Rect& rect, InputEvent& evt)
+    {
+    }
     bool CWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
         return false;
@@ -627,6 +645,7 @@ namespace oui
         }
 
         handled = HandleMouseEvent(rect, evt);
+        OnHandleMouseEvent(handled, rect, evt);
         if (handled && evtContext.onMouseEventCallback)
         {
             if (auto me = GetPtr())

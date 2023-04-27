@@ -1,3 +1,4 @@
+#define  _CRT_SECURE_NO_WARNINGS
 #include "oui_open_file_dialog.h"
 
 namespace oui
@@ -41,6 +42,7 @@ namespace oui
         {
             Size zeroSize;
             m_filesBox->Resize(zeroSize);
+            m_fileEdit->Resize(zeroSize);
             return;
         }
 
@@ -52,6 +54,16 @@ namespace oui
 
         m_filesBox->MoveTo(boxRect.position);
         m_filesBox->Resize(boxRect.size);
+
+        // file edit
+        Rect fileEditRect = clientRect;
+        fileEditRect.position.x += 2;
+        fileEditRect.position.y += 2;
+        fileEditRect.size.width -= 4;
+        fileEditRect.size.height = 1;
+
+        m_fileEdit->MoveTo(fileEditRect.position);
+        m_fileEdit->Resize(fileEditRect.size);
 
         Parent_type::OnResize();
     }
@@ -72,7 +84,8 @@ namespace oui
     void COpenFileDialog::OnOpCompleted(std::shared_ptr<BaseOperation> operation,
         const FileUnifiedId& folderId,
         const std::vector<FileInfo>& data,
-        int error)
+        int error,
+        const String& tag)
     {
         if (operation != m_currentOperation)
         {
@@ -91,6 +104,9 @@ namespace oui
             m_currentFiles.reserve(data.size() + 1);
             m_firstResult = false;
 
+            m_fileEdit->SetText(m_fileSystem->AppendSlash(m_currentFolderId.fullFileName));
+            m_fileEdit->ScrollRight();
+
             if (!m_currentFolderId.fullFileName.native.empty())
             {
                 FileInfo info;
@@ -98,6 +114,10 @@ namespace oui
                 info.flags |= info.flag_directory | info.flag_uplink;
                 m_currentFiles.push_back(info);
             }
+            m_parentOffset = m_filesBox->GetOffset();
+            m_parentPosition = m_filesBox->GetSelectedPosition();
+
+            m_filesBox->SetOffset(0);
             m_filesBox->SetSelectedPosition(0);
         }
         else
@@ -105,8 +125,8 @@ namespace oui
             m_currentFiles.reserve(m_currentFiles.size() + data.size());
         }
 
-
         String highlighName;
+        bool applyTag = false;
         for (auto& info : data)
         {
             m_currentFiles.push_back(info);
@@ -115,17 +135,60 @@ namespace oui
             if (info.flags & info.flag_highlight)
             {
                 highlighName = info.fileName;
+                applyTag = true;
             }
         }
-
+        if (highlighName.native.empty())
+        {
+            oui::ListBoxItem listItem;
+            if (m_filesBox->GetSelectedItem(listItem) && !listItem.text.empty())
+            {
+                highlighName = listItem.text[0];
+            }
+        }
         std::sort(m_currentFiles.begin(), m_currentFiles.end());
-
         if (!highlighName.native.empty())
         {
-            // TODO: improve selection
+            if (applyTag)
+            {
+                int offset = -1;
+                int pos = -1;
+                OUI_SCANF(tag.native.c_str(), OUI_TCSTR("%i:%i"), &offset, &pos);
+                if (offset != -1 && pos != -1)
+                {
+                    if (pos < (int)m_currentFiles.size())
+                    {
+                        m_filesBox->SetSelectedPosition(pos);
+                    }
+                    if (offset < (int)m_currentFiles.size())
+                    {
+                        m_filesBox->SetOffset(offset);
+                    }
+                }
+            }
             auto it = std::find_if(m_currentFiles.begin(), m_currentFiles.end(), [&](auto& value) { return value.info.fileName.native == highlighName.native;  });
-            size_t offset = it - m_currentFiles.begin();
-            m_filesBox->SetOffset((int)offset);
+            int highlightItemOffset = (int)(it - m_currentFiles.begin());
+            int maxVisibleOffset = std::min(m_filesBox->GetVisibleSize() + m_filesBox->GetOffset(), (int)m_currentFiles.size());
+            if (highlightItemOffset >= m_filesBox->GetOffset() && highlightItemOffset < maxVisibleOffset)
+            {
+                m_filesBox->SetSelectedPosition(highlightItemOffset - m_filesBox->GetOffset());
+            }
+            else
+            {
+                // try to reuse at least position
+                int newOffset = highlightItemOffset - m_filesBox->GetSelectedPosition();
+                if (newOffset < 0)
+                {
+                    newOffset = 0;
+                    m_filesBox->SetSelectedPosition(highlightItemOffset);
+                }
+                else if (newOffset >= (int)m_currentFiles.size())
+                {
+                    newOffset = highlightItemOffset;
+                    m_filesBox->SetSelectedPosition(0);
+                }
+                m_filesBox->SetOffset(newOffset);
+            }
         }
         UpdateVisibleItems();
     }
@@ -165,21 +228,31 @@ namespace oui
         {
             vit->text.clear();
             vit->text.push_back(it->info.fileName);
+            vit->fsFlags = it->info.flags;
+
             if (it->info.flags & it->info.flag_uplink)
             {
                 vit->openHandler = [=]() { 
                     ChangeFolder(m_currentFolderId, 
                         String(),
-                        IFileSystem::queryFlags_OpenParent);  
+                        IFileSystem::queryFlags_OpenParent,
+                        String(OUI_TO_STR(m_parentOffset) + OUI_STR(":") + OUI_TO_STR(m_parentPosition)));
                 };
             }
             else
+            if (it->info.flags & it->info.flag_directory)
             {
                 vit->openHandler = [=, fileName = it->info.fileName]() {
                     ChangeFolder(m_currentFolderId,
                         fileName,
-                        IFileSystem::queryFlags_OpenChild);
+                        IFileSystem::queryFlags_OpenChild,
+                        String());
                 };
+            }
+            else
+            {
+                // open file here
+                vit->openHandler = nullptr;
             }
 
             if (it->info.flags & it->info.flag_directory)
@@ -191,6 +264,7 @@ namespace oui
                 vit->colorsHandler = nullptr;
             }
         }
+        OnVisibleItemChanged();
         m_filesBox->Invalidate();
     }
     void COpenFileDialog::OnDefaultRoot(const String& name, int error)
@@ -199,9 +273,12 @@ namespace oui
         {
             return;
         }
-        ChangeFolder(name, String(), 0);
+        ChangeFolder(name, String(), 0, String());
     }
-    void COpenFileDialog::ChangeFolder(const FileUnifiedId& fileId, const String& argument, int flags)
+    void COpenFileDialog::ChangeFolder(const FileUnifiedId& fileId, 
+        const String& argument, 
+        int flags,
+        const String& tag)
     {
         if (m_currentOperation)
         {
@@ -214,12 +291,18 @@ namespace oui
                 std::placeholders::_1,
                 std::placeholders::_2, 
                 std::placeholders::_3,
-                std::placeholders::_4));
+                std::placeholders::_4,
+                std::placeholders::_5));
 
         m_currentOperation = operation;
         m_firstResult = true;
 
-        m_fileSystem->AsyncStartQueryFiles(this->GetThread(), fileId, argument, flags, operation);
+        m_fileSystem->AsyncStartQueryFiles(this->GetThread(), 
+            fileId,
+            argument,
+            flags,
+            tag,
+            operation);
     }
 
     COpenFileDialog::COpenFileDialog(const String& rootFile, 
@@ -236,6 +319,8 @@ namespace oui
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
         m_filesBox->InitColumns(2);
+
+        m_fileEdit = std::make_shared<CEditBox>(m_colorProfile);
     }
 
     void COpenFileDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
@@ -245,6 +330,7 @@ namespace oui
     void COpenFileDialog::ConstructChilds()
     {
         AddChild(m_filesBox);
+        AddChild(m_fileEdit);
 
         if (m_rootFile.native.empty())
         {
@@ -258,25 +344,66 @@ namespace oui
             OnDefaultRoot(m_rootFile, 0);
         }
     }
+    
+    void COpenFileDialog::OnVisibleItemChanged()
+    {
+        ListBoxItem item;
+        if (!m_filesBox->GetSelectedItem(item))
+        {
+            return;
+        }
+        if (item.fsFlags & FileInfo::flag_uplink)
+        {
+            m_fileEdit->SetText(m_fileSystem->AppendSlash(m_currentFolderId.fullFileName));
+            m_fileEdit->ScrollRight();
+            m_fileEdit->Invalidate();
+            return;
+        }
+        if (item.text.empty())
+        {
+            return;
+        }
+        auto newText = m_fileSystem->AppendSlash(m_currentFolderId.fullFileName);
+        newText.native.append(item.text[0].native);
+        m_fileEdit->SetText(newText);
+        m_fileEdit->ScrollRight();
+        m_fileEdit->Invalidate();
+    }
+     
     void COpenFileDialog::ShiftViewWindow(int newOffset)
     {
         const int visibleSize = m_filesBox->GetVisibleSize();
         const int totalFilesAvailable = (int)m_currentFiles.size();
+
         int newSelectedPositon = m_filesBox->GetSelectedPosition();
 
+        int newSelectedOffset = newSelectedPositon + newOffset;
         int maxOffset = totalFilesAvailable - visibleSize;
-        if (newOffset >= maxOffset)
+        if (maxOffset < 0)
         {
-            if (visibleSize && (newOffset + newSelectedPositon) >= maxOffset)
+            maxOffset = 0;
+        }
+        if (newOffset > maxOffset)
+        {
+            if (newSelectedOffset >= totalFilesAvailable)
             {
-                newSelectedPositon = visibleSize - 1;
+                auto sizeToProceed = std::min(totalFilesAvailable - maxOffset, visibleSize);
+                newSelectedPositon = sizeToProceed - 1;
+            }
+            else
+            {
+                newSelectedPositon = visibleSize - (totalFilesAvailable - newSelectedOffset);
             }
             newOffset = maxOffset;
         }
         if (newOffset < 0)
         {
             newOffset = 0;
-            newSelectedPositon = 0;
+            newSelectedPositon = newSelectedOffset;
+            if (newSelectedPositon < 0)
+            {
+                newSelectedPositon = 0;
+            }
         }
         m_filesBox->SetSelectedPosition(newSelectedPositon);
         m_filesBox->SetOffset(newOffset);

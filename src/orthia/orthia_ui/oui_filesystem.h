@@ -43,8 +43,11 @@ namespace oui
 
     using ThreadPtr_type = std::shared_ptr<CWindowThread>;
     using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile>, int error)>;
-    using QueryFilesHandler_type = std::function<void(std::shared_ptr<BaseOperation> operation, const FileUnifiedId& folderId, 
-        const std::vector<FileInfo>& data, int error)>;
+    using QueryFilesHandler_type = std::function<void(std::shared_ptr<BaseOperation> operation, 
+        const FileUnifiedId& folderId, 
+        const std::vector<FileInfo>& data, 
+        int error,
+        const String& tag)>;
     using QueryDefaultRootHandler_type = std::function<void(const String& name, int error)>;
 
     struct IFileSystem
@@ -57,9 +60,11 @@ namespace oui
         virtual void AsyncStartQueryFiles(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId, 
             const String& argument,
-            int queryFlags, 
+            int queryFlags,
+            const String& tag,
             OperationPtr_type<QueryFilesHandler_type> handler) = 0;
         virtual void AsyncQueryDefaultRoot(ThreadPtr_type targetThread, QueryDefaultRootHandler_type handler) = 0;
+        virtual String AppendSlash(const String& file) = 0;
     };
 
     // default filesystem
@@ -79,11 +84,14 @@ namespace oui
             const FileUnifiedId& fileId,
             const String& argument,
             int queryFlags,
+            const String& tag,
             OperationPtr_type<QueryFilesHandler_type> handler) override;
 
         // root
         void AsyncQueryDefaultRoot(ThreadPtr_type targetThread, 
             QueryDefaultRootHandler_type handler) override;
+
+        String AppendSlash(const String& file) override;
     };
 
     std::shared_ptr<IFileSystem> CreateDefaultFSProvider();

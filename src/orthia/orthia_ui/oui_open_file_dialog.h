@@ -2,6 +2,7 @@
 
 #include "oui_modal.h"
 #include "oui_listbox.h"
+#include "oui_editbox.h"
 #include "oui_filesystem.h"
 
 namespace oui
@@ -33,17 +34,24 @@ namespace oui
         FileRecipientHandler_type m_resultCallback;
         std::shared_ptr<IFileSystem> m_fileSystem;
         const String m_rootFile;
+        std::shared_ptr<CEditBox> m_fileEdit;
 
         bool m_firstResult = false;
         OperationPtr_type<QueryFilesHandler_type> m_currentOperation;
         std::vector<FileDialogInfo> m_currentFiles;
         FileUnifiedId m_currentFolderId;
+        int m_parentOffset = 0;
+        int m_parentPosition = 0;
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
             const FileUnifiedId& folderId,
             const std::vector<FileInfo>& data,
-            int error);
-        void ChangeFolder(const FileUnifiedId& fileId, const String& argument, int flags);
+            int error,
+            const String& tag);
+        void ChangeFolder(const FileUnifiedId& fileId,
+            const String& argument,
+            int flags,
+            const String& tag);
 
     protected:
         void OnResize() override;
@@ -56,6 +64,7 @@ namespace oui
         void UpdateVisibleItems();
         void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
 
+        void OnVisibleItemChanged() override;
     public:
         COpenFileDialog(const String& rootFile,
             FileRecipientHandler_type resultCallback,

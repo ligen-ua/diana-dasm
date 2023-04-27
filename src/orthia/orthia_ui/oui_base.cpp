@@ -54,6 +54,62 @@ namespace oui
         return charCount;
     }
 
+    int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in)
+    {
+        if (g_consoleSupportsUTF16)
+        {
+            return CalculateSymbolsCountUTF16(pStart, sizeInWchars, exceptSym_in);
+        }
+        return CalculateSymbolsCountUCS2(pStart, sizeInWchars, exceptSym_in);
+    }
+
+    static int CalculateSymbolsCountUTF16(const wchar_t* pStart, size_t sizeInWchars, std::vector<SymbolInfo>& symbols)
+    {
+        int charCount = 0;
+        const wchar_t* pEnd = pStart + sizeInWchars;
+        for (const wchar_t* p = pStart; p < pEnd; ++p)
+        {
+            SymbolInfo info;
+            info.charOffset = (int)(p - pStart);
+            info.sizeInTChars = 1;
+
+            symbols.push_back(info);
+            wchar_t ch = *p;
+            ++charCount;
+            if (IsLeadByte(ch))
+            {
+                ++info.sizeInTChars;
+                ++p;
+                if (p >= pEnd)
+                {
+                    break;
+                }
+            }
+        }
+        return charCount;
+    }
+
+    int CalculateSymbolsCount(const wchar_t* pStart,
+        size_t sizeInWchars,
+        std::vector<SymbolInfo>& symbols)
+    {
+        symbols.clear();
+        if (g_consoleSupportsUTF16)
+        {
+            return CalculateSymbolsCountUTF16(pStart, sizeInWchars, symbols);
+        }
+        symbols.resize(sizeInWchars, SymbolInfo());
+        int pos = 0;
+        for (auto& sym : symbols)
+        {
+            sym.charOffset = pos;
+            sym.sizeInTChars = 1;
+            ++pos;
+        }
+        return sizeInWchars;
+    }
+
+    // CutString
     static int CutStringUTF16(std::wstring& str, int maxCharsCount)
     {
         int charCount = 0;
@@ -91,15 +147,8 @@ namespace oui
         }
         return (int)str.size();
     }
-    int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in)
-    {
-        if (g_consoleSupportsUTF16)
-        {
-            return CalculateSymbolsCountUTF16(pStart, sizeInWchars, exceptSym_in);
-        }
-        return CalculateSymbolsCountUCS2(pStart, sizeInWchars, exceptSym_in);
-    }
 
+    // other
     bool IsInside(const Range& range, int value)
     {
         return value >= range.begin && value < range.end;
@@ -122,4 +171,5 @@ namespace oui
         }
         return true;
     }
+
 }

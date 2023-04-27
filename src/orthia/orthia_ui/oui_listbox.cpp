@@ -125,7 +125,22 @@ namespace oui
     }
     bool CListBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
-        if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
+        {
+            int pageSize = 1;
+            if (evt.mouseEvent.button == MouseButton::WheelDown)
+            {
+                UIShiftWindow(m_offset, m_selectedPosition + pageSize);
+                return true;
+            }
+            if (evt.mouseEvent.button == MouseButton::WheelUp)
+            {
+                UIShiftWindow(m_offset, m_selectedPosition - pageSize);
+                return true;
+            }
+        }
+        if (evt.mouseEvent.button == MouseButton::Left && 
+            (evt.mouseEvent.state == MouseState::Pressed ||
+            evt.mouseEvent.state == MouseState::DoubleClick))
         {
             auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
             int newPosition = 0;
@@ -141,12 +156,12 @@ namespace oui
                     int relRightX = ((i + 1) * absClientRect.size.width) / m_columnsCount;
                     int rightX = absClientRect.position.x + relRightX;
 
-                    if (evt.mouseEvent.point.x == rightX)
+                    if (evt.mouseEvent.point.x == rightX - 1)
                     {
                         // click on separator, do nothing
                         return true;
                     }
-                    if (evt.mouseEvent.point.x < rightX)
+                    if (evt.mouseEvent.point.x < rightX - 1)
                     {
                         targetColumn = i;
                         break;
@@ -166,7 +181,7 @@ namespace oui
                 }
                 if (newPosition >= m_visibleSize && targetColumn == m_columnsCount - 1)
                 {
-                    UIShiftWindow(m_offset, m_selectedPosition+1);
+                    UIShiftWindow(m_offset, m_selectedPosition + 1);
                     return true;
                 }
             }
@@ -179,9 +194,18 @@ namespace oui
                 }
                 newPosition = relativePoint.y;
             }
-            if (newPosition < m_visibleSize)
+            if (newPosition >= (int)m_pageItems.size() && !m_pageItems.empty())
             {
-                m_selectedPosition = newPosition;
+                newPosition = (int)m_pageItems.size() - 1;
+            }
+            if (newPosition >= 0 && newPosition < (int)m_pageItems.size())
+            {
+                SetSelectedPosition(newPosition);
+                m_owner->OnVisibleItemChanged();
+                if (evt.mouseEvent.state == MouseState::DoubleClick)
+                {
+                    OpenSelectedItem();
+                }
             }
             Invalidate();
         }
@@ -235,6 +259,15 @@ namespace oui
     {
         return m_selectedPosition;
     }
+    bool CListBox::GetSelectedItem(ListBoxItem& item) const
+    {
+        if (m_selectedPosition >= 0 && m_selectedPosition < (int)m_pageItems.size())
+        {
+            item = m_pageItems[m_selectedPosition];
+            return true;
+        }
+        return false;
+    }
     void CListBox::SetSelectedPosition(int selectedPosition)
     {
         m_selectedPosition = selectedPosition;
@@ -277,6 +310,8 @@ namespace oui
 
             case VirtualKey::Home:
                 newOffset = 0;
+                newPosition = 0;
+                SetSelectedPosition(0);
                 break;
 
             case VirtualKey::End:
@@ -310,29 +345,24 @@ namespace oui
     }
     void CListBox::UIShiftWindow(int newOffset, int newPosition)
     {
-        if (newOffset == m_offset)
+        if (m_selectedPosition == newPosition)
+        {
+            // user requests to change offset
+            m_owner->ShiftViewWindow(newOffset);
+            return;
+        }
+        
+        const int windowSize = (int)m_pageItems.size();
+        if (newPosition < 0 || newPosition >= windowSize)
         {
             const int diff = newPosition - m_selectedPosition;
             newOffset = m_offset + diff;
-        }
-        else
-        {
-            const int diff = newOffset - m_offset;
-            newPosition = m_selectedPosition + diff;
-        }
-        if (newPosition == m_selectedPosition)
-        {
-            return;
-        }
-        const int windowSize = (int)m_pageItems.size();
-
-        if (newPosition < 0 || newPosition >= windowSize)
-        {
             m_owner->ShiftViewWindow(newOffset);
         }
         else
         {
-            m_selectedPosition = newPosition;
+            SetSelectedPosition(newPosition);
+            m_owner->OnVisibleItemChanged();
         }
         Invalidate();
     }

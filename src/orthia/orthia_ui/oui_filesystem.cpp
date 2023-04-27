@@ -27,6 +27,7 @@ namespace oui
         const FileUnifiedId& fileId,
         const String& argument,
         int queryFlags,
+        const String& tag,
         OperationPtr_type<QueryFilesHandler_type> handler)
     {
         if (!targetThread)
@@ -34,10 +35,13 @@ namespace oui
             return;
         }
         m_pool.AddTask([=, handler = std::move(handler)]() {
-            m_fsImpl->AsyncStartQueryFiles(targetThread, fileId, argument, queryFlags, handler);
+            m_fsImpl->AsyncStartQueryFiles(targetThread, fileId, argument, queryFlags, tag, handler);
         });
     }
- 
+    String CFileSystem::AppendSlash(const String& file)
+    {
+        return m_fsImpl->AppendSlash(file);
+    }
     void CFileSystem::AsyncQueryDefaultRoot(ThreadPtr_type targetThread, 
         QueryDefaultRootHandler_type handler)
     {

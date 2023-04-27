@@ -60,7 +60,7 @@
     <ClCompile Include="oui_open_file_dialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="oui_edit_box.cpp">
+    <ClCompile Include="oui_editbox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="oui_label.cpp">
@@ -140,7 +140,7 @@
     <ClInclude Include="oui_open_file_dialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="oui_edit_box.h">
+    <ClInclude Include="oui_editbox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_label.h">

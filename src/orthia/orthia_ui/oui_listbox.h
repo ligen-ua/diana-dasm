@@ -11,6 +11,7 @@ namespace oui
         std::vector<String> text;
         std::function<void()> openHandler;
         std::function<LabelColorState()> colorsHandler;
+        int fsFlags = 0;
     };
 
     class CListBox;
@@ -20,11 +21,12 @@ namespace oui
         virtual int GetTotalCount() const = 0;
         virtual void CancelAllQueries() = 0;
         virtual void ShiftViewWindow(int newOffset) = 0;
+        virtual void OnVisibleItemChanged() = 0;
     };
 
-    class CListBox:public WithBorder<CWindow>
+    class CListBox:public MouseFocusable<WithBorder<CWindow>>
     {
-        using Parent_type = WithBorder<CWindow>;
+        using Parent_type = MouseFocusable<WithBorder<CWindow>>;
 
         std::shared_ptr<DialogColorProfile> m_colorProfile;
         Rect m_lastRect;
@@ -87,6 +89,8 @@ namespace oui
         int GetSelectedPosition() const;
         void SetSelectedPosition(int selectedPosition);
         std::vector<ListBoxItem>& GetItems();
+
+        bool GetSelectedItem(ListBoxItem& item) const;
     };
 
 }

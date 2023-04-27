@@ -114,13 +114,49 @@ namespace oui
             SendMessage(wnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
         }
     }
+    void CConsole::ShowCursor()
+    {
+        CONSOLE_CURSOR_INFO info;
+        info.bVisible = TRUE;
+        info.dwSize = 20;
+        SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
+    }
     void CConsole::HideCursor()
     {
         CONSOLE_CURSOR_INFO info;
         info.bVisible = FALSE;
-        info.dwSize = 100;
+        info.dwSize = 20;
         SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
     }
+    short CConsole::GetYDifference() const
+    {
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+            return 0;
+
+        return csbi.dwSize.Y - (csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
+    }
+    void CConsole::SetCursorPositon(const Point& pt)
+    {
+        COORD coord;
+        coord.X = pt.x;
+        coord.Y = pt.y;
+        coord.Y -= GetYDifference();
+        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+    }
+    Point CConsole::GetCursorPositon()
+    {
+        Point result;
+        CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
+        if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &bufferInfo))
+        {
+            result.x = bufferInfo.dwCursorPosition.X;
+            result.y = bufferInfo.dwCursorPosition.Y;   
+            result.y -= GetYDifference();
+        }
+        return result;
+    }
+
     Size CConsole::GetSize()
     {
         Size result;

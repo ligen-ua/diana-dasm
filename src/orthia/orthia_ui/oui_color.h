@@ -144,12 +144,21 @@ namespace oui
     };
     void QueryDefaultColorProfile(ListBoxColorProfile& profile);
 
+    // editbox
+    struct EditBoxColorProfile
+    {
+        LabelColorState normal;
+        LabelColorState selectedText;
+    };
+    void QueryDefaultColorProfile(EditBoxColorProfile& profile);
+
     // dialog
     struct DialogColorProfile
     {
         LabelColorProfile label;
         ListBoxColorProfile listBox;
         Color listBoxFolders;
+        EditBoxColorProfile editBox;
     };
     void QueryDefaultColorProfile(DialogColorProfile& profile);
 
