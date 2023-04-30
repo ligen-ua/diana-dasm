@@ -124,6 +124,8 @@ namespace oui
     {
         return QueryFirstSymbol(str.c_str(), str.size(), exceptSym_in);
     }
+    bool StartsWith(const std::wstring& text, const std::wstring& phrase);
+    std::wstring Uppercase_Silent(const std::wstring& str);
 
     enum class BorderStyle
     {

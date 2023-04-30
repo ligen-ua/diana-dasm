@@ -22,6 +22,7 @@ namespace oui
         virtual void CancelAllQueries() = 0;
         virtual void ShiftViewWindow(int newOffset) = 0;
         virtual void OnVisibleItemChanged() = 0;
+        virtual bool ShiftViewWindowToSymbol(const String& symbol) = 0;
     };
 
     class CListBox:public MouseFocusable<WithBorder<CWindow>>

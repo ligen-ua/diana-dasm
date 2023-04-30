@@ -55,6 +55,7 @@ namespace oui
             const String& argument,
             int flags,
             const String& tag);
+        void HighlightItem(int highlightItemOffset);
 
     protected:
         void OnResize() override;
@@ -74,6 +75,7 @@ namespace oui
             std::shared_ptr<IFileSystem> fileSystem);
 
         void ShiftViewWindow(int newPosition) override;
+        bool ShiftViewWindowToSymbol(const String& symbol) override;
         int GetTotalCount() const override;
     };
 
