@@ -145,7 +145,41 @@ namespace oui
             }
             Base::OnHandleMouseEvent(res, rect, evt);
         }
-
     };
 
+
+
+    template<class Base>
+    class ChildSwitcher:public Base
+    {
+        std::vector<std::shared_ptr<CWindow>> m_childs;
+    public:
+        void RegisterSwitch(std::shared_ptr<CWindow> child)
+        {
+            m_childs.push_back(child);
+        }
+        bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override
+        {
+            if (evt.keyEvent.valid && evt.keyEvent.virtualKey == VirtualKey::Tab && !m_childs.empty())
+            {
+                if (auto poolPtr = this->GetPool())
+                {
+                    auto focused = poolPtr->GetFocus();
+                    auto it = std::find(m_childs.begin(), m_childs.end(), focused);
+                    if (it == m_childs.end())
+                    {
+                        m_childs[0]->SetFocus();
+                        return true;
+                    }
+                    if (++it == m_childs.end())
+                    {
+                        it = m_childs.begin();
+                    }
+                    (*it)->SetFocus();
+                    return true;
+                }
+            }
+            return Base::ProcessEvent(evt, evtContext);
+        }
+    };
 }

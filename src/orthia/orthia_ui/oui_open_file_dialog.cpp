@@ -331,6 +331,9 @@ namespace oui
 
         m_fileEdit = std::make_shared<CEditBox>(m_colorProfile);
         m_fileLabel = std::make_shared<CLabel>(m_colorProfile, [] { return String(OUI_STR(">"));  });
+
+        this->RegisterSwitch(m_fileEdit);
+        this->RegisterSwitch(m_filesBox);
     }
 
     void COpenFileDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
