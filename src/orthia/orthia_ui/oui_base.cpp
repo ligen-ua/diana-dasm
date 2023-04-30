@@ -148,6 +148,18 @@ namespace oui
         return (int)str.size();
     }
 
+    void FilterUnreadableSymbols(std::wstring& text)
+    {
+        text.erase(std::remove_if(text.begin(), text.end(), [](wchar_t ch) { 
+            if ((unsigned int)ch < (unsigned int)' ')
+            {
+                return true;
+            }
+            return false;
+
+        }), text.end());
+    }
+
     // other
     bool IsInside(const Range& range, int value)
     {

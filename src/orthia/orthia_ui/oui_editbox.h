@@ -17,8 +17,18 @@ namespace oui
         int m_windowRightIterator = 0;
 
         static String m_chunk;
+        void InsertText(const String& text);
+
+
+        int m_windowSymStart = 0;
+        int m_windowSymSize = 0;
 
         int GetCursorPosition() const;
+        void SetTextImpl(const String& text);
+
+        void ProcessEnter();
+        void ProcessDelete();
+        void ProcessBackpace();
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;

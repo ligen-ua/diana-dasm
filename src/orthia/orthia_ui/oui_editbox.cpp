@@ -9,7 +9,7 @@ namespace oui
         :
             m_colorProfile(colorProfile)
     {
-        SetBackgroundColor(m_colorProfile->editBox.normal.background);        
+        SetBackgroundColor(m_colorProfile->editBox.normal.background); 
     }
     void CEditBox::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
@@ -51,26 +51,51 @@ namespace oui
             {
                 auto text = GetText();
                 m_chunk = text;
+
                 if (cursorAsSymbol)
                 {
                     m_chunk.native.push_back(String::symSpace);
                 }
 
-                const int symbolBegin = m_windowRightIterator - windowsSymbolsCount;
-                int chunkStartOffset = 0;
-                for (int pos = 0; pos < symbolBegin; ++pos)
+                // scroll left if necessary
+                if (cursorOffsetToUse >= m_windowRightIterator)
                 {
-                    chunkStartOffset += m_symbols[pos].sizeInTChars;
+                    m_windowRightIterator = cursorOffsetToUse + 1;
                 }
+                int chunkStartOffset = 0;
+                for (;;)
+                {
+                    const int symbolBegin = m_windowRightIterator - windowsSymbolsCount;
+                    if (symbolBegin < 0)
+                    {
+                        // inconsistency here
+                        chunkStartOffset = 0; 
+                        break;
+                    }
+                    chunkStartOffset = m_symbols[symbolBegin].charOffset;
+                    cursorOffsetToUse = cursorOffset - chunkStartOffset;
 
+                    if (cursorOffsetToUse >= 0)
+                    {
+                        break;
+                    }
+                    --m_windowRightIterator;
+                }
+                // erase begin
                 m_chunk.native.erase(0, chunkStartOffset);
-                cursorOffsetToUse -= chunkStartOffset;
-
             }
+
+            m_windowSymStart = m_windowRightIterator - windowsSymbolsCount;
+            m_windowSymSize = windowsSymbolsCount;
+
+            CutString(m_chunk.native, windowsSymbolsCount);
             stringToRender = &m_chunk;
         }
         else
         {
+            m_windowSymStart = 0;
+            m_windowSymSize = (int)m_symbols.size();
+
             // fill free space
             Parent_type::DoPaint(rect, parameters);
         }
@@ -107,10 +132,117 @@ namespace oui
     }
     bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
+        if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
+        {
+            auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+            if (relativePoint.x < 0 || relativePoint.y < 0 || relativePoint.y != 0)
+            {
+                return false;
+            }
+            int newIterator = m_windowSymStart + relativePoint.x;
+            if (newIterator >= 0 && newIterator <= (int)m_symbols.size())
+            {
+                m_cursorIterator = newIterator;
+                Invalidate();
+            }
+        }
         return true;
     }
+    void CEditBox::InsertText(const String& text)
+    {
+        if (text.native.empty())
+        {
+            return;
+        }
+
+        int symbolsToInsert = CalculateSymbolsCount(text.native, 0);
+
+        // if no selection just insert
+        if (m_cursorIterator >= 0 && m_cursorIterator < (int)m_symbols.size())
+        {
+            auto newText = m_text;
+            newText.native.insert(m_symbols[m_cursorIterator].charOffset, text.native);
+            SetTextImpl(newText);
+        }
+        else
+        {
+            SetTextImpl(m_text.native + text.native);
+        }
+        m_cursorIterator += symbolsToInsert;
+    }
+
+    void CEditBox::ProcessEnter()
+    {
+    }
+    void CEditBox::ProcessDelete()
+    {
+        if (m_cursorIterator >= 0 && m_cursorIterator < (int)m_symbols.size())
+        {
+            auto newText = m_text;
+            newText.native.erase(m_symbols[m_cursorIterator].charOffset, 1);
+            SetTextImpl(newText);
+        }
+    }
+    void CEditBox::ProcessBackpace()
+    {
+        if (m_cursorIterator > 0 && m_cursorIterator <= (int)m_symbols.size())
+        {
+            auto newText = m_text;
+            newText.native.erase(m_symbols[m_cursorIterator-1].charOffset, 1);
+            SetTextImpl(newText);
+            --m_cursorIterator;
+        }
+    }
+
     bool CEditBox::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
+        if (evt.keyEvent.valid)
+        {
+            bool handled = false;
+            switch (evt.keyEvent.virtualKey)
+            {
+            case oui::VirtualKey::Enter:
+                ProcessEnter();
+                handled = true;
+                break;
+
+            case oui::VirtualKey::Delete:
+                ProcessDelete();
+                handled = true;
+                break;
+            case oui::VirtualKey::Backspace:
+                ProcessBackpace();
+                handled = true;
+                break;
+
+            case oui::VirtualKey::Left:
+                if (m_cursorIterator > 0)
+                {
+                    --m_cursorIterator;
+                }
+                handled = true;
+                break;
+            case oui::VirtualKey::Right:
+                if (m_cursorIterator < (int)m_symbols.size())
+                {
+                    ++m_cursorIterator;
+                    if (m_cursorIterator >= (int)m_symbols.size())
+                    {
+                        m_windowRightIterator = m_cursorIterator + 1;
+                    }
+                }
+                handled = true;
+                break;
+            }
+            if (!handled && !evt.keyEvent.rawText.native.empty())
+            {
+                auto text = evt.keyEvent.rawText;
+                FilterUnreadableSymbols(text.native);
+                InsertText(text);
+                handled = true;
+            }
+            Invalidate();
+        }
         return Parent_type::ProcessEvent(evt, evtContext);
     }
     void CEditBox::Clear()
@@ -140,10 +272,14 @@ namespace oui
         auto& sym = m_symbols[arrayOffset];
         return sym.charOffset + sym.sizeInTChars;
     }
-    void CEditBox::SetText(const String& text)
+    void CEditBox::SetTextImpl(const String& text)
     {
         CalculateSymbolsCount(text.native.c_str(), text.native.size(), m_symbols);
         m_text = text;
+    }
+    void CEditBox::SetText(const String& text)
+    {
+        SetTextImpl(text);
         m_cursorIterator = 0;
         m_windowRightIterator = 0;
     }
