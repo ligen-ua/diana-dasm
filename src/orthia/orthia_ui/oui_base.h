@@ -111,7 +111,8 @@ namespace oui
     }
     int CutString(std::wstring & str, int maxCharsCount);
     int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in);
-
+    void FilterUnreadableSymbols(std::wstring& text);
+    
     template<class Type>
     int CalculateSymbolsCount(const Type& str, const wchar_t exceptSym_in)
     {
