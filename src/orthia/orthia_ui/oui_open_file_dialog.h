@@ -26,9 +26,9 @@ namespace oui
         return info1.sortKey.native < info2.sortKey.native;
     }
 
-    class COpenFileDialog:public oui::SimpleBrush<CModalWindow>, IListBoxOwner
+    class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
-        using Parent_type = oui::SimpleBrush<CModalWindow>;
+        using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
         std::shared_ptr<DialogColorProfile> m_colorProfile;
 
         std::shared_ptr<CListBox> m_filesBox;
