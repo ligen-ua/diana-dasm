@@ -9,6 +9,8 @@ namespace oui
         std::shared_ptr<DialogColorProfile> m_colorProfile;
         std::function<String()> m_getText;
 
+        static String m_chunk;
+
         Rect m_lastRect;
         Point m_lastMouseMovePoint;
     public:

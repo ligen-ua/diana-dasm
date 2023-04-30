@@ -43,6 +43,7 @@ namespace oui
             Size zeroSize;
             m_filesBox->Resize(zeroSize);
             m_fileEdit->Resize(zeroSize);
+            m_fileLabel->Resize(zeroSize);
             return;
         }
 
@@ -57,13 +58,21 @@ namespace oui
 
         // file edit
         Rect fileEditRect = clientRect;
-        fileEditRect.position.x += 2;
+        fileEditRect.position.x += 3;
         fileEditRect.position.y += 2;
-        fileEditRect.size.width -= 4;
+        fileEditRect.size.width -= 5;
         fileEditRect.size.height = 1;
 
         m_fileEdit->MoveTo(fileEditRect.position);
         m_fileEdit->Resize(fileEditRect.size);
+
+        // small 1 symbol label
+        Rect labelRect = fileEditRect;
+        --labelRect.position.x;
+        labelRect.size.width = 1;
+        labelRect.size.height = 1;
+        m_fileLabel->MoveTo(labelRect.position);
+        m_fileLabel->Resize(labelRect.size);
 
         Parent_type::OnResize();
     }
@@ -321,6 +330,7 @@ namespace oui
         m_filesBox->InitColumns(2);
 
         m_fileEdit = std::make_shared<CEditBox>(m_colorProfile);
+        m_fileLabel = std::make_shared<CLabel>(m_colorProfile, [] { return String(OUI_STR(">"));  });
     }
 
     void COpenFileDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
@@ -331,7 +341,8 @@ namespace oui
     {
         AddChild(m_filesBox);
         AddChild(m_fileEdit);
-
+        AddChild(m_fileLabel);
+        
         if (m_rootFile.native.empty())
         {
             m_fileSystem->AsyncQueryDefaultRoot(GetThread(), 

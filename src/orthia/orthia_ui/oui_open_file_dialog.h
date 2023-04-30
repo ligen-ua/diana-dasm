@@ -4,6 +4,7 @@
 #include "oui_listbox.h"
 #include "oui_editbox.h"
 #include "oui_filesystem.h"
+#include "oui_label.h"
 
 namespace oui
 {
@@ -34,6 +35,8 @@ namespace oui
         FileRecipientHandler_type m_resultCallback;
         std::shared_ptr<IFileSystem> m_fileSystem;
         const String m_rootFile;
+
+        std::shared_ptr<CLabel> m_fileLabel;
         std::shared_ptr<CEditBox> m_fileEdit;
 
         bool m_firstResult = false;
