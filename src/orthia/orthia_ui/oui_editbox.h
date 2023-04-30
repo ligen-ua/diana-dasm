@@ -14,9 +14,11 @@ namespace oui
         Rect m_lastRect;
         std::vector<SymbolInfo> m_symbols;
         int m_cursorIterator = 0;
+        int m_windowRightIterator = 0;
+
+        static String m_chunk;
 
         int GetCursorPosition() const;
-
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;

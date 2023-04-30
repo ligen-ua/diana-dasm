@@ -3,6 +3,7 @@
 
 namespace oui
 {
+    String CEditBox::m_chunk;
 
     CEditBox::CEditBox(std::shared_ptr<DialogColorProfile> colorProfile)
         :
@@ -12,11 +13,67 @@ namespace oui
     }
     void CEditBox::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
-        Parent_type::DoPaint(rect, parameters);
-
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
-  
         m_lastRect = absClientRect;
+
+        // calculate real text view window
+        // [01234567[123_567]]
+        //              ^-- cursorIterator
+        // [[123_567]01234567]
+        //      ^-- cursorIterator
+
+        const int cursorOffset = m_cursorIterator;
+        
+        bool cursorAsSymbol = false;
+        int totalSymbolsToDisplay = (int)m_symbols.size();
+        if (cursorOffset >= totalSymbolsToDisplay)
+        {
+            cursorAsSymbol = true;
+            ++totalSymbolsToDisplay;
+        }
+
+        int cursorOffsetToUse = cursorOffset;
+        String* stringToRender = &m_text;
+        const int windowsSymbolsCount = rect.size.width;
+        if (windowsSymbolsCount < totalSymbolsToDisplay)
+        {
+            // windowed mode
+            if (m_windowRightIterator < windowsSymbolsCount)
+            {
+                m_windowRightIterator = windowsSymbolsCount;
+            }
+            else
+            if (m_windowRightIterator >= totalSymbolsToDisplay)
+            {
+                m_windowRightIterator = totalSymbolsToDisplay;
+            }
+
+            {
+                auto text = GetText();
+                m_chunk = text;
+                if (cursorAsSymbol)
+                {
+                    m_chunk.native.push_back(String::symSpace);
+                }
+
+                const int symbolBegin = m_windowRightIterator - windowsSymbolsCount;
+                int chunkStartOffset = 0;
+                for (int pos = 0; pos < symbolBegin; ++pos)
+                {
+                    chunkStartOffset += m_symbols[pos].sizeInTChars;
+                }
+
+                m_chunk.native.erase(0, chunkStartOffset);
+                cursorOffsetToUse -= chunkStartOffset;
+
+            }
+            stringToRender = &m_chunk;
+        }
+        else
+        {
+            // fill free space
+            Parent_type::DoPaint(rect, parameters);
+        }
 
         if (auto pool = GetPool())
         {
@@ -24,8 +81,7 @@ namespace oui
             {
                 if (IsFocused())
                 {
-                    const int offset = GetCursorPosition();
-                    const int cursorX = m_lastRect.position.x + offset;
+                    const int cursorX = m_lastRect.position.x + cursorOffsetToUse;
                     console->SetCursorPositon(Point{ cursorX, m_lastRect.position.y });
 
                     console->ShowCursor();
@@ -46,7 +102,7 @@ namespace oui
             parameters.console.PaintText(target,
                 state->text,
                 state->background,
-                text.native);
+                stringToRender->native);
         }
     }
     bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
@@ -68,6 +124,7 @@ namespace oui
     void CEditBox::ScrollRight()
     {
         m_cursorIterator = (int)m_symbols.size();
+        m_windowRightIterator = m_cursorIterator + 1;
     }
     int CEditBox::GetCursorPosition() const
     {
@@ -87,6 +144,8 @@ namespace oui
     {
         CalculateSymbolsCount(text.native.c_str(), text.native.size(), m_symbols);
         m_text = text;
+        m_cursorIterator = 0;
+        m_windowRightIterator = 0;
     }
     void CEditBox::OnFocusLost()
     {
