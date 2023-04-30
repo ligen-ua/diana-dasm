@@ -3,20 +3,6 @@
 
 namespace oui
 {
-
-    static std::wstring Uppercase_Silent(const std::wstring& str)
-    {
-        if (str.empty())
-            return std::wstring();
-
-        std::vector<wchar_t> temp(str.c_str(), str.c_str() + str.size());
-        DWORD dwSize = (DWORD)(str.size());
-        if (CharUpperBuffW(&temp.front(), dwSize) != dwSize)
-        {
-            return str;
-        }
-        return std::wstring(&temp.front(), &temp.front() + dwSize);
-    }
     static void GenSortKey(FileDialogInfo& fileInfo)
     {
         auto& info = fileInfo.info;
@@ -177,29 +163,35 @@ namespace oui
             }
             auto it = std::find_if(m_currentFiles.begin(), m_currentFiles.end(), [&](auto& value) { return value.info.fileName.native == highlighName.native;  });
             int highlightItemOffset = (int)(it - m_currentFiles.begin());
-            int maxVisibleOffset = std::min(m_filesBox->GetVisibleSize() + m_filesBox->GetOffset(), (int)m_currentFiles.size());
-            if (highlightItemOffset >= m_filesBox->GetOffset() && highlightItemOffset < maxVisibleOffset)
-            {
-                m_filesBox->SetSelectedPosition(highlightItemOffset - m_filesBox->GetOffset());
-            }
-            else
-            {
-                // try to reuse at least position
-                int newOffset = highlightItemOffset - m_filesBox->GetSelectedPosition();
-                if (newOffset < 0)
-                {
-                    newOffset = 0;
-                    m_filesBox->SetSelectedPosition(highlightItemOffset);
-                }
-                else if (newOffset >= (int)m_currentFiles.size())
-                {
-                    newOffset = highlightItemOffset;
-                    m_filesBox->SetSelectedPosition(0);
-                }
-                m_filesBox->SetOffset(newOffset);
-            }
+
+            HighlightItem(highlightItemOffset);
         }
         UpdateVisibleItems();
+    }
+
+    void COpenFileDialog::HighlightItem(int highlightItemOffset)
+    {
+        int maxVisibleOffset = std::min(m_filesBox->GetVisibleSize() + m_filesBox->GetOffset(), (int)m_currentFiles.size());
+        if (highlightItemOffset >= m_filesBox->GetOffset() && highlightItemOffset < maxVisibleOffset)
+        {
+            m_filesBox->SetSelectedPosition(highlightItemOffset - m_filesBox->GetOffset());
+        }
+        else
+        {
+            // try to reuse at least position
+            int newOffset = highlightItemOffset - m_filesBox->GetSelectedPosition();
+            if (newOffset < 0)
+            {
+                newOffset = 0;
+                m_filesBox->SetSelectedPosition(highlightItemOffset);
+            }
+            else if (newOffset >= (int)m_currentFiles.size())
+            {
+                newOffset = highlightItemOffset;
+                m_filesBox->SetSelectedPosition(0);
+            }
+            m_filesBox->SetOffset(newOffset);
+        }
     }
     void COpenFileDialog::UpdateVisibleItems()
     {
@@ -384,6 +376,35 @@ namespace oui
         m_fileEdit->Invalidate();
     }
      
+    bool COpenFileDialog::ShiftViewWindowToSymbol(const String& symbol) 
+    {
+        const int totalFilesAvailable = (int)m_currentFiles.size();
+        const int selectionOffset = m_filesBox->GetOffset() + m_filesBox->GetSelectedPosition();
+
+        // scan forward till end
+        for (int i = selectionOffset + 1; i < totalFilesAvailable; ++i)
+        {
+            if (StartsWith(m_currentFiles[i].info.fileName.native, symbol.native))
+            {
+                HighlightItem(i);
+                UpdateVisibleItems();
+                return true;
+            }
+        }
+
+        // scan from start
+        for (int i = 0; i <= selectionOffset; ++i)
+        {
+            if (StartsWith(m_currentFiles[i].info.fileName.native, symbol.native))
+            {
+                HighlightItem(i);
+                UpdateVisibleItems();
+                return true;
+            }
+        }
+        return false;
+    }
+
     void COpenFileDialog::ShiftViewWindow(int newOffset)
     {
         const int visibleSize = m_filesBox->GetVisibleSize();

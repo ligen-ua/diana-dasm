@@ -14,6 +14,8 @@ namespace oui
 #define OUI_STR(X) std::wstring(OUI_TCSTR(X))
 #define OUI_TO_STR(X) std::to_wstring(X)
 #define OUI_SCANF swscanf
+#define OUI_STRNCMP(X1, X2, X3)  wcsncmp(X1, X2, X3)
+
 
 #else
         std::string native;
@@ -21,6 +23,7 @@ namespace oui
 #define OUI_STR(X) std::string(X)
 #define OUI_TO_STR(X) std::to_string(X)
 #define OUI_SCANF sscanf
+#define OUI_STRNCMP(X1, X2, X3)  strncmp(X1, X2, X3)
 
 #endif
         typedef typename decltype(native)::value_type char_type;

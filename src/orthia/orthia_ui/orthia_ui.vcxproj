@@ -158,6 +158,7 @@
     <ClCompile Include="gtest\gtest-all.cc" />
     <ClCompile Include="oui_app.cpp" />
     <ClCompile Include="oui_base.cpp" />
+    <ClCompile Include="oui_base_win32.cpp" />
     <ClCompile Include="oui_color.cpp" />
     <ClCompile Include="oui_console.cpp" />
     <ClCompile Include="oui_containers.cpp" />

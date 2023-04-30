@@ -294,6 +294,7 @@ namespace oui
         {
             int newOffset = m_offset;
             int newPosition = m_selectedPosition;
+            bool handled = false;
             switch (evt.keyEvent.virtualKey)
             {
             case VirtualKey::Enter:
@@ -301,45 +302,67 @@ namespace oui
                 return true;
 
             case VirtualKey::PageUp:
+                handled = true;
                 newOffset -= GetVisibleSize();
                 break;
 
             case VirtualKey::PageDown:
+                handled = true;
                 newOffset += GetVisibleSize();
                 break;
 
             case VirtualKey::Home:
+                handled = true;
                 newOffset = 0;
                 newPosition = 0;
                 SetSelectedPosition(0);
                 break;
 
             case VirtualKey::End:
+                handled = true;
                 newOffset = m_owner->GetTotalCount();
                 break;
 
             // arrows
             case VirtualKey::Left:
+                handled = true;
                 newPosition -= GetVisibleSize() / 2;
                 break;
 
             case VirtualKey::Right:
+                handled = true;
                 newPosition += GetVisibleSize() / 2;
                 break;
 
             case VirtualKey::Up:
+                handled = true;
                 --newPosition;
                 break;
 
             case VirtualKey::Down:
+                handled = true;
                 ++newPosition;
                 break;
             default:
-                return false;
+                break;
             }
 
-            UIShiftWindow(newOffset, newPosition);
-            return true;
+            if (handled)
+            {
+                UIShiftWindow(newOffset, newPosition);
+                return true;
+            }
+            // check text
+            auto text = evt.keyEvent.rawText;
+            FilterUnreadableSymbols(text.native);
+            if (!text.native.empty())
+            {
+                if (m_owner->ShiftViewWindowToSymbol(text.native))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
         return Parent_type::ProcessEvent(evt, evtContext);
     }
