@@ -108,10 +108,14 @@ namespace oui
         FixupAfterResize();
         SetDefaultPalette();
 
-        auto wnd = GetRealWindow();
-        if (IsWindowVisible(wnd))
+        m_consoleWindow = GetRealWindow();
+        if (!m_consoleWindow)
         {
-            SendMessage(wnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+            m_consoleWindow = GetConsoleWindow();
+        }
+        if (IsWindowVisible(m_consoleWindow))
+        {
+            SendMessage(m_consoleWindow, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
         }
     }
     void CConsole::ShowCursor()
@@ -154,6 +158,36 @@ namespace oui
             result.y = bufferInfo.dwCursorPosition.Y;   
             result.y -= GetYDifference();
         }
+        return result;
+    }
+    bool CConsole::CopyTextToClipboard(const String& text)
+    {
+        bool result = false;
+        if (!::OpenClipboard(m_consoleWindow))
+        {
+            return result;
+        }
+        if (!::EmptyClipboard())
+        {
+            return result;
+        }
+        // Get the currently selected data
+        int sizeInBytes = ((int)text.native.size() + 1) * 2;
+        HGLOBAL hGlob = GlobalAlloc(GMEM_FIXED, sizeInBytes);
+        if (hGlob)
+        {
+            memcpy((char*)hGlob, text.native.c_str(), sizeInBytes);
+            if (::SetClipboardData(CF_UNICODETEXT, hGlob))
+            {
+                hGlob = 0;
+                result = true;
+            }
+        }
+        if (hGlob)
+        {
+            GlobalFree(hGlob);
+        }
+        CloseClipboard();
         return result;
     }
 

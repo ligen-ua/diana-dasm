@@ -10,6 +10,7 @@ namespace oui
 {
     class CConsole
     {
+        HWND m_consoleWindow = 0;
         std::unordered_map<Color, int, ColorHash> m_colorCache;
 
         int TranslateColor(const Color& color);
@@ -31,6 +32,8 @@ namespace oui
 
         void SetCursorPositon(const Point& pt);
         Point GetCursorPositon();
+
+        bool CopyTextToClipboard(const String& text);
     };
 
     struct PanelBorderSymbols

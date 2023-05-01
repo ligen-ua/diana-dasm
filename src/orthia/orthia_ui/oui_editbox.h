@@ -16,7 +16,11 @@ namespace oui
         int m_cursorIterator = 0;
         int m_windowRightIterator = 0;
 
-        static String m_chunk;
+        // selection
+        int m_selPosStart = 0;
+        int m_selPosEnd = 0;
+
+        static String m_chunk, m_chunk2;
         void InsertText(const String& text);
 
 
@@ -29,6 +33,9 @@ namespace oui
         void ProcessEnter();
         void ProcessDelete();
         void ProcessBackpace();
+        void ResetSelection();
+        int GetSymOffset(int symbol) const;
+
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
@@ -40,6 +47,9 @@ namespace oui
         void ScrollRight();
         void OnFocusLost() override;
         void OnFocusEnter() override;
+        bool SelectionIsActive() const;
+        String ExtractSelected(bool cut);
+        void SelectAll();
     };
 
 }

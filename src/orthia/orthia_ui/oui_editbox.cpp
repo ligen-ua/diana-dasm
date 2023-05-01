@@ -1,15 +1,76 @@
 #include "oui_editbox.h"
 #include "oui_console.h"
 
+// TODO: Add LTR support after switching to new terminal style
 namespace oui
 {
     String CEditBox::m_chunk;
+    String CEditBox::m_chunk2;
 
     CEditBox::CEditBox(std::shared_ptr<DialogColorProfile> colorProfile)
         :
             m_colorProfile(colorProfile)
     {
         SetBackgroundColor(m_colorProfile->editBox.normal.background); 
+    }
+    bool CEditBox::SelectionIsActive() const
+    {
+        return m_selPosStart != m_selPosEnd;
+    }
+    String CEditBox::ExtractSelected(bool cut)
+    {
+        if (!SelectionIsActive())
+        {
+            return String();
+        }
+
+        int selPosStart = m_selPosStart;
+        int selPosEnd = m_selPosEnd;
+        if (selPosStart > selPosEnd)
+        {
+            selPosStart = m_selPosEnd;
+            selPosEnd = m_selPosStart;
+        }
+        int start = GetSymOffset(selPosStart);
+        int end = GetSymOffset(selPosEnd);
+        if (end < start)
+        {
+            return String();
+        }
+        auto it = m_text.native.begin() + start;
+        auto it_end = m_text.native.begin() + end;
+        String res(decltype(String::native)(it, it_end));
+        if (cut)
+        {
+            String text = m_text;
+            text.native.erase(start, end - start);
+            SetTextImpl(text);
+            if (m_cursorIterator > (int)m_symbols.size())
+            {
+                m_cursorIterator = (int)m_symbols.size();
+                m_windowRightIterator = m_cursorIterator + 1;
+            }
+            ResetSelection();
+            Invalidate();
+        }
+        return res;
+    }
+    int CEditBox::GetSymOffset(int symbol) const
+    {
+        if (symbol <= 0)
+        {
+            return 0;
+        }
+        if (symbol >= (int)m_symbols.size())
+        {
+            if (m_symbols.empty())
+            {
+                return 0;
+            }
+            return m_symbols.back().charOffset + m_symbols.back().sizeInTChars;
+        }
+        auto& sym = m_symbols[symbol];
+        return sym.charOffset;
     }
     void CEditBox::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
@@ -35,6 +96,7 @@ namespace oui
         int cursorOffsetToUse = cursorOffset;
         String* stringToRender = &m_text;
         const int windowsSymbolsCount = rect.size.width;
+        int chunkStartOffset = 0;
         if (windowsSymbolsCount < totalSymbolsToDisplay)
         {
             // windowed mode
@@ -62,7 +124,6 @@ namespace oui
                 {
                     m_windowRightIterator = cursorOffsetToUse + 1;
                 }
-                int chunkStartOffset = 0;
                 for (;;)
                 {
                     const int symbolBegin = m_windowRightIterator - windowsSymbolsCount;
@@ -118,16 +179,101 @@ namespace oui
             }
         }
 
+        if (!SelectionIsActive())
         {
+            // simple case if no selection
             Point target = absClientRect.position;
             auto state = &m_colorProfile->editBox.normal;
-
-            auto text = GetText();
 
             parameters.console.PaintText(target,
                 state->text,
                 state->background,
                 stringToRender->native);
+            return;
+        }
+
+        struct SelectionRange
+        {
+            int start = 0;
+            int end = 0;
+            int symbolsCount = 0;
+            bool selected = false;
+        };
+
+        int selPosStart = m_selPosStart;
+        int selPosEnd = m_selPosEnd;
+        if (selPosStart > selPosEnd)
+        {
+            selPosStart = m_selPosEnd;
+            selPosEnd = m_selPosStart;
+        }
+
+        SelectionRange ranges[3];
+        ranges[0].start = GetSymOffset(0);
+        ranges[0].end = GetSymOffset(selPosStart) - chunkStartOffset;
+        ranges[0].symbolsCount = 0;
+        if (ranges[0].end < 0)
+        {
+            ranges[0].end = 0;
+        }
+        if (selPosStart > m_windowSymStart)
+        {
+            ranges[0].symbolsCount = selPosStart - m_windowSymStart;
+        }
+
+        ranges[1].start = GetSymOffset(selPosStart) - chunkStartOffset;
+        ranges[1].end = GetSymOffset(selPosEnd) - chunkStartOffset;
+        ranges[1].selected = true;
+        ranges[1].symbolsCount = selPosEnd - selPosStart;
+        if (ranges[1].start < 0)
+        {
+            ranges[1].start = 0;
+        }
+        if (selPosStart < m_windowSymStart)
+        {
+            ranges[1].symbolsCount -= m_windowSymStart - selPosStart;
+        }       
+        if (selPosEnd > m_windowSymStart + m_windowSymSize)
+        {
+            ranges[1].symbolsCount -= selPosEnd - (m_windowSymStart + m_windowSymSize);
+        }
+
+        ranges[2].start = GetSymOffset(selPosEnd) - chunkStartOffset;
+        ranges[2].end = GetSymOffset((int)m_symbols.size());
+        ranges[2].symbolsCount = m_windowSymSize - ranges[0].symbolsCount - ranges[1].symbolsCount;
+
+        Point target = absClientRect.position;
+        for (int i = 0; i < 3; ++i)
+        {
+            auto range = ranges[i];
+
+            if (range.symbolsCount <= 0)
+            {
+                continue;
+            }
+            int endPos = range.end;
+            if (endPos > (int)stringToRender->native.size())
+            {
+                endPos = (int)stringToRender->native.size();
+            }
+            if (range.start >= range.end)
+            {
+                continue;
+            }
+            m_chunk2.native.assign(stringToRender->native.begin() + range.start,
+                stringToRender->native.begin() + endPos);
+            
+            auto state = &m_colorProfile->editBox.normal;
+            if (range.selected)
+            {
+                state = &m_colorProfile->editBox.selectedText;
+            }
+            parameters.console.PaintText(target,
+                state->text,
+                state->background,
+                m_chunk2.native);
+
+            target.x += range.symbolsCount;
         }
     }
     bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
@@ -143,6 +289,15 @@ namespace oui
             if (newIterator >= 0 && newIterator <= (int)m_symbols.size())
             {
                 m_cursorIterator = newIterator;
+
+                if (evt.keyState.state & evt.keyState.AnyShift)
+                {
+                    m_selPosEnd = m_cursorIterator;
+                }
+                else
+                {
+                    ResetSelection();
+                }
                 Invalidate();
             }
         }
@@ -153,6 +308,11 @@ namespace oui
         if (text.native.empty())
         {
             return;
+        }
+
+        if (SelectionIsActive())
+        {
+            ExtractSelected(true);
         }
 
         int symbolsToInsert = CalculateSymbolsCount(text.native, 0);
@@ -176,6 +336,11 @@ namespace oui
     }
     void CEditBox::ProcessDelete()
     {
+        if (SelectionIsActive())
+        {
+            ExtractSelected(true);
+            return;
+        }
         if (m_cursorIterator >= 0 && m_cursorIterator < (int)m_symbols.size())
         {
             auto newText = m_text;
@@ -185,6 +350,11 @@ namespace oui
     }
     void CEditBox::ProcessBackpace()
     {
+        if (SelectionIsActive())
+        {
+            ExtractSelected(true);
+            return;
+        }
         if (m_cursorIterator > 0 && m_cursorIterator <= (int)m_symbols.size())
         {
             auto newText = m_text;
@@ -198,9 +368,38 @@ namespace oui
     {
         if (evt.keyEvent.valid)
         {
+            int prevCursor = m_cursorIterator;
             bool handled = false;
+            bool cursorMove = false;
             switch (evt.keyEvent.virtualKey)
             {
+            case oui::VirtualKey::Escape:
+                if (SelectionIsActive())
+                {
+                    ResetSelection();
+                    return true;
+                }
+                break;
+            case oui::VirtualKey::kA:
+                if (evt.keyState.state & evt.keyState.AnyCtrl)
+                {
+                    SelectAll();
+                    handled = true;
+                }
+                break;
+            case oui::VirtualKey::kC:
+                if (evt.keyState.state & evt.keyState.AnyCtrl)
+                {
+                    if (auto pool = GetPool())
+                    {
+                        if (auto console = pool->GetConsole())
+                        {
+                            console->CopyTextToClipboard(ExtractSelected(false));
+                        }
+                    }
+                    handled = true;
+                }
+                break;
             case oui::VirtualKey::Enter:
                 ProcessEnter();
                 handled = true;
@@ -221,6 +420,7 @@ namespace oui
                     --m_cursorIterator;
                 }
                 handled = true;
+                cursorMove = true;
                 break;
             case oui::VirtualKey::Right:
                 if (m_cursorIterator < (int)m_symbols.size())
@@ -232,7 +432,35 @@ namespace oui
                     }
                 }
                 handled = true;
+                cursorMove = true;
                 break;
+            case oui::VirtualKey::End:
+                m_cursorIterator = (int)m_symbols.size();
+                m_windowRightIterator = m_cursorIterator + 1;
+                handled = true;
+                cursorMove = true;
+                break;
+            case oui::VirtualKey::Home:
+                m_cursorIterator = 0;
+                handled = true;
+                cursorMove = true;
+                break;
+            }
+
+            if (cursorMove)
+            {
+                if (evt.keyState.state & evt.keyState.AnyShift)
+                {
+                    if (!SelectionIsActive())
+                    {
+                        m_selPosStart = prevCursor;
+                    }
+                    m_selPosEnd = m_cursorIterator;
+                }
+                else
+                {
+                    ResetSelection();
+                }
             }
             if (!handled && !evt.keyEvent.rawText.native.empty())
             {
@@ -282,7 +510,22 @@ namespace oui
         SetTextImpl(text);
         m_cursorIterator = 0;
         m_windowRightIterator = 0;
+        ResetSelection();
     }
+    void CEditBox::SelectAll()
+    {
+        m_selPosStart = 0;
+        m_selPosEnd = (int)m_symbols.size();
+        m_cursorIterator = m_selPosEnd;
+        Invalidate();
+    }
+    void CEditBox::ResetSelection()
+    {
+        m_selPosStart = m_cursorIterator;
+        m_selPosEnd = m_cursorIterator;
+        Invalidate();
+    }
+
     void CEditBox::OnFocusLost()
     {
         Invalidate();
@@ -294,6 +537,8 @@ namespace oui
                 console->HideCursor();
             }
         }
+
+        ResetSelection();
 
         Parent_type::OnFocusLost();
     }
