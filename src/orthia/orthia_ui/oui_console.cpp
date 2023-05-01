@@ -160,6 +160,36 @@ namespace oui
         }
         return result;
     }
+    String CConsole::PasteTextFromClipboard()
+    {
+        String result;
+        if (!::OpenClipboard(m_consoleWindow))
+        {
+            return result;
+        }
+
+        WORD wFmt = 0;
+        while ((wFmt = EnumClipboardFormats(wFmt)) != 0)
+        {
+            if (wFmt == CF_TEXT || wFmt == CF_UNICODETEXT)
+            {
+                HANDLE hText = GetClipboardData(CF_UNICODETEXT);
+                if (hText)
+                {
+                    const wchar_t* pText = (const wchar_t*)GlobalLock(hText);
+                    SIZE_T size = GlobalSize(hText);
+                    if (pText && size)
+                    {
+                        result.native.assign(pText, pText + size/2);
+                    }
+                    GlobalUnlock(hText);
+                }
+                break;
+            }
+        }
+        CloseClipboard();
+        return result;
+    }
     bool CConsole::CopyTextToClipboard(const String& text)
     {
         bool result = false;

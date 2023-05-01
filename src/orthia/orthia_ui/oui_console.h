@@ -34,6 +34,8 @@ namespace oui
         Point GetCursorPositon();
 
         bool CopyTextToClipboard(const String& text);
+        String PasteTextFromClipboard();
+
     };
 
     struct PanelBorderSymbols

@@ -303,8 +303,11 @@ namespace oui
         }
         return true;
     }
-    void CEditBox::InsertText(const String& text)
+    void CEditBox::InsertText(const String& text_in)
     {
+        String text = text_in;
+        FilterUnreadableSymbols(text.native);
+
         if (text.native.empty())
         {
             return;
@@ -387,6 +390,24 @@ namespace oui
                     handled = true;
                 }
                 break;
+            case oui::VirtualKey::kV:
+                if (evt.keyState.state & evt.keyState.AnyCtrl)
+                {
+                    String text;
+                    if (auto pool = GetPool())
+                    {
+                        if (auto console = pool->GetConsole())
+                        {
+                            text = console->PasteTextFromClipboard();
+                        }
+                    }
+                    if (!text.native.empty())
+                    {
+                        InsertText(text);
+                        handled = true;
+                    }
+                }
+                break;
             case oui::VirtualKey::kC:
                 if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
@@ -464,9 +485,7 @@ namespace oui
             }
             if (!handled && !evt.keyEvent.rawText.native.empty())
             {
-                auto text = evt.keyEvent.rawText;
-                FilterUnreadableSymbols(text.native);
-                InsertText(text);
+                InsertText(evt.keyEvent.rawText);
                 handled = true;
             }
             Invalidate();
