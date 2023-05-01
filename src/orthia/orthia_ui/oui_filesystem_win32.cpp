@@ -199,6 +199,7 @@ namespace oui
             FileInfo info;
             std::wstring path;
             ULARGE_INTEGER size;
+            bool wasReply = false;
             for (;;)
             {
                 path = win32Info.cFileName;
@@ -234,6 +235,7 @@ namespace oui
                         return;
                     }
                     result.clear();
+                    wasReply = true;
                 }
 
                 if (!FindNextFileW(hSearch, &win32Info))
@@ -241,7 +243,7 @@ namespace oui
                     break;
                 }
             }
-            if (!result.empty())
+            if (!wasReply || !result.empty())
             {
                 handler->Reply(handler, fileId, result, 0, tag);
             }
