@@ -160,7 +160,6 @@ namespace oui
 
         }), text.end());
     }
-
     std::wstring Uppercase_Silent(const std::wstring& str)
     {
         if (str.empty())
