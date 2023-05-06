@@ -4,21 +4,23 @@
 #include "oui_color.h"
 #include "oui_string.h"
 
-#include "windows.h"
-
 namespace oui
 {
     class CConsole
     {
         HWND m_consoleWindow = 0;
         std::unordered_map<Color, int, ColorHash> m_colorCache;
+        bool m_newTerminal = false;
+        std::unique_ptr<ISymbolsAnalyzer> m_symbolsAnalyzer;
 
         int TranslateColor(const Color& color);
         void SetPalette(std::array<COLORREF, 16>& colors);
         void SetDefaultPalette();
         short GetYDifference() const;
+        void DetectVersion();
     public:
         CConsole();
+        ISymbolsAnalyzer& GetSymbolsAnalyzer();
         void Init();
         Size GetSize();
         void FixupAfterResize();

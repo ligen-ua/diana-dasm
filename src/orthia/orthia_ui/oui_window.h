@@ -137,9 +137,14 @@ namespace oui
             std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler,
             int endX,
             int endY);
+        CConsole* GetConsole();
+
+        static CConsole* g_defConsole;
     public:
         CWindow();
         virtual ~CWindow();
+
+        static void InitDefConsole(CConsole* defConsole);
 
         virtual bool IsPopup() const { return false;  }
         virtual void OnMouseLeave();

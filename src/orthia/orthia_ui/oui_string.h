@@ -2,9 +2,7 @@
 
 #include "oui_base.h"
 
-
 namespace oui
-
 {
     struct String
     {
@@ -15,7 +13,6 @@ namespace oui
 #define OUI_TO_STR(X) std::to_wstring(X)
 #define OUI_SCANF swscanf
 #define OUI_STRNCMP(X1, X2, X3)  wcsncmp(X1, X2, X3)
-
 
 #else
         std::string native;
@@ -42,6 +39,39 @@ namespace oui
             :
             native(p)
         {
+        }
+    };
+
+
+
+    // symbols
+    struct SymbolInfo
+    {
+        int charOffset = 0;
+        int visibleOffset = 0;
+        int16_t sizeInTChars = 0;
+        int16_t visibleSize = 0;
+    };
+
+    struct ISymbolsAnalyzer
+    {
+        virtual ~ISymbolsAnalyzer() {}
+        
+        virtual int CutVisibleString(String::string_type& str, 
+            int visibleSymCount) = 0;
+        
+        virtual int CalculateSymbolsCount(const String::char_type* pStart, 
+            size_t sizeInWchars, 
+            const String::char_type exceptSym_in) = 0;
+        
+        virtual int CalculateSymbolsCount(const String::char_type* pStart,
+            size_t sizeInWchars,
+            std::vector<SymbolInfo>& symbols) = 0;
+
+        template<class Type, class CharType>
+        int CalculateSymbolsCount(const Type& str, const CharType exceptSym_in)
+        {
+            return this->CalculateSymbolsCount(str.c_str(), str.size(), exceptSym_in);
         }
     };
 }

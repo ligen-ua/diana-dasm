@@ -13,6 +13,11 @@ namespace oui
     }
     void CLabel::DoPaint(const Rect& rect, DrawParameters& parameters) 
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
         Point target = absClientRect.position;
 
@@ -21,7 +26,7 @@ namespace oui
             m_chunk = text;
         }
         int symbolsLeft = absClientRect.size.width;
-        CutString(m_chunk.native, symbolsLeft);
+        console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, symbolsLeft);
 
         bool mouseInside = IsInside(absClientRect, m_lastMouseMovePoint);
         auto state = &m_colorProfile->label.normal;

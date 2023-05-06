@@ -391,6 +391,12 @@ namespace oui
     String CPanelGroupWindow::m_chunk;
     void CPanelGroupWindow::PaintTitle(const Rect& rect, DrawParameters& parameters)
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+
         if (rect.size.width <= 0 || rect.size.height <= 0)
         {
             return;
@@ -484,7 +490,8 @@ namespace oui
             {
                 break;
             }
-            int tableCharsCount = CutString(m_chunk.native, symbolsLeft);
+            
+            int tableCharsCount = console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, symbolsLeft);
 
             if (IsMouseOn() &&
                 m_lastMouseMovePoint.y == target.y &&

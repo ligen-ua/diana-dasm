@@ -95,7 +95,12 @@ namespace oui
     }
     void CMenuButtonWindow::Dock()
     {
-        int symbols = CalculateSymbolsCount(m_caption.native, g_HotKeySymbol);
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+        int symbols = console->GetSymbolsAnalyzer().CalculateSymbolsCount(m_caption.native, g_HotKeySymbol);
         Size size = { m_spaceAroundName * 2 + symbols, 1 };
         this->Resize(size);
     }
@@ -306,7 +311,7 @@ namespace oui
         }
         return Parent_type::ProcessEvent(evt, evtContext);
     }
-    static int ToString(const PopupItem& item, int fixedWidth, String& result)
+    static int ToString(CConsole * console, const PopupItem& item, int fixedWidth, String& result)
     {
         const int g_spacesBefore = 2;
         const int g_spacesAfter = 2;
@@ -329,7 +334,7 @@ namespace oui
         result.native.append(g_spacesBefore, String::symSpace);
 
         // -- 
-        symCount += CalculateSymbolsCount(item.text.native, g_HotKeySymbol);
+        symCount += console->GetSymbolsAnalyzer().CalculateSymbolsCount(item.text.native, g_HotKeySymbol);
         result.native += item.text.native;
 
         if (fixedWidth)
@@ -349,6 +354,11 @@ namespace oui
     }
     void CMenuPopup::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         // paint border
         Parent_type::DoPaint(rect, parameters);
 
@@ -380,7 +390,7 @@ namespace oui
         for (auto popup : *popupItems)
         {
             MenuButtonProfile* profile = &colorProfile->popup.normal;
-            int symbolsCount = ToString(popup, clientRect.size.width, tmp);
+            int symbolsCount = ToString(console, popup, clientRect.size.width, tmp);
 
             if (popup.handler == nullptr)
             {
@@ -439,6 +449,11 @@ namespace oui
     }
     void CMenuPopup::Dock()
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         m_selectedPosition = 0;
         auto menu = m_menuWindow.lock();
         if (!menu)
@@ -463,7 +478,7 @@ namespace oui
         String tmp;
         for (auto popup: *popupItems)
         {
-            int symbolsCount = ToString(popup, 0, tmp);
+            int symbolsCount = ToString(console, popup, 0, tmp);
             if (symbolsCount > maxWidth)
             {
                 maxWidth = symbolsCount;

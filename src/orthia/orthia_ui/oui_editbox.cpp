@@ -74,6 +74,11 @@ namespace oui
     }
     void CEditBox::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
+        CConsole* console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
         m_lastRect = absClientRect;
 
@@ -149,7 +154,7 @@ namespace oui
             m_windowSymStart = m_windowRightIterator - windowsSymbolsCount;
             m_windowSymSize = windowsSymbolsCount;
 
-            CutString(m_chunk.native, windowsSymbolsCount);
+            console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, windowsSymbolsCount);
             stringToRender = &m_chunk;
         }
         else
@@ -161,21 +166,18 @@ namespace oui
             Parent_type::DoPaint(rect, parameters);
         }
 
-        if (auto pool = GetPool())
+        if (auto console = GetConsole())
         {
-            if (auto console = pool->GetConsole())
+            if (IsFocused())
             {
-                if (IsFocused())
-                {
-                    const int cursorX = m_lastRect.position.x + cursorOffsetToUse;
-                    console->SetCursorPositon(Point{ cursorX, m_lastRect.position.y });
+                const int cursorX = m_lastRect.position.x + cursorOffsetToUse;
+                console->SetCursorPositon(Point{ cursorX, m_lastRect.position.y });
 
-                    console->ShowCursor();
-                }
-                else
-                {
-                    console->HideCursor();
-                }
+                console->ShowCursor();
+            }
+            else
+            {
+                console->HideCursor();
             }
         }
 
@@ -305,6 +307,12 @@ namespace oui
     }
     void CEditBox::InsertText(const String& text_in)
     {
+        CConsole* console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+
         String text = text_in;
         FilterUnreadableSymbols(text.native);
 
@@ -318,7 +326,7 @@ namespace oui
             ExtractSelected(true);
         }
 
-        int symbolsToInsert = CalculateSymbolsCount(text.native, 0);
+        int symbolsToInsert = console->GetSymbolsAnalyzer().CalculateSymbolsCount(text.native, 0);
 
         // if no selection just insert
         if (m_cursorIterator >= 0 && m_cursorIterator < (int)m_symbols.size())
@@ -394,12 +402,10 @@ namespace oui
                 if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
                     String text;
-                    if (auto pool = GetPool())
+
+                    if (auto console = GetConsole())                        
                     {
-                        if (auto console = pool->GetConsole())
-                        {
-                            text = console->PasteTextFromClipboard();
-                        }
+                        text = console->PasteTextFromClipboard();
                     }
                     if (!text.native.empty())
                     {
@@ -411,12 +417,9 @@ namespace oui
             case oui::VirtualKey::kC:
                 if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
-                    if (auto pool = GetPool())
+                    if (auto console = GetConsole())
                     {
-                        if (auto console = pool->GetConsole())
-                        {
-                            console->CopyTextToClipboard(ExtractSelected(false));
-                        }
+                        console->CopyTextToClipboard(ExtractSelected(false));
                     }
                     handled = true;
                 }
@@ -521,7 +524,12 @@ namespace oui
     }
     void CEditBox::SetTextImpl(const String& text)
     {
-        CalculateSymbolsCount(text.native.c_str(), text.native.size(), m_symbols);
+        CConsole* console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+        console->GetSymbolsAnalyzer().CalculateSymbolsCount(text.native.c_str(), text.native.size(), m_symbols);
         m_text = text;
     }
     void CEditBox::SetText(const String& text)
@@ -549,12 +557,9 @@ namespace oui
     {
         Invalidate();
        
-        if (auto pool = GetPool())
+        if (auto console = GetConsole())
         {
-            if (auto console = pool->GetConsole())
-            {
-                console->HideCursor();
-            }
+            console->HideCursor();
         }
 
         ResetSelection();

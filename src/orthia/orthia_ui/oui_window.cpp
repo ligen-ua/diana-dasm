@@ -177,6 +177,11 @@ namespace oui
     }
 
     // CWindow
+    CConsole* CWindow::g_defConsole = 0;
+    void CWindow::InitDefConsole(CConsole* defConsole)
+    {
+        g_defConsole = defConsole;
+    }
     CWindow::CWindow()
     {
 
@@ -322,7 +327,17 @@ namespace oui
     {
         return m_active || IsFocused();
     }
-
+    CConsole* CWindow::GetConsole()
+    {
+        if (auto pool = GetPool())
+        {
+            if (auto console = pool->GetConsole())
+            {
+                return console;
+            }
+        }
+        return g_defConsole;
+    }
 
     static bool CheckModalInput(std::shared_ptr<CWindowsPool> poolPtr,
         std::shared_ptr<CWindow> me)

@@ -5,6 +5,7 @@ orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 int RunTests();
 
+
 int wmain(int argc, const wchar_t* argv[])
 {
    // MessageBox(0, 0, 0, 0);

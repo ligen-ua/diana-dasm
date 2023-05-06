@@ -62,6 +62,11 @@ namespace oui
 
     void CModalWindow::PaintTitle(const Rect& rect, DrawParameters& parameters)
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         m_captionRange = Range();
         m_closeRange = Range();
 
@@ -106,7 +111,7 @@ namespace oui
                 }
                 if (symbolsLeft > 0)
                 {
-                    int tableCharsCount = CutString(m_chunk.native, symbolsLeft);
+                    int tableCharsCount = console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, symbolsLeft);
 
                     if (IsMouseOn() &&
                         m_lastMouseMovePoint.y == target.y &&
