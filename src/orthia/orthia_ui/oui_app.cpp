@@ -29,7 +29,10 @@ namespace oui
 
         oui::CConsole mainConsole;
         m_pool->RegisterConsole(&mainConsole);
+        CWindow::InitDefConsole(&mainConsole);
+
         oui::ScopedGuard consoleGuard([&]() {  m_pool->RegisterConsole(0);  });
+        oui::ScopedGuard wndConsoleGuard([&]() {  CWindow::InitDefConsole(0);  });
 
         try
         {

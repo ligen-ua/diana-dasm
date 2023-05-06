@@ -14,6 +14,7 @@
 #include <utility>
 #include <condition_variable>
 #include <mutex>
+#include <cstdint>
 
 #if defined(_WIN32) || (_MSC_VER)
 
@@ -109,21 +110,8 @@ namespace oui
     {
         return (ch & 0xC0) != 0x80;
     }
-    int CutString(std::wstring & str, int maxCharsCount);
-    int CalculateSymbolsCount(const wchar_t* pStart, size_t sizeInWchars, const wchar_t exceptSym_in);
-    void FilterUnreadableSymbols(std::wstring& text);
-    
-    template<class Type>
-    int CalculateSymbolsCount(const Type& str, const wchar_t exceptSym_in)
-    {
-        return CalculateSymbolsCount(str.c_str(), str.size(), exceptSym_in);
-    }
 
-    template<class Type>
-    wchar_t QueryFirstSymbol(const Type& str, const wchar_t exceptSym_in)
-    {
-        return QueryFirstSymbol(str.c_str(), str.size(), exceptSym_in);
-    }
+    void FilterUnreadableSymbols(std::wstring& text);
     bool StartsWith(const std::wstring& text, const std::wstring& phrase);
     std::wstring Uppercase_Silent(const std::wstring& str);
 
@@ -156,15 +144,12 @@ namespace oui
             m_handler = nullptr;
         }
     };
-
-    // symbols
-    struct SymbolInfo
-    {
-        int charOffset = 0;
-        int sizeInTChars = 0;
-    };
-    int CalculateSymbolsCount(const wchar_t* pStart, 
-        size_t sizeInWchars,
-        std::vector<SymbolInfo>& symbols);
-
 }
+
+
+#ifdef OUI_SYS_WINDOWS
+
+#include "oui_base_win32.h"
+
+#endif
+

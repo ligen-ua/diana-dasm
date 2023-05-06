@@ -1,13 +1,15 @@
 #include "oui_console.h"
 #include "windows.h"
+#include "iostream"
+#include "oui_symbols_newterm_win32.h"
 
 #undef min
 
 namespace oui
 {
 #define OUI_ENABLE_VIRTUAL_TERMINAL_INPUT       0x0200
-
-
+#define OUI_ENABLE_VIRTUAL_TERMINAL_PROCESSING  0x0004
+    
     struct ColorMap
     {
         Color color;
@@ -91,6 +93,55 @@ namespace oui
         return hWnd;
     }
 
+    void CConsole::DetectVersion()
+    {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(m_consoleWindow, &pid);
+
+        if (!pid)
+        {
+            return;
+        }
+        HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+        if (!hProc)
+        {
+            return;
+        }
+        oui::ScopedGuard procGuard([&]() {  CloseHandle(hProc);  });
+
+        typedef DWORD  (WINAPI * GetProcessImageFileNameW_type)(
+            HANDLE hProcess,
+            LPWSTR lpImageFileName,
+            DWORD  nSize
+        );
+#ifndef LOAD_LIBRARY_SEARCH_SYSTEM32 
+#define LOAD_LIBRARY_SEARCH_SYSTEM32    0x00000800
+#endif
+
+        HMODULE hLib = LoadLibraryExW(L"psapi.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!hLib)
+        {
+            return;
+        }
+        oui::ScopedGuard libGuard([&]() {  FreeLibrary(hLib);  });
+
+        auto pGetProcessImageFileNameW = (GetProcessImageFileNameW_type)GetProcAddress(hLib, "GetProcessImageFileNameW");
+        if (!pGetProcessImageFileNameW)
+        {
+            return;
+        }
+
+        std::vector<wchar_t> buffer(4096);
+        if (!pGetProcessImageFileNameW(hProc, buffer.data(), (DWORD)buffer.size()))
+        {
+            return;
+        }
+        m_newTerminal = wcsstr(buffer.data(), L"\\WindowsApps\\Microsoft.WindowsTerminal_") != nullptr;
+    }
+    ISymbolsAnalyzer& CConsole::GetSymbolsAnalyzer()
+    {
+        return *m_symbolsAnalyzer;
+    }
     void CConsole::Init()
     {
         SetConsoleCP(CP_UTF8);
@@ -105,6 +156,15 @@ namespace oui
             mode |= ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
             SetConsoleMode(inputHandle, mode);
         }
+
+        DWORD ouputMode = 0;
+        auto ouputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (GetConsoleMode(ouputHandle, &ouputMode))
+        {
+            ouputMode &= ~(OUI_ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+            SetConsoleMode(ouputHandle, ouputMode);
+        }
+
         FixupAfterResize();
         SetDefaultPalette();
 
@@ -113,10 +173,17 @@ namespace oui
         {
             m_consoleWindow = GetConsoleWindow();
         }
+        DetectVersion();
+
+        //if (m_newTerminal)
+        {
+            m_symbolsAnalyzer.reset(new CWin32SymbolsAnalyzer_UTF16());
+        }
         if (IsWindowVisible(m_consoleWindow))
         {
             SendMessage(m_consoleWindow, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
         }
+
     }
     void CConsole::ShowCursor()
     {

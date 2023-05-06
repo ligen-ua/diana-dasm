@@ -14,6 +14,11 @@ namespace oui
     }
     void CListBox::DoPaintListMode(const Rect& rect, DrawParameters& parameters)
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         const auto colorProfile = m_colorProfile->listBox;
         const PanelBorderSymbols symbols = GetPanelBorderSymbols();
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
@@ -50,7 +55,7 @@ namespace oui
                     colorsHandler = currentItem->colorsHandler;
                     tmpStr = currentItem->text.empty() ? String() : currentItem->text[0];
                     auto prevSize = tmpStr.native.size();
-                    CutString(tmpStr.native, symbolsCount);
+                    console->GetSymbolsAnalyzer().CutVisibleString(tmpStr.native, symbolsCount);
                     auto newSize = tmpStr.native.size();
                     std::copy(tmpStr.native.begin(), tmpStr.native.end(), m_chunk.native.begin());
                     cutHappens = newSize != prevSize;
