@@ -104,7 +104,9 @@ namespace oui
             m_currentFiles.reserve(data.size() + 1);
             m_firstResult = false;
 
-            m_fileEdit->SetText(m_fileSystem->AppendSlash(m_currentFolderId.fullFileName));
+            String fullName = m_fileSystem->AppendSlash(m_currentFolderId.fullFileName);
+            console->FilterOrReplaceUnreadableSymbols(fullName);
+            m_fileEdit->SetText(fullName);
             m_fileEdit->ScrollRight();
 
             if (!m_currentFolderId.fullFileName.native.empty())
@@ -113,6 +115,7 @@ namespace oui
                 info.fileName = OUI_STR("..");
                 info.flags |= info.flag_directory | info.flag_uplink;
                 m_currentFiles.push_back(info);
+                m_currentFiles.back().visibleName = info.fileName;
             }
             m_parentOffset = m_filesBox->GetOffset();
             m_parentPosition = m_filesBox->GetSelectedPosition();
@@ -370,9 +373,16 @@ namespace oui
         {
             return;
         }
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+        String newText = m_fileSystem->AppendSlash(m_currentFolderId.fullFileName);
+        console->FilterOrReplaceUnreadableSymbols(newText);
         if (item.fsFlags & FileInfo::flag_uplink)
         {
-            m_fileEdit->SetText(m_fileSystem->AppendSlash(m_currentFolderId.fullFileName));
+            m_fileEdit->SetText(newText);
             m_fileEdit->ScrollRight();
             m_fileEdit->Invalidate();
             return;
@@ -381,7 +391,6 @@ namespace oui
         {
             return;
         }
-        auto newText = m_fileSystem->AppendSlash(m_currentFolderId.fullFileName);
         newText.native.append(item.text[0].native);
         m_fileEdit->SetText(newText);
         m_fileEdit->ScrollRight();
