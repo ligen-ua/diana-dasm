@@ -29,6 +29,7 @@ namespace oui
         auto currentItem = m_pageItems.begin();
         String tmpStr;
         int pos = 0;
+
         for (int i = 0; i < m_columnsCount; ++i)
         {
             int relRightX = ((i + 1) * absClientRect.size.width) / m_columnsCount;
@@ -39,7 +40,7 @@ namespace oui
             {
                 return;
             }
-
+            int cutSize = 0;
             for (int u = 0; u < absClientRect.size.height; ++u)
             {
                 const int yPos = u + absClientRect.position.y;
@@ -55,9 +56,18 @@ namespace oui
                     colorsHandler = currentItem->colorsHandler;
                     tmpStr = currentItem->text.empty() ? String() : currentItem->text[0];
                     auto prevSize = tmpStr.native.size();
-                    console->GetSymbolsAnalyzer().CutVisibleString(tmpStr.native, symbolsCount);
+
+                    const auto info = console->GetSymbolsAnalyzer().CutVisibleString(tmpStr.native, symbolsCount);
+
                     auto newSize = tmpStr.native.size();
                     std::copy(tmpStr.native.begin(), tmpStr.native.end(), m_chunk.native.begin());
+
+                    if (info.visibleSize > info.symbolsCount)
+                    {
+                        cutSize = info.visibleSize - info.symbolsCount;
+                        m_chunk.native.erase(m_chunk.native.end()-cutSize, m_chunk.native.end());
+                    }
+
                     cutHappens = newSize != prevSize;
                     ++currentItem;
                 }
@@ -295,6 +305,13 @@ namespace oui
     }
     bool CListBox::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
+        CConsole* console = GetConsole();
+        if (!console)
+        {
+            return false;
+        }
+
+
         if (evt.keyEvent.valid)
         {
             int newOffset = m_offset;
@@ -359,7 +376,8 @@ namespace oui
             }
             // check text
             auto text = evt.keyEvent.rawText;
-            FilterUnreadableSymbols(text.native);
+            console->FilterOrReplaceUnreadableSymbols(text);
+
             if (!text.native.empty())
             {
                 if (m_owner->ShiftViewWindowToSymbol(text.native))

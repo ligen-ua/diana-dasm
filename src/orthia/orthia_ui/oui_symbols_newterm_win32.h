@@ -7,9 +7,19 @@ namespace oui
 
     class CWin32SymbolsAnalyzer_NewTerminal:public ISymbolsAnalyzer
     {
-        CWin32SymbolsAnalyzer_UTF16 m_utf16;
+        HWND m_hWindow;
+        HDC m_windowDC;
+        CWin32SymbolsAnalyzer_UCS2 m_utf16;
+
+        std::function<int(const wchar_t*, const wchar_t*)> m_calcSize;
+
+        std::vector<SymbolInfo> m_symbolsBuf;
+
+        int AnalyzeSymbolSize(const String::char_type* pStart, const String::char_type* pEnd);
     public:
-        int CutVisibleString(String::string_type& str,
+        CWin32SymbolsAnalyzer_NewTerminal(HWND hWindow);
+        ~CWin32SymbolsAnalyzer_NewTerminal();
+        VisibleStringInfo CutVisibleString(String::string_type& str,
             int visibleSymCount) override;
 
         int CalculateSymbolsCount(const String::char_type* pStart,

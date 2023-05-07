@@ -57,32 +57,36 @@ namespace oui
     {
         int charCount = 0;
         const wchar_t* pEnd = pStart + sizeInWchars;
+        bool prevWasLead = false;
         for (const wchar_t* p = pStart; p < pEnd; ++p)
         {
+            if (prevWasLead)
+            {
+                SymbolInfo& info = symbols.back();
+                ++info.sizeInTChars;
+                ++charCount;
+                prevWasLead = false;
+                continue;
+            }
             {
                 SymbolInfo info;
                 info.charOffset = (int)(p - pStart);
                 info.sizeInTChars = 1;
+
+                info.visibleOffset = (int)symbols.size();
+                info.visibleSize = 1;
+
                 symbols.push_back(info);
             }
             wchar_t ch = *p;
             ++charCount;
-            if (IsLeadByte(ch))
-            {
-                SymbolInfo& info = symbols.back();
-                ++info.sizeInTChars;
-                ++p;
-                if (p >= pEnd)
-                {
-                    break;
-                }
-            }
+            prevWasLead = IsLeadByte(ch);
         }
         return charCount;
     }
 
     // CutVisibleString
-    static int CutStringUTF16(std::wstring& str, int maxCharsCount)
+    static VisibleStringInfo CutStringUTF16(std::wstring& str, int maxCharsCount)
     {
         int charCount = 0;
         const wchar_t* pEnd = str.c_str() + str.size();
@@ -104,11 +108,11 @@ namespace oui
                 }
             }
         }
-        return charCount;
+        return VisibleStringInfo(charCount, charCount);
     }
 
     // CWin32SymbolsAnalyzer_UTF16
-    int CWin32SymbolsAnalyzer_UTF16::CutVisibleString(String::string_type& str,
+    VisibleStringInfo CWin32SymbolsAnalyzer_UTF16::CutVisibleString(String::string_type& str,
         int visibleSymCount)
     {
         return CutStringUTF16(str, visibleSymCount);
@@ -130,15 +134,15 @@ namespace oui
     }
 
     // UCS2
-    int CWin32SymbolsAnalyzer_UCS2::CutVisibleString(String::string_type& str,
+    VisibleStringInfo CWin32SymbolsAnalyzer_UCS2::CutVisibleString(String::string_type& str,
         int visibleSymCount)
     {
         if (str.size() > visibleSymCount)
         {
             str.resize(visibleSymCount);
-            return visibleSymCount;
+            return VisibleStringInfo(visibleSymCount, visibleSymCount);
         }
-        return (int)str.size();
+        return VisibleStringInfo((int)str.size(), (int)str.size());
     }
 
     int CWin32SymbolsAnalyzer_UCS2::CalculateSymbolsCount(const String::char_type* pStart,
@@ -159,6 +163,8 @@ namespace oui
         {
             sym.charOffset = pos;
             sym.sizeInTChars = 1;
+            sym.visibleOffset = pos;
+            sym.visibleSize = 1;
             ++pos;
         }
         return (int)sizeInWchars;

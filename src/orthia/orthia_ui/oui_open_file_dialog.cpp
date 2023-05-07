@@ -17,7 +17,7 @@ namespace oui
             fileInfo.sortKey.native.append(L"1|");
         }
         fileInfo.sortKey.native.append(Uppercase_Silent(info.fileName.native));
-        fileInfo.sortKey.native.append(L"|");
+        fileInfo.sortKey.native.append(1, 1);
         fileInfo.sortKey.native.append(info.fileName.native);
     }
     void COpenFileDialog::OnResize()
@@ -82,6 +82,11 @@ namespace oui
         int error,
         const String& tag)
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         if (operation != m_currentOperation)
         {
             return;
@@ -120,29 +125,31 @@ namespace oui
             m_currentFiles.reserve(m_currentFiles.size() + data.size());
         }
 
-        String highlighName;
+        String highlightName;
         bool applyTag = false;
         for (auto& info : data)
         {
             m_currentFiles.push_back(info);
             GenSortKey(m_currentFiles.back());
+            m_currentFiles.back().visibleName = info.fileName;
+            console->FilterOrReplaceUnreadableSymbols(m_currentFiles.back().visibleName);
 
             if (info.flags & info.flag_highlight)
             {
-                highlighName = info.fileName;
+                highlightName = m_currentFiles.back().visibleName;
                 applyTag = true;
             }
         }
-        if (highlighName.native.empty())
+        if (highlightName.native.empty())
         {
             oui::ListBoxItem listItem;
             if (m_filesBox->GetSelectedItem(listItem) && !listItem.text.empty())
             {
-                highlighName = listItem.text[0];
+                highlightName = listItem.text[0];
             }
         }
         std::sort(m_currentFiles.begin(), m_currentFiles.end());
-        if (!highlighName.native.empty())
+        if (!highlightName.native.empty())
         {
             if (applyTag)
             {
@@ -161,7 +168,7 @@ namespace oui
                     }
                 }
             }
-            auto it = std::find_if(m_currentFiles.begin(), m_currentFiles.end(), [&](auto& value) { return value.info.fileName.native == highlighName.native;  });
+            auto it = std::find_if(m_currentFiles.begin(), m_currentFiles.end(), [&](auto& value) { return value.info.fileName.native == highlightName.native;  });
             int highlightItemOffset = (int)(it - m_currentFiles.begin());
 
             HighlightItem(highlightItemOffset);
@@ -195,6 +202,11 @@ namespace oui
     }
     void COpenFileDialog::UpdateVisibleItems()
     {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
         // update visible items
         const auto visibleSize = m_filesBox->GetVisibleSize();
         auto& visibleItems = m_filesBox->GetItems();
@@ -228,7 +240,7 @@ namespace oui
         for (; it != it_end; ++it, ++vit)
         {
             vit->text.clear();
-            vit->text.push_back(it->info.fileName);
+            vit->text.push_back(it->visibleName);
             vit->fsFlags = it->info.flags;
 
             if (it->info.flags & it->info.flag_uplink)

@@ -12,6 +12,7 @@ namespace oui
     {
         FileInfo info;
         String sortKey;
+        String visibleName;
 
         FileDialogInfo()
         {
