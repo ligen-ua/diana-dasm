@@ -491,7 +491,7 @@ namespace oui
                 break;
             }
             
-            int tableCharsCount = console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, symbolsLeft);
+            int tableCharsCount = console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, symbolsLeft).visibleSize;
 
             if (IsMouseOn() &&
                 m_lastMouseMovePoint.y == target.y &&

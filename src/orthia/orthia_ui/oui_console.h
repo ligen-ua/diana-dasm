@@ -20,6 +20,8 @@ namespace oui
         void DetectVersion();
     public:
         CConsole();
+        void FilterOrReplaceUnreadableSymbols(String& data);
+        void ReplaceWideSymbols(String& data);
         ISymbolsAnalyzer& GetSymbolsAnalyzer();
         void Init();
         Size GetSize();
@@ -58,6 +60,7 @@ namespace oui
         std::vector<CHAR_INFO> m_buffer;
         CConsole* m_console = 0;
         std::wstring m_separator;
+
     public:
         void PaintMenuSeparator(const Point& position,
             int width,

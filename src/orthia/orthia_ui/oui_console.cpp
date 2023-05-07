@@ -142,6 +142,54 @@ namespace oui
     {
         return *m_symbolsAnalyzer;
     }
+    void CConsole::FilterOrReplaceUnreadableSymbols(String& data)
+    {
+        oui::FilterUnreadableSymbols(data.native);
+        ReplaceWideSymbols(data);
+    }
+    void CConsole::ReplaceWideSymbols(String& data)
+    {
+        // new windows terminal fucked up this poor old API badly 
+        // so it is better just to filter wide hieroglyphs out
+        // it would be nice to implement a new one console for NT support
+        // if they fix that somehow
+        if (!m_newTerminal)
+        {
+            return;
+        }
+        std::vector<SymbolInfo> symbols;
+        m_symbolsAnalyzer->CalculateSymbolsCount(data.native.data(), data.native.size(), symbols);
+        bool foundWideSymbols = false;
+        for (auto& sym : symbols)
+        {
+            if (sym.visibleSize != 1)
+            {
+                foundWideSymbols = true;
+                break;
+            }
+        }
+        if (!foundWideSymbols)
+        {
+            // 99% goes here
+            return;
+        }
+        // repack string
+        std::wstring newStr;
+        auto prevRange = data.native.c_str();
+        for (auto& sym : symbols)
+        {
+            if (sym.visibleSize != 1)
+            {
+                auto curRange = data.native.c_str() + sym.charOffset;
+                newStr.insert(newStr.end(), prevRange, curRange);
+                newStr.push_back('#');
+                prevRange = curRange + sym.sizeInTChars;
+            }
+        }
+        newStr.insert(newStr.end(), prevRange, data.native.c_str() + data.native.size());
+        data = newStr;
+    }
+
     void CConsole::Init()
     {
         SetConsoleCP(CP_UTF8);
@@ -175,7 +223,11 @@ namespace oui
         }
         DetectVersion();
 
-        //if (m_newTerminal)
+        if (m_newTerminal)
+        {
+            m_symbolsAnalyzer.reset(new CWin32SymbolsAnalyzer_NewTerminal(m_consoleWindow));
+        }
+        else
         {
             m_symbolsAnalyzer.reset(new CWin32SymbolsAnalyzer_UTF16());
         }
@@ -397,6 +449,7 @@ namespace oui
         m_separator[m_separator.size() - 1] = syms[2];
         PaintText(position, textColor, textBgColor, m_separator);
     }
+
     void CConsoleDrawAdapter::PaintText(const Point& position,
         Color textColor,
         Color textBgColor,

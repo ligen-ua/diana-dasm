@@ -314,8 +314,7 @@ namespace oui
         }
 
         String text = text_in;
-        FilterUnreadableSymbols(text.native);
-
+        console->FilterOrReplaceUnreadableSymbols(text);
         if (text.native.empty())
         {
             return;

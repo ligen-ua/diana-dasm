@@ -53,11 +53,24 @@ namespace oui
         int16_t visibleSize = 0;
     };
 
+    struct VisibleStringInfo
+    {
+        int visibleSize = 0;
+        int symbolsCount = 0;
+
+        VisibleStringInfo(int visibleSize_in,
+            int symbolsCount_in)
+            :
+                visibleSize(visibleSize_in),
+                symbolsCount(symbolsCount_in)
+        {
+        }
+    };
     struct ISymbolsAnalyzer
     {
         virtual ~ISymbolsAnalyzer() {}
         
-        virtual int CutVisibleString(String::string_type& str, 
+        virtual VisibleStringInfo CutVisibleString(String::string_type& str,
             int visibleSymCount) = 0;
         
         virtual int CalculateSymbolsCount(const String::char_type* pStart, 
