@@ -135,6 +135,7 @@ namespace oui
     }
     void CListBox::Destroy()
     {
+        auto guard = GetPtr();
         m_owner->CancelAllQueries();
         Parent_type::Destroy();
     }

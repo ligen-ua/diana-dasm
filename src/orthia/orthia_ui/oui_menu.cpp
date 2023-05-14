@@ -136,6 +136,7 @@ namespace oui
     }
     void CMenuPopup::Destroy()
     {
+        auto guard = GetPtr();
         if (m_destroyed)
         {
             return;
