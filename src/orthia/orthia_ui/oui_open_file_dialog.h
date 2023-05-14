@@ -55,6 +55,7 @@ namespace oui
         int m_openFileSeq = 0;
         String m_waitBoxText;
         std::shared_ptr<IFile> m_result;
+        int m_typesToHighlight;
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
             const FileUnifiedId& folderId,
@@ -91,7 +92,8 @@ namespace oui
             const String& openingText,
             const String& errorText,
             FileRecipientHandler_type resultCallback,
-            std::shared_ptr<IFileSystem> fileSystem);
+            std::shared_ptr<IFileSystem> fileSystem,
+            int typesToHighlight = 0);
 
         void ShiftViewWindow(int newPosition) override;
         bool ShiftViewWindowToSymbol(const String& symbol) override;
