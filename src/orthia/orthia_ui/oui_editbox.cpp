@@ -72,6 +72,10 @@ namespace oui
         auto& sym = m_symbols[symbol];
         return sym.charOffset;
     }
+    void CEditBox::SetEnterHandler(std::function<void(const String& text)> enterHandler)
+    {
+        m_enterHandler = enterHandler;
+    }
     void CEditBox::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
         CConsole* console = GetConsole();
@@ -340,10 +344,6 @@ namespace oui
         }
         m_cursorIterator += symbolsToInsert;
     }
-
-    void CEditBox::ProcessEnter()
-    {
-    }
     void CEditBox::ProcessDelete()
     {
         if (SelectionIsActive())
@@ -424,8 +424,11 @@ namespace oui
                 }
                 break;
             case oui::VirtualKey::Enter:
-                ProcessEnter();
-                handled = true;
+                if (m_enterHandler)
+                {
+                    m_enterHandler(GetText());
+                    handled = true;
+                }
                 break;
 
             case oui::VirtualKey::Delete:

@@ -171,10 +171,15 @@ namespace oui
                     }
                 }
             }
-            auto it = std::find_if(m_currentFiles.begin(), m_currentFiles.end(), [&](auto& value) { return value.info.fileName.native == highlightName.native;  });
-            int highlightItemOffset = (int)(it - m_currentFiles.begin());
-
-            HighlightItem(highlightItemOffset);
+            auto it = std::find_if(m_currentFiles.begin(), m_currentFiles.end(), [&](auto& value) 
+            { 
+                return (value.visibleName.native == highlightName.native) || (value.info.fileName.native == highlightName.native);
+            });
+            if (it != m_currentFiles.end())
+            {
+                int highlightItemOffset = (int)(it - m_currentFiles.begin());
+                HighlightItem(highlightItemOffset);
+            }
         }
         UpdateVisibleItems();
     }
@@ -268,7 +273,11 @@ namespace oui
             else
             {
                 // open file here
-                vit->openHandler = nullptr;
+                vit->openHandler = [=, fileName = it->info.fileName]() {
+                    TryOpenFile(m_currentFolderId,
+                        fileName,
+                        true);
+                };
             }
 
             if (it->info.flags & it->info.flag_directory)
@@ -290,6 +299,97 @@ namespace oui
             return;
         }
         ChangeFolder(name, String(), 0, String());
+    }
+    String COpenFileDialog::GetWaitBoxText()
+    {
+        return m_waitBoxText;
+    }
+    void COpenFileDialog::TryOpenFile(const FileUnifiedId& folderId,
+        const String& fileName,
+        bool combine)
+    {
+        auto me = GetPtr_t<COpenFileDialog>(this);
+        if (!me)
+        {
+            return;
+        }
+        if (m_waitBox)
+        {
+            return;
+        }
+        m_waitBoxText = PassParameter1(m_openingText, fileName);
+        std::weak_ptr<COpenFileDialog> weakMe = me;
+        m_waitBox = AddChildAndInit_t(std::make_shared<CMessageBoxWindow>(
+            [=]() {
+            if (auto p = weakMe.lock())
+            {
+                return p->GetWaitBoxText();
+            }
+            return String();
+        },
+            [=]() { 
+            if (auto p = weakMe.lock())
+            {
+                return p->OnWaitBoxDestroyed();
+            }
+        }));
+        m_waitBox->Dock();
+
+        ++m_openFileSeq;
+        String targetFile;
+        if (combine)
+        {
+            targetFile = m_fileSystem->AppendSlash(folderId.fullFileName).native + fileName.native;
+        }
+        else
+        {
+            targetFile = folderId.fullFileName;
+        }
+        m_fileSystem->AsyncOpenFile(this->GetThread(),
+            FileUnifiedId(targetFile),
+            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile> file, int error) {
+            if (auto p = weakMe.lock())
+            {
+                me->SetOpenFileResult(openFileSeq, file, error);
+            }
+        });
+    }
+    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error)
+    {
+        if (openFileSeq != m_openFileSeq)
+        {
+            return;
+        }
+        if (error)
+        {
+            if (m_waitBox)
+            {
+                m_waitBoxText = PassParameter1(m_errorText, OUI_TO_STR(error));
+                m_waitBox->Invalidate();
+            }
+            return;
+        }
+        m_result = file;
+        if (m_resultCallback)
+        {
+            m_resultCallback(m_result, 0);
+        }
+        if (m_waitBox)
+        {
+            m_waitBox->FinishDialog();
+        }
+        else
+        {
+            FinishDialog();
+        }
+    }
+    void COpenFileDialog::OnWaitBoxDestroyed()
+    {
+        m_waitBox = 0;
+        if (m_result)
+        {
+            FinishDialog();
+        }
     }
     void COpenFileDialog::ChangeFolder(const FileUnifiedId& fileId, 
         const String& argument, 
@@ -322,21 +422,27 @@ namespace oui
     }
 
     COpenFileDialog::COpenFileDialog(const String& rootFile, 
+        const String& openingText,
+        const String& errorText,
         FileRecipientHandler_type resultCallback,
         std::shared_ptr<IFileSystem> fileSystem)
         :
             m_resultCallback(resultCallback),
             m_fileSystem(fileSystem),
-            m_rootFile(rootFile)
+            m_rootFile(rootFile),
+            m_openingText(openingText),
+            m_errorText(errorText)
     {
-        m_colorProfile = std::make_shared<DialogColorProfile>();
-        QueryDefaultColorProfile(*m_colorProfile);
-
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
         m_filesBox->InitColumns(2);
 
         m_fileEdit = std::make_shared<CEditBox>(m_colorProfile);
+        m_fileEdit->SetEnterHandler([this](const String& text) {
+            TryOpenFile(FileUnifiedId(text),
+                text,
+                true);
+        });
         m_fileLabel = std::make_shared<CLabel>(m_colorProfile, [] { return String(OUI_STR(">"));  });
 
         this->RegisterSwitch(m_fileEdit);
@@ -365,7 +471,15 @@ namespace oui
             OnDefaultRoot(m_rootFile, 0);
         }
     }
-    
+    void COpenFileDialog::OnFinishDialog()
+    {
+        if (m_waitBox)
+        {
+            m_waitBox->Destroy();
+        }
+        Parent_type::OnFinishDialog();
+    }
+
     void COpenFileDialog::OnVisibleItemChanged()
     {
         ListBoxItem item;

@@ -159,7 +159,13 @@ namespace oui
             const FileUnifiedId& fileId, 
             FileRecipientHandler_type handler) override
         {
-
+            auto operation = std::make_shared<Operation<FileRecipientHandler_type>>(
+                targetThread,
+                handler);
+            
+            Sleep(1000);
+            std::shared_ptr<IFile> file;
+            operation->ReplyWithRetain(operation, file, 1234);
         }
         void AsyncStartQueryFiles(ThreadPtr_type targetThread,
             const FileUnifiedId& fileId_in,

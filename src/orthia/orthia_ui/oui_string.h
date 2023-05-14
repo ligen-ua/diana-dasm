@@ -8,7 +8,9 @@ namespace oui
     {
 #ifdef OUI_SYS_WINDOWS
         std::wstring native;
+        typedef std::wstringstream StringStream_type;
 #define OUI_TCSTR(X) L##X
+#define OUI_TCHAR(X) L##X
 #define OUI_STR(X) std::wstring(OUI_TCSTR(X))
 #define OUI_TO_STR(X) std::to_wstring(X)
 #define OUI_SCANF swscanf
@@ -16,7 +18,9 @@ namespace oui
 
 #else
         std::string native;
+        typedef std::stringstream StringStream_type;
 #define OUI_TCSTR(X) X
+#define OUI_TCHAR(X) X
 #define OUI_STR(X) std::string(X)
 #define OUI_TO_STR(X) std::to_string(X)
 #define OUI_SCANF sscanf
@@ -42,7 +46,17 @@ namespace oui
         }
     };
 
+    oui::String PassParameter1(const oui::String& text,
+        const oui::String& param1);
 
+    oui::String PassParameter2(const oui::String& text,
+        const oui::String& param1,
+        const oui::String& param2);
+
+    oui::String PassParameter3(const oui::String& text,
+        const oui::String& param1,
+        const oui::String& param2,
+        const oui::String& param3);
 
     // symbols
     struct SymbolInfo

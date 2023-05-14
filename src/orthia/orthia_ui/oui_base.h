@@ -15,6 +15,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <cstdint>
+#include <sstream>
 
 #if defined(_WIN32) || (_MSC_VER)
 

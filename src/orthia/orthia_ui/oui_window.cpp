@@ -621,29 +621,33 @@ namespace oui
 
     bool CWindow::ProcessMouseEvent(const Rect& rect, InputEvent& evt, WindowEventContext& evtContext)
     {
+        if (evtContext.finishedProcessing)
+        {
+            return false;
+        }
         bool handled = false;
         ReverseRenderChilds(rect, [&](std::shared_ptr<CWindow> child, const Rect& childRect) {
 
-            if (IsInside(childRect, evt.mouseEvent.point))
+            handled = child->ProcessMouseEvent(childRect, evt, evtContext);
+            if (evtContext.finishedProcessing)
             {
-                handled = child->ProcessMouseEvent(childRect, evt, evtContext);
-                if (handled)
-                {
-                    return false;
-                }
+                return false;
             }
-            else
+            if (handled)
             {
-                // check if child is a modal dialog
-                if (auto poolPtr = m_pool.lock())
+                return false;
+            }
+            
+            // check if child is a modal dialog
+            if (auto poolPtr = m_pool.lock())
+            {
+                if (auto modal = poolPtr->GetModalWindow())
                 {
-                    if (auto modal = poolPtr->GetModalWindow())
+                    if ((!modal->IsPopup()) && child == modal)
                     {
-                        if ((!modal->IsPopup()) && child == modal)
-                        {
-                            // no more mouse processing
-                            return false;
-                        }
+                        // no more mouse processing
+                        evtContext.finishedProcessing = true;
+                        return false;
                     }
                 }
             }
@@ -658,7 +662,10 @@ namespace oui
         {
             return false;
         }
-
+        if (evtContext.finishedProcessing)
+        {
+            return false;
+        }
         handled = HandleMouseEvent(rect, evt);
         OnHandleMouseEvent(handled, rect, evt);
         if (handled && evtContext.onMouseEventCallback)

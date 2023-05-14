@@ -77,6 +77,7 @@ namespace oui
     struct WindowEventContext
     {
         std::function<void(std::shared_ptr<CWindow>)> onMouseEventCallback;
+        bool finishedProcessing = false;
     };
 
     class CWindow:Noncopyable
@@ -103,24 +104,6 @@ namespace oui
         virtual void ConstructChilds();
         virtual void OnResize();
 
-        template<class Type>
-        Type AddChild_t(Type child)
-        {
-            AddChild(child);
-            return child;
-        }
-        template<class Type>
-        Type AddChildAndInit_t(Type child)
-        {
-            auto ptr = GetPtr();
-            if (!ptr)
-            {
-                return nullptr;
-            }
-            AddChild(child);
-            child->Init(ptr);
-            return child;
-        }
         virtual bool HandleMouseEvent(const Rect& rect, InputEvent& evt);
 
         virtual bool ProcessMouseEvent(const Rect& rect, InputEvent& evt, WindowEventContext& evtContext);
@@ -141,6 +124,26 @@ namespace oui
 
         static CConsole* g_defConsole;
     public:
+
+        template<class Type>
+        Type AddChild_t(Type child)
+        {
+            AddChild(child);
+            return child;
+        }
+        template<class Type>
+        Type AddChildAndInit_t(Type child)
+        {
+            auto ptr = GetPtr();
+            if (!ptr)
+            {
+                return nullptr;
+            }
+            AddChild(child);
+            child->Init(ptr);
+            return child;
+        }
+
         CWindow();
         virtual ~CWindow();
 

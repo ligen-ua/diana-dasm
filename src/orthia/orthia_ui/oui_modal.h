@@ -2,12 +2,14 @@
 
 #include "oui_window.h"
 #include "oui_win_styles.h"
+#include "oui_label.h"
 
 namespace oui
 {
     class CBaseModalWindow:public CWindow
     {
     protected:
+        bool m_dialogFinished = false;
         std::weak_ptr<CWindow> m_prevFocus;
         void OnInit(std::shared_ptr<CWindowsPool> pool);
         virtual void OnFinishDialog() {}
@@ -23,6 +25,7 @@ namespace oui
     {
         using Parent_type = WithBorder<CBaseModalWindow>;
         
+    protected:
         std::shared_ptr<CWindow> m_lastModalWindow;
         static String m_chunk;
         int m_lastTabY = 0;
@@ -31,6 +34,7 @@ namespace oui
         String m_caption;
         Point m_lastMouseMovePoint;
         std::shared_ptr<PanelColorProfile> m_panelColorProfile;
+        std::shared_ptr<DialogColorProfile> m_colorProfile;
 
         void OnInit(std::shared_ptr<CWindowsPool> pool) override;
         void OnFinishDialog() override;
@@ -43,11 +47,33 @@ namespace oui
     public:
         CModalWindow();
 
-        void Dock(); 
+        std::shared_ptr<DialogColorProfile> GetColorProfile();
+
+        void Dock();
+
         bool IsPopup() const override { return false; }
         void SetCaption(const String& caption);
         String GetCaption() const;
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
     };
+
+
+    class CMessageBoxWindow :public oui::SimpleBrush<CModalWindow>
+    {
+        using Parent_type = oui::SimpleBrush<CModalWindow>;
+
+    protected:
+        std::shared_ptr<CLabel> m_fileLabel;
+        std::function<void()> m_onDestroy;
+
+        void OnFinishDialog() override;
+    public:
+        CMessageBoxWindow(std::function<String()> getText, std::function<void()> onDestroy);
+        void ConstructChilds() override;
+        void OnResize() override;
+        void Resize(const Size& newSize) override;
+
+    };
+
 }

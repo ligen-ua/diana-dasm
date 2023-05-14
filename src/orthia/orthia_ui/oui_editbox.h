@@ -27,10 +27,10 @@ namespace oui
         int m_windowSymStart = 0;
         int m_windowSymSize = 0;
 
+        std::function<void(const String&text)> m_enterHandler;
         int GetCursorPosition() const;
         void SetTextImpl(const String& text);
 
-        void ProcessEnter();
         void ProcessDelete();
         void ProcessBackpace();
         void ResetSelection();
@@ -38,6 +38,7 @@ namespace oui
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
+        void SetEnterHandler(std::function<void(const String& text)> enterHandler);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
