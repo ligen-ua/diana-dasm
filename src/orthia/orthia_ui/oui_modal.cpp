@@ -14,6 +14,12 @@ namespace oui
     }
     void CBaseModalWindow::FinishDialog()
     {
+        if (m_dialogFinished)
+        {
+            return;
+        }
+        m_dialogFinished = true;
+
         OnFinishDialog();
         Deactivate();
         auto pool = GetPool();
@@ -46,8 +52,14 @@ namespace oui
     // CModalWindow
     CModalWindow::CModalWindow()
     {
+        // colors for header
         m_panelColorProfile = std::make_shared<PanelColorProfile>();
         QueryDefaultColorProfile(*m_panelColorProfile);
+
+        // other dialog colors
+        m_colorProfile = std::make_shared<DialogColorProfile>();
+        QueryDefaultColorProfile(*m_colorProfile);
+
     }
     void CModalWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
@@ -232,6 +244,7 @@ namespace oui
     {
         m_lastModalWindow = pool->GetModalWindow();
         pool->SetModalWindow(GetPtr());
+        pool->SetFocus(GetPtr());
         Parent_type::OnInit(pool);
     }
     void CModalWindow::OnFinishDialog() 
@@ -252,6 +265,10 @@ namespace oui
     {
         return m_caption;
     }
+    std::shared_ptr<DialogColorProfile> CModalWindow::GetColorProfile()
+    {
+        return m_colorProfile;
+    }
     void CModalWindow::Dock()
     {
         auto parent = GetParent();
@@ -265,10 +282,57 @@ namespace oui
         Rect rect = parentRect;
         rect.position.x += xBorder;
         rect.position.y += yBorder;
-        rect.size.width -= xBorder*2;
-        rect.size.height -= yBorder*2;
+        rect.size.width -= xBorder * 2;
+        rect.size.height -= yBorder * 2;
         this->MoveTo(rect.position);
         this->Resize(rect.size);
+    }
+
+    // CMessageBoxWindow
+    CMessageBoxWindow::CMessageBoxWindow(std::function<String()> getText, std::function<void()> onDestroy)
+        :
+            m_onDestroy(onDestroy)
+    {
+        m_fileLabel = std::make_shared<CLabel>(m_colorProfile, getText);
+    }
+    void CMessageBoxWindow::OnFinishDialog()
+    {
+        if (m_onDestroy)
+        {
+            m_onDestroy();
+        }
+        Parent_type::OnFinishDialog();
+    }
+    void CMessageBoxWindow::ConstructChilds()
+    {
+        AddChild(m_fileLabel);
+    }
+    void CMessageBoxWindow::Resize(const Size& newSize)
+    {
+        auto size = newSize;
+        size.height = 5;
+        Parent_type::Resize(size);
+    }
+    void CMessageBoxWindow::OnResize()
+    {
+        const auto clientRect = GetClientRect();
+
+        if (clientRect.size.width < 5 || clientRect.size.height < 3)
+        {
+            Size zeroSize;
+            m_fileLabel->Resize(zeroSize);
+            return;
+        }
+
+        Rect fileEditRect = clientRect;
+        fileEditRect.position.x += 2;
+        fileEditRect.position.y += 1;
+        fileEditRect.size.width -= 4;
+        fileEditRect.size.height = 1;
+
+        m_fileLabel->MoveTo(fileEditRect.position);
+        m_fileLabel->Resize(fileEditRect.size);
+        Parent_type::OnResize();
     }
 
 

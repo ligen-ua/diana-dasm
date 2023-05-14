@@ -176,6 +176,7 @@
     <ClCompile Include="oui_open_file_dialog.cpp" />
     <ClCompile Include="oui_param.cpp" />
     <ClCompile Include="oui_screen.cpp" />
+    <ClCompile Include="oui_string.cpp" />
     <ClCompile Include="oui_symbols_newterm_win32.cpp" />
     <ClCompile Include="oui_symbols_win32.cpp" />
     <ClCompile Include="oui_threadpool.cpp" />

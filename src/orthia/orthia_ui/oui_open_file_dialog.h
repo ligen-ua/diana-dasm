@@ -30,7 +30,6 @@ namespace oui
     class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
-        std::shared_ptr<DialogColorProfile> m_colorProfile;
 
         std::shared_ptr<CListBox> m_filesBox;
         FileRecipientHandler_type m_resultCallback;
@@ -47,6 +46,12 @@ namespace oui
         int m_parentOffset = 0;
         int m_parentPosition = 0;
 
+        const String m_openingText, m_errorText;
+        std::shared_ptr<CMessageBoxWindow> m_waitBox;
+        int m_openFileSeq = 0;
+        String m_waitBoxText;
+        std::shared_ptr<IFile> m_result;
+
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
             const FileUnifiedId& folderId,
             const std::vector<FileInfo>& data,
@@ -57,7 +62,11 @@ namespace oui
             int flags,
             const String& tag);
         void HighlightItem(int highlightItemOffset);
-
+        void TryOpenFile(const FileUnifiedId& folderId,
+            const String& fileName,
+            bool combine);
+        void OnWaitBoxDestroyed();
+        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error);
     protected:
         void OnResize() override;
         void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size);
@@ -69,9 +78,14 @@ namespace oui
         void UpdateVisibleItems();
         void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
 
+        void OnFinishDialog() override;
         void OnVisibleItemChanged() override;
+        String GetWaitBoxText();
+
     public:
         COpenFileDialog(const String& rootFile,
+            const String& openingText,
+            const String& errorText,
             FileRecipientHandler_type resultCallback,
             std::shared_ptr<IFileSystem> fileSystem);
 
