@@ -21,7 +21,8 @@ void CMainWindow::OpenExecutable()
         openFileNode->QueryValue(ORTHIA_TCSTR("opening")),
         openFileNode->QueryValue(ORTHIA_TCSTR("error")),
         nullptr,
-        m_model->GetFileSystem()));
+        m_model->GetFileSystem(),
+        oui::FileInfo::flag_any_executable));
     dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
     dialog->Dock();
 }

@@ -31,10 +31,11 @@ namespace oui
     };
     struct FileInfo
     {
-        static const int flag_directory = 1;
-        static const int flag_disk      = 3;
-        static const int flag_uplink    = 4;
-        static const int flag_highlight = 8;
+        static const int flag_directory      = 0x01;
+        static const int flag_disk           = 0x03;
+        static const int flag_uplink         = 0x04;
+        static const int flag_highlight      = 0x08;
+        static const int flag_any_executable = 0x10;
 
         String fileName;
         int flags = 0;

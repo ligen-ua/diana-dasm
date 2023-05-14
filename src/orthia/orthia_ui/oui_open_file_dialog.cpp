@@ -281,7 +281,7 @@ namespace oui
                 };
             }
 
-            if (it->info.flags & it->info.flag_directory)
+            if (it->info.flags & (it->info.flag_directory | m_typesToHighlight))
             {
                 vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
             }
@@ -437,13 +437,15 @@ namespace oui
         const String& openingText,
         const String& errorText,
         FileRecipientHandler_type resultCallback,
-        std::shared_ptr<IFileSystem> fileSystem)
+        std::shared_ptr<IFileSystem> fileSystem,
+        int typesToHighlight)
         :
             m_resultCallback(resultCallback),
             m_fileSystem(fileSystem),
             m_rootFile(rootFile),
             m_openingText(openingText),
-            m_errorText(errorText)
+            m_errorText(errorText),
+            m_typesToHighlight(typesToHighlight)
     {
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);

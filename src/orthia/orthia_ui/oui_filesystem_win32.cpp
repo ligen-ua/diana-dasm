@@ -4,6 +4,27 @@
 
 namespace oui
 {
+
+    template<class ContainerStr>
+    void GetExtensionOfFile(const ContainerStr& fullName, ContainerStr* pExtension)
+    {
+        pExtension->clear();
+        int pExtensionsize = (int)fullName.size();
+        int size = (int)fullName.size();
+        for (int i = size - 1; i > 0; --i)
+        {
+            wchar_t ch = (wchar_t)fullName[i];
+            if (ch == '\\' || ch == L'/')
+            {
+                return;
+            }
+            if (ch == '.')
+            {
+                pExtension->assign(fullName.begin() + i + 1, fullName.end());
+                return;
+            }
+        }
+    }
     static bool IsFileNameSeparator(wchar_t ch)
     {
         return (ch == L'\\' || ch == L'/');
@@ -181,7 +202,17 @@ namespace oui
     };
     class CFileSystemImpl:public IFileSystem
     {
+        std::unordered_map<std::wstring, int> m_knownExtensions;
     public:
+        CFileSystemImpl()
+        {
+            m_knownExtensions[L"EXE"] = FileInfo::flag_any_executable;
+            m_knownExtensions[L"DLL"] = FileInfo::flag_any_executable;
+            m_knownExtensions[L"SYS"] = FileInfo::flag_any_executable;
+            m_knownExtensions[L"OCX"] = FileInfo::flag_any_executable;
+            m_knownExtensions[L"CPL"] = FileInfo::flag_any_executable;
+            m_knownExtensions[L"SCR"] = FileInfo::flag_any_executable;
+        }
         void AsyncOpenFile(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId_in, 
             FileRecipientHandler_type handler) override
@@ -294,6 +325,15 @@ namespace oui
                 if (highlightName == path)
                 {
                     info.flags |= FileInfo::flag_highlight;
+                }
+                std::wstring extension;
+                GetExtensionOfFile(info.fileName.native, &extension);
+                {
+                    auto it = m_knownExtensions.find(Uppercase_Silent(extension));
+                    if (it != m_knownExtensions.end())
+                    {
+                        info.flags |= it->second;
+                    }
                 }
                 result.push_back(info);
 
