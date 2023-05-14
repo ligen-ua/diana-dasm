@@ -152,20 +152,84 @@ namespace oui
         }
         return 0;
     }
+
+    class CFile:public IFile, Noncopyable
+    {
+        HANDLE m_hFile;
+    public:
+        CFile(HANDLE hFile)
+            :
+                m_hFile(hFile)
+        {
+        }
+        ~CFile()
+        {
+            Reset(0);
+        }
+        void Reset(HANDLE hFile)
+        {
+            if (hFile == m_hFile)
+            {
+                return;
+            }
+            if (m_hFile != 0 && m_hFile != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(m_hFile);
+            }
+            m_hFile = hFile;
+        }
+    };
     class CFileSystemImpl:public IFileSystem
     {
     public:
         void AsyncOpenFile(ThreadPtr_type targetThread, 
-            const FileUnifiedId& fileId, 
+            const FileUnifiedId& fileId_in, 
             FileRecipientHandler_type handler) override
         {
+            FileUnifiedId fileId = fileId_in;
+            Normalize(fileId.fullFileName.native);
+
+            std::wstring folderName;
+            std::shared_ptr<IFile> file;
+            int error = 0;
+            HANDLE hValue = CreateFileW(fileId.fullFileName.native.c_str(),
+                GENERIC_READ,
+                FILE_SHARE_READ,
+                nullptr,
+                OPEN_EXISTING,
+                0,
+                0);
+
+            if (hValue == INVALID_HANDLE_VALUE)
+            {
+                // check if it is a directory
+                error = GetLastError();
+                HANDLE hDir = CreateFileW(fileId.fullFileName.native.c_str(),
+                    GENERIC_READ,
+                    FILE_SHARE_READ,
+                    nullptr,
+                    OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS,
+                    0);
+                if (hDir != INVALID_HANDLE_VALUE)
+                {
+                    folderName = fileId.fullFileName.native;
+                    ErasePrefix(folderName);
+
+                    error = 0;
+                    CloseHandle(hDir);
+                }
+            }
+            else
+            {
+                file = std::make_shared<CFile>(hValue);
+            }
+
             auto operation = std::make_shared<Operation<FileRecipientHandler_type>>(
                 targetThread,
                 handler);
             
-            Sleep(1000);
-            std::shared_ptr<IFile> file;
-            operation->ReplyWithRetain(operation, file, 1234);
+            operation->ReplyWithRetain(operation, file, error, folderName);
         }
         void AsyncStartQueryFiles(ThreadPtr_type targetThread,
             const FileUnifiedId& fileId_in,

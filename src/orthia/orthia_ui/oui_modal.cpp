@@ -14,6 +14,10 @@ namespace oui
     }
     void CBaseModalWindow::FinishDialog()
     {
+        // take the guard, it could be the last call 
+        // where on finish dialog can remove last shared ptr
+        auto guard = GetPtr();
+
         if (m_dialogFinished)
         {
             return;
@@ -244,8 +248,8 @@ namespace oui
     {
         m_lastModalWindow = pool->GetModalWindow();
         pool->SetModalWindow(GetPtr());
-        pool->SetFocus(GetPtr());
         Parent_type::OnInit(pool);
+        pool->SetFocus(GetPtr());
     }
     void CModalWindow::OnFinishDialog() 
     {

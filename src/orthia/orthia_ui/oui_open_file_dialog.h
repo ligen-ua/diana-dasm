@@ -29,6 +29,10 @@ namespace oui
 
     class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
+    public:
+        using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile>)>;
+
+    private:
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
 
         std::shared_ptr<CListBox> m_filesBox;
@@ -66,7 +70,7 @@ namespace oui
             const String& fileName,
             bool combine);
         void OnWaitBoxDestroyed();
-        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error);
+        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error, const String& folderName);
     protected:
         void OnResize() override;
         void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size);
