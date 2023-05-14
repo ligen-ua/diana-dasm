@@ -199,6 +199,58 @@ namespace oui
             }
             m_hFile = hFile;
         }
+        std::tuple<int, unsigned long long> GetSizeInBytes() const override
+        {
+            LARGE_INTEGER size;
+            size.QuadPart = 0;
+            if (!::GetFileSizeEx(m_hFile, &size))
+            {
+                int error = GetLastError();
+                return std::make_tuple(error, 0ULL);
+            }
+            return std::make_tuple(0, size.QuadPart);
+        }
+
+        void MoveToBegin()
+        {
+            LARGE_INTEGER distance;
+            distance.QuadPart = 0;
+            LARGE_INTEGER result;
+            SetFilePointerEx(m_hFile, distance, &result, FILE_BEGIN);
+        }
+        int SaveToVector(std::shared_ptr<BaseOperation> operation, size_t size, std::vector<char>& peFile) override
+        {
+            MoveToBegin();
+            peFile.resize(size);
+
+            DWORD pageSize = 1024 * 1024;
+            std::vector<char> page(pageSize);
+            
+            auto ptr = peFile.data();
+            size_t sizeToCopy = size;
+            for (; sizeToCopy; )
+            {
+                DWORD sizeToRead = pageSize;
+                if (sizeToCopy < pageSize)
+                {
+                    sizeToRead = (DWORD)sizeToCopy;
+                }
+                DWORD readBytes = 0;
+                if (!ReadFile(m_hFile, ptr, sizeToRead, &readBytes, 0))
+                {
+                    return GetLastError();
+                }
+                ptr += readBytes;
+                sizeToCopy -= readBytes;
+
+                if (operation->IsCancelled())
+                {
+                    return ERROR_CANCELLED;
+                }
+            }
+            return 0;
+        }
+
     };
     class CFileSystemImpl:public IFileSystem
     {
@@ -392,6 +444,12 @@ namespace oui
                 error = GetLastError();
             }
             targetThread->AddTask([=]() { handler(oui::String(result), error);  });
+        }
+
+        void AsyncExecute(ThreadPtr_type targetThread,
+            ExecuteHandler_type handler)
+        {
+            handler();
         }
     };
 

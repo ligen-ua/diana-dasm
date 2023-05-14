@@ -355,6 +355,32 @@ namespace oui
             }
         });
     }
+    void COpenFileDialog::FinishFileOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result)
+    {
+        if (op != m_openOperation || !m_waitBox)
+        {
+            // user cancelled the op
+            return;
+        }
+        // this is valid op
+        if (result.error.native.empty())
+        {
+            // no error
+            m_readyToExit = true;
+            m_resultCallback = nullptr;
+            m_waitBox->FinishDialog();
+            return;
+        }
+
+        // the owner doesn't approve this particular file
+        // show it
+        m_result = nullptr;
+        if (m_waitBox)
+        {
+            m_waitBoxText = result.error.native;
+            m_waitBox->Invalidate();
+        }
+    }
     void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error, const String& folderName)
     {
         if (openFileSeq != m_openFileSeq)
@@ -375,17 +401,40 @@ namespace oui
         {
             if (m_waitBox)
             {
-                m_waitBoxText = PassParameter1(m_errorText, OUI_TO_STR(error));
+                m_waitBoxText = PassParameter1(m_errorText, GetErrorText(error));
                 m_waitBox->Invalidate();
             }
             return;
         }
         m_result = file;
-        if (m_resultCallback)
+        auto me = GetPtr_t<COpenFileDialog>(this);
+        if (m_resultCallback && me)
         {
-            m_resultCallback(m_result);
-            m_resultCallback = nullptr;
+            // call approve callback
+            std::weak_ptr<COpenFileDialog> weakMe = me;
+            auto operation = std::make_shared<Operation<oui::fsui::FileCompleteHandler_type>>(
+                this->GetThread(),
+                [=](std::shared_ptr<BaseOperation> op, std::shared_ptr<IFile> file, const oui::fsui::OpenResult& result) {
+                if (auto p = weakMe.lock())
+                {
+                    me->FinishFileOpen(op, result);
+                }
+            });
+            m_openOperation = operation;
+            auto errorText = m_resultCallback(me, m_result, m_openOperation);
+            if (errorText.error.native.empty())
+            {
+                return;
+            }
+            if (m_waitBox)
+            {
+                m_waitBoxText = errorText.error;
+                m_waitBox->Invalidate();
+            }
+            return;
         }
+        m_readyToExit = true;
+        m_resultCallback = nullptr;
         if (m_waitBox)
         {
             m_waitBox->FinishDialog();
@@ -398,7 +447,13 @@ namespace oui
     void COpenFileDialog::OnWaitBoxDestroyed()
     {
         m_waitBox = 0;
-        if (m_result)
+        m_result = nullptr;
+        if (m_openOperation)
+        {
+            m_openOperation->Cancel();
+            m_openOperation = nullptr;
+        }
+        if (m_readyToExit)
         {
             FinishDialog();
         }
@@ -462,7 +517,10 @@ namespace oui
         this->RegisterSwitch(m_fileEdit);
         this->RegisterSwitch(m_filesBox);
     }
+    COpenFileDialog::~COpenFileDialog()
+    {
 
+    }
     void COpenFileDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
     {
         m_filesBox->SetFocus();
@@ -494,7 +552,8 @@ namespace oui
         if (m_resultCallback && !m_result)
         {
             // report nothing
-            m_resultCallback(m_result);
+            auto me = GetPtr_t<COpenFileDialog>(this);
+            m_resultCallback(me, m_result, nullptr);
             m_resultCallback = nullptr;
         }
         Parent_type::OnFinishDialog();

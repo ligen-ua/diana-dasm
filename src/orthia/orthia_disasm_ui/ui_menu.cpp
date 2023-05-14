@@ -1,5 +1,5 @@
 #include "ui_main_window.h"
-#include "oui_open_file_dialog.h"
+
 void CMainWindow::ToggleMenu(bool openPopup)
 {
     if (m_menu->IsActive())
@@ -13,14 +13,44 @@ void CMainWindow::ToggleMenu(bool openPopup)
         m_menu->OpenPopup();
     }
 }
+
+oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
+    std::shared_ptr<oui::IFile> file, 
+    oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
+{ 
+    if (dialog && file && completeHandler)
+    {
+        // means "success"
+        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
+            model->AddExecutable(file, completeHandler);
+        });
+    }
+    return oui::fsui::OpenResult();
+};
+
 void CMainWindow::OpenExecutable()
 {
     auto openFileNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.openfile"));
 
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    std::weak_ptr<CMainWindow> weakMe = me;
+    if (!me)
+    {
+        return;
+    }
+    
+    // create open dialog
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>(oui::String(),
         openFileNode->QueryValue(ORTHIA_TCSTR("opening")),
         openFileNode->QueryValue(ORTHIA_TCSTR("error")),
-        nullptr,
+        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler) {
+            if (auto p = weakMe.lock())
+            {
+                return p->HandleOpenExecutable(dlg, file, handler);
+            }
+            oui::fsui::OpenResult result(OUI_TCSTR("Error"));
+            return result;
+        },
         m_model->GetFileSystem(),
         oui::FileInfo::flag_any_executable));
     dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));

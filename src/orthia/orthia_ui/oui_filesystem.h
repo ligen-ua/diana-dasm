@@ -10,6 +10,8 @@ namespace oui
     struct IFile
     {
         virtual ~IFile() {}
+        virtual std::tuple<int, unsigned long long> GetSizeInBytes() const = 0;
+        virtual int SaveToVector(std::shared_ptr<BaseOperation> operation, size_t size, std::vector<char>& peFile) = 0;
     };
 
     struct FileUnifiedId
@@ -50,6 +52,7 @@ namespace oui
         int error,
         const String& tag)>;
     using QueryDefaultRootHandler_type = std::function<void(const String& name, int error)>;
+    using ExecuteHandler_type = std::function<void()>;
 
     struct IFileSystem
     {
@@ -57,7 +60,9 @@ namespace oui
         const static int queryFlags_OpenChild  = 0x0002;
 
         virtual ~IFileSystem() {}
-        virtual void AsyncOpenFile(ThreadPtr_type targetThread, const FileUnifiedId& fileId, FileRecipientHandler_type handler) = 0;
+        virtual void AsyncOpenFile(ThreadPtr_type targetThread, 
+            const FileUnifiedId& fileId, 
+            FileRecipientHandler_type handler) = 0;
         virtual void AsyncStartQueryFiles(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId, 
             const String& argument,
@@ -66,6 +71,10 @@ namespace oui
             OperationPtr_type<QueryFilesHandler_type> handler) = 0;
         virtual void AsyncQueryDefaultRoot(ThreadPtr_type targetThread, QueryDefaultRootHandler_type handler) = 0;
         virtual String AppendSlash(const String& file) = 0;
+
+        // async execute
+        virtual void AsyncExecute(ThreadPtr_type targetThread,
+            ExecuteHandler_type handler) = 0;
     };
 
     // default filesystem
@@ -93,7 +102,30 @@ namespace oui
             QueryDefaultRootHandler_type handler) override;
 
         String AppendSlash(const String& file) override;
+
+        // execute FS task
+        void AsyncExecute(ThreadPtr_type targetThread,
+            ExecuteHandler_type handler) override;
+
     };
 
     std::shared_ptr<IFileSystem> CreateDefaultFSProvider();
+
+    namespace fsui
+    {
+        struct OpenResult
+        {
+            String error;
+            OpenResult()
+            {
+            }
+            OpenResult(const String& error_in)
+                :
+                error(error_in)
+            {
+            }
+        };
+
+        using FileCompleteHandler_type = std::function<void(std::shared_ptr<BaseOperation>, std::shared_ptr<IFile>, const OpenResult&)>;
+    }
 }

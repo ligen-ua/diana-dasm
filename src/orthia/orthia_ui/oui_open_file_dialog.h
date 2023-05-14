@@ -30,7 +30,7 @@ namespace oui
     class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
     public:
-        using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile>)>;
+        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile>, OperationPtr_type<fsui::FileCompleteHandler_type>)>;
 
     private:
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
@@ -55,7 +55,9 @@ namespace oui
         int m_openFileSeq = 0;
         String m_waitBoxText;
         std::shared_ptr<IFile> m_result;
-        int m_typesToHighlight;
+        OperationPtr_type<oui::fsui::FileCompleteHandler_type> m_openOperation;
+        int m_typesToHighlight = 0;
+        bool m_readyToExit = false;
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
             const FileUnifiedId& folderId,
@@ -72,6 +74,7 @@ namespace oui
             bool combine);
         void OnWaitBoxDestroyed();
         void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error, const String& folderName);
+        void FinishFileOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
     protected:
         void OnResize() override;
         void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size);
@@ -94,7 +97,7 @@ namespace oui
             FileRecipientHandler_type resultCallback,
             std::shared_ptr<IFileSystem> fileSystem,
             int typesToHighlight = 0);
-
+        ~COpenFileDialog();
         void ShiftViewWindow(int newPosition) override;
         bool ShiftViewWindowToSymbol(const String& symbol) override;
         int GetTotalCount() const override;

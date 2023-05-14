@@ -10,6 +10,10 @@ namespace oui
     }
     void CWindowsPool::SetModalWindow(std::shared_ptr<CWindow> window)
     {
+        if (window && window->IsDestroyed())
+        {
+            return;
+        }
         m_modalWindow = window;
     }
     std::shared_ptr<CWindow> CWindowsPool::GetModalWindow()
@@ -64,6 +68,10 @@ namespace oui
 
     void CWindowsPool::SetFocus(std::shared_ptr<CWindow> window, bool invalidate)
     {
+        if (window && window->IsDestroyed())
+        {
+            return;
+        }
         auto oldFocused = m_focused;
 
         if (m_focused != window)
@@ -212,7 +220,7 @@ namespace oui
         }
     }
 
-    std::shared_ptr<CWindowsPool> CWindow::GetPool()
+    std::shared_ptr<CWindowsPool> CWindow::GetPool() const
     {
         return m_pool.lock();
     }
@@ -327,7 +335,7 @@ namespace oui
     {
         return m_active || IsFocused();
     }
-    CConsole* CWindow::GetConsole()
+    CConsole* CWindow::GetConsole() const
     {
         if (auto pool = GetPool())
         {
@@ -422,6 +430,12 @@ namespace oui
     }
     void CWindow::Destroy()
     {
+        if (m_destroyed)
+        {
+            return;
+        }
+        m_destroyed = true;
+    
         auto guard = GetPtr();
         for (auto it = m_childs.begin(), it_end = m_childs.end(); it != it_end; )
         {

@@ -72,7 +72,7 @@ namespace oui
     class Noncopyable {
     public:
         Noncopyable() = default;
-        ~Noncopyable() = default;
+        virtual ~Noncopyable() = default;
 
     private:
         Noncopyable(const Noncopyable&) = delete;

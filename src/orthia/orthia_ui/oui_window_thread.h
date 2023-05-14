@@ -24,21 +24,13 @@ namespace oui
 
     class BaseOperation:public Noncopyable
     {
-    public:
-    };
-    template<class HandlerType>
-    class Operation:public BaseOperation
-    {
-        std::shared_ptr<CWindowThread> m_thread;
-        HandlerType m_handler;
+    protected:
         std::atomic_bool m_cancelled = false;
-
     public:
-        template<class Type>
-        Operation(std::shared_ptr<CWindowThread> thread, Type&& value)
-            :
-                m_thread(thread),
-                m_handler(std::forward<Type>(value))
+        BaseOperation()
+        {
+        }
+        virtual ~BaseOperation()
         {
         }
         void Cancel()
@@ -48,6 +40,21 @@ namespace oui
         bool IsCancelled() const
         {
             return m_cancelled;
+        }
+    };
+    template<class HandlerType>
+    class Operation:public BaseOperation
+    {
+        std::shared_ptr<CWindowThread> m_thread;
+        HandlerType m_handler;
+
+    public:
+        template<class Type>
+        Operation(std::shared_ptr<CWindowThread> thread, Type&& value)
+            :
+                m_thread(thread),
+                m_handler(std::forward<Type>(value))
+        {
         }
         template<class... Args>
         bool Reply(Args&&... args)
