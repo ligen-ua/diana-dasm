@@ -422,6 +422,7 @@ namespace oui
     }
     void CWindow::Destroy()
     {
+        auto guard = GetPtr();
         for (auto it = m_childs.begin(), it_end = m_childs.end(); it != it_end; )
         {
             auto oldIt = it++;
