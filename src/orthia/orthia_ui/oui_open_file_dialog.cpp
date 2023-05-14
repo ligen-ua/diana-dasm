@@ -122,6 +122,7 @@ namespace oui
 
             m_filesBox->SetOffset(0);
             m_filesBox->SetSelectedPosition(0);
+            m_filesBox->SetFocus();
         }
         else
         {
@@ -347,17 +348,27 @@ namespace oui
         }
         m_fileSystem->AsyncOpenFile(this->GetThread(),
             FileUnifiedId(targetFile),
-            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile> file, int error) {
+            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile> file, int error, const oui::String& folderName) {
             if (auto p = weakMe.lock())
             {
-                me->SetOpenFileResult(openFileSeq, file, error);
+                me->SetOpenFileResult(openFileSeq, file, error, folderName);
             }
         });
     }
-    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error)
+    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error, const String& folderName)
     {
         if (openFileSeq != m_openFileSeq)
         {
+            return;
+        }
+        // check the case when user entered filename, just go there
+        if (!folderName.native.empty())
+        {
+            if (m_waitBox)
+            {
+                m_waitBox->FinishDialog();
+            }
+            ChangeFolder(FileUnifiedId(folderName), oui::String(), 0, oui::String());
             return;
         }
         if (error)
@@ -372,7 +383,8 @@ namespace oui
         m_result = file;
         if (m_resultCallback)
         {
-            m_resultCallback(m_result, 0);
+            m_resultCallback(m_result);
+            m_resultCallback = nullptr;
         }
         if (m_waitBox)
         {
@@ -441,7 +453,7 @@ namespace oui
         m_fileEdit->SetEnterHandler([this](const String& text) {
             TryOpenFile(FileUnifiedId(text),
                 text,
-                true);
+                false);
         });
         m_fileLabel = std::make_shared<CLabel>(m_colorProfile, [] { return String(OUI_STR(">"));  });
 
@@ -476,6 +488,12 @@ namespace oui
         if (m_waitBox)
         {
             m_waitBox->Destroy();
+        }
+        if (m_resultCallback && !m_result)
+        {
+            // report nothing
+            m_resultCallback(m_result);
+            m_resultCallback = nullptr;
         }
         Parent_type::OnFinishDialog();
     }

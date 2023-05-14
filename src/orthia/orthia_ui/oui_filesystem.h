@@ -42,7 +42,7 @@ namespace oui
     };
 
     using ThreadPtr_type = std::shared_ptr<CWindowThread>;
-    using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile>, int error)>;
+    using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile>, int error, const String& folderName)>;
     using QueryFilesHandler_type = std::function<void(std::shared_ptr<BaseOperation> operation, 
         const FileUnifiedId& folderId, 
         const std::vector<FileInfo>& data, 
