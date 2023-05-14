@@ -301,11 +301,12 @@ namespace oui
     }
     void CMessageBoxWindow::OnFinishDialog()
     {
+        auto guard = GetPtr();
+        Parent_type::OnFinishDialog();
         if (m_onDestroy)
         {
             m_onDestroy();
         }
-        Parent_type::OnFinishDialog();
     }
     void CMessageBoxWindow::ConstructChilds()
     {

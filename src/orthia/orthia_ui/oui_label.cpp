@@ -43,7 +43,14 @@ namespace oui
     }
     String CLabel::GetText() const
     {
-        return m_getText();
+        auto console = GetConsole();
+
+        String text = m_getText();
+        if (console)
+        {
+            console->FilterOrReplaceUnreadableSymbols(text);
+        }
+        return text;
     }
     bool CLabel::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {

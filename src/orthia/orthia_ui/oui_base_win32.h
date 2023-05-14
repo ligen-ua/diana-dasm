@@ -51,4 +51,40 @@ namespace oui
     };
 
 
+    inline std::wstring GetErrorText(int error, DWORD dwLangId = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT))
+    {
+        HLOCAL hlocal = NULL;   // Buffer that gets the error message string
+
+        // Get the error code's textual description
+        BOOL fOk = FormatMessageW(
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+            NULL, (DWORD)error, dwLangId,
+            (LPWSTR)&hlocal, 0, NULL);
+
+        if (!fOk) {
+            // Is it a network-related error?
+            HMODULE hDll = LoadLibraryEx(TEXT("netmsg.dll"), NULL,
+                DONT_RESOLVE_DLL_REFERENCES);
+
+            if (hDll != NULL) {
+                FormatMessageW(
+                    FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_FROM_SYSTEM,
+                    hDll, (DWORD)error, dwLangId,
+                    (LPWSTR)&hlocal, 0, NULL);
+                FreeLibrary(hDll);
+            }
+        }
+
+        if (hlocal != NULL)
+        {
+            std::wstring sErr = (const wchar_t*)LocalLock(hlocal);
+            LocalFree(hlocal);
+            return sErr;
+        }
+        else
+        {
+            return std::to_wstring(error);
+        }
+    }
+
 }

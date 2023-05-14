@@ -42,6 +42,18 @@ namespace oui
     {
         return m_fsImpl->AppendSlash(file);
     }
+
+    void CFileSystem::AsyncExecute(ThreadPtr_type targetThread,
+        ExecuteHandler_type handler)
+    {
+        if (!targetThread)
+        {
+            return;
+        }
+        m_pool.AddTask([=, handler = std::move(handler)]() {
+            m_fsImpl->AsyncExecute(targetThread, handler);
+        });
+    }
     void CFileSystem::AsyncQueryDefaultRoot(ThreadPtr_type targetThread, 
         QueryDefaultRootHandler_type handler)
     {

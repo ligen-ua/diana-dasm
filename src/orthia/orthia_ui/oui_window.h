@@ -84,7 +84,7 @@ namespace oui
     {
     protected:
         std::weak_ptr<CWindow> m_parent;
-        std::weak_ptr<CWindowsPool> m_pool;
+        mutable std::weak_ptr<CWindowsPool> m_pool;
 
         Point m_position;
         Size m_size;
@@ -94,7 +94,7 @@ namespace oui
 
         bool m_active = false;
         bool m_mouseIsOn = false;
-
+        bool m_destroyed = false;
         std::list<std::shared_ptr<CWindow>> m_childs;
         std::function<void()> m_onResize = nullptr;
 
@@ -120,7 +120,7 @@ namespace oui
             std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler,
             int endX,
             int endY);
-        CConsole* GetConsole();
+        CConsole* GetConsole() const;
 
         static CConsole* g_defConsole;
     public:
@@ -149,6 +149,7 @@ namespace oui
 
         static void InitDefConsole(CConsole* defConsole);
 
+        bool IsDestroyed() const { return m_destroyed; }
         virtual bool IsPopup() const { return false;  }
         virtual void OnMouseLeave();
         virtual void OnMouseEnter();
@@ -198,7 +199,7 @@ namespace oui
         virtual void DoPaint(const Rect& rect, DrawParameters& parameters);
 
         std::shared_ptr<CWindow> GetPtr();
-        std::shared_ptr<CWindowsPool> GetPool();
+        std::shared_ptr<CWindowsPool> GetPool() const;
 
         virtual void Activate();
         virtual void Deactivate();
