@@ -12,6 +12,7 @@ namespace oui
         virtual ~IFile() {}
         virtual std::tuple<int, unsigned long long> GetSizeInBytes() const = 0;
         virtual int SaveToVector(std::shared_ptr<BaseOperation> operation, size_t size, std::vector<char>& peFile) = 0;
+        virtual oui::String GetFullFileName() const = 0;
     };
 
     struct FileUnifiedId

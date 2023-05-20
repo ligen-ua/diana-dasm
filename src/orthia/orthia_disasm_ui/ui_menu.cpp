@@ -20,9 +20,31 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
 { 
     if (dialog && file && completeHandler)
     {
-        // means "success"
+        // means open dialog manager to open a file
+        // setup UI proxy on success and pass the handler to FS handler
+        auto me = oui::GetPtr_t<CMainWindow>(this);
+        std::weak_ptr<CMainWindow> weakMe = me;
+        if (!me)
+        {
+            return oui::fsui::OpenResult();
+        }
+        oui::fsui::FileCompleteHandler_type rawHandler = completeHandler->GetHandler();
+        completeHandler->SetHandler(
+            [=](std::shared_ptr<oui::BaseOperation> op, std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result) {
+    
+            if (auto p = weakMe.lock())
+            {
+                if (result.error.native.empty())
+                {
+                    // finally
+                    p->OnWorkspaceItemChanged();
+                }
+            }
+            rawHandler(op, file, result);
+        });
+
         m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
-            model->AddExecutable(file, completeHandler);
+            model->AddExecutable(file, completeHandler, true);
         });
     }
     return oui::fsui::OpenResult();

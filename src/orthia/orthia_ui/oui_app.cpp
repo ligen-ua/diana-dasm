@@ -25,7 +25,6 @@ namespace oui
     {
         auto thread = std::make_shared<CWindowThread>();
         m_pool->RegisterRootWindow(rootWindow, thread);
-        rootWindow->Init(m_pool);
 
         oui::CConsole mainConsole;
         m_pool->RegisterConsole(&mainConsole);
@@ -34,6 +33,7 @@ namespace oui
         oui::ScopedGuard consoleGuard([&]() {  m_pool->RegisterConsole(0);  });
         oui::ScopedGuard wndConsoleGuard([&]() {  CWindow::InitDefConsole(0);  });
 
+        rootWindow->Init(m_pool);
         try
         {
             oui::CConsoleStateSaver stateSaver;

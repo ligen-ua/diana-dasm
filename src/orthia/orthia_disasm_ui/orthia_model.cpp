@@ -16,12 +16,42 @@ namespace orthia
     {
         return m_fileSystem;
     }
-    void CProgramModel::QueryWorkspace(std::vector<std::string>& allNames, std::string& active)
+    bool CProgramModel::QueryActiveWorkspaceItem(WorkplaceItem& item) const
     {
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+
+        auto it = m_items.find(m_activeId);
+        if (it == m_items.end())
+        {
+            return false;
+        }
+        item.uid = m_activeId;
+        item.name = it->second->shortName;
+        return true;
+    }
+    int CProgramModel::QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const
+    {
+        items.clear();
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+
+        int activePos = -1;
+        for (const auto& item : m_items)
+        {
+            WorkplaceItem res;
+            res.uid = item.first;
+            res.name = item.second->shortName;
+            if (res.uid == m_activeId)
+            {
+                activePos = (int)items.size();
+            }
+            items.push_back(res);
+        }
+        return activePos;
     }
 
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile> file,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+        bool makeActive)
     {
         // non-ui thread
         auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
@@ -59,10 +89,24 @@ namespace orthia
             return;
         }
         
-        orthia::CSimplePeFile mappedPE;
+        auto mappedPE = std::make_unique<orthia::CSimplePeFile>();
         orthia::MapFileParameters params;
-        mappedPE.MapFile(peFile, params);
+        mappedPE->MapFile(peFile, params);
 
+        auto info = std::make_shared<WorkplaceItemInternal>();
+        info->fullName = file->GetFullFileName();
+        info->peFile = std::move(mappedPE);
+        oui::String shortName;
+        orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
+        info->shortName = std::move(shortName);
+
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+        m_items[++m_lastUid] = info;
+
+        if (makeActive)
+        {
+            m_activeId = m_lastUid;
+        }
         // OK
         result.error.native.clear();
     }

@@ -88,6 +88,21 @@ namespace oui
             });
             return true;
         }
+
+        HandlerType& GetHandler()
+        {
+            return m_handler;
+        }
+        const HandlerType& GetHandler() const
+        {
+            return m_handler;
+        }
+
+        template<class Type>
+        void SetHandler(Type&& value)
+        {
+            m_handler = std::forward<Type>(value);
+        }
     };
 
     template<class T>

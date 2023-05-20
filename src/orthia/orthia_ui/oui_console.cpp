@@ -142,6 +142,10 @@ namespace oui
     {
         return *m_symbolsAnalyzer;
     }
+    void CConsole::SetTitle(const String& caption)
+    {
+        SetConsoleTitleW(caption.native.c_str());
+    }
     void CConsole::FilterOrReplaceUnreadableSymbols(String& data)
     {
         oui::FilterUnreadableSymbols(data.native);

@@ -20,6 +20,7 @@ namespace oui
         void DetectVersion();
     public:
         CConsole();
+        void SetTitle(const String& caption);
         void FilterOrReplaceUnreadableSymbols(String& data);
         void ReplaceWideSymbols(String& data);
         ISymbolsAnalyzer& GetSymbolsAnalyzer();
