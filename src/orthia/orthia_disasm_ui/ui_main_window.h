@@ -30,6 +30,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
         std::shared_ptr<oui::IFile> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
+    void OnWorkspaceItemChanged();
+    void SetDefaultTitle();
 public:
     CMainWindow(std::shared_ptr<orthia::CProgramModel> model);
     void ConstructChilds() override;

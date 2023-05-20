@@ -5,6 +5,34 @@ CMainWindow::CMainWindow(std::shared_ptr<orthia::CProgramModel> model)
         m_model(model)
 {
 }
+void CMainWindow::SetDefaultTitle()
+{
+    auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+
+    auto console = GetConsole();
+    if (!console)
+    {
+        return;
+    }
+    console->SetTitle(mainNode->QueryValue(ORTHIA_TCSTR("caption")));
+}
+void CMainWindow::OnWorkspaceItemChanged()
+{
+    orthia::WorkplaceItem item;
+    if (!m_model->QueryActiveWorkspaceItem(item))
+    {
+        SetDefaultTitle();
+        return;
+    }
+    auto console = GetConsole();
+    if (!console)
+    {
+        return;
+    }
+
+    auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+    console->SetTitle(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("caption-file")), item.name));
+}
 void CMainWindow::ConstructChilds()
 {
     CMainWindow::ConstuctMenu();
@@ -45,6 +73,7 @@ void CMainWindow::ConstructChilds()
 
 void CMainWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
 {
+    SetDefaultTitle();
     m_disasmWindow->Activate();
 }
 bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)

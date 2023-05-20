@@ -41,6 +41,11 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("error"), ORTHIA_TCSTR("Error: %1"))
         ;
 
+    // main
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.main"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Orthia Disassembler"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption-file"), ORTHIA_TCSTR("Orthia File: %1"))
+        ;
 
     // model
     textManager->RegisterNode(ORTHIA_TCSTR("model.errors"))

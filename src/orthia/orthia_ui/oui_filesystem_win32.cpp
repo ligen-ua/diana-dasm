@@ -176,18 +176,20 @@ namespace oui
 
     class CFile:public IFile, Noncopyable
     {
+        String m_fullName;
         HANDLE m_hFile;
     public:
-        CFile(HANDLE hFile)
+        CFile(const String& fullname, HANDLE hFile)
             :
+                m_fullName(fullname),
                 m_hFile(hFile)
         {
         }
         ~CFile()
         {
-            Reset(0);
+            Reset(String(), 0);
         }
-        void Reset(HANDLE hFile)
+        void Reset(const String& fullname, HANDLE hFile)
         {
             if (hFile == m_hFile)
             {
@@ -198,6 +200,7 @@ namespace oui
                 CloseHandle(m_hFile);
             }
             m_hFile = hFile;
+            m_fullName = fullname;
         }
         std::tuple<int, unsigned long long> GetSizeInBytes() const override
         {
@@ -211,12 +214,16 @@ namespace oui
             return std::make_tuple(0, size.QuadPart);
         }
 
-        void MoveToBegin()
+        void MoveToBegin() 
         {
             LARGE_INTEGER distance;
             distance.QuadPart = 0;
             LARGE_INTEGER result;
             SetFilePointerEx(m_hFile, distance, &result, FILE_BEGIN);
+        }
+        oui::String GetFullFileName() const override
+        {
+            return m_fullName;
         }
         int SaveToVector(std::shared_ptr<BaseOperation> operation, size_t size, std::vector<char>& peFile) override
         {
@@ -305,7 +312,7 @@ namespace oui
             }
             else
             {
-                file = std::make_shared<CFile>(hValue);
+                file = std::make_shared<CFile>(fileId.fullFileName, hValue);
             }
 
             auto operation = std::make_shared<Operation<FileRecipientHandler_type>>(

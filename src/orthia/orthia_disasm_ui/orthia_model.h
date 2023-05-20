@@ -8,19 +8,38 @@ extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
 namespace orthia
 {
+    class CSimplePeFile;
+    struct WorkplaceItemInternal
+    {
+        std::unique_ptr<orthia::CSimplePeFile> peFile;
+        oui::String fullName, shortName;
+    };
+
+    struct WorkplaceItem
+    {
+        int uid = 0;
+        oui::String name;
+    };
     class CProgramModel
     {
         std::shared_ptr<oui::CFileSystem> m_fileSystem;
 
+        mutable std::mutex m_lock;
+        std::map<int, std::shared_ptr<WorkplaceItemInternal>> m_items;
+        int m_lastUid = 0;
+
+        int m_activeId = 0;
     public:
         CProgramModel();
 
         std::shared_ptr<oui::CFileSystem> GetFileSystem();
-        void QueryWorkspace(std::vector<std::string>& allNames, std::string& active);
+        int QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const;
+        bool QueryActiveWorkspaceItem(WorkplaceItem& item) const;
 
         // other thread
         void AddExecutable(std::shared_ptr<oui::IFile> file,
-            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+            bool makeActive);
 
     };
 }
