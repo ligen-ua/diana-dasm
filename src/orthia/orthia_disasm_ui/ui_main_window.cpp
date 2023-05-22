@@ -22,6 +22,7 @@ void CMainWindow::OnWorkspaceItemChanged()
     if (!m_model->QueryActiveWorkspaceItem(item))
     {
         SetDefaultTitle();
+        m_disasmWindow->SetActiveItem(-1);
         return;
     }
     auto console = GetConsole();
@@ -32,6 +33,7 @@ void CMainWindow::OnWorkspaceItemChanged()
 
     auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
     console->SetTitle(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("caption-file")), item.name));
+    m_disasmWindow->SetActiveItem(item.uid);
 }
 void CMainWindow::ConstructChilds()
 {
@@ -42,7 +44,8 @@ void CMainWindow::ConstructChilds()
     auto defaultGroup = m_panelContainerWindow->CreateDefaultGroup();
     {
         auto disasmNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.disasm"));
-        m_disasmWindow = std::make_shared<CDisasmWindow>([=]() {  return disasmNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+        m_disasmWindow = std::make_shared<CDisasmWindow>([=]() {  return disasmNode->QueryValue(ORTHIA_TCSTR("caption"));  },
+            m_model);
         defaultGroup->AddPanel(m_disasmWindow);
     }
 

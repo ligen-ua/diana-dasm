@@ -127,7 +127,7 @@ namespace oui
         }
 
         Parent_type::DoPaint(rect, parameters);
-;    }
+    }
     void CListBox::OnResize()
     {
         Parent_type::OnResize();
