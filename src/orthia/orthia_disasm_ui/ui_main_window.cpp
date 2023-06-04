@@ -35,6 +35,15 @@ void CMainWindow::OnWorkspaceItemChanged()
     console->SetTitle(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("caption-file")), item.name));
     m_disasmWindow->SetActiveItem(item.uid);
 }
+
+void CMainWindow::AddInitialArgument(const InitialOpenFileInfo& info)
+{
+    m_fileToOpen.push_back(info);
+}
+void CMainWindow::AddInitialTextOutputInfo(const oui::String& text)
+{
+    m_initialText.push_back(text);
+}
 void CMainWindow::ConstructChilds()
 {
     CMainWindow::ConstuctMenu();
@@ -78,6 +87,26 @@ void CMainWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
 {
     SetDefaultTitle();
     m_disasmWindow->Activate();
+
+    for (const auto& line: m_initialText)
+    {
+        m_outputWindow->AddLine(line);
+    }
+    auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+    for (const auto& info : m_fileToOpen)
+    {
+        if (info.errorCode)
+        {
+            m_outputWindow->AddLine(oui::PassParameter2(mainNode->QueryValue(ORTHIA_TCSTR("unknown")),
+                info.name,
+                oui::GetErrorText(info.errorCode)));
+            continue;
+        }
+        if (!AsyncOpenFile(info.file))
+        {
+            m_outputWindow->AddLine(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("file-error-name")), info.file->GetFullFileName()));
+        }
+    }
 }
 bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
 {

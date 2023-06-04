@@ -272,6 +272,29 @@ namespace oui
             m_knownExtensions[L"CPL"] = FileInfo::flag_any_executable;
             m_knownExtensions[L"SCR"] = FileInfo::flag_any_executable;
         }
+        std::tuple<int, std::shared_ptr<IFile>> SyncOpenFile(const FileUnifiedId& fileId_in)
+        {
+            FileUnifiedId fileId = fileId_in;
+            Normalize(fileId.fullFileName.native);
+
+            std::wstring folderName;
+            std::shared_ptr<IFile> file;
+            int error = 0;
+            HANDLE hValue = CreateFileW(fileId.fullFileName.native.c_str(),
+                GENERIC_READ,
+                FILE_SHARE_READ,
+                nullptr,
+                OPEN_EXISTING,
+                0,
+                0);
+            if (hValue == INVALID_HANDLE_VALUE)
+            {
+                auto err = GetLastError();
+                return std::make_tuple(err, file);
+            }
+            file = std::make_shared<CFile>(fileId.fullFileName, hValue);
+            return std::make_tuple(0, file);
+        }
         void AsyncOpenFile(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId_in, 
             FileRecipientHandler_type handler) override

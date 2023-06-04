@@ -6,17 +6,32 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 int RunTests();
 
 
+static void PrintUsage()
+{
+    std::cout << "Usage: [--run-tests] <filename>\n";
+}
 int wmain(int argc, const wchar_t* argv[])
 {
-   // MessageBox(0, 0, 0, 0);
-
+    // MessageBox(0, 0, 0, 0);
+    std::vector<std::wstring> filenamesToOpen;
     if (argc == 2)
     {
         if (wcscmp(argv[1], L"--run-tests") == 0)
         {
             return RunTests();
         }
+        filenamesToOpen.push_back(argv[1]);
     }
+    else
+    {
+        if (argc > 2)
+        {
+            // there is no support of that currently
+            PrintUsage();
+            return 1;
+        }
+    }
+
     std::cout << "Welcome to Orthia Disasm\n\n";
     std::cout.flush();
 
@@ -30,6 +45,16 @@ int wmain(int argc, const wchar_t* argv[])
         oui::CConsoleApp app;
 
         auto rootWindow = std::make_shared<CMainWindow>(programModel);
+
+
+        for (auto& name : filenamesToOpen)
+        {
+            int platformError = 0;
+            std::shared_ptr<oui::IFile> file;
+            std::tie(platformError, file) = programModel->GetFileSystem()->SyncOpenFile(oui::FileUnifiedId(name));
+            rootWindow->AddInitialArgument({platformError, name, file});
+        }
+
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

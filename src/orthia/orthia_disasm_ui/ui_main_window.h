@@ -11,6 +11,13 @@
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
+struct InitialOpenFileInfo
+{
+    int errorCode = 0;
+    oui::String name;
+    std::shared_ptr<oui::IFile> file;
+};
+
 class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
 {
     std::shared_ptr<orthia::CProgramModel> m_model;
@@ -21,6 +28,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     std::shared_ptr<COutputWindow> m_outputWindow;
 
     oui::CHotkeyStorage m_hotkeys;
+    std::vector<InitialOpenFileInfo> m_fileToOpen;
+    std::vector<oui::String> m_initialText;
 
     void ConstuctMenu();
     void ToggleMenu(bool openPopup);
@@ -31,9 +40,14 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
     void OnWorkspaceItemChanged();
+    void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);
+
     void SetDefaultTitle();
 public:
     CMainWindow(std::shared_ptr<orthia::CProgramModel> model);
+    void AddInitialArgument(const InitialOpenFileInfo& info);
+    void AddInitialTextOutputInfo(const oui::String& text);
     void ConstructChilds() override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
+    bool AsyncOpenFile(std::shared_ptr<oui::IFile> file);
 };
