@@ -7,3 +7,7 @@ COutputWindow::COutputWindow(std::function<oui::String()> getCaption)
     // FOR WIN LOGIC DEBUG
     //    SetBackgroundColor(oui::ColorBlue());
 }
+void COutputWindow::AddLine(const oui::String& line)
+{
+    m_lines.push_back(line);
+}

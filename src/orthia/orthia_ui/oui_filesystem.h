@@ -61,6 +61,8 @@ namespace oui
         const static int queryFlags_OpenChild  = 0x0002;
 
         virtual ~IFileSystem() {}
+        virtual std::tuple<int, std::shared_ptr<IFile>> SyncOpenFile(const FileUnifiedId& fileId) = 0;
+
         virtual void AsyncOpenFile(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId, 
             FileRecipientHandler_type handler) = 0;
@@ -85,6 +87,8 @@ namespace oui
         CThreadPool m_pool;
     public:
         CFileSystem();
+
+        std::tuple<int, std::shared_ptr<IFile>> SyncOpenFile(const FileUnifiedId& fileId);
 
         // id-based stuff
         void AsyncOpenFile(ThreadPtr_type targetThread, 

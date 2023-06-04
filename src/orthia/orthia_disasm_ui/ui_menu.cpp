@@ -13,7 +13,37 @@ void CMainWindow::ToggleMenu(bool openPopup)
         m_menu->OpenPopup();
     }
 }
+void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result)
+{
+    // TODO: write output here
+    if (result.error.native.empty())
+    {
+        // finally
+        OnWorkspaceItemChanged();
+    }
+}
+bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile> file)
+{
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    std::weak_ptr<CMainWindow> weakMe = me;
+    if (!me)
+    {
+        return false;
+    }
+    auto completeHandler = std::make_shared<oui::Operation<oui::fsui::FileCompleteHandler_type>>(
+        this->GetThread(),
+        [=](std::shared_ptr<oui::BaseOperation> op, std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result) {
+        if (auto p = weakMe.lock())
+        {
+            me->OnFileOpen(file, result);
+        }
+    });
 
+    m_model->GetFileSystem()->AsyncExecute(GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
+        model->AddExecutable(file, completeHandler, true);
+    });
+    return true;
+}
 oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
     std::shared_ptr<oui::IFile> file, 
     oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
@@ -34,11 +64,7 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
     
             if (auto p = weakMe.lock())
             {
-                if (result.error.native.empty())
-                {
-                    // finally
-                    p->OnWorkspaceItemChanged();
-                }
+                p->OnFileOpen(file, result);
             }
             rawHandler(op, file, result);
         });

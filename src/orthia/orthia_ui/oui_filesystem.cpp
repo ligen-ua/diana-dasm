@@ -9,6 +9,11 @@ namespace oui
         m_pool.Start(g_tasksCount);
     }
 
+    std::tuple<int, std::shared_ptr<IFile>> CFileSystem::SyncOpenFile(const FileUnifiedId& fileId)
+    {
+        return m_fsImpl->SyncOpenFile(fileId);
+    }
+
     // id-based stuff
     void CFileSystem::AsyncOpenFile(ThreadPtr_type targetThread, 
         const FileUnifiedId& fileId,

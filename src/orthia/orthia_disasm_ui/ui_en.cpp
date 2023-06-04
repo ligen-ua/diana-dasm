@@ -49,6 +49,8 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
 
     // model
     textManager->RegisterNode(ORTHIA_TCSTR("model.errors"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("file-error-name"), ORTHIA_TCSTR("Can't open file: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("file-error-name-code"), ORTHIA_TCSTR("Can't open file: \"%1\", %2"))
         << textManager->RegisterValue(ORTHIA_TCSTR("unknown"), ORTHIA_TCSTR("Can't parse PE file"))
         << textManager->RegisterValue(ORTHIA_TCSTR("empty"), ORTHIA_TCSTR("File is empty"))
         << textManager->RegisterValue(ORTHIA_TCSTR("too-big"), ORTHIA_TCSTR("File is too big"))
