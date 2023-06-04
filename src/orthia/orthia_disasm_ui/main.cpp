@@ -44,9 +44,10 @@ int wmain(int argc, const wchar_t* argv[])
 
         oui::CConsoleApp app;
 
+        // create root windows
         auto rootWindow = std::make_shared<CMainWindow>(programModel);
 
-
+        // pass arguments
         for (auto& name : filenamesToOpen)
         {
             int platformError = 0;

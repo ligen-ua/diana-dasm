@@ -15,11 +15,22 @@ void CMainWindow::ToggleMenu(bool openPopup)
 }
 void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result)
 {
-    // TODO: write output here
+    // finall result
     if (result.error.native.empty())
     {
-        // finally
+        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        m_outputWindow->AddLine(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opened-file")),
+            file->GetFullFileNameForUI()));
+
         OnWorkspaceItemChanged();
+        return;
+    }
+    if (file)
+    {
+        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+        m_outputWindow->AddLine(oui::PassParameter2(mainNode->QueryValue(ORTHIA_TCSTR("file-error-name-code")),
+            file->GetFullFileNameForUI(),
+            result.error));
     }
 }
 bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile> file)
