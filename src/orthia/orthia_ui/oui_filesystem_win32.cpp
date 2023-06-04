@@ -225,6 +225,12 @@ namespace oui
         {
             return m_fullName;
         }
+        oui::String GetFullFileNameForUI() const override
+        {
+            auto result = m_fullName;
+            ErasePrefix(result.native);
+            return result;
+        }
         int SaveToVector(std::shared_ptr<BaseOperation> operation, size_t size, std::vector<char>& peFile) override
         {
             MoveToBegin();

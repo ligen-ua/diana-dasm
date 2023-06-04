@@ -97,14 +97,14 @@ void CMainWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
     {
         if (info.errorCode)
         {
-            m_outputWindow->AddLine(oui::PassParameter2(mainNode->QueryValue(ORTHIA_TCSTR("unknown")),
+            m_outputWindow->AddLine(oui::PassParameter2(mainNode->QueryValue(ORTHIA_TCSTR("file-error-name-code")),
                 info.name,
                 oui::GetErrorText(info.errorCode)));
             continue;
         }
         if (!AsyncOpenFile(info.file))
         {
-            m_outputWindow->AddLine(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("file-error-name")), info.file->GetFullFileName()));
+            m_outputWindow->AddLine(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("file-error-name")), info.file->GetFullFileNameForUI()));
         }
     }
 }
