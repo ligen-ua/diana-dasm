@@ -27,6 +27,7 @@ namespace oui
         int m_windowSymStart = 0;
         int m_windowSymSize = 0;
 
+        bool m_readOnly = false;
         std::function<void(const String&text)> m_enterHandler;
         int GetCursorPosition() const;
         void SetTextImpl(const String& text);
@@ -38,6 +39,8 @@ namespace oui
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
+        void SetReadOnly(bool readOnly);
+        bool IsReadOnly() const;
         void SetEnterHandler(std::function<void(const String& text)> enterHandler);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
