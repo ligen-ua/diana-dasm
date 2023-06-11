@@ -38,7 +38,7 @@ namespace oui
             m_firstVisibleLineIndex = 0;
         }
         else
-        if (availableSize < availableHeight)
+        if ((availableSize + 1) < availableHeight)
         {
             yResizeCorrection = availableHeight - availableSize;
             m_firstVisibleLineIndex -= yResizeCorrection;
@@ -55,6 +55,10 @@ namespace oui
         if (m_cursorOutOfText)
         {
             m_yCursopPos = std::min(availableHeight, (int)m_lines.size() - m_firstVisibleLineIndex);
+            if ((m_yCursopPos + m_firstVisibleLineIndex) < (int)m_lines.size())
+            {
+                m_firstVisibleLineIndex += (int)m_lines.size() - (m_yCursopPos + m_firstVisibleLineIndex);
+            }
         }
         else
         {
@@ -102,13 +106,14 @@ namespace oui
             {
                 requestCount = -newFirstVisibleLineIndex;
                 newFirstVisibleLineIndex = 0;
-            }
-            if (requestCount)
-            {
-                // ask owner, need some data
-                MultiLineViewItem * item = m_lines.empty()? nullptr: &m_lines[0];
-                m_owner->ScrollUp(item, requestCount);
-                return;
+
+                if (requestCount)
+                {
+                    // ask owner, need some data
+                    MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[0];
+                    m_owner->ScrollUp(item, requestCount);
+                    return;
+                }
             }
             m_firstVisibleLineIndex = newFirstVisibleLineIndex;
             newCursor = 0;
@@ -122,9 +127,7 @@ namespace oui
             offset = 0;
         }
         m_editBox->SetText(m_lines[offset].text);
-
-        // move edit box
-        m_editBox->MoveTo({0, m_yCursopPos});
+        Invalidate();
     }
 
     void CMultiLineView::ScrollDown(int count)
@@ -158,10 +161,8 @@ namespace oui
         {
             int offset = m_firstVisibleLineIndex + m_yCursopPos;
             m_editBox->SetText(m_lines[offset].text);
-
-            // move edit box
-            m_editBox->MoveTo({ 0, m_yCursopPos });
         }
+        Invalidate();
     }
 
     bool CMultiLineView::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
@@ -250,19 +251,7 @@ namespace oui
     }
     void CMultiLineView::AddLine(MultiLineViewItem&& item)
     {
-        const Rect clientRect = GetClientRect();
-            
-        int visibleItemsCount = (int)m_lines.size() - m_firstVisibleLineIndex;
-        int emptyLinesCount = clientRect.size.height - visibleItemsCount;
-
         m_lines.push_back(std::move(item));
-        if (m_cursorOutOfText)
-        {
-            if (emptyLinesCount <= 0)
-            {
-                m_firstVisibleLineIndex = (int)m_lines.size() - clientRect.size.height;
-            }
-        }
         Invalidate();
     }
 }

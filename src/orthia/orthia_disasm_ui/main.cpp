@@ -47,6 +47,14 @@ int wmain(int argc, const wchar_t* argv[])
         // create root windows
         auto rootWindow = std::make_shared<CMainWindow>(programModel);
 
+        rootWindow->AddInitialTextOutputInfo(L"this");
+        rootWindow->AddInitialTextOutputInfo(L"is");
+        rootWindow->AddInitialTextOutputInfo(L"test");
+        rootWindow->AddInitialTextOutputInfo(L"data");
+        rootWindow->AddInitialTextOutputInfo(L"yep");
+        rootWindow->AddInitialTextOutputInfo(L"it is");
+        rootWindow->AddInitialTextOutputInfo(L"a");
+        rootWindow->AddInitialTextOutputInfo(L"test");
         // pass arguments
         for (auto& name : filenamesToOpen)
         {
