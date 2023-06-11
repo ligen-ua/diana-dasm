@@ -95,6 +95,22 @@ namespace oui
         }
         if (auto focused = m_focused)
         {
+            // notify parents 
+            auto modal = GetModalWindow();
+            auto ptr = focused;
+            if (ptr != modal)
+            {
+                ptr = ptr->GetParent();
+                for (; ptr;)
+                {
+                    if (ptr == modal)
+                    {
+                        break;
+                    }
+                    ptr->OnChildFocused();
+                    ptr = ptr->GetParent();
+                }
+            }
             focused->OnFocusEnter();
         }
     }
@@ -139,7 +155,7 @@ namespace oui
         {
             return false;
         }
-        if (evt.keyEvent.valid && 
+        if (evt.keyEvent.valid &&
             evt.keyEvent.virtualKey == oui::VirtualKey::Escape)
         {
             CancelDragEvent();
@@ -276,6 +292,9 @@ namespace oui
     {
         m_onResize = fnc;
     }
+    void CWindow::OnChildFocused()
+    {
+    }
     void CWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
     }
@@ -375,6 +394,10 @@ namespace oui
     }
 
     void CWindow::SetFocus()
+    {
+        SetFocusImpl();
+    }
+    void CWindow::SetFocusImpl()
     {
         if (auto poolPtr = m_pool.lock())
         {

@@ -12,12 +12,14 @@ namespace oui
     class CPanelWindow:public CWindow
     {
         std::function<String()> m_getCaption;
+        void ActivateImpl();
     public:
         CPanelWindow(std::function<String()> getCaption);
         String GetCaption() const;
         void Activate() override;
         void Deactivate() override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        void OnChildFocused() override;
     };
 
     class CPanelGroupWindow:public CWindow

@@ -70,6 +70,7 @@ namespace oui
         IMultiLineViewOwner* m_owner = 0;
         void ConstructChilds() override;
         void OnResize() override;
+        void SetFocusImpl() override;
 
     public:
         CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner);
@@ -77,6 +78,7 @@ namespace oui
         void OnFocusLost() override;
         void OnFocusEnter() override;
         void Destroy() override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
 
         void Init(std::vector<MultiLineViewItem>&& lines);
         void AddLine(MultiLineViewItem && item);

@@ -100,6 +100,7 @@ namespace oui
 
         void RemoveChild(CWindow* child);
         bool IsMouseOn() const { return m_mouseIsOn;  }
+        virtual void SetFocusImpl();
 
         virtual void ConstructChilds();
         virtual void OnResize();
@@ -146,6 +147,7 @@ namespace oui
 
         CWindow();
         virtual ~CWindow();
+        virtual void OnChildFocused();
 
         static void InitDefConsole(CConsole* defConsole);
 

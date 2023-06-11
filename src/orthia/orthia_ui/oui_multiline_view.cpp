@@ -32,6 +32,7 @@ namespace oui
 
         // check available size
         int availableSize = (int)m_lines.size() - m_firstVisibleLineIndex;
+        int yResizeCorrection = 0;
         if (availableSize <= 0)
         {
             m_firstVisibleLineIndex = 0;
@@ -39,7 +40,8 @@ namespace oui
         else
         if (availableSize < availableHeight)
         {
-            m_firstVisibleLineIndex -= availableHeight - availableSize;
+            yResizeCorrection = availableHeight - availableSize;
+            m_firstVisibleLineIndex -= yResizeCorrection;
         }
         
         if (m_firstVisibleLineIndex < 0)
@@ -53,6 +55,14 @@ namespace oui
         if (m_cursorOutOfText)
         {
             m_yCursopPos = std::min(availableHeight, (int)m_lines.size() - m_firstVisibleLineIndex);
+        }
+        else
+        {
+            m_yCursopPos -= yResizeCorrection;
+            if (m_yCursopPos < 0)
+            {
+                m_yCursopPos = 0;
+            }
         }
         auto target = absClientRect.position;
         auto it = m_lines.begin() + m_firstVisibleLineIndex;
@@ -120,6 +130,15 @@ namespace oui
         m_firstVisibleLineIndex = 0;
         m_lines = std::move(lines);
         Invalidate();
+    }
+    bool CMultiLineView::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    {
+        Invalidate(false);
+        return true;
+    }
+    void CMultiLineView::SetFocusImpl()
+    {
+        m_editBox->SetFocus();
     }
     void CMultiLineView::AddLine(MultiLineViewItem&& item)
     {
