@@ -38,12 +38,14 @@ namespace oui
             m_firstVisibleLineIndex = 0;
         }
         else
-        if ((availableSize + 1) < availableHeight)
         {
-            yResizeCorrection = availableHeight - availableSize;
-            m_firstVisibleLineIndex -= yResizeCorrection;
+            if (!m_cursorOutOfText && m_yCursopPos >= absClientRect.size.height)
+            {
+                yResizeCorrection = m_yCursopPos - absClientRect.size.height + 1;
+                m_firstVisibleLineIndex += yResizeCorrection;
+            }
         }
-        
+    
         if (m_firstVisibleLineIndex < 0)
         {
             m_firstVisibleLineIndex = 0;
