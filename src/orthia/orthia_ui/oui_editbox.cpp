@@ -72,6 +72,14 @@ namespace oui
         auto& sym = m_symbols[symbol];
         return sym.charOffset;
     }
+    void CEditBox::SetReadOnly(bool readOnly)
+    {
+        m_readOnly = readOnly;
+    }
+    bool CEditBox::IsReadOnly() const
+    {
+        return m_readOnly;
+    }
     void CEditBox::SetEnterHandler(std::function<void(const String& text)> enterHandler)
     {
         m_enterHandler = enterHandler;
@@ -311,6 +319,11 @@ namespace oui
     }
     void CEditBox::InsertText(const String& text_in)
     {
+        if (IsReadOnly())
+        {
+            return;
+        }
+
         CConsole* console = GetConsole();
         if (!console)
         {
@@ -346,6 +359,10 @@ namespace oui
     }
     void CEditBox::ProcessDelete()
     {
+        if (IsReadOnly())
+        {
+            return;
+        }
         if (SelectionIsActive())
         {
             ExtractSelected(true);
@@ -360,6 +377,10 @@ namespace oui
     }
     void CEditBox::ProcessBackpace()
     {
+        if (IsReadOnly())
+        {
+            return;
+        }
         if (SelectionIsActive())
         {
             ExtractSelected(true);

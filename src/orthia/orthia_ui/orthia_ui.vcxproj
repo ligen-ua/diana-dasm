@@ -173,6 +173,7 @@
     <ClCompile Include="oui_listbox.cpp" />
     <ClCompile Include="oui_menu.cpp" />
     <ClCompile Include="oui_modal.cpp" />
+    <ClCompile Include="oui_multiline_view.cpp" />
     <ClCompile Include="oui_open_file_dialog.cpp" />
     <ClCompile Include="oui_param.cpp" />
     <ClCompile Include="oui_screen.cpp" />
@@ -203,6 +204,7 @@
     <ClInclude Include="oui_listbox.h" />
     <ClInclude Include="oui_menu.h" />
     <ClInclude Include="oui_modal.h" />
+    <ClInclude Include="oui_multiline_view.h" />
     <ClInclude Include="oui_open_file_dialog.h" />
     <ClInclude Include="oui_param.h" />
     <ClInclude Include="oui_string.h" />
