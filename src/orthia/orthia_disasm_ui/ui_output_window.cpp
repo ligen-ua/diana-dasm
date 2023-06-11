@@ -32,3 +32,7 @@ void COutputWindow::OnResize()
     const oui::Rect clientRect = GetClientRect();
     m_view->Resize(clientRect.size);
 }
+void COutputWindow::SetFocusImpl()
+{
+    m_view->SetFocus();
+}

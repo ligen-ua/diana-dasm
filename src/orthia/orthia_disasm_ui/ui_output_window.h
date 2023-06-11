@@ -11,6 +11,7 @@ class COutputWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void CancelAllQueries() override;
     void ConstructChilds() override;
     void OnResize() override;
+    void SetFocusImpl() override;
 
 public:
     COutputWindow(std::function<oui::String()> getCaption);

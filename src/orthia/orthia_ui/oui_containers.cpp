@@ -20,7 +20,11 @@ namespace oui
     {
         return m_getCaption();
     }
-    void CPanelWindow::Activate()
+    void CPanelWindow::OnChildFocused()
+    {
+        ActivateImpl();
+    }
+    void CPanelWindow::ActivateImpl()
     {
         if (!IsActive())
         {
@@ -31,6 +35,10 @@ namespace oui
                 parent->Activate();
             }
         }
+    }
+    void CPanelWindow::Activate()
+    {
+        ActivateImpl();
         CWindow::SetFocus();
     }
     void CPanelWindow::Deactivate()
