@@ -312,7 +312,6 @@ namespace oui
             return false;
         }
 
-
         if (evt.keyEvent.valid)
         {
             int newOffset = m_offset;

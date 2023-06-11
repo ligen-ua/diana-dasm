@@ -23,6 +23,12 @@ void COutputWindow::AddLine(const oui::String& line)
 void COutputWindow::CancelAllQueries()
 {
 }
+void COutputWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
+{
+}
+void COutputWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
+{
+}
 void COutputWindow::ConstructChilds()
 {
     AddChild(m_view);

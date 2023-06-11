@@ -41,16 +41,17 @@ namespace oui
     }
 
 
+    struct MultiLineViewItem
+    {
+        String text;
+    };
+
     struct IMultiLineViewOwner
     {
         virtual ~IMultiLineViewOwner() {}
         virtual void CancelAllQueries() = 0;
-    };
-
-    struct MultiLineViewItem
-    {
-        String text;
-        std::function<void(int number)> populateNextHandler;        
+        virtual void ScrollUp(MultiLineViewItem* item, int count) = 0;
+        virtual void ScrollDown(MultiLineViewItem* item, int count) = 0;
     };
 
     class CMultiLineView:public SimpleBrush<MouseFocusable<CWindow>>
@@ -72,6 +73,9 @@ namespace oui
         void OnResize() override;
         void SetFocusImpl() override;
 
+        void ScrollUp(int count);
+        void ScrollDown(int count);
+
     public:
         CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
@@ -79,6 +83,7 @@ namespace oui
         void OnFocusEnter() override;
         void Destroy() override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
 
         void Init(std::vector<MultiLineViewItem>&& lines);
         void AddLine(MultiLineViewItem && item);

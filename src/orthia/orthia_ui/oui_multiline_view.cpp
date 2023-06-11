@@ -90,6 +90,114 @@ namespace oui
         }
     }
 
+    void CMultiLineView::ScrollUp(int count)
+    {
+        int newCursor = m_yCursopPos - count;
+        if (newCursor < 0)
+        {
+            int requestCount = -newCursor;
+            int newFirstVisibleLineIndex = m_firstVisibleLineIndex;
+            newFirstVisibleLineIndex -= requestCount;
+            if (newFirstVisibleLineIndex < 0)
+            {
+                requestCount = -newFirstVisibleLineIndex;
+                newFirstVisibleLineIndex = 0;
+            }
+            if (requestCount)
+            {
+                // ask owner, need some data
+                MultiLineViewItem * item = m_lines.empty()? nullptr: &m_lines[0];
+                m_owner->ScrollUp(item, requestCount);
+                return;
+            }
+            m_firstVisibleLineIndex = newFirstVisibleLineIndex;
+            newCursor = 0;
+        }
+
+        m_cursorOutOfText = false;
+        m_yCursopPos = newCursor;
+        int offset = m_firstVisibleLineIndex + m_yCursopPos;
+        if (offset >= (int)m_lines.size() || offset < 0)
+        {
+            offset = 0;
+        }
+        m_editBox->SetText(m_lines[offset].text);
+
+        // move edit box
+        m_editBox->MoveTo({0, m_yCursopPos});
+    }
+
+    void CMultiLineView::ScrollDown(int count)
+    {
+        const auto clientRect = GetClientRect();
+        const int availableScreenHeight = clientRect.size.height;
+        const int availableItemsCount = 1 + (int)m_lines.size() - m_firstVisibleLineIndex;
+
+        const int lastPossibleCursor = std::min(availableScreenHeight, availableItemsCount);
+        int newCursor = m_yCursopPos + count;
+        if (newCursor > lastPossibleCursor)
+        {
+            int requestCount = newCursor - lastPossibleCursor;
+            if (requestCount > availableItemsCount)
+            {
+                // ask owner, need some data
+                MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[m_lines.size()-1];
+                m_owner->ScrollDown(item, requestCount - availableItemsCount);
+                return;
+            }
+            m_firstVisibleLineIndex += requestCount;
+            newCursor = lastPossibleCursor;
+        }
+
+        m_yCursopPos = newCursor;
+        if (m_firstVisibleLineIndex + m_yCursopPos >= (int)m_lines.size())
+        {
+            m_cursorOutOfText = true;
+        }
+        else
+        {
+            int offset = m_firstVisibleLineIndex + m_yCursopPos;
+            m_editBox->SetText(m_lines[offset].text);
+
+            // move edit box
+            m_editBox->MoveTo({ 0, m_yCursopPos });
+        }
+    }
+
+    bool CMultiLineView::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
+    {
+        CConsole* console = GetConsole();
+        if (!console)
+        {
+            return false;
+        }
+
+        if (evt.keyEvent.valid)
+        {
+            bool handled = false;
+            switch (evt.keyEvent.virtualKey)
+            {
+            case VirtualKey::Up:
+                handled = true;
+                ScrollUp(1);
+                return true;
+
+            case VirtualKey::Down:
+                handled = true;
+                ScrollDown(1);
+                break;
+
+            default:
+                break;
+            }
+            if (handled)
+            {
+                Invalidate();
+            }
+            return handled;
+        }
+        return Parent_type::ProcessEvent(evt, evtContext);
+    }
     void CMultiLineView::OnFocusLost()
     {
         Invalidate();
