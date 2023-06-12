@@ -72,6 +72,10 @@ namespace oui
         auto& sym = m_symbols[symbol];
         return sym.charOffset;
     }
+    void CEditBox::SetLowLevelHandlers(EditBoxLowLevelHandlers&& handlers)
+    {
+        m_llHandlers = std::move(handlers);
+    }
     void CEditBox::SetReadOnly(bool readOnly)
     {
         m_readOnly = readOnly;
@@ -290,6 +294,37 @@ namespace oui
             target.x += range.symbolsCount;
         }
     }
+
+    void CEditBox::SetVirtualCursorPosition(int newIterator, bool changeSelecton, bool shiftMode)
+    {
+        if (newIterator < 0)
+        {
+            newIterator = 0;
+        }
+        else
+        if (newIterator > (int)m_symbols.size())
+        {
+            newIterator = (int)m_symbols.size();
+        }
+        m_cursorIterator = newIterator;
+
+        if (changeSelecton)
+        {
+            if (shiftMode)
+            {
+                m_selPosEnd = m_cursorIterator;
+            }
+            else
+            {
+                ResetSelection();
+            }
+        }
+        Invalidate();
+    }
+    void CEditBox::SetCursorPosition(int newScreenX, bool changeSelecton, bool shiftMode)
+    {
+        SetVirtualCursorPosition(m_windowSymStart + newScreenX, changeSelecton, shiftMode);
+    }
     bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
         if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
@@ -299,21 +334,11 @@ namespace oui
             {
                 return false;
             }
-            int newIterator = m_windowSymStart + relativePoint.x;
-            if (newIterator >= 0 && newIterator <= (int)m_symbols.size())
-            {
-                m_cursorIterator = newIterator;
-
-                if (evt.keyState.state & evt.keyState.AnyShift)
-                {
-                    m_selPosEnd = m_cursorIterator;
-                }
-                else
-                {
-                    ResetSelection();
-                }
-                Invalidate();
-            }
+            SetCursorPosition(relativePoint.x, true, evt.keyState.state & evt.keyState.AnyShift);
+        }
+        if (m_llHandlers.mouseHandler)
+        {
+            return m_llHandlers.mouseHandler(rect, evt);
         }
         return true;
     }
@@ -531,19 +556,9 @@ namespace oui
         m_cursorIterator = (int)m_symbols.size();
         m_windowRightIterator = m_cursorIterator + 1;
     }
-    int CEditBox::GetCursorPosition() const
+    int CEditBox::GetVirtualCursorPosition() const
     {
-        if (!m_cursorIterator)
-        {
-            return 0;
-        }
-        int arrayOffset = m_cursorIterator - 1;
-        if (arrayOffset >= (int)m_symbols.size())
-        {
-            arrayOffset = (int)m_symbols.size() - 1;;
-        }
-        auto& sym = m_symbols[arrayOffset];
-        return sym.charOffset + sym.sizeInTChars;
+        return m_cursorIterator;
     }
     void CEditBox::SetTextImpl(const String& text)
     {

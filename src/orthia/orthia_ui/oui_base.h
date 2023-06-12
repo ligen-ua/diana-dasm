@@ -147,7 +147,6 @@ namespace oui
     };
 }
 
-
 #ifdef OUI_SYS_WINDOWS
 
 #include "oui_base_win32.h"

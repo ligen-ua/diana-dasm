@@ -63,6 +63,8 @@ namespace oui
 
         int m_firstVisibleLineIndex = 0;
         int m_yCursopPos = 0;
+        int m_xCursopPos = 0;
+
         bool m_cursorOutOfText = true;
         std::vector<MultiLineViewItem> m_lines;
 
@@ -75,6 +77,10 @@ namespace oui
 
         void ScrollUp(int count);
         void ScrollDown(int count);
+
+        void SetupHandlers();
+        void SetNewCursor(const Point& pt);
+        void SetNewYCursorPosImpl(int newCursor);
 
     public:
         CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner);
