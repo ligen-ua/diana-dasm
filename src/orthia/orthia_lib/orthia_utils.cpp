@@ -2,6 +2,48 @@
 #pragma warning(disable:4996)
 namespace orthia
 {
+
+
+static int GetWinFolder_Silent(int csidl, PlatformString_type& result)
+{
+    CDll shell;
+    int error = shell.Reset_Silent(L"shell32.dll");
+    if (error)
+    {
+        return error;
+    }
+    std::vector<wchar_t> dataPath(MAX_PATH + 1);
+    dataPath[0] = 0;
+    HRESULT (STDAPICALLTYPE* pSHGetFolderPath)(HWND hwnd,
+        int csidl, 
+        HANDLE hToken, 
+        int dwFlags, 
+        LPWSTR pszPath) = 0;
+    shell.QueryFunction("SHGetFolderPathW", &pSHGetFolderPath, true);
+    if (!pSHGetFolderPath)
+    {
+        return ERROR_INVALID_FUNCTION;
+    }
+    if (pSHGetFolderPath(NULL,
+        csidl,
+        0,
+        0,
+        &dataPath[0]) != S_OK)
+    {
+        return ERROR_INVALID_FUNCTION;
+    }
+    result.clear();
+    result.append(&dataPath[0]);
+    AddSlash(result);
+    return 0;
+}
+
+int GetAppDataFolderWithSlash_Silent(PlatformString_type& result)
+{
+    const int cs_CSIDL_APPDATA = 0x001a;
+    return GetWinFolder_Silent(cs_CSIDL_APPDATA, result);
+}
+
 // systemtime
 long long ConvertSystemTimeToFileTime(const SYSTEMTIME * pTime)
 {
@@ -365,7 +407,11 @@ void CreateAllDirectoriesForFile(const std::wstring & fullFileName)
     }
 }
 
-
+CDll::CDll()
+    :
+    m_hLib(0)
+{
+}
 CDll::CDll(const std::wstring & name)
     :
         m_hLib(0)
@@ -400,6 +446,24 @@ void CDll::Reset(const wchar_t * pName)
     {
         ORTHIA_THROW_WIN32("Can't load: "<<orthia::ToAnsiString_Silent(pName)<<", code: "<<orthia____code);
     }
+}
+int CDll::Reset_Silent(const wchar_t* pName)
+{
+    if (m_hLib)
+    {
+        FreeLibrary(m_hLib);
+        m_hLib = 0;
+    }
+    if (!pName)
+    {
+        return 0;
+    }
+    m_hLib = LoadLibraryW(pName);
+    if (!m_hLib)
+    {
+        return GetLastError();
+    }
+    return 0;
 }
 FARPROC CDll::QueryFunctionRaw(const char * pFunctionName, 
                               bool bSilent)
@@ -629,6 +693,10 @@ bool IsWhiteSpace_Ansi(char symbol)
     }
     return false;
 }
+bool IsFileNameSeparator(ORTHIA_TCHAR ch)
+{
+    return (ch == L'\\' || ch == L'/');
+}
 bool IsEOL(ORTHIA_TCHAR symbol)
 {
     switch (symbol)
@@ -649,6 +717,26 @@ bool IsEOL_Ansi(char symbol)
     }
     return false;
 }
+
+void AddSlash(PlatformString_type& str)
+{
+    EraseLastSlash(str);
+    str.append(1, ORTHIA_SYM_PLATFORM_SLASH);
+}
+void EraseLastSlash(PlatformString_type& str)
+{
+    for (;;)
+    {
+        if (str.empty())
+            return;
+
+        if (!IsFileNameSeparator(*str.rbegin()))
+            break;
+
+        str.resize(str.size() - 1);
+    }
+}
+
 void TrimString(std::wstring& str)
 {
     TrimStringIf(str, IsSpace);

@@ -27,6 +27,7 @@ typedef std::wstringstream PlatformStringStream_type;
 #define ORTHIA_TCSTR(X) L##X
 #define ORTHIA_TSTRNCMP(X1, X2, X3)  wcsncmp(X1, X2, X3)
 #define ORTHIA_TCHAR wchar_t
+#define ORTHIA_SYM_PLATFORM_SLASH L'\\'
 
 #endif
 
@@ -598,11 +599,14 @@ class CDll
     CDll&operator = (const CDll&);
     HMODULE m_hLib;
 public:
+    CDll();
     explicit CDll(const std::wstring & dllName);
     ~CDll();
     HMODULE GetBase();
     void Reset(const std::wstring & dllName);
     void Reset(const wchar_t * pDllName);
+    int Reset_Silent(const wchar_t* pName);
+
     FARPROC QueryFunctionRaw(const char * pFunctionName, 
                             bool bSilent);
     template<class Type>
@@ -971,8 +975,11 @@ bool IsSpace(ORTHIA_TCHAR symbol);
 bool IsWhiteSpace(ORTHIA_TCHAR symbol);
 bool IsWhiteSpace_Ansi(char symbol);
 bool IsEOL(ORTHIA_TCHAR symbol);
-inline bool IsEOL_Ansi(char symbol);
+bool IsEOL_Ansi(char symbol);
+bool IsFileNameSeparator(ORTHIA_TCHAR ch);
 
+void AddSlash(PlatformString_type& str);
+void EraseLastSlash(PlatformString_type& str);
 template<class Predicate, class CharType>
 inline int TrimRightIf(std::basic_string<CharType>& str, Predicate pred)
 {
@@ -1020,7 +1027,7 @@ std::string TrimString2(const std::string& str);
 int TrimStringAllWhiteSpace(std::wstring& str);
 int TrimStringAllWhiteSpace(std::string& str);
 
-
+// splitters
 void SplitStringWithoutWhitespace(const StringInfo& str,
     const StringInfo& separator,
     std::set<orthia::PlatformString_type>* pInfo);
@@ -1028,6 +1035,8 @@ void SplitStringWithoutWhitespace(const StringInfo& str,
 void SplitStringWithoutWhitespace(const StringInfo& str_in,
     const StringInfo& separator,
     std::vector<orthia::PlatformString_type>* pInfo);
+
+int GetAppDataFolderWithSlash_Silent(PlatformString_type& result);
 
 }
 #endif 
