@@ -1,12 +1,15 @@
 #pragma once
 #include "oui_containers.h"
 #include "orthia_model.h"
+#include "oui_multiline_view.h"
 
-struct DisasmLine
-{
-    oui::String text;
-};
-class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>
+
+// Structure
+// [PE HEADER]
+// [SECTION HEADER]
+// [FUNCTION HEADER]
+// [INSTRUCTION HEADER]
+class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineViewOwner
 {
     using Parent_type = oui::SimpleBrush<oui::CPanelWindow>;
 
@@ -14,11 +17,13 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>
     long long m_offset = 0;
     int m_itemUid = -1;
 
-    std::vector<DisasmLine> m_lines;
-    int m_selectedLine = 0;
+    std::shared_ptr<oui::CMultiLineView> m_view;
     std::shared_ptr<oui::DialogColorProfile> m_colorProfile;
 
-    static oui::String m_chunk;
+
+    void CancelAllQueries() override;
+    void ScrollUp(oui::MultiLineViewItem* item, int count) override;
+    void ScrollDown(oui::MultiLineViewItem* item, int count) override;
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,
         std::shared_ptr<orthia::CProgramModel> model);
