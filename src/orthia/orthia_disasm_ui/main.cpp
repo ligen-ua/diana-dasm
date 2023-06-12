@@ -5,7 +5,6 @@ orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 int RunTests();
 
-
 static void PrintUsage()
 {
     std::cout << "Usage: [--run-tests] <filename>\n";
@@ -46,7 +45,7 @@ int wmain(int argc, const wchar_t* argv[])
 
         // create root windows
         auto rootWindow = std::make_shared<CMainWindow>(programModel);
-
+#if 0
         rootWindow->AddInitialTextOutputInfo(L"this");
         rootWindow->AddInitialTextOutputInfo(L"is");
         rootWindow->AddInitialTextOutputInfo(L"test");
@@ -55,6 +54,8 @@ int wmain(int argc, const wchar_t* argv[])
         rootWindow->AddInitialTextOutputInfo(L"it is");
         rootWindow->AddInitialTextOutputInfo(L"a");
         rootWindow->AddInitialTextOutputInfo(L"test");
+#endif
+
         // pass arguments
         for (auto& name : filenamesToOpen)
         {

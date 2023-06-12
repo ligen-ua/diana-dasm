@@ -5,6 +5,10 @@
 
 namespace oui
 {
+    struct EditBoxLowLevelHandlers
+    {
+        std::function<bool(const Rect& rect, InputEvent& evt)> mouseHandler;
+    };
     class CEditBox:public SimpleBrush<MouseFocusable<CWindow>>
     {
         using Parent_type = SimpleBrush<MouseFocusable<CWindow>>;
@@ -29,7 +33,8 @@ namespace oui
 
         bool m_readOnly = false;
         std::function<void(const String&text)> m_enterHandler;
-        int GetCursorPosition() const;
+
+        EditBoxLowLevelHandlers m_llHandlers;
         void SetTextImpl(const String& text);
 
         void ProcessDelete();
@@ -39,6 +44,7 @@ namespace oui
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
+        void SetLowLevelHandlers(EditBoxLowLevelHandlers&& handlers);
         void SetReadOnly(bool readOnly);
         bool IsReadOnly() const;
         void SetEnterHandler(std::function<void(const String& text)> enterHandler);
@@ -54,6 +60,9 @@ namespace oui
         bool SelectionIsActive() const;
         String ExtractSelected(bool cut);
         void SelectAll();
+        void SetCursorPosition(int newScreenX, bool changeSelecton, bool shiftMode);
+        int GetVirtualCursorPosition() const;
+        void SetVirtualCursorPosition(int newIterator, bool changeSelecton, bool shiftMode);
     };
 
 }

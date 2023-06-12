@@ -3,6 +3,21 @@
 
 namespace oui
 {
+    void CMultiLineView::SetupHandlers()
+    {
+        EditBoxLowLevelHandlers handlers;
+        handlers.mouseHandler = [&](const Rect& rect, InputEvent& evt) {
+            // translate edit box rect to my rect
+            auto myPosition = rect.position;
+            myPosition.y -= m_yCursopPos;
+
+            Rect myRect = this->GetWndRect();
+            myRect.position = myPosition;
+
+            return this->HandleMouseEvent(myRect, evt);
+        };
+        m_editBox->SetLowLevelHandlers(std::move(handlers));
+    }
     CMultiLineView::CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, 
         IMultiLineViewOwner* owner)
         :
@@ -11,6 +26,7 @@ namespace oui
     {
         m_editBox = std::make_shared<CEditBox>(m_colorProfile);
         m_editBox->SetReadOnly(true);
+        SetupHandlers();
 
         m_paintBox = std::make_shared<CEditBox>(m_colorProfile);
         m_paintBox->SetReadOnly(true);
@@ -122,13 +138,7 @@ namespace oui
         }
 
         m_cursorOutOfText = false;
-        m_yCursopPos = newCursor;
-        int offset = m_firstVisibleLineIndex + m_yCursopPos;
-        if (offset >= (int)m_lines.size() || offset < 0)
-        {
-            offset = 0;
-        }
-        m_editBox->SetText(m_lines[offset].text);
+        SetNewYCursorPosImpl(newCursor);
         Invalidate();
     }
 
@@ -154,16 +164,7 @@ namespace oui
             newCursor = lastPossibleCursor;
         }
 
-        m_yCursopPos = newCursor;
-        if (m_firstVisibleLineIndex + m_yCursopPos >= (int)m_lines.size())
-        {
-            m_cursorOutOfText = true;
-        }
-        else
-        {
-            int offset = m_firstVisibleLineIndex + m_yCursopPos;
-            m_editBox->SetText(m_lines[offset].text);
-        }
+        SetNewYCursorPosImpl(newCursor);
         Invalidate();
     }
 
@@ -188,6 +189,16 @@ namespace oui
             case VirtualKey::Down:
                 handled = true;
                 ScrollDown(1);
+                break;
+
+            case VirtualKey::PageUp:
+                handled = true;
+                ScrollUp(GetClientRect().size.height);
+                break;
+
+            case VirtualKey::PageDown:
+                handled = true;
+                ScrollDown(GetClientRect().size.height);
                 break;
 
             default:
@@ -242,8 +253,76 @@ namespace oui
         m_lines = std::move(lines);
         Invalidate();
     }
+
+    void CMultiLineView::SetNewYCursorPosImpl(int newCursor)
+    {
+        m_yCursopPos = newCursor;
+        if (m_firstVisibleLineIndex + m_yCursopPos >= (int)m_lines.size())
+        {
+            m_cursorOutOfText = true;
+        }
+        else
+        {
+            m_cursorOutOfText = false;
+            int offset = m_firstVisibleLineIndex + m_yCursopPos;
+            int cursorPos = m_editBox->GetVirtualCursorPosition(); 
+            m_editBox->SetText(m_lines[offset].text);
+            m_editBox->SetVirtualCursorPosition(cursorPos, true, false);            
+        }
+    }
+    void CMultiLineView::SetNewCursor(const Point& pt)
+    {
+        if (m_yCursopPos == pt.y)
+        {
+            return;
+        }
+        int newCursopPos = pt.y;
+        int availableHeight = GetClientRect().size.height;
+
+        int maxPos = std::min(availableHeight, (int)m_lines.size() - m_firstVisibleLineIndex);
+        if (newCursopPos > maxPos)
+        {
+            newCursopPos = maxPos;
+            m_cursorOutOfText = true;
+        }
+        else
+        {
+            m_cursorOutOfText = false;
+        }
+        SetNewYCursorPosImpl(newCursopPos);
+
+        if (!m_cursorOutOfText)
+        {
+            m_editBox->SetCursorPosition(pt.x, true, false);
+        }
+    }
+
     bool CMultiLineView::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
+        {
+            int pageSize = 1;
+            if (evt.mouseEvent.button == MouseButton::WheelDown)
+            {
+                ScrollDown(pageSize);
+                return true;
+            }
+            if (evt.mouseEvent.button == MouseButton::WheelUp)
+            {
+                ScrollUp(pageSize);
+                return true;
+            }
+        }
+        if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
+        {
+            auto clientRect = GetClientRect();
+            auto point = GetRelativeMousePoint(rect, evt.mouseEvent.point);
+            if (point.y < 0 || point.y >= clientRect.size.height)
+            {
+                return false;
+            }
+            // got click
+            SetNewCursor(point);
+        }
         Invalidate(false);
         return true;
     }

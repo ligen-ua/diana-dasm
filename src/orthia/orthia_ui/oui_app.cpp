@@ -94,6 +94,7 @@ namespace oui
             {
                 return;
             }
+
             // call handlers
             m_pool->GetThread()->GUI_ProcessTasks();
 
