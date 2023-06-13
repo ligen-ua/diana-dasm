@@ -723,6 +723,13 @@ void AddSlash(PlatformString_type& str)
     EraseLastSlash(str);
     str.append(1, ORTHIA_SYM_PLATFORM_SLASH);
 }
+PlatformString_type AddSlash2(const PlatformString_type& str)
+{
+    PlatformString_type copy(str);
+    AddSlash(copy);
+    return copy;
+}
+
 void EraseLastSlash(PlatformString_type& str)
 {
     for (;;)

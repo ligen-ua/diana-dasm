@@ -979,6 +979,8 @@ bool IsEOL_Ansi(char symbol);
 bool IsFileNameSeparator(ORTHIA_TCHAR ch);
 
 void AddSlash(PlatformString_type& str);
+PlatformString_type AddSlash2(const PlatformString_type& str);
+
 void EraseLastSlash(PlatformString_type& str);
 template<class Predicate, class CharType>
 inline int TrimRightIf(std::basic_string<CharType>& str, Predicate pred)
