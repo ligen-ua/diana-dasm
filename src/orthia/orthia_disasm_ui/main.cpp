@@ -1,4 +1,5 @@
 #include "ui_main_window.h"
+#include "orthia_config.h"
 #include <iostream>
 
 orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
@@ -36,11 +37,13 @@ int wmain(int argc, const wchar_t* argv[])
 
     try
     {
-        auto programModel = std::make_shared<orthia::CProgramModel>();
-
         g_textManager = new orthia::CTextManager();
         InitLanguage_EN(g_textManager);
 
+        orthia::CConfigOptionsStorage config;
+        config.Init();
+
+        auto programModel = std::make_shared<orthia::CProgramModel>();
         oui::CConsoleApp app;
 
         // create root windows
