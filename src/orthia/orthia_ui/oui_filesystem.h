@@ -9,9 +9,11 @@ namespace oui
 
     struct IFile
     {
+        const static unsigned long long offset_UseCurrent = (unsigned long long)(-1);
+
         virtual ~IFile() {}
         virtual std::tuple<int, unsigned long long> GetSizeInBytes() const = 0;
-        virtual int SaveToVector(std::shared_ptr<BaseOperation> operation, size_t size, std::vector<char>& peFile) = 0;
+        virtual int ReadExact(std::shared_ptr<BaseOperation> operation, unsigned long long offset, size_t size, std::vector<char>& peFile) = 0;
         virtual oui::String GetFullFileName() const = 0;
         virtual oui::String GetFullFileNameForUI() const = 0;
     };

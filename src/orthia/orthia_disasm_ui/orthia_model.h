@@ -3,6 +3,8 @@
 #include "orthia_utils.h"
 #include "oui_filesystem.h"
 #include "orthia_text_manager.h"
+#include "orthia_config.h"
+#include "orthia_module_manager.h"
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -29,8 +31,9 @@ namespace orthia
         int m_lastUid = 0;
 
         int m_activeId = 0;
+        std::shared_ptr<orthia::CConfigOptionsStorage> m_config;
     public:
-        CProgramModel();
+        CProgramModel(std::shared_ptr<orthia::CConfigOptionsStorage> config);
 
         std::shared_ptr<oui::CFileSystem> GetFileSystem();
         int QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const;
