@@ -1,6 +1,12 @@
 #include "ui_main_window.h"
 #include "orthia_config.h"
 #include <iostream>
+#include "diana_core_cpp.h"
+extern "C"
+{
+#include "diana_processor/diana_processor_core.h"
+#include "diana_win32.h"
+}
 
 orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
@@ -40,10 +46,14 @@ int wmain(int argc, const wchar_t* argv[])
         g_textManager = new orthia::CTextManager();
         InitLanguage_EN(g_textManager);
 
-        orthia::CConfigOptionsStorage config;
-        config.Init();
+        auto config = std::make_shared<orthia::CConfigOptionsStorage>();
+        config->Init();
 
-        auto programModel = std::make_shared<orthia::CProgramModel>();
+        Diana_Init();
+        DianaProcessor_GlobalInit();
+        DianaWin32_Init();
+
+        auto programModel = std::make_shared<orthia::CProgramModel>(config);
         oui::CConsoleApp app;
 
         // create root windows

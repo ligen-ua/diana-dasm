@@ -1,13 +1,15 @@
 #include "orthia_model.h"
 #include "orthia_files.h"
 #include "orthia_pe.h"
-
+#include "orthia_helpers.h"
 namespace orthia
 {
     const unsigned long long g_maxSizeBytes = 512 * 1024 * 1024;
     const unsigned long long g_minSizeBytes = 1;
 
-    CProgramModel::CProgramModel()
+    CProgramModel::CProgramModel(std::shared_ptr<orthia::CConfigOptionsStorage> config)
+        :
+        m_config(config)
     {
         m_fileSystem = std::make_shared<oui::CFileSystem>();
     }
@@ -54,6 +56,8 @@ namespace orthia
         bool makeActive)
     {
         // non-ui thread
+        
+        // prepare the message on unknown error
         auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
         oui::fsui::OpenResult result;
         result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
@@ -61,9 +65,10 @@ namespace orthia
             completeHandler->Reply(completeHandler, file, result);  
         });
 
-        int platformError = 0;
+        // read entire file in memory
+        int error = 0;
         unsigned long long fileSize = 0;
-        std::tie(platformError, fileSize) = file->GetSizeInBytes();
+        std::tie(error, fileSize) = file->GetSizeInBytes();
         if (fileSize < g_minSizeBytes)
         {
             result.error = errorNode->QueryValue(ORTHIA_TCSTR("empty"));
@@ -75,8 +80,8 @@ namespace orthia
             return;
         }
 
-        std::vector<char> peFile;
-        int error = file->SaveToVector(completeHandler, (size_t)fileSize, peFile);
+        std::vector<char> binPeFile;
+        error = file->ReadExact(completeHandler, 0, (size_t)fileSize, binPeFile);
         if (error)
         {
             result.error.native = oui::GetErrorText(error);
@@ -88,11 +93,50 @@ namespace orthia
             handlerGuard.Release();
             return;
         }
-        
+
+        // try map it first
         auto mappedPE = std::make_unique<orthia::CSimplePeFile>();
         orthia::MapFileParameters params;
-        mappedPE->MapFile(peFile, params);
+        mappedPE->MapFile(binPeFile, params);
 
+        // check folder
+        auto fileHash = CalcSha1(binPeFile);
+        auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
+        auto dbFolder = m_config->GetDBFolder() + AddSlash2(fileHashStr);
+        auto dbFileName = dbFolder + m_config->GetDBFileName();
+        auto binFileName = dbFolder + m_config->GetBinFileName();
+        CreateAllDirectoriesForFile(dbFileName);
+
+        // check binary file
+        bool hashIsValid = false;
+        try
+        {
+            orthia::CFile existingFile;
+            error = existingFile.Open_Silent(binFileName, g_desired_read, g_share_read, g_open_existing);
+            if (!error)
+            {
+                auto savedFileHash = CalcSha1(existingFile, completeHandler);
+                hashIsValid = savedFileHash == fileHash;
+            }
+        }
+        catch (std::exception&)
+        {
+            hashIsValid = false;
+        }
+        if (!hashIsValid)
+        {
+            // save file to local dir
+            orthia::CFile localFile;
+            error = localFile.Open_Silent(binFileName, g_desired_write, g_share_read, g_create_always);
+            if (error)
+            {
+                result.error = errorNode->QueryValue(ORTHIA_TCSTR("too-big"));
+                return;
+            }
+            localFile.WriteToFile(binPeFile.data(), binPeFile.size());
+        }
+
+        // fill the model data
         auto info = std::make_shared<WorkplaceItemInternal>();
         info->fullName = file->GetFullFileName();
         info->peFile = std::move(mappedPE);
@@ -107,6 +151,17 @@ namespace orthia
         {
             m_activeId = m_lastUid;
         }
+
+        auto moduleManager = std::make_shared<CModuleManager>();
+        moduleManager->Reinit(dbFileName, false);
+
+        CMemoryReaderOnLoadedData reader(info->peFile->GetImageBase(), binPeFile.data(), binPeFile.size());
+        moduleManager->ReloadModule(info->peFile->GetImageBase(),
+            &reader,
+            false,
+            info->shortName.native,
+            0);
+
         // OK
         result.error.native.clear();
     }

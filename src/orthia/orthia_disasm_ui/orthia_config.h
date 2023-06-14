@@ -11,5 +11,8 @@ namespace orthia
 
     public:
         void Init();
+        PlatformString_type GetBinFileName() const;
+        PlatformString_type GetDBFileName() const;
+        PlatformString_type GetDBFolder() const;
     };
 }

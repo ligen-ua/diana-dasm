@@ -23,6 +23,12 @@ inline long long GetSizeOfFile(HANDLE hFile)
 const ULONG g_share_all = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
 const ULONG g_share_read = FILE_SHARE_READ;
 
+const ULONG g_desired_read = GENERIC_READ;
+const ULONG g_desired_write = GENERIC_WRITE;
+
+const ULONG g_open_existing = OPEN_EXISTING;
+const ULONG g_create_always = CREATE_ALWAYS;
+
 class CFile
 {
     HANDLE m_handle;

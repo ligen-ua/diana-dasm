@@ -214,12 +214,17 @@ namespace oui
             return std::make_tuple(0, size.QuadPart);
         }
 
-        void MoveToBegin() 
+        int MoveToBegin(unsigned long long offset)
         {
             LARGE_INTEGER distance;
-            distance.QuadPart = 0;
+            distance.QuadPart = offset;
+
             LARGE_INTEGER result;
-            SetFilePointerEx(m_hFile, distance, &result, FILE_BEGIN);
+            if (!SetFilePointerEx(m_hFile, distance, &result, FILE_BEGIN))
+            {
+                return GetLastError();
+            }
+            return 0;
         }
         oui::String GetFullFileName() const override
         {
@@ -231,9 +236,16 @@ namespace oui
             ErasePrefix(result.native);
             return result;
         }
-        int SaveToVector(std::shared_ptr<BaseOperation> operation, size_t size, std::vector<char>& peFile) override
+        int ReadExact(std::shared_ptr<BaseOperation> operation, unsigned long long offset, size_t size, std::vector<char>& peFile) override
         {
-            MoveToBegin();
+            if (offset != (unsigned long long)(-1))
+            {
+                int err = MoveToBegin(offset);
+                if (err)
+                {
+                    return err;
+                }
+            }
             peFile.resize(size);
 
             DWORD pageSize = 1024 * 1024;

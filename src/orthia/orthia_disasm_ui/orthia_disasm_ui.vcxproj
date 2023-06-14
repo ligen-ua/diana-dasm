@@ -179,6 +179,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="orthia_config.cpp" />
+    <ClCompile Include="orthia_helpers.cpp" />
     <ClCompile Include="orthia_model.cpp" />
     <ClCompile Include="ui_disasm_window.cpp" />
     <ClCompile Include="ui_en.cpp" />
@@ -189,6 +190,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_config.h" />
+    <ClInclude Include="orthia_helpers.h" />
     <ClInclude Include="orthia_model.h" />
     <ClInclude Include="ui_disasm_window.h" />
     <ClInclude Include="ui_main_window.h" />
