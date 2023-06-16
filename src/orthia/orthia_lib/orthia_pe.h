@@ -35,5 +35,6 @@ namespace orthia
 
         PeDianaContext* GetImpl();
         DI_UINT64 GetImageBase() const;
+        const std::vector<char> & GetMappedPeFile() const;
     };
 }

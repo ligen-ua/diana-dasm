@@ -15,12 +15,13 @@ class CModuleManager
     CModuleManager(const CModuleManager&);
     CModuleManager&operator = (const CModuleManager&);
 
-    orthia::intrusive_ptr<CDatabaseManager> m_pDatabaseManager;
+    mutable CCriticalSection m_lock;
+    mutable orthia::intrusive_ptr<CDatabaseManager> m_pDatabaseManager;
     std::wstring m_fullFileName;
 public:
     CModuleManager();
     void Reinit(const std::wstring & fullFileName, bool bForce);
-    std::wstring GetDatabaseName();
+    std::wstring GetDatabaseName() const;
     orthia::intrusive_ptr<CDatabaseManager> QueryDatabaseManager(); 
 
     void UnloadModule(Address_type offset);
@@ -35,12 +36,12 @@ public:
                      int mode,
                      int analyserFlags);
 
-    void QueryLoadedModules(std::vector<CommonModuleInfo> * pResult);
+    void QueryLoadedModules(std::vector<CommonModuleInfo> * pResult) const;
     // references
-    void QueryReferencesFromInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pResult);
-    void QueryReferencesToInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pResult);
-    void QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult);
-    void QueryReferencesFromInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult);
+    void QueryReferencesFromInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pResult) const;
+    void QueryReferencesToInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pResult) const;
+    void QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult) const;
+    void QueryReferencesFromInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult) const;
 };
 
 }

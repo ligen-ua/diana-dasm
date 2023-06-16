@@ -69,3 +69,9 @@ void COutputWindow::SetFocusImpl()
 {
     m_view->SetFocus();
 }
+
+// orthia::IUILogInterface
+void COutputWindow::WriteLog(const oui::String& line)
+{
+    AddLine(line);
+}

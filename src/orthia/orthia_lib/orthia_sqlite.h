@@ -82,5 +82,9 @@ bool ConvertSQLTimeToSystemTime(const std::string & time_in,
                                 SYSTEMTIME * pSt);
 std::string SQLiteTimeFromISO8601(const std::string & time);
 std::string ConvertSystemTimeToSQLite(const SYSTEMTIME & st);
+
+int SQLiteStep_Wrapper(sqlite3_stmt* statement);
+int SQLiteExec_Wrapper(sqlite3* statement, const char* sql);
+
 }
 #endif

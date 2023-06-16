@@ -22,7 +22,11 @@ namespace orthia
 
         orthia::CreateAllDirectoriesForFile(m_dbDir);
     }
-
+    PlatformString_type CConfigOptionsStorage::GetReadmeFileName() const
+    {
+        // haha, this is a joke for us, u know, the old poople
+        return ORTHIA_TCSTR("DIRINFO");
+    }
     PlatformString_type CConfigOptionsStorage::GetBinFileName() const
     {
         return ORTHIA_TCSTR("target.bin");

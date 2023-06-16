@@ -6,8 +6,89 @@
 #define _CRT_SECURE_NO_WARNINGS
 #pragma warning(disable:4996)
 
+#ifdef DIANA_HAS_CPP11
+#include <chrono>
+#include <mutex>
+#endif
 namespace orthia
 {
+    static int g_secondsToWaitLock = 15;
+
+#ifdef DIANA_HAS_CPP11
+    int SQLiteStep_Wrapper(sqlite3_stmt* statement)
+    {
+        int secondsToWaitLock = IsDebuggerPresent() ? 60 : g_secondsToWaitLock;
+        auto operationStart = std::chrono::steady_clock::now();
+        for (;;)
+        {
+            int stepResult = sqlite3_step(statement);
+            if (stepResult != SQLITE_BUSY)
+            {
+                return stepResult;
+            }
+            auto now = std::chrono::steady_clock::now();
+
+            auto opDuration = now - operationStart;
+            if (opDuration >= std::chrono::seconds(secondsToWaitLock))
+            {
+                return SQLITE_BUSY;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+    }
+
+    int SQLiteExec_Wrapper(sqlite3* statement, const char* sql)
+    {
+        int secondsToWaitLock = IsDebuggerPresent() ? 60 : g_secondsToWaitLock;
+        auto operationStart = std::chrono::steady_clock::now();
+        for (;;)
+        {
+            int stepResult = sqlite3_exec(statement, sql, 0, 0, 0);
+            if (stepResult != SQLITE_BUSY)
+            {
+                return stepResult;
+            }
+            auto now = std::chrono::steady_clock::now();
+
+            auto opDuration = now - operationStart;
+            if (opDuration >= std::chrono::seconds(secondsToWaitLock))
+            {
+                return SQLITE_BUSY;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+    }
+
+#else
+    int SQLiteStep_Wrapper(sqlite3_stmt* statement)
+    {
+        for (int i = 0; i < g_secondsToWaitLock; ++i)
+        {
+            int stepResult = sqlite3_step(statement);
+            if (stepResult != SQLITE_BUSY)
+            {
+                return stepResult;
+            }
+            Sleep(1000);
+        }
+        return SQLITE_BUSY;
+    }
+
+    int SQLiteExec_Wrapper(sqlite3* statement, const char* sql)
+    {
+        for (int i = 0; i < g_secondsToWaitLock; ++i)
+        {
+            int stepResult = sqlite3_exec(statement, sql, 0, 0, 0);
+            if (stepResult != SQLITE_BUSY)
+            {
+                return stepResult;
+            }
+            Sleep(1000);
+        }
+        return SQLITE_BUSY;
+    }
+#endif
+
 
 static bool IsNotDigit(wchar_t ch)
 {
@@ -164,7 +245,7 @@ CSQLTransaction::CSQLTransaction(sqlite3 * database)
 {
     if (database)
     {
-        ORTHIA_CHECK_SQLITE(sqlite3_exec(database, "BEGIN TRANSACTION", 0,0,0), "Can't start transaction");
+        ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(database, "BEGIN TRANSACTION"), "Can't start transaction");
     }
 }
 void CSQLTransaction::Init(sqlite3 * database)
@@ -174,25 +255,25 @@ void CSQLTransaction::Init(sqlite3 * database)
         throw std::runtime_error("Transaction already started");
     }
     m_database = database;
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(database, "BEGIN TRANSACTION", 0,0,0), "Can't start transaction");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(database, "BEGIN TRANSACTION"), "Can't start transaction");
 }
 CSQLTransaction::~CSQLTransaction()
 {
     if (m_database)
     {
-        sqlite3_exec(m_database, "ROLLBACK TRANSACTION", 0,0,0);
+        SQLiteExec_Wrapper(m_database, "ROLLBACK TRANSACTION");
     }
 }
 void CSQLTransaction::Commit()
 {
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(m_database, "END TRANSACTION", 0,0,0), "Can't commit transaction");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_database, "END TRANSACTION"), "Can't commit transaction");
     m_database = 0;
 }   
 void CSQLTransaction::Rollback()
 {
     try
     {
-        ORTHIA_CHECK_SQLITE(sqlite3_exec(m_database, "ROLLBACK TRANSACTION", 0,0,0), "Can't rollback transaction");
+        ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_database, "ROLLBACK TRANSACTION"), "Can't rollback transaction");
     }
     catch(std::exception & e)
     {
@@ -207,7 +288,7 @@ long long SQLite_ReadInt(sqlite3_stmt * statement, bool bSilent, int defaultValu
     long long result = 0;
     for(;;)
     {
-        int stepResult = sqlite3_step(statement);
+        int stepResult = SQLiteStep_Wrapper(statement);
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -217,13 +298,13 @@ long long SQLite_ReadInt(sqlite3_stmt * statement, bool bSilent, int defaultValu
         {
             if (bResult)
             {
-                throw std::runtime_error("sqlite3_step failed: only one row expected");
+                throw std::runtime_error("SQLiteStep_Wrapper failed: only one row expected");
             }
             result = sqlite3_column_int64(statement, 0);
             bResult = true;
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
     if (!bResult)
     {
@@ -231,7 +312,7 @@ long long SQLite_ReadInt(sqlite3_stmt * statement, bool bSilent, int defaultValu
         {
             return defaultValue;
         }
-        throw std::runtime_error("sqlite3_step failed: value not found");
+        throw std::runtime_error("SQLiteStep_Wrapper failed: value not found");
     }
     return result;
 }
@@ -244,7 +325,7 @@ void SQLite_ReadWideString(sqlite3_stmt * statement,
     bool bResult = false;
     for(;;)
     {
-        int stepResult = sqlite3_step(statement);
+        int stepResult = SQLiteStep_Wrapper(statement);
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -254,13 +335,13 @@ void SQLite_ReadWideString(sqlite3_stmt * statement,
         {
             if (bResult)
             {
-                throw std::runtime_error("sqlite3_step failed: only one row expected");
+                throw std::runtime_error("SQLiteStep_Wrapper failed: only one row expected");
             }
             *pResult = SQLReadWideString(statement, 0);
             bResult = true;
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
     if (!bResult)
     {
@@ -268,7 +349,7 @@ void SQLite_ReadWideString(sqlite3_stmt * statement,
         {
             *pResult = defaultValue;
         }
-        throw std::runtime_error("sqlite3_step failed: value not found");
+        throw std::runtime_error("SQLiteStep_Wrapper failed: value not found");
     }
 }
 

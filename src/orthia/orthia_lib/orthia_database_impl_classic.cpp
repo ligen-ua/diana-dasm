@@ -58,9 +58,9 @@ void CClassicDatabase::InsertReference(sqlite3_stmt * stmt, Address_type from, A
 {
     sqlite3_bind_int64(stmt, 1, from);
     sqlite3_bind_int64(stmt, 2, to);
-    if (sqlite3_step(stmt) != SQLITE_DONE)
+    if (SQLiteStep_Wrapper(stmt) != SQLITE_DONE)
     {
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
     sqlite3_reset(stmt);
 }
@@ -92,15 +92,14 @@ void CClassicDatabase::InsertModule(Address_type baseAddress,
     std::stringstream sql;
     sql<<"INSERT INTO tbl_modules VALUES("<<(long long)baseAddress<<","<<size<<",\""<<orthia::ToAnsiString_Silent(orthia::Escape(moduleName))<<"\")";
     std::string sqlString = sql.str();
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(),sqlString.c_str(),
-                0,0,0), L"Can't insert module");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),sqlString.c_str()), L"Can't insert module");
 }
 void CClassicDatabase::StartSaveModule(Address_type baseAddress, 
                                 Address_type size, 
                                 const std::wstring & moduleName,
                                 CAutoRollbackClassicDatabase * pRollback)
 {
-    ORTHIA_CHECK_SQLITE2(sqlite3_exec(m_pDatabase->Get(), "BEGIN TRANSACTION", NULL, NULL, NULL));
+    ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "BEGIN TRANSACTION"));
     pRollback->Init(this);
     char * buffer = 0;
     buffer = "INSERT INTO tbl_references VALUES(?1, ?2)";
@@ -110,7 +109,7 @@ void CClassicDatabase::StartSaveModule(Address_type baseAddress,
 void CClassicDatabase::DoneSave()
 {
     m_cache.clear();
-    ORTHIA_CHECK_SQLITE2(sqlite3_exec(m_pDatabase->Get(), "COMMIT TRANSACTION", NULL, NULL, NULL));
+    ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "COMMIT TRANSACTION"));
 }
 void CClassicDatabase::CleanupResources()
 {
@@ -147,7 +146,7 @@ void CClassicDatabase::QueryReferencesToInstructionsRange(Address_type address1,
     pResult->clear();
     for(;;)
     {
-        int stepResult = sqlite3_step(m_stmtSelectReferencesToRange.Get());
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectReferencesToRange.Get());
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -165,7 +164,7 @@ void CClassicDatabase::QueryReferencesToInstructionsRange(Address_type address1,
             pResult->back().references.push_back(CommonReferenceInfo(refFrom, false));
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
 }
 
@@ -177,7 +176,7 @@ void CClassicDatabase::QueryReferencesFromInstruction(Address_type offset, std::
     pReferences->clear();
     for(;;)
     {
-        int stepResult = sqlite3_step(m_stmtSelectReferencesFrom.Get());
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectReferencesFrom.Get());
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -189,7 +188,7 @@ void CClassicDatabase::QueryReferencesFromInstruction(Address_type offset, std::
             pReferences->push_back(CommonReferenceInfo(ref, false));
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
 }
 
@@ -201,7 +200,7 @@ void CClassicDatabase::QueryReferencesToInstruction(Address_type offset, std::ve
     pReferences->clear();
     for(;;)
     {
-        int stepResult = sqlite3_step(m_stmtSelectReferencesTo.Get());
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectReferencesTo.Get());
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -213,7 +212,7 @@ void CClassicDatabase::QueryReferencesToInstruction(Address_type offset, std::ve
             pReferences->push_back(CommonReferenceInfo(ref, false));
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
 }
 
@@ -251,16 +250,14 @@ void CClassicDatabase::UnloadModule(Address_type address, bool bSilent)
             std::stringstream sql;
             sql<<"DELETE FROM tbl_references WHERE UINT_LESSOE("<<(long long)address<<", ref_address_from) and UINT_LESSOE(ref_address_from, "<<(long long)(address+size)<<")";
             std::string sqlString = sql.str();
-            ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(), sqlString.c_str(),
-                        0,0,0), L"Can't unload module");
+            ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), sqlString.c_str()), L"Can't unload module");
         }
 
         {
             std::stringstream sql;
             sql<<"DELETE FROM tbl_modules WHERE mod_address = "<<(long long)address;
             std::string sqlString = sql.str();
-            ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(), sqlString.c_str(),
-                        0,0,0), L"Can't unload module");
+            ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), sqlString.c_str()), L"Can't unload module");
         }
     }
     catch(const std::exception & e)
@@ -274,7 +271,7 @@ bool CClassicDatabase::IsModuleExists(Address_type address)
 {
     CSQLAutoReset autoStatement(m_stmtSelectModule.Get());
     sqlite3_bind_int64(m_stmtSelectModule.Get(), 1, address);
-    int stepResult = sqlite3_step(m_stmtSelectModule.Get());
+    int stepResult = SQLiteStep_Wrapper(m_stmtSelectModule.Get());
     if (stepResult == SQLITE_ROW)
     {
         return true;
@@ -290,7 +287,7 @@ void CClassicDatabase::QueryReferencesFromInstructionsRange(Address_type address
     pResult->clear();
     for(;;)
     {
-        int stepResult = sqlite3_step(m_stmtSelectReferencesFromRange.Get());
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectReferencesFromRange.Get());
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -307,7 +304,7 @@ void CClassicDatabase::QueryReferencesFromInstructionsRange(Address_type address
             pResult->back().references.push_back(CommonReferenceInfo(refTo, false));
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
 }
 
@@ -318,7 +315,7 @@ void CClassicDatabase::QueryModules(std::vector<CommonModuleInfo> * pResult)
     pResult->clear();
     for(;;)
     {
-        int stepResult = sqlite3_step(m_stmtQueryModules.Get());
+        int stepResult = SQLiteStep_Wrapper(m_stmtQueryModules.Get());
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -332,13 +329,13 @@ void CClassicDatabase::QueryModules(std::vector<CommonModuleInfo> * pResult)
             pResult->push_back(CommonModuleInfo(address, size, orthia::ToWideString(name)));
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
 }
 void CClassicDatabase::RollbackTransactionSilent()
 {
     m_cache.clear();
-    sqlite3_exec(m_pDatabase->Get(), "ROLLBACK TRANSACTION", NULL, NULL, NULL);
+    SQLiteExec_Wrapper(m_pDatabase->Get(), "ROLLBACK TRANSACTION");
 }
 
 }

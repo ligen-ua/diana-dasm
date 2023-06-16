@@ -45,7 +45,12 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.main"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Orthia Disassembler"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption-file"), ORTHIA_TCSTR("Orthia File: %1"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("opened-file"), ORTHIA_TCSTR("Opened: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("analyzing-file"), ORTHIA_TCSTR("Analyzing...."))
+        << textManager->RegisterValue(ORTHIA_TCSTR("done-opened"), ORTHIA_TCSTR("Opened Successfully"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("module-sha1"), ORTHIA_TCSTR("SHA1: %1"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("readme-header"), ORTHIA_TCSTR("Orthia Disasm Database Folder"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("original-name"), ORTHIA_TCSTR("Original Name: \"%1\""))
         ;
 
     // model

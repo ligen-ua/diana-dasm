@@ -19,8 +19,7 @@ void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::
     if (result.error.native.empty())
     {
         auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-        m_outputWindow->AddLine(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opened-file")),
-            file->GetFullFileNameForUI()));
+        m_outputWindow->AddLine(mainNode->QueryValue(ORTHIA_TCSTR("done-opened")));
 
         OnWorkspaceItemChanged();
         return;

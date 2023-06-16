@@ -67,6 +67,8 @@ void CMainWindow::ConstructChilds()
 
         bottomPanel->AddPanel(m_outputWindow);
     }
+    m_model->SetUILog(m_outputWindow);
+
     // we need to set focus somewhere
     SetOnResize([&]() {
         
