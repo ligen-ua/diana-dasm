@@ -105,5 +105,8 @@ namespace orthia
     {
         return m_imageBase;
     }
-
+    const std::vector<char>& CSimplePeFile::GetMappedPeFile() const
+    {
+        return m_mappedPeFile;
+    }
 }

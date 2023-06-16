@@ -26,12 +26,20 @@ namespace oui
     {
     protected:
         std::atomic_bool m_cancelled = false;
+        std::shared_ptr<CWindowThread> m_thread;
+
     public:
-        BaseOperation()
+        BaseOperation(std::shared_ptr<CWindowThread> thread)
+            : 
+                m_thread(thread)
         {
         }
         virtual ~BaseOperation()
         {
+        }
+        std::shared_ptr<CWindowThread> GetThread()
+        {
+            return m_thread;
         }
         void Cancel()
         {
@@ -45,14 +53,13 @@ namespace oui
     template<class HandlerType>
     class Operation:public BaseOperation
     {
-        std::shared_ptr<CWindowThread> m_thread;
         HandlerType m_handler;
 
     public:
         template<class Type>
         Operation(std::shared_ptr<CWindowThread> thread, Type&& value)
             :
-                m_thread(thread),
+                BaseOperation(thread),
                 m_handler(std::forward<Type>(value))
         {
         }

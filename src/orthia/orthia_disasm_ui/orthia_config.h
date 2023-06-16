@@ -14,5 +14,7 @@ namespace orthia
         PlatformString_type GetBinFileName() const;
         PlatformString_type GetDBFileName() const;
         PlatformString_type GetDBFolder() const;
+        PlatformString_type GetReadmeFileName() const;
+
     };
 }
