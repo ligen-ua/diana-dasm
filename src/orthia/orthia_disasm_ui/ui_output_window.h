@@ -19,6 +19,6 @@ class COutputWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
 public:
     COutputWindow(std::function<oui::String()> getCaption);
     void AddLine(const oui::String& line);
-    void ScrollUp(oui::MultiLineViewItem* item, int count) override;
-    void ScrollDown(oui::MultiLineViewItem* item, int count) override;
+    bool ScrollUp(oui::MultiLineViewItem* item, int count) override;
+    bool ScrollDown(oui::MultiLineViewItem* item, int count) override;
 };

@@ -56,8 +56,8 @@ namespace oui
     {
         virtual ~IMultiLineViewOwner() {}
         virtual void CancelAllQueries() = 0;
-        virtual void ScrollUp(MultiLineViewItem* item, int count) = 0;
-        virtual void ScrollDown(MultiLineViewItem* item, int count) = 0;
+        virtual bool ScrollUp(MultiLineViewItem* item, int count) = 0;
+        virtual bool ScrollDown(MultiLineViewItem* item, int count) = 0;
     };
 
     class CMultiLineView:public SimpleBrush<MouseFocusable<CWindow>>

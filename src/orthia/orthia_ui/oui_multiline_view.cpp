@@ -131,8 +131,10 @@ namespace oui
                 {
                     // ask owner, need some data
                     MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[0];
-                    m_owner->ScrollUp(item, count);
-                    return;
+                    if (m_owner->ScrollUp(item, count))
+                    {
+                        return;
+                    }
                 }
             }
             m_firstVisibleLineIndex = newFirstVisibleLineIndex;
@@ -166,8 +168,11 @@ namespace oui
             {
                 // ask owner, need some data
                 MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[m_lines.size()-1];
-                m_owner->ScrollDown(item, count);
-                return;
+                if (m_owner->ScrollDown(item, count))
+                {
+                    return;
+                }
+                count = availableItemsCountAfterCursor;
             }
             int requestCount = availableItemsCountAfterCursor - count;
             m_firstVisibleLineIndex += requestCount;
