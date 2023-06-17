@@ -317,6 +317,41 @@ long long SQLite_ReadInt(sqlite3_stmt * statement, bool bSilent, int defaultValu
     return result;
 }
 
+unsigned long long SQLite_ReadInt64(sqlite3_stmt* statement, bool bSilent, unsigned long long defaultValue)
+{
+    bool bResult = false;
+    unsigned long long  result = 0;
+    for (;;)
+    {
+        int stepResult = SQLiteStep_Wrapper(statement);
+        if (stepResult == SQLITE_DONE)
+        {
+            break;
+        }
+        else
+            if (stepResult == SQLITE_ROW)
+            {
+                if (bResult)
+                {
+                    throw std::runtime_error("SQLiteStep_Wrapper failed: only one row expected");
+                }
+                result = (unsigned long long)sqlite3_column_int64(statement, 0);
+                bResult = true;
+                continue;
+            }
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
+    }
+    if (!bResult)
+    {
+        if (bSilent)
+        {
+            return defaultValue;
+        }
+        throw std::runtime_error("SQLiteStep_Wrapper failed: value not found");
+    }
+    return result;
+}
+
 void SQLite_ReadWideString(sqlite3_stmt * statement, 
                            bool bSilent, 
                            const std::wstring & defaultValue, 

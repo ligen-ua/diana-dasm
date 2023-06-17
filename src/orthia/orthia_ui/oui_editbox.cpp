@@ -191,10 +191,6 @@ namespace oui
 
                 console->ShowCursor();
             }
-            else
-            {
-                console->HideCursor();
-            }
         }
 
         if (!SelectionIsActive())

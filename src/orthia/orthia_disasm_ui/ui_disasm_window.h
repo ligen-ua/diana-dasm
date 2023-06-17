@@ -11,7 +11,9 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
 
     // these vars form a content iterator
     int m_metaInfoPos = 0;
-    long long m_peAddress = 0;
+    DI_UINT64 m_peAddress = 0;
+    DI_UINT64 m_peAddressEnd = 0;
+    bool m_userSuppliedPeAddress = false;
 
     int m_itemUid = -1;
 
@@ -22,6 +24,7 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void ScrollUp(oui::MultiLineViewItem* item, int count) override;
     void ScrollDown(oui::MultiLineViewItem* item, int count) override;
     void ReloadVisibleData();
+    void ConstructChilds() override;
 
     void OnResize() override;
     void SetFocusImpl() override;

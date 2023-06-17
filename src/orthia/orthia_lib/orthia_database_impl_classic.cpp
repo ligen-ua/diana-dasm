@@ -52,6 +52,9 @@ void CClassicDatabase::Init()
     
     buffer = "SELECT ref_address_from, ref_address_to FROM tbl_references WHERE UINT_LESSOE(?1, ref_address_from) AND UINT_LESSOE(ref_address_from, ?2) ORDER BY ref_address_from, ref_address_to";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectReferencesFromRange.Get2(), NULL));
+
+    buffer = "SELECT ref_address_to FROM tbl_references WHERE UINT_LESSOE(ref_address_to, ?1) ORDER BY ref_address_to DESC LIMIT 1";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtQueryRouteStart.Get2(), NULL));
 }
 
 void CClassicDatabase::InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to)
@@ -166,6 +169,12 @@ void CClassicDatabase::QueryReferencesToInstructionsRange(Address_type address1,
         }
         throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
+}
+Address_type CClassicDatabase::QueryRouteStart(Address_type offset)
+{
+    CSQLAutoReset autoStatement(m_stmtQueryRouteStart.Get());
+    SQLBindInt64(m_stmtQueryRouteStart.Get(), offset, 1);
+    return SQLite_ReadInt64(m_stmtQueryRouteStart.Get(), true, 0);
 }
 
 void CClassicDatabase::QueryReferencesFromInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pReferences)

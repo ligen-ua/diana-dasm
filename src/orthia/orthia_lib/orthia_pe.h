@@ -34,6 +34,7 @@ namespace orthia
         DI_UINT64 DiGetProcAddress(const char * pFunctionName, OPERAND_SIZE* pForwardOffset = 0);
 
         PeDianaContext* GetImpl();
+        const PeDianaContext* GetImpl() const;
         DI_UINT64 GetImageBase() const;
         const std::vector<char> & GetMappedPeFile() const;
     };

@@ -101,6 +101,10 @@ namespace orthia
     {
         return m_dianaContext.get();
     }
+    const PeDianaContext* CSimplePeFile::GetImpl() const
+    {
+        return m_dianaContext.get();
+    }
     DI_UINT64 CSimplePeFile::GetImageBase() const
     {
         return m_imageBase;
