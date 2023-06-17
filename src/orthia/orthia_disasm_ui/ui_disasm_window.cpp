@@ -193,7 +193,7 @@ void CDisasmWindow::ReloadVisibleData()
 void CDisasmWindow::CancelAllQueries()
 {
 }
-void CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count) 
+bool CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count) 
 {
     if (count > 1)
     {
@@ -203,7 +203,7 @@ void CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
         {
             // just move cursor this time
             m_view->SetCursorYPos(0);
-            return;
+            return true;
         }
     }
     if (m_peAddress > count)
@@ -215,8 +215,9 @@ void CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
         m_peAddress = 0;
     }
     ReloadVisibleData();
+    return true;
 }
-void CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count) 
+bool CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count) 
 {
     const int maxLinesCount = m_view->GetSize().height;
     int countToUse = count;
@@ -227,7 +228,7 @@ void CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
         {
             // just move cursor this time
             m_view->SetCursorYPos(maxLinesCount);
-            return;
+            return true;
         }
         // don't scroll the entire screen
         // 1) it looks better with up logic which is based on random guess
@@ -244,6 +245,7 @@ void CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
     m_peAddress += bytesCount;
     m_userSuppliedPeAddress = true;
     ReloadVisibleData();
+    return true;
 }
 void CDisasmWindow::ConstructChilds()
 {

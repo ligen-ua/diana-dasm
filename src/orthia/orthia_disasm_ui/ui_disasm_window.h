@@ -21,11 +21,11 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     std::shared_ptr<oui::DialogColorProfile> m_colorProfile;
 
     void CancelAllQueries() override;
-    void ScrollUp(oui::MultiLineViewItem* item, int count) override;
-    void ScrollDown(oui::MultiLineViewItem* item, int count) override;
+    bool ScrollUp(oui::MultiLineViewItem* item, int count) override;
+    bool ScrollDown(oui::MultiLineViewItem* item, int count) override;
     void ReloadVisibleData();
-    void ConstructChilds() override;
 
+    void ConstructChilds() override;
     void OnResize() override;
     void SetFocusImpl() override;
 public:
