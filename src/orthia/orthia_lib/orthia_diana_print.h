@@ -15,6 +15,8 @@ namespace orthia
         std::wstring m_currentBlock;
         orthia::Address_type m_sizeInCommands;
         orthia::Address_type m_currentCommand;
+        int m_bytesIdent = 0;
+        int m_countOfSpacesAfterAddress = 1;
     public:
         CVmAsmMemoryPrinter(orthia::ITextPrinter* pTextPrinter,
             int dianaMode,
@@ -25,6 +27,12 @@ namespace orthia
             m_sizeInCommands(sizeInCommands),
             m_currentCommand(0)
         {
+            // default parameters are used in windbg plugin
+            m_bytesIdent = 25;
+            if (m_dianaMode == 8)
+            {
+                m_bytesIdent = 31;
+            }
         }
         void PrintCommand(unsigned long long address,
             const std::wstring& bytes,
@@ -39,14 +47,10 @@ namespace orthia
             {
                 m_currentBlock.append(orthia::Address64ToString(address));
             }
-            m_currentBlock.append(L" ");
+            m_currentBlock.append(m_countOfSpacesAfterAddress, L' ');
             m_currentBlock.append(bytes);
 
-            int count = 25;
-            if (m_dianaMode == 8)
-            {
-                count = 31;
-            }
+            int count = m_bytesIdent;
             if (count < (int)m_currentBlock.size())
             {
                 count = (int)m_currentBlock.size() + 1;

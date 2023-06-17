@@ -163,7 +163,11 @@ namespace oui
         int newCursor = m_yCursopPos + count;
         if (newCursor > lastPossibleCursor)
         {
-            const int availableItemsCountAfterCursor = availableItemsCount - 1 - m_yCursopPos;
+            int availableItemsCountAfterCursor = availableItemsCount - m_yCursopPos - 1;
+            if (availableItemsCountAfterCursor < 0)
+            {
+                availableItemsCountAfterCursor = 0;
+            }
             if (count > availableItemsCountAfterCursor)
             {
                 // ask owner, need some data
@@ -172,9 +176,8 @@ namespace oui
                 {
                     return;
                 }
-                count = availableItemsCountAfterCursor;
             }
-            int requestCount = availableItemsCountAfterCursor - count;
+            int requestCount = std::min(availableItemsCountAfterCursor, count);
             m_firstVisibleLineIndex += requestCount;
             newCursor = lastPossibleCursor;
         }

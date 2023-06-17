@@ -138,6 +138,8 @@ void CDisasmWindow::ReloadVisibleData()
             m_writer(writer),
             m_firstVirtualOffset(startAddress)
         {
+            m_bytesIdent += 10;
+            m_countOfSpacesAfterAddress = 3;
         }
         void Preprocess(int iRes,
             ::DianaContext& context,
@@ -258,10 +260,7 @@ void CDisasmWindow::OnResize()
     
     m_view->Resize(clientRect.size);
 
-    if (clientRect.size.height > prevHeight)
-    {
-        ReloadVisibleData();
-    }
+    ReloadVisibleData();
 }
 void CDisasmWindow::SetFocusImpl()
 {
