@@ -38,6 +38,8 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtSelectReferencesToRange;
     CSQLStatement m_stmtSelectReferencesFromRange;
 
+    CSQLStatement m_stmtQueryRouteStart;
+
     void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to);
     void InsertModule(Address_type baseAddress, Address_type size, const std::wstring & moduleName);
 
@@ -59,6 +61,7 @@ public:
     void InsertReferencesFromInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
 
     // queries
+    Address_type QueryRouteStart(Address_type offset);
     void QueryReferencesFromInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pReferences);
     void QueryReferencesToInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pReferences);
     void QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult);

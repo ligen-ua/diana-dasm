@@ -41,9 +41,15 @@ namespace oui
     }
 
 
+    struct IMultilineViewTag
+    {
+        virtual ~IMultilineViewTag() {}
+    };
     struct MultiLineViewItem
     {
         String text;
+        int intTag = 0;
+        std::shared_ptr<IMultilineViewTag> interfaceTag;
     };
 
     struct IMultiLineViewOwner
@@ -66,6 +72,8 @@ namespace oui
         int m_xCursopPos = 0;
 
         bool m_cursorOutOfText = true;
+        bool m_dynamicLogMode = true;
+
         std::vector<MultiLineViewItem> m_lines;
 
         std::shared_ptr<CEditBox> m_editBox;
@@ -83,7 +91,7 @@ namespace oui
         void SetNewYCursorPosImpl(int newCursor);
 
     public:
-        CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner);
+        CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner, bool dynamicLogMode);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         void OnFocusLost() override;
         void OnFocusEnter() override;
@@ -91,8 +99,16 @@ namespace oui
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
 
+
+        void Clear();
         void Init(std::vector<MultiLineViewItem>&& lines);
         void AddLine(MultiLineViewItem && item);
+
+        std::vector<MultiLineViewItem>::iterator VisibleItemsBegin();
+        std::vector<MultiLineViewItem>::iterator VisibleItemsEnd();
+
+        int GetCursorYPos() const;
+        void SetCursorYPos(int newPos);
     };
 
 }

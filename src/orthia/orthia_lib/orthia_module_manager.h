@@ -38,6 +38,7 @@ public:
 
     void QueryLoadedModules(std::vector<CommonModuleInfo> * pResult) const;
     // references
+    Address_type QueryRouteStart(Address_type offset);
     void QueryReferencesFromInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pResult) const;
     void QueryReferencesToInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pResult) const;
     void QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult) const;

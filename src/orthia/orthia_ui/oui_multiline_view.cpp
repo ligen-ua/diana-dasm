@@ -19,10 +19,12 @@ namespace oui
         m_editBox->SetLowLevelHandlers(std::move(handlers));
     }
     CMultiLineView::CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, 
-        IMultiLineViewOwner* owner)
+        IMultiLineViewOwner* owner,
+        bool dynamicLogMode)
         :
             m_colorProfile(colorProfile),
-            m_owner(owner)
+            m_owner(owner),
+            m_dynamicLogMode(dynamicLogMode)
     {
         m_editBox = std::make_shared<CEditBox>(m_colorProfile);
         m_editBox->SetReadOnly(true);
@@ -129,7 +131,7 @@ namespace oui
                 {
                     // ask owner, need some data
                     MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[0];
-                    m_owner->ScrollUp(item, requestCount);
+                    m_owner->ScrollUp(item, count);
                     return;
                 }
             }
@@ -146,20 +148,28 @@ namespace oui
     {
         const auto clientRect = GetClientRect();
         const int availableScreenHeight = clientRect.size.height;
-        const int availableItemsCount = 1 + (int)m_lines.size() - m_firstVisibleLineIndex;
-
-        const int lastPossibleCursor = std::min(availableScreenHeight, availableItemsCount);
+        int availableItemsCount = (int)m_lines.size() - m_firstVisibleLineIndex;
+        int lastPossibleCursor = std::min(availableScreenHeight, availableItemsCount);
+        if (m_dynamicLogMode)
+        {
+            ++availableItemsCount;
+        }
+        else
+        {
+            --lastPossibleCursor;
+        }
         int newCursor = m_yCursopPos + count;
         if (newCursor > lastPossibleCursor)
         {
-            int requestCount = newCursor - lastPossibleCursor;
-            if (requestCount > availableItemsCount)
+            const int availableItemsCountAfterCursor = availableItemsCount - 1 - m_yCursopPos;
+            if (count > availableItemsCountAfterCursor)
             {
                 // ask owner, need some data
                 MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[m_lines.size()-1];
-                m_owner->ScrollDown(item, requestCount - availableItemsCount);
+                m_owner->ScrollDown(item, count);
                 return;
             }
+            int requestCount = availableItemsCountAfterCursor - count;
             m_firstVisibleLineIndex += requestCount;
             newCursor = lastPossibleCursor;
         }
@@ -247,22 +257,34 @@ namespace oui
         m_owner->CancelAllQueries();
         Parent_type::Destroy();
     }
+    void CMultiLineView::Clear()
+    {
+        std::vector<MultiLineViewItem> lines;
+        Init(std::move(lines));
+    }
     void CMultiLineView::Init(std::vector<MultiLineViewItem>&& lines)
     {
+        m_cursorOutOfText = false;
         m_firstVisibleLineIndex = 0;
         m_lines = std::move(lines);
+        SetNewYCursorPosImpl(m_yCursopPos);
         Invalidate();
     }
 
     void CMultiLineView::SetNewYCursorPosImpl(int newCursor)
     {
         m_yCursopPos = newCursor;
-        if (m_firstVisibleLineIndex + m_yCursopPos >= (int)m_lines.size())
+        bool outOfBounds = m_firstVisibleLineIndex + m_yCursopPos >= (int)m_lines.size();
+        if (((int)m_lines.size() - m_firstVisibleLineIndex <= 0) || (outOfBounds && m_dynamicLogMode))
         {
             m_cursorOutOfText = true;
         }
         else
         {
+            if (outOfBounds)
+            {
+                m_yCursopPos = (int)m_lines.size() - m_firstVisibleLineIndex - 1;
+            }
             m_cursorOutOfText = false;
             int offset = m_firstVisibleLineIndex + m_yCursopPos;
             int cursorPos = m_editBox->GetVirtualCursorPosition(); 
@@ -334,5 +356,33 @@ namespace oui
     {
         m_lines.push_back(std::move(item));
         Invalidate();
+    }
+
+    std::vector<MultiLineViewItem>::iterator CMultiLineView::VisibleItemsBegin()
+    {
+        if (m_firstVisibleLineIndex > m_lines.size())
+        {
+            return m_lines.end();
+        }
+        return m_lines.begin() + m_firstVisibleLineIndex;
+    }
+    std::vector<MultiLineViewItem>::iterator CMultiLineView::VisibleItemsEnd()
+    {
+        if (m_firstVisibleLineIndex > m_lines.size())
+        {
+            return m_lines.end();
+        }
+        int avaliableItemsCount = (int)m_lines.size() - m_firstVisibleLineIndex;
+        int availableHeight = GetClientRect().size.height;
+        return m_lines.begin() + std::min(avaliableItemsCount, availableHeight);
+    }
+
+    int CMultiLineView::GetCursorYPos() const
+    {
+        return m_yCursopPos;
+    }
+    void CMultiLineView::SetCursorYPos(int newPos)
+    {
+        SetNewYCursorPosImpl(newPos);
     }
 }

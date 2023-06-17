@@ -15,7 +15,7 @@ COutputWindow::COutputWindow(std::function<oui::String()> getCaption)
     QueryDefaultColorProfile(*m_colorProfile);
 
     oui::IMultiLineViewOwner* param = this;
-    m_view = std::make_shared<oui::CMultiLineView>(m_colorProfile, param);
+    m_view = std::make_shared<oui::CMultiLineView>(m_colorProfile, param, true);
 
 }
 void COutputWindow::AddLine(const oui::String& line)

@@ -102,6 +102,11 @@ void CModuleManager::QueryLoadedModules(std::vector<CommonModuleInfo> * pResult)
     m_pDatabaseManager->GetClassicDatabase()->QueryModules(pResult);
 }
 // references
+Address_type CModuleManager::QueryRouteStart(Address_type offset)
+{
+    CAutoCriticalSection guard(m_lock);
+    return m_pDatabaseManager->GetClassicDatabase()->QueryRouteStart(offset);
+}
 void CModuleManager::QueryReferencesToInstruction(Address_type offset, 
                                                  std::vector<CommonReferenceInfo> * pResult) const
 {
