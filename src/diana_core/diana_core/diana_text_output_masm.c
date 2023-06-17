@@ -144,7 +144,7 @@ static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pL
         DI_CHECK(DianaTextOutput(pContext, "*"));
         DI_CHECK(DianaOpOutput(pContext, pLinkedOp->value.rmIndex.index, 1));
     }
-    if (pLinkedOp->value.rmIndex.dispSize)
+    if ((pLinkedOp->value.rmIndex.dispSize && pLinkedOp->value.rmIndex.dispValue) || !bWasSomething)
     {
         int positive = 1;
         int wasConvert = 0;
@@ -259,6 +259,11 @@ static int diana_cmd_output_generic(DianaTextOutputContext * pContext)
     return PrintOperands(pContext);
 }
 
+static int diana_cmd_output_hint_nop(DianaTextOutputContext* pContext)
+{
+    DI_CHECK(DianaTextOutput(pContext, "nop"));
+    return PrintOperands(pContext);
+}
 static DianaTextOutputCmd_fnc g_functions[] = 
 {
     0,
@@ -590,7 +595,7 @@ static DianaTextOutputCmd_fnc g_functions[] =
     diana_cmd_output_generic,     //   diana_cmd_output_emms,
     diana_cmd_output_generic,     //   diana_cmd_output_femms,
     diana_cmd_output_generic,     //   diana_cmd_output_mfence,
-    diana_cmd_output_generic,     //   diana_cmd_output_hint_nop,
+    diana_cmd_output_hint_nop,
     diana_cmd_output_generic,     //   diana_cmd_output_aaa,
     diana_cmd_output_generic,     //   diana_cmd_output_aad,
     diana_cmd_output_generic,     //   diana_cmd_output_aam,
