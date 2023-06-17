@@ -128,6 +128,19 @@ static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pL
     DI_CHECK(PrintRegister(pContext, pLinkedOp->value.rmIndex.seg_reg));
     DI_CHECK(DianaTextOutput(pContext, ":["));
     
+    // calculate RIP's
+    if (pLinkedOp->value.rmIndex.reg == reg_RIP &&
+        (pLinkedOp->value.rmIndex.indexed_reg == reg_none ||
+        pLinkedOp->value.rmIndex.index == 0))
+    {
+        OPERAND_SIZE result = pContext->instructionRIP;
+        result += pContext->pResult->iFullCmdSize;
+        result += pLinkedOp->value.rmIndex.dispValue;
+        DI_CHECK(DianaOpOutput(pContext, result, pLinkedOp->usedAddressSize));
+        DI_CHECK(DianaTextOutput(pContext, "]"));
+        return DI_SUCCESS;
+    }
+
     if (pLinkedOp->value.rmIndex.reg != reg_none)
     {
         bWasSomething = 1;
