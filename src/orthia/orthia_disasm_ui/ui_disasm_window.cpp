@@ -26,6 +26,13 @@ void CDisasmWindow::SetActiveItem(int itemUid)
     m_peAddressEnd = 0;
     m_metaInfoPos = 0;
 
+    auto item = m_model->GetItem(m_itemUid);
+    if (item)
+    {
+        const auto& context = item->GetFile()->GetImpl();
+        auto imageBase = item->GetFile()->GetImageBase();
+        m_peAddress = imageBase + context->mappedPE.pImpl->addressOfEntryPoint;
+    }
     ReloadVisibleData();
     Invalidate();
 }
