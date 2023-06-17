@@ -120,7 +120,14 @@ namespace oui
                 {
                     mainConsole.FixupAfterResize();
                 }
-                rootWindow->ProcessEvent(evt, evtContext);
+                try
+                {
+                    rootWindow->ProcessEvent(evt, evtContext);
+                }
+                catch (std::exception& e)
+                {
+                    oui::LogOutput(LogFlags::Error, e.what());
+                }
 
                 // generate on mouse leave
                 if (mouseHandler)

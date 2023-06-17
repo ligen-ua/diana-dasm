@@ -56,8 +56,7 @@ namespace oui
             }
             catch (const std::exception& e)
             {
-                &e;
-                // TODO: add some logs
+                oui::LogOutput(LogFlags::Error, e.what());
             }
         }
     }

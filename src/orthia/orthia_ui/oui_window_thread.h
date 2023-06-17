@@ -75,6 +75,7 @@ namespace oui
             auto params = std::make_tuple(std::forward<Args>(args)...);
 
             m_thread->AddTask([=, params = std::move(params)]() {
+
                 std::apply(m_handler, params);
             });
             return true;

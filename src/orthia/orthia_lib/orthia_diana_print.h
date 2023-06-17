@@ -162,7 +162,7 @@ namespace orthia
             *pExit = false;
 
             orthia::Address_type virtualEndOfCommand = virtualOffset + result.iFullCmdSize;
-            if (virtualEndOfCommand < m_startAddress)
+            if (virtualEndOfCommand <= m_startAddress)
             {
                 // just skip the backward step
                 *pPrint = false;
