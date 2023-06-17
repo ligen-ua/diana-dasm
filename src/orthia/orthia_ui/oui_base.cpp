@@ -25,4 +25,37 @@ namespace oui
         return true;
     }
 
+    std::string ToStringA(LogFlags flags)
+    {
+        switch (flags)
+        {
+        case LogFlags::Debug:
+            return "Debug";
+        case LogFlags::Info:
+            return "Info";
+        case LogFlags::Warning:
+            return "Warning";
+        case LogFlags::Error:
+            return "Error";
+        default:
+            return "Unknown";
+        }
+    }
+    std::wstring ToStringW(LogFlags flags)
+    {
+        switch (flags)
+        {
+        case LogFlags::Debug:
+            return L"Debug";
+        case LogFlags::Info:
+            return L"Info";
+        case LogFlags::Warning:
+            return L"Warning";
+        case LogFlags::Error:
+            return L"Error";
+        default:
+            return L"Unknown";
+        }
+    }
+
 }

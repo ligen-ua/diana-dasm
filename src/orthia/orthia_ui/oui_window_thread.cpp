@@ -37,7 +37,14 @@ namespace oui
         }
         for (auto task : m_uiBuffer)
         {
-            task();
+            try
+            {
+                task();
+            }
+            catch (std::exception& e)
+            {
+                oui::LogOutput(LogFlags::Error, e.what());
+            }
         }
         m_uiBuffer.clear();
     }

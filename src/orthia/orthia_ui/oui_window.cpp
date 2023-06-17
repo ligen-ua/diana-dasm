@@ -551,7 +551,14 @@ namespace oui
     {
         if (force || !this->IsValid())
         {
-            DoPaint(rect, parameters);
+            try
+            {
+                DoPaint(rect, parameters);
+            }
+            catch (std::exception& e)
+            {
+                oui::LogOutput(LogFlags::Error, e.what());
+            }
             this->Invalidate(true);
             force = true;
         }

@@ -145,6 +145,18 @@ namespace oui
             m_handler = nullptr;
         }
     };
+
+
+    enum class LogFlags
+    {
+        Debug,
+        Info,
+        Warning,
+        Error
+    };
+
+    std::string ToStringA(LogFlags flags);
+    std::wstring ToStringW(LogFlags flags);
 }
 
 #ifdef OUI_SYS_WINDOWS

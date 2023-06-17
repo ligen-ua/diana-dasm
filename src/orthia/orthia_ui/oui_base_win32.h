@@ -87,4 +87,9 @@ namespace oui
         }
     }
 
+
+    void LogOutput(LogFlags flags, const std::string& text);
+    void LogOutput(LogFlags flags, const std::wstring& text);
+
+
 }

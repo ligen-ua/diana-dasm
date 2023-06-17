@@ -179,6 +179,9 @@ void CDisasmWindow::ReloadVisibleData()
         // check if can be adjusted
         m_peAddress = printer.GetRealFirstAddress();
     }
+
+    // clear flag on any next move
+    m_userSuppliedPeAddress = false;
 }
 void CDisasmWindow::CancelAllQueries()
 {
@@ -232,6 +235,7 @@ void CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
         bytesCount += it->intTag;
     }
     m_peAddress += bytesCount;
+    m_userSuppliedPeAddress = true;
     ReloadVisibleData();
 }
 void CDisasmWindow::ConstructChilds()

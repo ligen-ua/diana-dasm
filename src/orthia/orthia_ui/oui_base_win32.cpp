@@ -3,6 +3,17 @@
 
 namespace oui
 {
+    void LogOutput(LogFlags flags, const std::string& text)
+    {
+        auto result = std::string("[") + ToStringA(flags) + "] " + text + "\n";
+        OutputDebugStringA(result.c_str());
+    }
+    void LogOutput(LogFlags flags, const std::wstring& text)
+    {
+        auto result = std::wstring(L"[") + ToStringW(flags) + L"] " + text + L"\n";
+        OutputDebugStringW(result.c_str());
+    }
+
     void FilterUnreadableSymbols(std::wstring& text)
     {
         text.erase(std::remove_if(text.begin(), text.end(), [](wchar_t ch) {
