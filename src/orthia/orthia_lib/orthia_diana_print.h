@@ -114,17 +114,22 @@ namespace orthia
                     prevWasBad = true;
                     int bytesRead = 0;
                     char data = 0;
-                    iRes = stream.parent.parent.parent.pReadFnc(&stream,
-                        &data,
-                        1,
-                        &bytesRead);
-                    result.iFullCmdSize = 1;
-                    result.iLinkedOpCount = 0;
-                    result.pInfo = Diana_GetNopInfo();
+
                     if (context.cacheSize)
                     {
                         Diana_CacheEatOneSafe(&context);
+                        iRes = 0;
                     }
+                    else
+                    {
+                        iRes = stream.parent.parent.parent.pReadFnc(&stream,
+                            &data,
+                            1,
+                            &bytesRead);
+                    }
+                    result.iFullCmdSize = 1;
+                    result.iLinkedOpCount = 0;
+                    result.pInfo = Diana_GetNopInfo();
                 }
                 else
                 {
