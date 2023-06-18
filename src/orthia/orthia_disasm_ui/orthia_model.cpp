@@ -10,10 +10,110 @@ namespace orthia
     const unsigned long long g_minSizeBytes = 1;
 
     // WorkplaceItemInternal
-    const orthia::CSimplePeFile* WorkplaceItemInternal::GetFile() const
+    WorkAddressData WorkplaceItemInternal::ReadData(Address_type address, Address_type size)
     {
-        return peFile.get();
+        if (!size)
+        {
+            return WorkAddressData();
+        }
+        Address_type lastValid = address;
+        if (Diana_SafeAdd(&lastValid, size - 1))
+        {
+            return WorkAddressData();
+        }
+        // check fast cases
+        if (lastValid < peFile->GetImageBase() ||
+            address > moduleLastValidAddress)
+        {
+            // the entire range is inaccessible
+            std::vector<char> buffer(size);
+            auto* pBufferStart = buffer.data();
+            return WorkAddressData(
+                pBufferStart,
+                size,
+                nullptr,
+                WorkAddressData::flags_FullInvalid,
+                [buffer = std::move(buffer)](WorkAddressData*) {
+                }
+            );
+        }
+
+        if (address >= peFile->GetImageBase() &&
+            lastValid <= moduleLastValidAddress)
+        {
+            // the entire range is good
+            auto offset = address - peFile->GetImageBase();
+            auto pBufferStart = peFile->GetMappedPeFile().data() + offset;
+            auto sharedThis = shared_from_this();
+            return WorkAddressData(
+                pBufferStart,
+                size,
+                nullptr,
+                WorkAddressData::flags_FullValid,
+                [sharedThis = std::move(sharedThis)](WorkAddressData*) mutable {
+                    sharedThis.reset();
+                }
+            );
+        }
+        // damn, the range is partially inaccessible, it will be slow
+        // [startInvalidBytes][module itself][endInvalidBytes]
+        Address_type startInvalidBytes = 0;
+        Address_type positiveAddress = 0;
+        if (address < peFile->GetImageBase())
+        {
+            startInvalidBytes = peFile->GetImageBase() - address;
+        }
+        else
+        {
+            positiveAddress = address - peFile->GetImageBase();
+        }
+        Address_type startValidBytes = (size - startInvalidBytes) - positiveAddress;
+        Address_type endInvalidBytes = 0;
+        if (startValidBytes > peFile->GetMappedPeFile().size())
+        {
+            endInvalidBytes = startValidBytes - peFile->GetMappedPeFile().size();
+            startValidBytes = peFile->GetMappedPeFile().size();
+        }
+        if (startInvalidBytes + startValidBytes + endInvalidBytes != size)
+        {
+            // something is just plain wrong, the main assumption is broken
+            return WorkAddressData();
+        }
+
+        // ok here we go, prepare the final data
+        std::vector<char> buffer(size);
+        auto* pBufferStart = buffer.data();
+        memcpy(pBufferStart + startInvalidBytes, peFile->GetMappedPeFile().data() + positiveAddress, startValidBytes);
+
+        std::vector<char> flags(size);
+        auto* pFlagsStart = flags.data();
+        memset(pFlagsStart + 0, WorkAddressData::dataFlags_Invalid, startInvalidBytes);
+        memset(pBufferStart + startInvalidBytes + startValidBytes, WorkAddressData::dataFlags_Invalid, endInvalidBytes);
+
+        return WorkAddressData(
+            pBufferStart,
+            size,
+            pFlagsStart,
+            0,
+            [buffer = std::move(buffer), 
+              flags = std::move(flags)](WorkAddressData*) {
+            }
+        );
     }
+
+    WorkAddressRangeInfo WorkplaceItemInternal::GetRangeInfo(Address_type address) const
+    {
+        Address_type entryPoint = peFile->GetImageBase();
+        Diana_SafeAdd(&entryPoint, peFile->GetImpl()->mappedPE.pImpl->addressOfEntryPoint);
+        return {
+            peFile->GetImageBase(),
+            moduleLastValidAddress,
+            entryPoint,
+            peFile->GetMappedPeFile().size(),
+            peFile->GetImpl()->mappedPE.pImpl->dianaMode
+        };
+    }
+
     const std::shared_ptr<CModuleManager> WorkplaceItemInternal::GetModuleManager() const
     {
         return moduleManager;
@@ -202,7 +302,6 @@ namespace orthia
         auto info = std::make_shared<WorkplaceItemInternal>();
         info->fullName = file->GetFullFileName();
         info->peFile = std::move(mappedPE);
-
         {
             oui::String shortName;
             orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
@@ -223,6 +322,18 @@ namespace orthia
         }
 
         const auto& mappedFile = info->peFile->GetMappedPeFile();
+        if (mappedFile.empty())
+        {
+            result.error = errorNode->QueryValue(ORTHIA_TCSTR("empty"));
+            return;
+        }
+        info->moduleLastValidAddress = mappedFile.size() - 1;
+        if (Diana_SafeAdd(&info->moduleLastValidAddress, info->peFile->GetImageBase()))
+        {
+            result.error = errorNode->QueryValue(ORTHIA_TCSTR("invalid-image-base"));
+            return;
+        }
+
         CMemoryReaderOnLoadedData reader(info->peFile->GetImageBase(), mappedFile.data(), mappedFile.size());
         if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->peFile->GetImageBase()))
         {
