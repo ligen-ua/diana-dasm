@@ -15,8 +15,9 @@ namespace orthia
         std::wstring m_currentBlock;
         orthia::Address_type m_sizeInCommands;
         orthia::Address_type m_currentCommand;
-        int m_bytesIdent = 0;
-        int m_countOfSpacesAfterAddress = 1;
+        int m_bytesIdent;
+        int m_countOfSpacesAfterAddress;
+        bool m_printInvalidPages;
     public:
         CVmAsmMemoryPrinter(orthia::ITextPrinter* pTextPrinter,
             int dianaMode,
@@ -25,7 +26,10 @@ namespace orthia
             m_pTextPrinter(pTextPrinter),
             m_dianaMode(dianaMode),
             m_sizeInCommands(sizeInCommands),
-            m_currentCommand(0)
+            m_currentCommand(0),
+            m_bytesIdent(0),
+            m_countOfSpacesAfterAddress(1),
+            m_printInvalidPages(false)
         {
             // default parameters are used in windbg plugin
             m_bytesIdent = 25;
@@ -69,6 +73,10 @@ namespace orthia
             *pPrint = true;
             *pExit = false;
         }
+        virtual bool IsBadByte(orthia::Address_type virtualOffset)
+        {
+            return false;
+        }
         virtual void OnRange(const orthia::VmMemoryRangeInfo& vmRange,
             const char* pDataStart)
         {
@@ -76,10 +84,15 @@ namespace orthia
             {
                 return;
             }
+            bool reportNoData = false;
             if (!vmRange.HasData())
             {
-                PrintCommand(vmRange.address, L"??", L"???");
-                throw std::runtime_error("Memory access error");
+                if (!m_printInvalidPages)
+                {
+                    PrintCommand(vmRange.address, L"??", L"???");
+                    throw std::runtime_error("Memory access error");
+                }
+                reportNoData = true;
             }
 
             ::DianaParserResult result;
@@ -92,9 +105,36 @@ namespace orthia
             std::wstring temp, binaryData;
             orthia::Address_type virtualOffset = vmRange.address;
             size_t offsetInPage = 0;
+            bool prevWasBad = false;
             for (; m_currentCommand < m_sizeInCommands; ++m_currentCommand)
             {
-                int iRes = Diana_ParseCmd(&context, Diana_GetRootLine(), &stream.parent.parent.parent, &result);
+                int iRes = 0;
+                if (reportNoData || this->IsBadByte(virtualOffset))
+                {
+                    prevWasBad = true;
+                    int bytesRead = 0;
+                    char data = 0;
+                    iRes = stream.parent.parent.parent.pReadFnc(&stream,
+                        &data,
+                        1,
+                        &bytesRead);
+                    result.iFullCmdSize = 1;
+                    result.iLinkedOpCount = 0;
+                    result.pInfo = Diana_GetNopInfo();
+                    if (context.cacheSize)
+                    {
+                        Diana_CacheEatOneSafe(&context);
+                    }
+                }
+                else
+                {
+                    if (prevWasBad)
+                    {
+                        Diana_ClearCache(&context);
+                    }
+                    prevWasBad = false;
+                    iRes = Diana_ParseCmd(&context, Diana_GetRootLine(), &stream.parent.parent.parent, &result);
+                }
                 if (iRes == DI_END)
                 {
                     break;
@@ -106,7 +146,14 @@ namespace orthia
                     temp = orthia::ToHexString(pDataStart + offsetInPage, 1);
                     if (print)
                     {
-                        PrintCommand(virtualOffset, temp, L"db " + temp);
+                        if (prevWasBad)
+                        {
+                            PrintCommand(vmRange.address, L"??", L"???");
+                        }
+                        else
+                        {
+                            PrintCommand(virtualOffset, temp, L"db " + temp);
+                        }
                     }
                     ++offsetInPage;
                     ++virtualOffset;
@@ -119,11 +166,19 @@ namespace orthia
                     }
                     continue;
                 }
-                temp = orthia::ToWideString(m_writer.Assign(&result, virtualOffset));
-                binaryData = orthia::ToHexString(pDataStart + offsetInPage, result.iFullCmdSize);
                 if (print)
                 {
-                    PrintCommand(virtualOffset, binaryData, temp);
+                    if (prevWasBad)
+                    {
+                        PrintCommand(vmRange.address, L"??", L"???");
+                    }
+                    else
+                    {
+                        temp = orthia::ToWideString(m_writer.Assign(&result, virtualOffset));
+                        binaryData = orthia::ToHexString(pDataStart + offsetInPage, result.iFullCmdSize);
+
+                        PrintCommand(virtualOffset, binaryData, temp);
+                    }
                 }
                 offsetInPage += result.iFullCmdSize;
                 virtualOffset += result.iFullCmdSize;
