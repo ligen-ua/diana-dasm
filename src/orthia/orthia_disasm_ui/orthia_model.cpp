@@ -203,11 +203,24 @@ namespace orthia
         info->fullName = file->GetFullFileName();
         info->peFile = std::move(mappedPE);
 
-        oui::String shortName;
-        orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
-        info->shortName = std::move(shortName);
+        {
+            oui::String shortName;
+            orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
+            info->shortName = std::move(shortName);
+        }
         info->moduleManager = std::make_shared<CModuleManager>();
         info->moduleManager->Reinit(dbFileName, false);
+
+        if (info->shortName.native == m_config->GetBinFileName())
+        {
+            // opening own database, give more info
+            std::vector<char> readmeBuffer;
+            if (!orthia::LoadFileToVector_Silent(readmeFileName, readmeBuffer))
+            {
+                readmeBuffer.push_back(0);
+                WriteLog(completeHandler->GetThread(), Utf8ToUtf16(readmeBuffer.data()));
+            }
+        }
 
         const auto& mappedFile = info->peFile->GetMappedPeFile();
         CMemoryReaderOnLoadedData reader(info->peFile->GetImageBase(), mappedFile.data(), mappedFile.size());

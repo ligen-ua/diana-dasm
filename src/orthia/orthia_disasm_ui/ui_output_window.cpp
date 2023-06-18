@@ -73,7 +73,21 @@ void COutputWindow::SetFocusImpl()
 }
 
 // orthia::IUILogInterface
-void COutputWindow::WriteLog(const oui::String& line)
+void COutputWindow::WriteLog(const oui::String& text)
 {
-    AddLine(line);
+    auto console = GetConsole();
+    if (!console)
+    {
+        return;
+    }
+
+    std::vector<oui::String::string_type> lines;
+    orthia::SplitStringWithoutWhitespace(text.native, L"\x0A", &lines);
+
+    for (auto& line : lines)
+    {
+        oui::String line2Add = std::move(line);
+        console->FilterOrReplaceUnreadableSymbols(line2Add);
+        AddLine(line2Add);
+    }
 }
