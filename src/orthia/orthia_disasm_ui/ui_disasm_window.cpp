@@ -29,9 +29,8 @@ void CDisasmWindow::SetActiveItem(int itemUid)
     auto item = m_model->GetItem(m_itemUid);
     if (item)
     {
-        const auto& context = item->GetFile()->GetImpl();
-        auto imageBase = item->GetFile()->GetImageBase();
-        m_peAddress = imageBase + context->mappedPE.pImpl->addressOfEntryPoint;
+        auto range = item->GetRangeInfo(0);
+        m_peAddress = range.entryPoint;
     }
     ReloadVisibleData();
     Invalidate();
@@ -48,19 +47,17 @@ void CDisasmWindow::ReloadVisibleData()
     {
         return;
     }
-    auto context = item->GetFile()->GetImpl();
+    auto rangeInfo = item->GetRangeInfo(m_peAddress);
 
     const int maxStepForwardBytes = 1024;
     const int maxStepBackwardBytes = m_userSuppliedPeAddress ? 0: 256 ;
-    
-    const auto& mappedPE = item->GetFile()->GetMappedPeFile();
-    auto imageBase = item->GetFile()->GetImageBase();
-    if (m_peAddress < imageBase)
+
+    if (m_peAddress < rangeInfo.address)
     {
-        m_peAddress = imageBase;
+        m_peAddress = rangeInfo.address;
     }
     else
-    if (m_peAddress >= imageBase + (DI_UINT64)mappedPE.size())
+    if (m_peAddress > rangeInfo.lastValidAddress)
     {
         m_view->Clear();
         return;
@@ -71,15 +68,15 @@ void CDisasmWindow::ReloadVisibleData()
     {
         // no route or it it too far away (which is strange, whatever)
         routeStart = m_peAddress - maxStepBackwardBytes;
-        if (routeStart < imageBase)
+        if (routeStart < rangeInfo.address)
         {
-            routeStart = imageBase;
+            routeStart = rangeInfo.address;
         }
     }
 
     // final check bounds
-    auto routeOffset = routeStart - imageBase;
-    if (routeOffset > mappedPE.size())
+    auto routeOffset = routeStart - rangeInfo.address;
+    if (routeOffset > rangeInfo.size)
     {
         m_view->Clear();
         return;
@@ -89,19 +86,6 @@ void CDisasmWindow::ReloadVisibleData()
         // something is terribly wrong
         m_view->Clear();
         return;
-    }
-    const orthia::Address_type preferrableSizeInBytes = maxStepForwardBytes + (m_peAddress - routeStart);
-    orthia::Address_type end = preferrableSizeInBytes;
-    orthia::Address_type maxSizeToUse = 0;
-    if (Diana_SafeAdd(&end, routeOffset) == DI_SUCCESS && end <= (orthia::Address_type)mappedPE.size())
-    {
-        // end is valid, use it
-        maxSizeToUse = end - routeOffset;
-    }
-    else
-    {
-        // any overflow, default to module's end
-        maxSizeToUse = mappedPE.size() - routeOffset;
     }
 
     struct DisasmWriter:orthia::ITextPrinter
@@ -170,16 +154,24 @@ void CDisasmWindow::ReloadVisibleData()
         }
 
     }printer(&writer, 
-        context->mappedPE.pImpl->dianaMode, 
+        rangeInfo.dianaMode,
         m_peAddress,
         requiredLinesCount,
         writer);
 
-    orthia::VmMemoryRangeInfo rangeInfo;
-    rangeInfo.address = routeStart;
-    rangeInfo.size = maxSizeToUse;
-    rangeInfo.flags = rangeInfo.flags_hasData;
-    printer.OnRange(rangeInfo, mappedPE.data() + routeOffset);
+    // query data
+    const orthia::Address_type maxSizeToUse = maxStepForwardBytes + (m_peAddress - routeStart);
+    auto data = item->ReadData(routeStart, maxSizeToUse);
+    if (!data.dataSize)
+    {
+        m_view->Clear();
+        return;
+    }
+    orthia::VmMemoryRangeInfo vmRangeInfo;
+    vmRangeInfo.address = routeStart;
+    vmRangeInfo.size = maxSizeToUse;
+    vmRangeInfo.flags = vmRangeInfo.flags_hasData;
+    printer.OnRange(vmRangeInfo, data.pDataStart);
 
     m_view->Init(std::move(writer.items));
 
