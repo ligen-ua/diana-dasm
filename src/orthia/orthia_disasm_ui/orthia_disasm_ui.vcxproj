@@ -100,7 +100,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\i386\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -121,7 +121,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\i386\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -138,7 +138,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\amd64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -159,7 +159,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\amd64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -181,6 +181,9 @@
     <ClCompile Include="orthia_config.cpp" />
     <ClCompile Include="orthia_helpers.cpp" />
     <ClCompile Include="orthia_model.cpp" />
+    <ClCompile Include="oui_open_process_dialog.cpp" />
+    <ClCompile Include="oui_processes.cpp" />
+    <ClCompile Include="oui_processes_win32.cpp" />
     <ClCompile Include="ui_disasm_window.cpp" />
     <ClCompile Include="ui_en.cpp" />
     <ClCompile Include="ui_main_window.cpp" />
@@ -192,6 +195,8 @@
     <ClInclude Include="orthia_config.h" />
     <ClInclude Include="orthia_helpers.h" />
     <ClInclude Include="orthia_model.h" />
+    <ClInclude Include="oui_open_process_dialog.h" />
+    <ClInclude Include="oui_processes.h" />
     <ClInclude Include="ui_disasm_window.h" />
     <ClInclude Include="ui_main_window.h" />
     <ClInclude Include="ui_output_window.h" />

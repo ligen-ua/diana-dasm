@@ -1,4 +1,5 @@
 #include "ui_main_window.h"
+#include "oui_open_process_dialog.h"
 
 void CMainWindow::ToggleMenu(bool openPopup)
 {
@@ -86,6 +87,33 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
     return oui::fsui::OpenResult();
 };
 
+
+void CMainWindow::OpenProcess()
+{
+    auto openFileNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.openprocess"));
+
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    std::weak_ptr<CMainWindow> weakMe = me;
+    if (!me)
+    {
+        return;
+    }
+
+    // create open dialog
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenProcessDialog>(openFileNode->QueryValue(ORTHIA_TCSTR("opening")),
+        openFileNode->QueryValue(ORTHIA_TCSTR("error")),
+        [=](std::shared_ptr<oui::COpenProcessDialog> dlg, std::shared_ptr<oui::IProcess> proc, oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> handler) {
+        if (auto p = weakMe.lock())
+        {
+           // return p->HandleOpenExecutable(dlg, file, handler);
+        }
+        oui::fsui::OpenResult result(OUI_TCSTR("Error"));
+        return result;
+    },
+        m_model->GetProcessSystem()));
+    dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
+    dialog->Dock();
+}
 void CMainWindow::OpenExecutable()
 {
     auto openFileNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.openfile"));
@@ -136,7 +164,7 @@ void CMainWindow::ConstuctMenu()
             },
             {
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_process")),
-                []() {},
+                [this]() {  OpenProcess();  },
                 oui::Hotkey(oui::VirtualKey::kX)
             },
             {

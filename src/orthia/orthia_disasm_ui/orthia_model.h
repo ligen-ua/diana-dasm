@@ -5,6 +5,7 @@
 #include "orthia_text_manager.h"
 #include "orthia_config.h"
 #include "orthia_module_manager.h"
+#include "oui_processes.h"
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -93,6 +94,7 @@ namespace orthia
     class CProgramModel
     {
         std::shared_ptr<oui::CFileSystem> m_fileSystem;
+        std::shared_ptr<oui::CProcessSystem> m_processSystem;
 
         mutable std::mutex m_lock;
         std::map<int, std::shared_ptr<WorkplaceItemInternal>> m_items;
@@ -107,6 +109,8 @@ namespace orthia
         CProgramModel(std::shared_ptr<orthia::CConfigOptionsStorage> config);
 
         std::shared_ptr<oui::CFileSystem> GetFileSystem();
+        std::shared_ptr<oui::CProcessSystem> GetProcessSystem();
+
         int QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const;
         bool QueryActiveWorkspaceItem(WorkplaceItem& item) const;
         void SetUILog(std::shared_ptr<IUILogInterface> uiLog);

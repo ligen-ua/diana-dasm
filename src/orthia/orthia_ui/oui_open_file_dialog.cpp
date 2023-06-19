@@ -62,11 +62,6 @@ namespace oui
 
         Parent_type::OnResize();
     }
-    void COpenFileDialog::AsyncQuery(CListBox* listBox, 
-        std::function<void(const ListBoxItem*, int)> handler, 
-        int offset, int size)
-    {
-    }
     void COpenFileDialog::CancelAllQueries()
     {
         if (m_currentOperation)
