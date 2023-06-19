@@ -34,9 +34,15 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Output"))
         ;
 
-    // dialog
+    // dialogs
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.openfile"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Open Executable"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: %1"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("error"), ORTHIA_TCSTR("Error: %1"))
+        ;
+
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.openprocess"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Open Process"))
         << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: %1"))
         << textManager->RegisterValue(ORTHIA_TCSTR("error"), ORTHIA_TCSTR("Error: %1"))
         ;

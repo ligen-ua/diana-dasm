@@ -77,8 +77,6 @@ namespace oui
         void FinishFileOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
     protected:
         void OnResize() override;
-        void AsyncQuery(CListBox* listBox, std::function<void(const ListBoxItem*, int)> handler, int offset, int size);
-
         void CancelAllQueries() override;
 
         void ConstructChilds() override;

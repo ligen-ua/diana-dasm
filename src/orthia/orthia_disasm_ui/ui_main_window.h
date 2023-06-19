@@ -35,6 +35,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     void ToggleMenu(bool openPopup);
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
     void OpenExecutable();
+    void OpenProcess();
+
     oui::fsui::OpenResult HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
         std::shared_ptr<oui::IFile> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);

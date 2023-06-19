@@ -253,6 +253,10 @@ namespace oui
 
     void CWindow::AddChild(std::shared_ptr<CWindow> child)
     {
+        if (m_destroyed)
+        {
+            return;
+        }
         if (auto poolPtr = m_pool.lock())
         {
             if (auto me = GetPtr())
@@ -460,10 +464,11 @@ namespace oui
         m_destroyed = true;
     
         auto guard = GetPtr();
-        for (auto it = m_childs.begin(), it_end = m_childs.end(); it != it_end; )
+        while (!m_childs.empty())
         {
-            auto oldIt = it++;
-            (*oldIt)->Destroy();
+            auto child = m_childs.back();
+            m_childs.pop_back();
+            child->Destroy();
         }
         if (auto parent = GetParent())
         {

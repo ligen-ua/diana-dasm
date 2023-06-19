@@ -2,11 +2,11 @@
 
 namespace oui
 {
-    const int g_tasksCount = 2;
+    const int g_threadsCount = 2;
     CFileSystem::CFileSystem()
     {
         m_fsImpl = CreateDefaultFSProvider();
-        m_pool.Start(g_tasksCount);
+        m_pool.Start(g_threadsCount);
     }
 
     std::tuple<int, std::shared_ptr<IFile>> CFileSystem::SyncOpenFile(const FileUnifiedId& fileId)
