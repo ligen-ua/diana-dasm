@@ -82,6 +82,11 @@ namespace oui
         {
             return;
         }
+        if (m_waitBox)
+        {
+            m_waitBox->FinishDialog();
+            m_waitBox = 0;
+        }
         if (error && data.empty())
         {
             return;
@@ -359,15 +364,14 @@ namespace oui
     }
     void COpenProcessDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
     {
-        m_filesBox->SetFocus();
+        m_fileEdit->SetFocus();
+        TryOpenProcess(oui::ProcessUnifiedId());
     }
     void COpenProcessDialog::ConstructChilds()
     {
         AddChild(m_filesBox);
         AddChild(m_fileEdit);
         AddChild(m_fileLabel);
-        
-        TryOpenProcess(oui::ProcessUnifiedId());
     }
     void COpenProcessDialog::OnFinishDialog()
     {

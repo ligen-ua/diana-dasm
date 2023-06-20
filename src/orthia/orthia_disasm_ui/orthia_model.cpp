@@ -192,6 +192,22 @@ namespace orthia
             }
         });
     }
+    void CProgramModel::AddProcess(std::shared_ptr<oui::IProcess> proc,
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+        bool makeActive)
+    {
+        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+        oui::fsui::OpenResult result;
+        result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
+        oui::ScopedGuard handlerGuard([&]() {
+            completeHandler->Reply(completeHandler, proc, result);
+        });
+
+
+        // OK
+        result.error.native.clear();
+    }
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
         bool makeActive)
