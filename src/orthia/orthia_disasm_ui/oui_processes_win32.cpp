@@ -374,6 +374,7 @@ namespace oui
                 std::wstring shortName;
                 orthia::UnparseFileNameFromFullFileName(fullName, &shortName);
 
+                shortName = std::to_wstring(processEntry.th32ProcessID) + L" " + shortName;
                 std::wstring uppercaseShortName = Uppercase_Silent(shortName);
 
                 if (!uppercasePart.empty())

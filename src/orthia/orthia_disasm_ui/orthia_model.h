@@ -117,6 +117,10 @@ namespace orthia
         std::shared_ptr<IWorkPlaceItem> GetItem(int uid);
 
         // other thread
+        void AddProcess(std::shared_ptr<oui::IProcess> proc,
+            oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+            bool makeActive);
+
         void AddExecutable(std::shared_ptr<oui::IFile> file,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
             bool makeActive);

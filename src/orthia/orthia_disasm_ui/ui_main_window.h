@@ -8,6 +8,8 @@
 #include "ui_disasm_window.h"
 #include "ui_output_window.h"
 #include "oui_open_file_dialog.h"
+#include "oui_open_process_dialog.h"
+
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -40,6 +42,10 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     oui::fsui::OpenResult HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
         std::shared_ptr<oui::IFile> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+
+    oui::fsui::OpenResult HandleOpenProcess(std::shared_ptr<oui::COpenProcessDialog> dialog,
+        std::shared_ptr<oui::IProcess> process,
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
 
     void OnWorkspaceItemChanged();
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);

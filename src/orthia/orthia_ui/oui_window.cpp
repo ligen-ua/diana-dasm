@@ -50,6 +50,10 @@ namespace oui
         {
             m_focused = window->GetParent();
         }
+        if (m_modalWindow.get() == window)
+        {
+            m_modalWindow = 0;
+        }
         if (m_lastMouseWindow.get() == window)
         {
             m_lastMouseWindow = 0;

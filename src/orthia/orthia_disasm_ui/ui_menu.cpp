@@ -16,7 +16,7 @@ void CMainWindow::ToggleMenu(bool openPopup)
 }
 void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result)
 {
-    // finall result
+    // final result
     if (result.error.native.empty())
     {
         auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
@@ -87,6 +87,37 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
     return oui::fsui::OpenResult();
 };
 
+oui::fsui::OpenResult CMainWindow::HandleOpenProcess(std::shared_ptr<oui::COpenProcessDialog> dialog,
+    std::shared_ptr<oui::IProcess> process,
+    oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler)
+{
+    if (dialog && process && completeHandler)
+    {
+        // means open dialog manager to open a file
+        // setup UI proxy on success and pass the handler to FS handler
+        auto me = oui::GetPtr_t<CMainWindow>(this);
+        std::weak_ptr<CMainWindow> weakMe = me;
+        if (!me)
+        {
+            return oui::fsui::OpenResult();
+        }
+        oui::fsui::ProcessCompleteHandler_type rawHandler = completeHandler->GetHandler();
+        completeHandler->SetHandler(
+            [=](std::shared_ptr<oui::BaseOperation> op, std::shared_ptr<oui::IProcess> proc, const oui::fsui::OpenResult& result) {
+
+            if (auto p = weakMe.lock())
+            {
+                //p->OnFileOpen(file, result);
+            }
+            rawHandler(op, proc, result);
+        });
+
+        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler)] {
+            model->AddProcess(process, completeHandler, true);
+        });
+    }
+    return oui::fsui::OpenResult();
+}
 
 void CMainWindow::OpenProcess()
 {
@@ -105,7 +136,7 @@ void CMainWindow::OpenProcess()
         [=](std::shared_ptr<oui::COpenProcessDialog> dlg, std::shared_ptr<oui::IProcess> proc, oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> handler) {
         if (auto p = weakMe.lock())
         {
-           // return p->HandleOpenExecutable(dlg, file, handler);
+            return p->HandleOpenProcess(dlg, proc, handler);
         }
         oui::fsui::OpenResult result(OUI_TCSTR("Error"));
         return result;
