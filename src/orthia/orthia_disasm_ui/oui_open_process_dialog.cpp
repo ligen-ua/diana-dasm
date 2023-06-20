@@ -15,7 +15,12 @@ namespace oui
     {
         auto& info = fileInfo.info;
         fileInfo.sortKey.native.clear();
-        fileInfo.sortKey = OUI_TO_STR(fileInfo.info.pid);
+
+        String::string_type fixedStr(20, OUI_TCHAR('0'));
+        auto pidStr = OUI_TO_STR(fileInfo.info.pid);
+
+        std::copy(pidStr.begin(), pidStr.end(), fixedStr.begin() + (fixedStr.size() - std::min(fixedStr.size(), pidStr.size())));
+        fileInfo.sortKey = std::move(fixedStr);
     }
     void COpenProcessDialog::OnResize()
     {
