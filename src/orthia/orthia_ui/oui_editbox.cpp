@@ -72,6 +72,10 @@ namespace oui
         auto& sym = m_symbols[symbol];
         return sym.charOffset;
     }
+    void CEditBox::SetSelectAllOnFocus(bool selectAllOnFocus)
+    {
+        m_selectAllOnFocus = selectAllOnFocus;
+    }
     void CEditBox::SetLowLevelHandlers(EditBoxLowLevelHandlers&& handlers)
     {
         m_llHandlers = std::move(handlers);
@@ -571,7 +575,10 @@ namespace oui
         SetTextImpl(text);
         m_cursorIterator = 0;
         m_windowRightIterator = 0;
-        ResetSelection();
+        if (m_selectAllOnFocus)
+            SelectAll();
+        else
+            ResetSelection();
     }
     void CEditBox::SelectAll()
     {
@@ -602,6 +609,10 @@ namespace oui
     }
     void CEditBox::OnFocusEnter()
     {
+        if (m_selectAllOnFocus)
+        {
+            SelectAll();
+        }
         Invalidate();
 
         Parent_type::OnFocusEnter();

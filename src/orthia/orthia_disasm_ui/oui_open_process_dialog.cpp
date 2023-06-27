@@ -105,14 +105,14 @@ namespace oui
             m_currentProcess.reserve(data.size() + 1);
             m_firstResult = false;
 
-            m_fileEdit->ScrollRight();
-
             m_parentOffset = m_filesBox->GetOffset();
             m_parentPosition = m_filesBox->GetSelectedPosition();
 
             m_filesBox->SetOffset(0);
             m_filesBox->SetSelectedPosition(0);
-            m_filesBox->SetFocus();
+
+            m_fileEdit->ScrollRight();
+            m_fileEdit->SetFocus();
         }
         else
         {
@@ -358,6 +358,7 @@ namespace oui
         m_fileEdit->SetEnterHandler([this](const String& text) {
             TryOpenProcess(ProcessUnifiedId(text));
         });
+        m_fileEdit->SetSelectAllOnFocus(true);
         m_fileLabel = std::make_shared<CLabel>(m_colorProfile, [] { return String(OUI_STR(">"));  });
 
         this->RegisterSwitch(m_fileEdit);
