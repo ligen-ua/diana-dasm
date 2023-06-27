@@ -88,6 +88,7 @@ namespace oui
         void ShiftViewWindow(int newPosition) override;
         bool ShiftViewWindowToSymbol(const String& symbol) override;
         int GetTotalCount() const override;
+        bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override;
     };
 
 }

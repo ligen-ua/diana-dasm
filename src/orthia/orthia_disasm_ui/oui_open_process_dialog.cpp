@@ -513,5 +513,21 @@ namespace oui
     {
         return (int)m_currentProcess.size();
     }
-
+    bool COpenProcessDialog::ProcessEvent(InputEvent& evt, WindowEventContext& evtContext)
+    {
+        // it is nice thing to use arrow to go from edit to box
+        if (evt.keyEvent.valid)
+        {
+            if (evt.keyEvent.virtualKey == VirtualKey::Down)
+            {
+                if (m_fileEdit->IsFocused())
+                {
+                    m_filesBox->SetFocus();
+                    return true;
+                }
+            }
+        }
+    
+        return Parent_type::ProcessEvent(evt, evtContext);
+    }
 }
