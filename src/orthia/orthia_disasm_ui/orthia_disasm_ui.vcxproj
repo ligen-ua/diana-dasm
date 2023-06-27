@@ -180,6 +180,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="orthia_config.cpp" />
     <ClCompile Include="orthia_helpers.cpp" />
+    <ClCompile Include="orthia_item_file.cpp" />
     <ClCompile Include="orthia_model.cpp" />
     <ClCompile Include="oui_open_process_dialog.cpp" />
     <ClCompile Include="oui_processes.cpp" />
@@ -194,7 +195,9 @@
   <ItemGroup>
     <ClInclude Include="orthia_config.h" />
     <ClInclude Include="orthia_helpers.h" />
+    <ClInclude Include="orthia_item_file.h" />
     <ClInclude Include="orthia_model.h" />
+    <ClInclude Include="orthia_model_interfaces.h" />
     <ClInclude Include="oui_open_process_dialog.h" />
     <ClInclude Include="oui_processes.h" />
     <ClInclude Include="ui_disasm_window.h" />

@@ -32,6 +32,7 @@ namespace oui
         int m_windowSymSize = 0;
 
         bool m_readOnly = false;
+        bool m_selectAllOnFocus = false;
         std::function<void(const String&text)> m_enterHandler;
 
         EditBoxLowLevelHandlers m_llHandlers;
@@ -44,6 +45,7 @@ namespace oui
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
+        void SetSelectAllOnFocus(bool selectAllOnFocus);
         void SetLowLevelHandlers(EditBoxLowLevelHandlers&& handlers);
         void SetReadOnly(bool readOnly);
         bool IsReadOnly() const;
