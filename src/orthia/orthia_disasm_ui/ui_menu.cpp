@@ -19,12 +19,15 @@ void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::
     // final result
     if (result.error.native.empty())
     {
+        // no error
         auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
         m_outputWindow->AddLine(mainNode->QueryValue(ORTHIA_TCSTR("done-opened")));
 
-        OnWorkspaceItemChanged();
+        OnWorkspaceItemChanged(result);
         return;
     }
+
+    // error
     if (file)
     {
         auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
@@ -107,7 +110,7 @@ oui::fsui::OpenResult CMainWindow::HandleOpenProcess(std::shared_ptr<oui::COpenP
 
             if (auto p = weakMe.lock())
             {
-                //p->OnFileOpen(file, result);
+                p->OnFileOpen(proc, result);
             }
             rawHandler(op, proc, result);
         });
@@ -131,6 +134,7 @@ void CMainWindow::OpenProcess()
     }
 
     // create open dialog
+    int flags = oui::IProcessSystem::queryFlags_TryOpenProcessAsReader;
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenProcessDialog>(openFileNode->QueryValue(ORTHIA_TCSTR("opening")),
         openFileNode->QueryValue(ORTHIA_TCSTR("error")),
         [=](std::shared_ptr<oui::COpenProcessDialog> dlg, std::shared_ptr<oui::IProcess> proc, oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> handler) {
@@ -141,7 +145,8 @@ void CMainWindow::OpenProcess()
         oui::fsui::OpenResult result(OUI_TCSTR("Error"));
         return result;
     },
-        m_model->GetProcessSystem()));
+        m_model->GetProcessSystem(),
+        flags));
     dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
     dialog->Dock();
 }

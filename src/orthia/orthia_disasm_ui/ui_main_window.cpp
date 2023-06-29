@@ -16,7 +16,7 @@ void CMainWindow::SetDefaultTitle()
     }
     console->SetTitle(mainNode->QueryValue(ORTHIA_TCSTR("caption")));
 }
-void CMainWindow::OnWorkspaceItemChanged()
+void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
 {
     orthia::WorkplaceItem item;
     if (!m_model->QueryActiveWorkspaceItem(item))
@@ -33,7 +33,14 @@ void CMainWindow::OnWorkspaceItemChanged()
 
     auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
     console->SetTitle(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("caption-file")), item.name));
-    m_disasmWindow->SetActiveItem(item.uid);
+
+    orthia::Address_type addressHint = 0;
+    auto it = result.extraInfo.find(orthia::model_OpenResult_extraInfo_InitalAddress);
+    if (it != result.extraInfo.end())
+    {
+        addressHint = std::any_cast<orthia::Address_type>(it->second);
+    }
+    m_disasmWindow->SetActiveItem(item.uid, addressHint);
 }
 
 void CMainWindow::AddInitialArgument(const InitialOpenFileInfo& info)

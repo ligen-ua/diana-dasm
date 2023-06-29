@@ -19,7 +19,7 @@ CDisasmWindow::CDisasmWindow(std::function<oui::String()> getCaption,
     oui::IMultiLineViewOwner* param = this;
     m_view = std::make_shared<oui::CMultiLineView>(m_colorProfile, param, false);
 }
-void CDisasmWindow::SetActiveItem(int itemUid)
+void CDisasmWindow::SetActiveItem(int itemUid, DI_UINT64 initialAddressHint)
 {
     m_itemUid = itemUid;
     m_peAddress = 0;
@@ -29,7 +29,7 @@ void CDisasmWindow::SetActiveItem(int itemUid)
     auto item = m_model->GetItem(m_itemUid);
     if (item)
     {
-        auto range = item->GetRangeInfo(0);
+        auto range = item->GetRangeInfo(initialAddressHint);
         m_peAddress = range.entryPoint;
     }
     ReloadVisibleData();
@@ -52,11 +52,22 @@ void CDisasmWindow::ReloadVisibleData()
     const int maxStepForwardBytes = 1024;
     const int maxStepBackwardBytes = m_userSuppliedPeAddress ? 0: 256 ;
 
-    auto routeStart = item->GetModuleManager()->QueryRouteStart(m_peAddress);
+    orthia::Address_type routeStart = m_peAddress;
+    if (auto moduleManager = item->GetModuleManager())
+    {
+        routeStart = moduleManager->QueryRouteStart(m_peAddress);
+    }
     if (!routeStart || (m_peAddress - routeStart) > (orthia::Address_type)maxStepBackwardBytes)
     {
         // no route or it it too far away (which is strange, whatever)
-        routeStart = m_peAddress - maxStepBackwardBytes;
+        if (m_peAddress > maxStepBackwardBytes)
+        {
+            routeStart = m_peAddress - maxStepBackwardBytes;
+        }
+        else
+        {
+            routeStart = 0;
+        }
     }
 
     {

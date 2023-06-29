@@ -1,12 +1,16 @@
 #pragma once
 
 #include "oui_filesystem.h"
+#include "orthia_model_interfaces.h"
 
 namespace oui
 {
 
     struct IProcess:IFile
     {
+        virtual orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) = 0;
+        virtual int ReadExactEx2(unsigned long long offset, void* pBuffer, size_t size) = 0;
+        virtual int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset) = 0;
     };
 
     struct ProcessUnifiedId
@@ -33,6 +37,8 @@ namespace oui
     };
     struct ProcessInfo
     {
+        static const int flag_hasReaderAccess = 0x01;
+
         unsigned long long pid = 0;
         String processName;
         int flags = 0;
@@ -47,6 +53,8 @@ namespace oui
 
     struct IProcessSystem
     {
+        const static int queryFlags_TryOpenProcessAsReader = 0x0001;
+
         virtual ~IProcessSystem() {}
         virtual void AsyncStartQueryProcess(ThreadPtr_type targetThread, 
             const ProcessUnifiedId& fileId,

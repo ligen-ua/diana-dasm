@@ -4,8 +4,14 @@
 #include <Psapi.h>
 #include <tlhelp32.h>
 #include "orthia_utils.h"
+#include "orthia_process_adapter.h"
+#include "orthia_memory_cache.h"
+#include "orthia_streams.h"
+
 namespace oui
 {
+    const DWORD g_ProcReaderDesiredAccess = PROCESS_QUERY_INFORMATION | STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | PROCESS_VM_OPERATION | PROCESS_VM_READ;
+
     struct RegionInfo
     {
         ULONGLONG baseAddress, regionSize;
@@ -56,12 +62,29 @@ namespace oui
         return 0;
     }
 
-    static int SafeReadProcess(HANDLE hProcess,
+    struct ProcessNoAccessRegion
+    {
+        size_t relOffset = 0;
+        size_t size = 0;
+    };
+
+    static void AddRange(std::vector<ProcessNoAccessRegion>& noAccessRegions, LPVOID lpBuffer, char* pOutBuffer, size_t holeSize)
+    {
+        ProcessNoAccessRegion region;
+        region.relOffset = pOutBuffer - (char*)lpBuffer;
+        region.size = holeSize;
+        noAccessRegions.push_back(region);
+    }
+
+    static int SafeReadProcess(std::vector<ProcessNoAccessRegion>& noAccessRegions,
+        HANDLE hProcess,
         ULONGLONG offset,
         LPVOID lpBuffer,
         DWORD nNumberOfBytesToRead,
         LPDWORD lpNumberOfBytesRead)
     {
+        noAccessRegions.clear();
+
         // check optimistic path, likely
         SIZE_T bytesRead = 0;
         if (ReadProcessMemory(hProcess, (LPCVOID)offset, lpBuffer, nNumberOfBytesToRead, &bytesRead) && 
@@ -80,11 +103,12 @@ namespace oui
         {
             // no access
             memset(lpBuffer, 0, nNumberOfBytesToRead);
+            AddRange(noAccessRegions, lpBuffer, (char*)lpBuffer, nNumberOfBytesToRead);
             return 0;
         }
 
 
-        char* pOutBuffer = 0;
+        char* pOutBuffer = (char*)lpBuffer;
         ULONGLONG outAddress = offset;
         ULONGLONG sizeToGo = nNumberOfBytesToRead;
 
@@ -100,10 +124,14 @@ namespace oui
                 // we got a hole
                 auto holeSize = std::min(reg.regionSize, reg.baseAddress - outAddress);
                 holeSize = std::min(sizeToGo, holeSize);
+                
                 memset(pOutBuffer, 0, (size_t)holeSize);
+                AddRange(noAccessRegions, lpBuffer, pOutBuffer, holeSize);
+
                 pOutBuffer += holeSize;
                 outAddress += holeSize;
                 sizeToGo -= holeSize;
+
                 continue;
             }
             // So here reg.baseAddress <= outAddress
@@ -136,6 +164,7 @@ namespace oui
         {
             // no access
             memset(lpBuffer, 0, nNumberOfBytesToRead);
+            AddRange(noAccessRegions, lpBuffer, (char*)lpBuffer, nNumberOfBytesToRead);
             return 0;
         }
         return 0;
@@ -184,12 +213,14 @@ namespace oui
         HANDLE m_hProc;
         bool m_is32bit;
         LARGE_INTEGER m_distance;
+        ULONG m_processID;
     public:
-        CProcess(const String& name, HANDLE hProc, bool is32bit)
+        CProcess(const String& name, HANDLE hProc, bool is32bit, ULONG processID)
             :
             m_name(name),
             m_hProc(hProc),
-            m_is32bit(is32bit)
+            m_is32bit(is32bit),
+            m_processID(processID)
         {
             m_distance.QuadPart = 0;
         }
@@ -237,6 +268,123 @@ namespace oui
         {
             return m_name;
         }
+        int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset) override
+        {
+            processModuleOffset = 0;
+            modules.clear();
+
+            HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, m_processID);
+            if (hSnapshot == INVALID_HANDLE_VALUE) 
+            {
+                return GetLastError();
+            }
+            oui::ScopedGuard guard([=]() {  CloseHandle(hSnapshot);   });
+
+            MODULEENTRY32 moduleEntry;
+            moduleEntry.dwSize = sizeof(MODULEENTRY32);
+
+            if (!Module32First(hSnapshot, &moduleEntry))
+            {
+                return GetLastError();
+            }
+
+            SYSTEM_INFO sysInfo;
+            GetSystemInfo(&sysInfo);
+            orthia::ProcessReaderAdapter memReader(this);
+            orthia::CMemoryStorageOfModifiedData writeCache(&memReader, sysInfo.dwPageSize);
+
+            do 
+            {
+                orthia::ModuleInfo info;
+                info.address = (orthia::Address_type)moduleEntry.modBaseAddr;
+                info.size = moduleEntry.modBaseSize;
+                if (!info.size)
+                {
+                    continue;
+                }
+
+                // prepare last valid
+                info.lastValidAddress = info.address;
+                Diana_SafeAdd(&info.lastValidAddress, info.size - 1);
+
+                info.fullName = moduleEntry.szExePath;
+
+
+                {
+                    // diana PE analyzer uses relative pointers
+                    orthia::CMemoryCache module(&writeCache, info.address);
+                    // adapter to C-code
+                    orthia::DianaMemoryStream stream(0, &module, info.size);
+
+                    Diana_PeFile dianaPeFile;
+                    if (!DianaPeFile_Init(&dianaPeFile,
+                        &stream.parent,
+                        info.size,
+                        DIANA_PE_FILE_FLAGS_MODULE_MODE))
+                    {
+                        // yahoo, success
+                        diana::Guard<diana::PeFile> peFileGuard(&dianaPeFile);
+
+                        info.dianaMode = dianaPeFile.pImpl->dianaMode;
+
+                        info.entryPoint = dianaPeFile.pImpl->addressOfEntryPoint;
+                        Diana_SafeAdd(&info.entryPoint, info.address);
+                    }
+                }
+                modules.push_back(info);
+            } 
+            while (Module32Next(hSnapshot, &moduleEntry));
+
+            return 0;
+        }
+        int ReadExactEx2(unsigned long long offset, void * pBuffer, size_t size) override
+        {
+            std::vector<ProcessNoAccessRegion> noAccessRegions;
+            DWORD readBytes = 0;
+            return SafeReadProcess(noAccessRegions, m_hProc, offset, pBuffer, (DWORD)size, &readBytes);
+        }
+
+        orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) override
+        {
+            std::vector<ProcessNoAccessRegion> noAccessRegions;
+            DWORD readBytes = 0;
+            std::vector<char> buffer(size);
+            if (int error = SafeReadProcess(noAccessRegions, m_hProc, offset, buffer.data(), (DWORD)size, &readBytes))
+            {
+                return orthia::WorkAddressData();
+            }
+            auto ptr = buffer.data();
+            if (noAccessRegions.empty())
+            {
+                // lucky case
+                return orthia::WorkAddressData(
+                    ptr,
+                    size,
+                    nullptr,
+                    orthia::WorkAddressData::flags_FullValid,
+                    [buffer = std::move(buffer)](orthia::WorkAddressData*) mutable {
+                }
+                );
+            }
+            // more complex case
+            std::vector<char> flags(size);
+            auto* pFlagsStart = flags.data();
+            for (auto& reg : noAccessRegions)
+            {
+                memset(pFlagsStart + reg.relOffset, orthia::WorkAddressData::dataFlags_Invalid, reg.size);
+            }
+            return orthia::WorkAddressData(
+                ptr,
+                size,
+                pFlagsStart,
+                0,
+                [
+                    buffer = std::move(buffer),
+                    flags = std::move(flags)
+                ](orthia::WorkAddressData*) mutable {
+            }
+            );
+        }
         int ReadExact(std::shared_ptr<BaseOperation> operation, unsigned long long offset, size_t size, std::vector<char>& peFile) override
         {
             if (offset != (unsigned long long)(-1))
@@ -254,6 +402,7 @@ namespace oui
 
             auto ptr = peFile.data();
             size_t sizeToCopy = size;
+            std::vector<ProcessNoAccessRegion> noAccessRegions;
             for (; sizeToCopy; )
             {
                 DWORD sizeToRead = pageSize;
@@ -262,7 +411,7 @@ namespace oui
                     sizeToRead = (DWORD)sizeToCopy;
                 }
                 DWORD readBytes = 0;
-                if (int error = SafeReadProcess(m_hProc, m_distance.QuadPart, ptr, sizeToRead, &readBytes))
+                if (int error = SafeReadProcess(noAccessRegions, m_hProc, m_distance.QuadPart, ptr, sizeToRead, &readBytes))
                 {
                     return error;
                 }
@@ -304,9 +453,7 @@ namespace oui
             // here we need to open it
             int error = 0;
             std::shared_ptr<IProcess> proc;
-            DWORD desiredAccess = PROCESS_QUERY_INFORMATION | STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | PROCESS_VM_OPERATION | PROCESS_VM_READ;
-
-            if (HANDLE hProc = OpenProcess(desiredAccess, FALSE, (DWORD)fileId.pid))
+            if (HANDLE hProc = OpenProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)fileId.pid))
             {
                 oui::ScopedGuard handlerGuard([&]() {
                     CloseHandle(hProc);
@@ -321,7 +468,13 @@ namespace oui
                 }
                 else
                 {
-                    proc = std::make_shared<CProcess>(buf.data(), hProc, is32bit);
+                    oui::String shortName;
+                    orthia::UnparseFileNameFromFullFileName<oui::String::string_type>(buf.data(), &shortName.native);
+
+                    oui::String::StringStream_type res;
+                    res << OUI_TCSTR("[") << fileId.pid << OUI_TCSTR("] ") << shortName.native;
+                    
+                    proc = std::make_shared<CProcess>(res.str(), hProc, is32bit, (DWORD)fileId.pid);
                     handlerGuard.Release();
                 }
             }
@@ -389,6 +542,15 @@ namespace oui
                 info.pid = processEntry.th32ProcessID;
                 info.processName = shortName;
                 info.pointerSize = defaultPointerSize;
+
+                if (flags & oui::IProcessSystem::queryFlags_TryOpenProcessAsReader)
+                {
+                    if (HANDLE hProc = OpenProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)info.pid))
+                    {
+                        CloseHandle(hProc);
+                        info.flags |= ProcessInfo::flag_hasReaderAccess;
+                    }
+                }
 
                 const DWORD desiredAccess = PROCESS_QUERY_LIMITED_INFORMATION;
                 if (HANDLE hProc = OpenProcess(desiredAccess, FALSE, (DWORD)info.pid))

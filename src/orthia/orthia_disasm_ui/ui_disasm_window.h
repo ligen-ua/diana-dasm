@@ -31,5 +31,5 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,
         std::shared_ptr<orthia::CProgramModel> model);
-    void SetActiveItem(int itemUid);
+    void SetActiveItem(int itemUid, DI_UINT64 initialAddressHint = 0);
 };

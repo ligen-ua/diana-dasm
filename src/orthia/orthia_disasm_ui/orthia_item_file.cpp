@@ -118,4 +118,7 @@ namespace orthia
     {
         return shortName;
     }
+    void FileWorkplaceItem::ReloadModules() 
+    {
+    }
 }

@@ -26,6 +26,7 @@ namespace orthia
         WorkAddressRangeInfo GetRangeInfo(Address_type address) const override;
         const std::shared_ptr<CModuleManager> GetModuleManager() const override;
         oui::String GetShortName() const override;
+        void ReloadModules() override;
     };
 
     struct WorkplaceItem
@@ -38,6 +39,10 @@ namespace orthia
         virtual ~IUILogInterface() {}
         virtual void WriteLog(const oui::String& line) = 0;
     };
+
+    // OpenResult extra fields
+    const int model_OpenResult_extraInfo_InitalAddress = 1;
+
     class CProgramModel
     {
         std::shared_ptr<oui::CFileSystem> m_fileSystem;

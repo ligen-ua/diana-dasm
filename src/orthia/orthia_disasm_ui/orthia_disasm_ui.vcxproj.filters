@@ -62,6 +62,12 @@
     <ClCompile Include="orthia_item_file.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_item_process.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="orthia_process_adapter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h">
@@ -92,6 +98,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_model_interfaces.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_item_process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_process_adapter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

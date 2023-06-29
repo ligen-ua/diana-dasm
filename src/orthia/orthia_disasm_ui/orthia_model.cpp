@@ -3,6 +3,7 @@
 #include "orthia_pe.h"
 #include "orthia_helpers.h"
 #include "orthia_database_module.h"
+#include "orthia_item_process.h"
 
 namespace orthia
 {
@@ -95,6 +96,42 @@ namespace orthia
             completeHandler->Reply(completeHandler, proc, result);
         });
 
+        // opening
+        WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opening")),
+            proc->GetFullFileNameForUI()));
+
+        int platformError = 0;
+        unsigned long long fileSize = 0;
+        std::tie(platformError, fileSize) = proc->GetSizeInBytes();
+        int dianaMode = 0;
+        if (fileSize == MAXUINT32)
+        {
+            dianaMode = DIANA_MODE32;
+        }
+        else
+        {
+            dianaMode = DIANA_MODE64;
+        }
+
+        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode);
+        info->ReloadModules();
+
+        if (auto address = info->GerProcessModuleAddress())
+        {
+            auto rangeInfo = info->GetRangeInfo(address);
+            auto addressToStart = std::max(rangeInfo.entryPoint, rangeInfo.address);
+            result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(addressToStart);
+        }
+
+        {
+            std::unique_lock<std::mutex> lockGuard(m_lock);
+            m_items[++m_lastUid] = info;
+
+            if (makeActive)
+            {
+                m_activeId = m_lastUid;
+            }
+        }
         // OK
         result.error.native.clear();
     }
