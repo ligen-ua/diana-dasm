@@ -153,7 +153,7 @@ namespace orthia
                     {
                         if (prevWasBad)
                         {
-                            PrintCommand(vmRange.address, L"??", L"???");
+                            PrintCommand(virtualOffset, L"??", L"???");
                         }
                         else
                         {
@@ -175,7 +175,7 @@ namespace orthia
                 {
                     if (prevWasBad)
                     {
-                        PrintCommand(vmRange.address, L"??", L"???");
+                        PrintCommand(virtualOffset, L"??", L"???");
                     }
                     else
                     {

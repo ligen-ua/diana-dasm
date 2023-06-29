@@ -3,6 +3,7 @@
 #include "oui_string.h"
 #include "oui_threadpool.h"
 #include "oui_window_thread.h"
+#include <any>
 
 namespace oui
 {
@@ -124,6 +125,8 @@ namespace oui
         struct OpenResult
         {
             String error;
+            std::map<int, std::any> extraInfo;
+
             OpenResult()
             {
             }

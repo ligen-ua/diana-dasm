@@ -177,7 +177,20 @@ namespace oui
             vit->openHandler = [=, info = it->info]() {
                 TryOpenProcess(info.pid);
             };
+
             vit->colorsHandler = nullptr;
+
+            if (m_scanFlags & IProcessSystem::queryFlags_TryOpenProcessAsReader)
+            {
+                if (it->info.flags & (it->info.flag_hasReaderAccess))
+                {
+                    vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
+                }
+            }
+            else
+            {
+                vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
+            }
         }
         OnVisibleItemChanged();
         m_filesBox->Invalidate();
@@ -244,7 +257,7 @@ namespace oui
                 }
             },
             operation,
-            0);
+            m_scanFlags);
     }
     void COpenProcessDialog::FinishProcessOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result)
     {
@@ -343,12 +356,14 @@ namespace oui
     COpenProcessDialog::COpenProcessDialog(const String& openingText,
         const String& errorText,
         ProcessRecipientHandler_type resultCallback,
-        std::shared_ptr<IProcessSystem> fileSystem)
+        std::shared_ptr<IProcessSystem> fileSystem,
+        int scanFlags)
         :
             m_resultCallback(resultCallback),
             m_fileSystem(fileSystem),
             m_openingText(openingText),
-            m_errorText(errorText)
+            m_errorText(errorText),
+            m_scanFlags(scanFlags)
     {
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);

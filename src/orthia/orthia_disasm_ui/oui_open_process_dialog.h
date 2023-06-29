@@ -57,6 +57,7 @@ namespace oui
         OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> m_openOperation;
         int m_typesToHighlight = 0;
         bool m_readyToExit = false;
+        int m_scanFlags = 0;
         void HighlightItem(int highlightItemOffset);
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
@@ -83,7 +84,9 @@ namespace oui
         COpenProcessDialog(const String& openingText,
             const String& errorText,
             ProcessRecipientHandler_type resultCallback,
-            std::shared_ptr<IProcessSystem> fileSystem);
+            std::shared_ptr<IProcessSystem> fileSystem,
+            int scanFlags = 0);
+
         ~COpenProcessDialog();
         void ShiftViewWindow(int newPosition) override;
         bool ShiftViewWindowToSymbol(const String& symbol) override;

@@ -47,7 +47,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
         std::shared_ptr<oui::IProcess> process,
         oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
 
-    void OnWorkspaceItemChanged();
+    void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);
 
     void SetDefaultTitle();

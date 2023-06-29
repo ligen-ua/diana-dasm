@@ -15,7 +15,22 @@ namespace orthia
         Address_type entryPoint = 0;
         Address_type size = 0;
         int dianaMode = 0;
+
+        bool IsInRange(Address_type offset) const
+        {
+            return offset >= address && offset <= lastValidAddress;
+        }
     };
+
+    struct ModuleInfo:WorkAddressRangeInfo
+    {
+        static const int flags_analyzeDone   = 1;
+        static const int flags_symbolsLoaded = 2;
+        
+        PlatformString_type fullName;
+        int flags = 0;
+    };
+
     struct WorkAddressData :oui::Noncopyable
     {
         const static int flags_FullValid = 1;
@@ -61,6 +76,7 @@ namespace orthia
         virtual const std::shared_ptr<CModuleManager> GetModuleManager() const = 0;
         virtual WorkAddressData ReadData(Address_type address, Address_type size) = 0;
         virtual oui::String GetShortName() const = 0;
+        virtual void ReloadModules() = 0;
     };
 
 }
