@@ -203,5 +203,14 @@ namespace oui
             return;
         }
     }
+    void ResizeLayoutX(std::shared_ptr<PanelLayout> layout, int newWidth, bool left)
+    {
+        if (layout->group)
+        {
+            layout->rect.size.width = newWidth;
+            layout->group->SetPreferredSize(layout->rect.size);
+            return;
+        }
+    }
 
 }

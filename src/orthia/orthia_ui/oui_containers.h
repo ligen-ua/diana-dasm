@@ -33,8 +33,13 @@ namespace oui
 
             bool SaveState();
         };
-        void ApplyState(const ResizeState& state);
+
+        static const int statef_Vertical = 1;
+        static const int statef_Horizontal = 2;
+        void ApplyState(const ResizeState& state, int flags);
+
         ResizeState GetHeaderResizeState();
+        ResizeState GetHorizontalResizeState();
 
         friend class CPanelContainerWindow;
         std::vector<std::shared_ptr<CPanelWindow>> m_panels;
@@ -63,6 +68,11 @@ namespace oui
 
         // drag handlers
         bool Drag_ResizeHandler_TopBottom(DragEvent event,
+            const Point& initialPoint,
+            const Point& currentPoint,
+            std::shared_ptr<CWindow> wnd,
+            const ResizeState& originalState);
+        bool Drag_ResizeHandler_LeftRight(DragEvent event,
             const Point& initialPoint,
             const Point& currentPoint,
             std::shared_ptr<CWindow> wnd,

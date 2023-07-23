@@ -169,7 +169,7 @@ namespace oui
             return;
         }
     }
-    void CPanelGroupWindow::ApplyState(const ResizeState& state)
+    void CPanelGroupWindow::ApplyState(const ResizeState& state, int flags)
     {
         auto newState = state;
         if (newState.panelSize.width <= 0)
@@ -181,7 +181,15 @@ namespace oui
             newState.panelSize.height = 1;
         }
 
-        ResizeLayoutY(state.resizeTarget, newState.panelSize.height, state.resizeTargetIsMe);
+        if (flags & statef_Vertical)
+        {
+            ResizeLayoutY(state.resizeTarget, newState.panelSize.height, state.resizeTargetIsMe);
+        }
+        
+        if (flags & statef_Horizontal)
+        {
+            ResizeLayoutX(state.resizeTarget, newState.panelSize.width, state.resizeTargetIsMe);
+        }
         state.applyTarget->ForceResize();
     }
 
@@ -194,6 +202,73 @@ namespace oui
         }
         return false;
     }
+    
+    CPanelGroupWindow::ResizeState CPanelGroupWindow::GetHorizontalResizeState()
+    {
+        CPanelGroupWindow::ResizeState result;
+
+        auto layout = m_layout.lock();
+        if (!layout)
+        {
+            return result;
+        }
+
+        // climb up for a proper layout
+        bool resizeTargetIsMe = true;
+        for (;;)
+        {
+            auto parentLayout = layout->parentLayout.lock();
+            if (!parentLayout)
+            {
+                return result;
+            }
+
+            auto it = parentLayout->data.begin(), it_end = parentLayout->data.end();
+            for (;
+                it != it_end;
+                ++it)
+            {
+                if (*it == layout)
+                {
+                    break;
+                }
+            }
+            if (it == parentLayout->data.end())
+            {
+                return result;
+            }
+            const auto myIt = it;
+            if (!(*myIt)->stretchWidth)
+            {
+                result.resizeTarget = (*myIt);
+                result.resizeTargetIsMe = resizeTargetIsMe;
+                result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                return result;
+            }
+            if (parentLayout->type == PanelItemType::Horizontal)
+            {
+                // my layout is auto stretched, its size doesn't matter
+                // check on above
+                it = myIt;
+                if (it != parentLayout->data.begin())
+                {
+                    --it;
+                    if (!(*it)->stretchWidth)
+                    {
+                        result.resizeTargetIsMe = false;
+                        result.resizeTarget = (*it);
+                        result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                        return result;
+                    }
+                }
+                return result;
+            }
+            resizeTargetIsMe = false;
+            layout = parentLayout;
+        }
+        return result;
+    }
+
     CPanelGroupWindow::ResizeState CPanelGroupWindow::GetHeaderResizeState()
     {
         CPanelGroupWindow::ResizeState result;
@@ -281,25 +356,53 @@ namespace oui
                 differenceY = -differenceY;
 
             newState.panelSize.height += differenceY;
-            ApplyState(newState);
+            ApplyState(newState, statef_Vertical);
         }
         break;
         case DragEvent::Cancel:
-            ApplyState(originalState);
+            ApplyState(originalState, statef_Vertical);
+        }
+        return true;
+    }
+
+    bool CPanelGroupWindow::Drag_ResizeHandler_LeftRight(DragEvent event,
+        const Point& initialPoint,
+        const Point& currentPoint,
+        std::shared_ptr<CWindow> wnd,
+        const ResizeState& originalState)
+    {
+        switch (event)
+        {
+        default:
+            return false;
+
+        case DragEvent::Progress:
+        case DragEvent::Drop:
+        {
+            int differenceX = currentPoint.x - initialPoint.x;
+            auto newState = originalState;
+
+            if (originalState.resizeTargetIsMe)
+                differenceX = -differenceX;
+
+            newState.panelSize.width += differenceX;
+            ApplyState(newState, statef_Horizontal);
+        }
+        break;
+        case DragEvent::Cancel:
+            ApplyState(originalState, statef_Horizontal);
         }
         return true;
     }
     bool CPanelGroupWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
+        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+
         if (!HasPanels())
         {
             return false;
         }
         m_lastMouseMovePoint = evt.mouseEvent.point;
-        if (m_lastTabY != evt.mouseEvent.point.y)
-        {
-            return false;
-        }
         if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
         {
             int index = 0;
@@ -318,6 +421,7 @@ namespace oui
                 // TODO handle caption drag-n-drop
             }
             else
+            if (relativePoint.y == 0)
             {
                 ResizeState resiseState = GetHeaderResizeState();
                 if (resiseState.SaveState())
@@ -334,6 +438,25 @@ namespace oui
                     });
                 }
             }
+            else
+            if (relativePoint.x == 0)
+            {
+                ResizeState resiseState = GetHorizontalResizeState();
+                if (resiseState.SaveState())
+                {
+                    RegisterDragEvent(m_lastMouseMovePoint, [this, resiseState = resiseState](DragEvent evt,
+                        const Point& initialPoint,
+                        const Point& currentPoint,
+                        std::shared_ptr<CWindow> wnd) {
+                        return Drag_ResizeHandler_LeftRight(evt,
+                        initialPoint,
+                        currentPoint,
+                        wnd,
+                        resiseState);
+                    });
+                }
+            }
+
             if (index != m_activePanelIndex)
             {
                 SwitchPanel(index);
