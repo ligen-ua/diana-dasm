@@ -193,6 +193,7 @@
     <ClCompile Include="ui_menu.cpp" />
     <ClCompile Include="ui_output_window.cpp" />
     <ClCompile Include="ui_tests.cpp" />
+    <ClCompile Include="ui_workspace_window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_config.h" />
@@ -207,6 +208,7 @@
     <ClInclude Include="ui_disasm_window.h" />
     <ClInclude Include="ui_main_window.h" />
     <ClInclude Include="ui_output_window.h" />
+    <ClInclude Include="ui_workspace_window.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

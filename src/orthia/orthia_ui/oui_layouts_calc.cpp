@@ -28,6 +28,7 @@ namespace oui
             {
                 sizeToUse.width = wndRect.size.width;
             }
+            layout->group->SetLeftBorderState(wndRect.position.x != 0);
             layout->rect.size = sizeToUse;
             layout->rect.position = wndRect.position;
             return;
