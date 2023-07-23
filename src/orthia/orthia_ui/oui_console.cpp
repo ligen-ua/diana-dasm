@@ -411,10 +411,15 @@ namespace oui
     }
 
     // CConsoleDrawAdapter
-    const wchar_t g_symsOfSeparatorThick[] = L"─╟╢";
-    const wchar_t g_symsOfSeparatorThin[] = L"─├┤";
-    const wchar_t g_symsOfBorderThick[] = L"╔═╗║╚═╝";
-    const wchar_t g_symsOfBorderThin[] = L"┌─┐│└─┘";
+    //const wchar_t g_symsOfSeparatorThick[] = L"─╟╢";
+    //const wchar_t g_symsOfSeparatorThin[] = L"─├┤";
+    //const wchar_t g_symsOfBorderThick[] = L"╔═╗║╚═╝123";
+    //const wchar_t g_symsOfBorderThin[] = L"┌─┐│└─┘";
+        
+    const wchar_t g_symsOfSeparatorThick[] = { 0x2500, 0x255f, 0x2562 };
+    const wchar_t g_symsOfSeparatorThin[] = { 0x2500, 0x251c, 0x2524 };
+    const wchar_t g_symsOfBorderThick[] = { 0x2554, 0x2550, 0x2557, 0x2551, 0x255a, 0x2550, 0x255d };
+    const wchar_t g_symsOfBorderThin[] = { 0x250c, 0x2500, 0x2510, 0x2502, 0x2514, 0x2500, 0x2518 };
 
     PanelBorderSymbols GetPanelBorderSymbols()
     {
