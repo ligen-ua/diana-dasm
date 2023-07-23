@@ -58,7 +58,9 @@ void CMainWindow::ConstructChilds()
     // construct panels
     m_panelContainerWindow = AddChild_t(std::make_shared<oui::CPanelContainerWindow>());
     auto defaultGroup = m_panelContainerWindow->CreateDefaultGroup();
+    auto topGroup = defaultGroup;
     {
+        // disasm panel
         auto disasmNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.disasm"));
         m_disasmWindow = std::make_shared<CDisasmWindow>([=]() {  return disasmNode->QueryValue(ORTHIA_TCSTR("caption"));  },
             m_model);
@@ -66,6 +68,7 @@ void CMainWindow::ConstructChilds()
     }
 
     {
+        // output window
         auto bottomPanel = m_panelContainerWindow->AttachNewGroup(defaultGroup, oui::GroupLocation::Bottom, oui::GroupAttachMode::Sibling);
 
         auto outputNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.output"));
@@ -73,6 +76,18 @@ void CMainWindow::ConstructChilds()
         // m_outputWindow->SetBackgroundColor(oui::ColorBlue());
 
         bottomPanel->AddPanel(m_outputWindow);
+    }
+    {
+        // workspace window
+        auto workspacePanel = m_panelContainerWindow->AttachNewGroup(topGroup, oui::GroupLocation::Left, oui::GroupAttachMode::Child);
+        oui::Size size;
+        size.width = 30;
+        workspacePanel->SetPreferredSize(size);
+        auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.workspace"));
+        m_workspaceWindow = std::make_shared<CWorkspaceWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+        workspacePanel->AddPanel(m_workspaceWindow);
+
+       // m_workspaceWindow->SetBackgroundColor(oui::ColorBlue());
     }
     m_model->SetUILog(m_outputWindow);
 

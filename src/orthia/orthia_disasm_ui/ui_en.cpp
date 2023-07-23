@@ -15,6 +15,9 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("open_process"), ORTHIA_TCSTR("Open &Process"))
         << textManager->RegisterValue(ORTHIA_TCSTR("exit"), ORTHIA_TCSTR("E&xit"))
         ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.menu.view"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("workspace"), ORTHIA_TCSTR("&Workspace"))
+        ;
 
     // modal
     textManager->RegisterNode(ORTHIA_TCSTR("ui.modal.exit"))
@@ -32,6 +35,11 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     // output
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.output"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Output"))
+        ;
+
+    // workspace
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.workspace"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Workspace"))
         ;
 
     // dialogs

@@ -58,6 +58,7 @@ namespace oui
         std::weak_ptr<PanelLayout> m_layout;
 
         void PaintTitle(const Rect& rect, DrawParameters& parameters);
+        void PaintLeftBorder(const Rect& rect, DrawParameters& parameters);
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
 
         // drag handlers
@@ -92,6 +93,8 @@ namespace oui
         std::shared_ptr<CPanelWindow> GetActivePanel();
         std::shared_ptr<CPanelCommonContext> GetPanelCommonContext();
         bool SwitchPanel(int index);
+
+        void SetLeftBorderState(bool state);
     };
 
     class CPanelCommonContext

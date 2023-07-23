@@ -178,10 +178,14 @@ void CMainWindow::OpenExecutable()
     dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
     dialog->Dock();
 }
+void CMainWindow::ToggleWorkspaceView()
+{
+}
 void CMainWindow::ConstuctMenu()
 {
     auto uiMenuTextNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.menu"));
     auto uiMenuTextNodeFile = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.menu.file"));
+    auto uiMenuTextNodeView = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.menu.view"));
 
     m_menu = AddChild_t(std::make_shared<oui::CMenuWindow>());
     m_menu->SetBackgroundColor(oui::ColorBlack());
@@ -232,8 +236,9 @@ void CMainWindow::ConstuctMenu()
         std::vector<oui::PopupItem> view =
         {
             {
-                L"Test5",
-                []() {}
+                uiMenuTextNodeView->QueryValue(ORTHIA_TCSTR("workspace")),
+                [this]() { ToggleWorkspaceView(); },
+                oui::Hotkey(oui::VirtualKey::kW)
             }
         };
         m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("view")),

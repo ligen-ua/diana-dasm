@@ -142,6 +142,10 @@ namespace oui
         return m_panels[m_activePanelIndex];
     }
 
+    void CPanelGroupWindow::SetLeftBorderState(bool state)
+    {
+        m_drawLeftBorder = state;
+    }
     void CPanelGroupWindow::OnResize()
     {
         // resize childs
@@ -155,6 +159,11 @@ namespace oui
             Rect clientRectWithTitle = clientRect;
             ++clientRectWithTitle.position.y;
             --clientRectWithTitle.size.height;
+            if (m_drawLeftBorder && clientRectWithTitle.size.width)
+            {
+                --clientRectWithTitle.size.width;
+                ++clientRectWithTitle.position.x;
+            }
             activePanel->MoveTo(clientRectWithTitle.position);
             activePanel->Resize(clientRectWithTitle.size);
             return;
@@ -397,6 +406,33 @@ namespace oui
     }
 
     String CPanelGroupWindow::m_chunk;
+    void CPanelGroupWindow::PaintLeftBorder(const Rect& rect, DrawParameters& parameters)
+    {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+
+        if (rect.size.width <= 0 || rect.size.height <= 0)
+        {
+            return;
+        }
+        const PanelBorderSymbols symbols = GetPanelBorderSymbols();
+
+        Point target = { rect.position.x, rect.position.y + 1 };
+        PanelCaptionProfile* currentColors = &m_panelColorProfile->normal;
+        m_chunk.native.clear();
+        m_chunk.native.push_back(symbols.vertical);
+        for (auto i = 1; i < rect.size.height; ++i)
+        {
+            parameters.console.PaintText(target,
+                m_panelColorProfile->borderText,
+                m_panelColorProfile->borderBackground,
+                m_chunk.native);
+            ++target.y;
+        }
+    }
     void CPanelGroupWindow::PaintTitle(const Rect& rect, DrawParameters& parameters)
     {
         auto console = GetConsole();
@@ -414,12 +450,8 @@ namespace oui
 
         auto activePanel = m_panels[m_activePanelIndex];
         Rect clientRect;
-        clientRect.position = activePanel->GetPosition();
+        clientRect.position = { 0, 0 };
         clientRect.size = activePanel->GetSize();
-        if (clientRect.position.y)
-        {
-            --clientRect.position.y;
-        }
         clientRect.size.height = 1;
 
         auto absClientRect = clientRect;
@@ -453,8 +485,8 @@ namespace oui
 
         // draw prefix
         m_chunk.native.clear();
-        m_chunk.native.resize(3, symbols.horizontal);
-        m_chunk.native[2] = oui::String::symSpace;
+        m_chunk.native.resize(m_drawLeftBorder?4:3, symbols.horizontal);
+        m_chunk.native.back() = oui::String::symSpace;
 
         parameters.console.PaintText(target,
             m_panelColorProfile->borderText,
@@ -545,6 +577,10 @@ namespace oui
             PaintTitle(rect, parameters);
         }
         CWindow::DoPaint(rect, parameters);
+        if (m_drawLeftBorder)
+        {
+            PaintLeftBorder(rect, parameters);
+        }
     }
     // CPanelCommonContext
     CPanelCommonContext::CPanelCommonContext()
