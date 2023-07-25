@@ -392,6 +392,7 @@ namespace oui
             HANDLE hSearch = FindFirstFileW(searchParam.c_str(), &win32Info);
             if (hSearch == INVALID_HANDLE_VALUE)
             {
+                error = GetLastError();
                 handler->Reply(handler, fileId, result, error, tag);
                 return;
             }

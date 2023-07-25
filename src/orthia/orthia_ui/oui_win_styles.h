@@ -96,6 +96,10 @@ namespace oui
         Rect GetClientRect() const override
         {
             Rect rect = Base::GetClientRect();
+            if (m_style == BorderStyle::None)
+            {
+                return rect;
+            }
             ++rect.position.x;
             ++rect.position.y;
             rect.size.width -= 2;
@@ -104,6 +108,11 @@ namespace oui
         }
         void DoPaint(const Rect& rect, DrawParameters& parameters) override
         {
+            if (m_style == BorderStyle::None)
+            {
+                Base::DoPaint(rect, parameters);
+                return;
+            }
             parameters.console.PaintBorder(rect, m_frontColor, m_backgroundColor, this->m_style);
             Base::DoPaint(rect, parameters);
         }
