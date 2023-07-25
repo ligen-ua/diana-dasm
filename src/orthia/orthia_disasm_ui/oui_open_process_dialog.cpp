@@ -132,42 +132,8 @@ namespace oui
 
     void COpenProcessDialog::UpdateVisibleItems()
     {
-        auto console = GetConsole();
-        if (!console)
-        {
-            return;
-        }
-        // update visible items
-        const auto visibleSize = m_filesBox->GetVisibleSize();
-        auto& visibleItems = m_filesBox->GetItems();
-        const int maxSize = (int)m_currentProcess.size();
-
-        auto offset = m_filesBox->GetOffset();
-        if (offset >= maxSize)
-        {
-            // set to the last file here
-            visibleItems.clear();
-            if (m_currentProcess.empty())
-            {
-                m_filesBox->Invalidate();
-                return;
-            }
-            // we have some files, show last page
-            offset = (int)m_currentProcess.size() - visibleSize;
-            if (offset < 0)
-            {
-                offset = 0;
-            }
-            m_filesBox->SetOffset(offset);
-        }
-
-        auto sizeToProceed = std::min(maxSize - offset, visibleSize);
-        visibleItems.resize(sizeToProceed);
-
-        auto it = m_currentProcess.begin() + offset;
-        auto it_end = it + sizeToProceed;
-        auto vit = visibleItems.begin();
-        for (; it != it_end; ++it, ++vit)
+        DefaultUpdateVisibleItems(this, this, m_filesBox, m_currentProcess,
+            [&](auto it, auto vit)
         {
             vit->text.clear();
             vit->text.push_back(it->visibleName);
@@ -191,9 +157,7 @@ namespace oui
             {
                 vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
             }
-        }
-        OnVisibleItemChanged();
-        m_filesBox->Invalidate();
+        });
     }
     String COpenProcessDialog::GetWaitBoxText()
     {
@@ -487,41 +451,7 @@ namespace oui
 
     void COpenProcessDialog::ShiftViewWindow(int newOffset)
     {
-        const int visibleSize = m_filesBox->GetVisibleSize();
-        const int totalProcessAvailable = (int)m_currentProcess.size();
-
-        int newSelectedPositon = m_filesBox->GetSelectedPosition();
-
-        int newSelectedOffset = newSelectedPositon + newOffset;
-        int maxOffset = totalProcessAvailable - visibleSize;
-        if (maxOffset < 0)
-        {
-            maxOffset = 0;
-        }
-        if (newOffset > maxOffset)
-        {
-            if (newSelectedOffset >= totalProcessAvailable)
-            {
-                auto sizeToProceed = std::min(totalProcessAvailable - maxOffset, visibleSize);
-                newSelectedPositon = sizeToProceed - 1;
-            }
-            else
-            {
-                newSelectedPositon = visibleSize - (totalProcessAvailable - newSelectedOffset);
-            }
-            newOffset = maxOffset;
-        }
-        if (newOffset < 0)
-        {
-            newOffset = 0;
-            newSelectedPositon = newSelectedOffset;
-            if (newSelectedPositon < 0)
-            {
-                newSelectedPositon = 0;
-            }
-        }
-        m_filesBox->SetSelectedPosition(newSelectedPositon);
-        m_filesBox->SetOffset(newOffset);
+        DefaultShiftViewWindow(m_filesBox, newOffset, m_currentProcess.size());
         UpdateVisibleItems();
     }
     int COpenProcessDialog::GetTotalCount() const

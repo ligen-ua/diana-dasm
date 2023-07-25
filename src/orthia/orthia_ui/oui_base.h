@@ -118,6 +118,7 @@ namespace oui
 
     enum class BorderStyle
     {
+        None,
         Thin,
         Thick
     };

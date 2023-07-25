@@ -94,4 +94,57 @@ namespace oui
         bool GetSelectedItem(ListBoxItem& item) const;
     };
 
+
+    void DefaultShiftViewWindow(std::shared_ptr<CListBox> filesBox, int newOffset, size_t totalFilesAvailable_in);
+
+    
+    template<class OwnerType, class ContainerType, class ItemHandler>
+    void DefaultUpdateVisibleItems(OwnerType owner,
+        IListBoxOwner * ifaceOwner,
+        std::shared_ptr<CListBox> filesBox, 
+        ContainerType& container,
+        ItemHandler && itemHandler)
+    {
+        auto console = owner->GetConsole();
+        if (!console)
+        {
+            return;
+        }
+        // update visible items
+        const auto visibleSize = filesBox->GetVisibleSize();
+        auto& visibleItems = filesBox->GetItems();
+        const int maxSize = (int)container.size();
+
+        auto offset = filesBox->GetOffset();
+        if (offset >= maxSize)
+        {
+            // set to the last file here
+            visibleItems.clear();
+            if (container.empty())
+            {
+                filesBox->Invalidate();
+                return;
+            }
+            // we have some files, show last page
+            offset = (int)container.size() - visibleSize;
+            if (offset < 0)
+            {
+                offset = 0;
+            }
+            filesBox->SetOffset(offset);
+        }
+
+        auto sizeToProceed = std::min(maxSize - offset, visibleSize);
+        visibleItems.resize(sizeToProceed);
+
+        auto it = container.begin() + offset;
+        auto it_end = it + sizeToProceed;
+        auto vit = visibleItems.begin();
+        for (; it != it_end; ++it, ++vit)
+        {
+            itemHandler(it, vit);
+        }
+        ifaceOwner->OnVisibleItemChanged();
+        filesBox->Invalidate();
+     }
 }

@@ -177,7 +177,11 @@ namespace oui
             ColorBrightWhite(),     // text
             ColorCyan(),     // background
         },
-        ColorGray()
+        ColorGray(),
+        {
+            ColorBlack(),     // text
+            ColorGray(),     // background
+        },
     };
     static Color g_listBoxFolders = ColorWhite();
 

@@ -1,24 +1,27 @@
 #pragma once
 
 #include "oui_containers.h"
-#include "oui_multiline_view.h"
+#include "oui_listbox.h"
 #include "orthia_model.h"
 
-class CWorkspaceWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineViewOwner, public orthia::IUILogInterface
+class CWorkspaceWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IListBoxOwner
 {
-    std::shared_ptr<oui::CMultiLineView> m_view;
+    std::shared_ptr<orthia::CProgramModel> m_model;
+    std::shared_ptr<oui::CListBox> m_itemsBox;
     std::shared_ptr<oui::DialogColorProfile> m_colorProfile;
 
-    void CancelAllQueries() override;
     void ConstructChilds() override;
     void OnResize() override;
     void SetFocusImpl() override;
 
-    // orthia::IUILogInterface
-    void WriteLog(const oui::String& line) override;
+    int GetTotalCount() const override;
+    void CancelAllQueries() override;
+    void ShiftViewWindow(int newOffset) override;
+    void OnVisibleItemChanged() override;
+    bool ShiftViewWindowToSymbol(const oui::String & symbol) override;
+
+    void UpdateVisibleItems();
 public:
-    CWorkspaceWindow(std::function<oui::String()> getCaption);
-    void AddLine(const oui::String& line);
-    bool ScrollUp(oui::MultiLineViewItem* item, int count) override;
-    bool ScrollDown(oui::MultiLineViewItem* item, int count) override;
+    CWorkspaceWindow(std::function<oui::String()> getCaption, std::shared_ptr<orthia::CProgramModel> model);
+    void OnWorkspaceItemChanged();
 };

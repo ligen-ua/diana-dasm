@@ -4,9 +4,10 @@
 #include "ui_workspace_window.h"
 #include <ctime>
 
-CWorkspaceWindow::CWorkspaceWindow(std::function<oui::String()> getCaption)
+CWorkspaceWindow::CWorkspaceWindow(std::function<oui::String()> getCaption, std::shared_ptr<orthia::CProgramModel> model)
     : 
-     oui::SimpleBrush<oui::CPanelWindow>(getCaption)
+     oui::SimpleBrush<oui::CPanelWindow>(getCaption),
+     m_model(model)
 {
     // FOR WIN LOGIC DEBUG
     //    SetBackgroundColor(oui::ColorBlue());
@@ -14,80 +15,64 @@ CWorkspaceWindow::CWorkspaceWindow(std::function<oui::String()> getCaption)
     m_colorProfile = std::make_shared<oui::DialogColorProfile>();
     QueryDefaultColorProfile(*m_colorProfile);
 
-    oui::IMultiLineViewOwner* param = this;
-    m_view = std::make_shared<oui::CMultiLineView>(m_colorProfile, param, true);
-
+    oui::IListBoxOwner* owner = this;
+    m_itemsBox = std::make_shared<oui::CListBox>(m_colorProfile, owner);
+    m_itemsBox->InitColumns(1);
+    m_itemsBox->SetBorderStyle(oui::BorderStyle::None);
 }
-void CWorkspaceWindow::AddLine(const oui::String& line)
+int CWorkspaceWindow::GetTotalCount() const
 {
-    auto timeval = std::chrono::system_clock::now();
-    std::time_t time = std::chrono::system_clock::to_time_t(timeval);
-    tm tm = { 0 };
-
-#ifdef OUI_SYS_WINDOWS    
-    localtime_s(&tm, &time);
-#else
-    localtime_r(&time, &tm);
-#endif
-
-    std::chrono::system_clock::time_point time_without_ms = std::chrono::system_clock::from_time_t(time);
-    int milliseconds = (int)std::chrono::duration_cast<std::chrono::milliseconds>(timeval - time_without_ms).count();
-
-    oui::String::char_type buffer[64];
-    buffer[0] = 0;
-    OUI_SPRINTF(buffer,
-        OUI_TCSTR("%02i:%02i:%02i:%03i  "),
-        (int)tm.tm_hour,
-        (int)tm.tm_min,
-        (int)tm.tm_sec,
-        (int)milliseconds);
-   
-
-    oui::MultiLineViewItem item;
-    item.text = oui::String::string_type(buffer) + line.native;
-    m_view->AddLine(std::move(item));
+    return 0;
 }
 void CWorkspaceWindow::CancelAllQueries()
 {
+
 }
-bool CWorkspaceWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
+void CWorkspaceWindow::UpdateVisibleItems()
 {
-    return false;
+    std::vector<orthia::WorkplaceItem> items;
+    m_model->QueryWorkspaceItems(items);
+    DefaultUpdateVisibleItems(this, this, m_itemsBox, items,
+        [&](auto it, auto vit)
+    {
+        vit->text.clear();
+        vit->text.push_back(it->name);
+
+        vit->openHandler = nullptr;
+        vit->colorsHandler = nullptr;
+    });
 }
-bool CWorkspaceWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
+void CWorkspaceWindow::ShiftViewWindow(int newOffset)
+{
+    std::vector<orthia::WorkplaceItem> items;
+    m_model->QueryWorkspaceItems(items);
+ 
+    DefaultShiftViewWindow(m_itemsBox, newOffset, items.size());
+    UpdateVisibleItems();
+
+}
+void CWorkspaceWindow::OnVisibleItemChanged()
+{
+
+}
+bool CWorkspaceWindow::ShiftViewWindowToSymbol(const oui::String& symbol)
 {
     return false;
 }
 void CWorkspaceWindow::ConstructChilds()
 {
-    AddChild(m_view);
+    AddChild(m_itemsBox);
 }
 void CWorkspaceWindow::OnResize()
 {
     const oui::Rect clientRect = GetClientRect();
-    m_view->Resize(clientRect.size);
+    m_itemsBox->Resize(clientRect.size);
 }
 void CWorkspaceWindow::SetFocusImpl()
 {
-    m_view->SetFocus();
+    m_itemsBox->SetFocus();
 }
-
-// orthia::IUILogInterface
-void CWorkspaceWindow::WriteLog(const oui::String& text)
+void CWorkspaceWindow::OnWorkspaceItemChanged()
 {
-    auto console = GetConsole();
-    if (!console)
-    {
-        return;
-    }
-
-    std::vector<oui::String::string_type> lines;
-    orthia::SplitStringWithoutWhitespace(text.native, L"\x0A", &lines);
-
-    for (auto& line : lines)
-    {
-        oui::String line2Add = std::move(line);
-        console->FilterOrReplaceUnreadableSymbols(line2Add);
-        AddLine(line2Add);
-    }
+    UpdateVisibleItems();
 }

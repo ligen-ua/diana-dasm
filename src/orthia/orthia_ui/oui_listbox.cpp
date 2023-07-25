@@ -90,7 +90,14 @@ namespace oui
                 LabelColorState customColor;
                 if (m_selectedPosition == pos)
                 {
-                    color = &colorProfile.selectedText;
+                    if (IsFocused())
+                    {
+                        color = &colorProfile.selectedText;
+                    }
+                    else
+                    {
+                        color = &colorProfile.selectedNonFocusedText;
+                    }
                 }
                 else
                 {
@@ -442,4 +449,42 @@ namespace oui
         InitSize();
     }
 
+    void DefaultShiftViewWindow(std::shared_ptr<CListBox> filesBox, int newOffset, size_t totalFilesAvailable_in)
+    {
+        const int visibleSize = filesBox->GetVisibleSize();
+        const int totalFilesAvailable = (int)totalFilesAvailable_in;
+
+        int newSelectedPositon = filesBox->GetSelectedPosition();
+
+        int newSelectedOffset = newSelectedPositon + newOffset;
+        int maxOffset = totalFilesAvailable - visibleSize;
+        if (maxOffset < 0)
+        {
+            maxOffset = 0;
+        }
+        if (newOffset > maxOffset)
+        {
+            if (newSelectedOffset >= totalFilesAvailable)
+            {
+                auto sizeToProceed = std::min(totalFilesAvailable - maxOffset, visibleSize);
+                newSelectedPositon = sizeToProceed - 1;
+            }
+            else
+            {
+                newSelectedPositon = visibleSize - (totalFilesAvailable - newSelectedOffset);
+            }
+            newOffset = maxOffset;
+        }
+        if (newOffset < 0)
+        {
+            newOffset = 0;
+            newSelectedPositon = newSelectedOffset;
+            if (newSelectedPositon < 0)
+            {
+                newSelectedPositon = 0;
+            }
+        }
+        filesBox->SetSelectedPosition(newSelectedPositon);
+        filesBox->SetOffset(newOffset);
+    }
 }

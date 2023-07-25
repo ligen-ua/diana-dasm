@@ -16,6 +16,7 @@ static void PrintUsage()
 {
     std::cout << "Usage: [--run-tests] <filename>\n";
 }
+typedef int FIRMWARE_TYPE;
 int wmain(int argc, const wchar_t* argv[])
 {
     // MessageBox(0, 0, 0, 0);

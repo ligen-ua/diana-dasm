@@ -121,11 +121,11 @@ namespace oui
             std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler,
             int endX,
             int endY);
-        CConsole* GetConsole() const;
 
         static CConsole* g_defConsole;
     public:
-
+        CConsole* GetConsole() const;
+ 
         template<class Type>
         Type AddChild_t(Type child)
         {

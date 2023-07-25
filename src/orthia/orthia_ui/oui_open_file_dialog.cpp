@@ -206,42 +206,8 @@ namespace oui
     }
     void COpenFileDialog::UpdateVisibleItems()
     {
-        auto console = GetConsole();
-        if (!console)
-        {
-            return;
-        }
-        // update visible items
-        const auto visibleSize = m_filesBox->GetVisibleSize();
-        auto& visibleItems = m_filesBox->GetItems();
-        const int maxSize = (int)m_currentFiles.size();
-
-        auto offset = m_filesBox->GetOffset();
-        if (offset >= maxSize)
-        {
-            // set to the last file here
-            visibleItems.clear();
-            if (m_currentFiles.empty())
-            {
-                m_filesBox->Invalidate();
-                return;
-            }
-            // we have some files, show last page
-            offset = (int)m_currentFiles.size() - visibleSize;
-            if (offset < 0)
-            {
-                offset = 0;
-            }
-            m_filesBox->SetOffset(offset);
-        }
-
-        auto sizeToProceed = std::min(maxSize - offset, visibleSize);
-        visibleItems.resize(sizeToProceed);
-
-        auto it = m_currentFiles.begin() + offset;
-        auto it_end = it + sizeToProceed;
-        auto vit = visibleItems.begin();
-        for (; it != it_end; ++it, ++vit)
+        DefaultUpdateVisibleItems(this, this, m_filesBox, m_currentFiles,
+            [&](auto it, auto vit)
         {
             vit->text.clear();
             vit->text.push_back(it->visibleName);
@@ -249,32 +215,32 @@ namespace oui
 
             if (it->info.flags & it->info.flag_uplink)
             {
-                vit->openHandler = [=]() { 
-                    ChangeFolder(m_currentFolderId, 
+                vit->openHandler = [=]() {
+                    ChangeFolder(m_currentFolderId,
                         String(),
                         IFileSystem::queryFlags_OpenParent,
                         String(OUI_TO_STR(m_parentOffset) + OUI_STR(":") + OUI_TO_STR(m_parentPosition)));
                 };
             }
             else
-            if (it->info.flags & it->info.flag_directory)
-            {
-                vit->openHandler = [=, fileName = it->info.fileName]() {
-                    ChangeFolder(m_currentFolderId,
-                        fileName,
-                        IFileSystem::queryFlags_OpenChild,
-                        String());
-                };
-            }
-            else
-            {
-                // open file here
-                vit->openHandler = [=, fileName = it->info.fileName]() {
-                    TryOpenFile(m_currentFolderId,
-                        fileName,
-                        true);
-                };
-            }
+                if (it->info.flags & it->info.flag_directory)
+                {
+                    vit->openHandler = [=, fileName = it->info.fileName]() {
+                        ChangeFolder(m_currentFolderId,
+                            fileName,
+                            IFileSystem::queryFlags_OpenChild,
+                            String());
+                    };
+                }
+                else
+                {
+                    // open file here
+                    vit->openHandler = [=, fileName = it->info.fileName]() {
+                        TryOpenFile(m_currentFolderId,
+                            fileName,
+                            true);
+                    };
+                }
 
             if (it->info.flags & (it->info.flag_directory | m_typesToHighlight))
             {
@@ -284,9 +250,7 @@ namespace oui
             {
                 vit->colorsHandler = nullptr;
             }
-        }
-        OnVisibleItemChanged();
-        m_filesBox->Invalidate();
+        });
     }
     void COpenFileDialog::OnDefaultRoot(const String& name, int error)
     {
@@ -616,41 +580,7 @@ namespace oui
 
     void COpenFileDialog::ShiftViewWindow(int newOffset)
     {
-        const int visibleSize = m_filesBox->GetVisibleSize();
-        const int totalFilesAvailable = (int)m_currentFiles.size();
-
-        int newSelectedPositon = m_filesBox->GetSelectedPosition();
-
-        int newSelectedOffset = newSelectedPositon + newOffset;
-        int maxOffset = totalFilesAvailable - visibleSize;
-        if (maxOffset < 0)
-        {
-            maxOffset = 0;
-        }
-        if (newOffset > maxOffset)
-        {
-            if (newSelectedOffset >= totalFilesAvailable)
-            {
-                auto sizeToProceed = std::min(totalFilesAvailable - maxOffset, visibleSize);
-                newSelectedPositon = sizeToProceed - 1;
-            }
-            else
-            {
-                newSelectedPositon = visibleSize - (totalFilesAvailable - newSelectedOffset);
-            }
-            newOffset = maxOffset;
-        }
-        if (newOffset < 0)
-        {
-            newOffset = 0;
-            newSelectedPositon = newSelectedOffset;
-            if (newSelectedPositon < 0)
-            {
-                newSelectedPositon = 0;
-            }
-        }
-        m_filesBox->SetSelectedPosition(newSelectedPositon);
-        m_filesBox->SetOffset(newOffset);
+        DefaultShiftViewWindow(m_filesBox, newOffset, m_currentFiles.size());
         UpdateVisibleItems();
     }
     int COpenFileDialog::GetTotalCount() const

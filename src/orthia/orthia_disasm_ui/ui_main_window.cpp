@@ -41,6 +41,8 @@ void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
         addressHint = std::any_cast<orthia::Address_type>(it->second);
     }
     m_disasmWindow->SetActiveItem(item.uid, addressHint);
+
+    m_workspaceWindow->OnWorkspaceItemChanged();
 }
 
 void CMainWindow::AddInitialArgument(const InitialOpenFileInfo& info)
@@ -84,7 +86,8 @@ void CMainWindow::ConstructChilds()
         size.width = 30;
         workspacePanel->SetPreferredSize(size);
         auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.workspace"));
-        m_workspaceWindow = std::make_shared<CWorkspaceWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  });
+        m_workspaceWindow = std::make_shared<CWorkspaceWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  },
+            m_model);
         workspacePanel->AddPanel(m_workspaceWindow);
 
        // m_workspaceWindow->SetBackgroundColor(oui::ColorBlue());
