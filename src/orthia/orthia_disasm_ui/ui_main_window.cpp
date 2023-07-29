@@ -16,6 +16,31 @@ void CMainWindow::SetDefaultTitle()
     }
     console->SetTitle(mainNode->QueryValue(ORTHIA_TCSTR("caption")));
 }
+void CMainWindow::OnPreWorkspaceItemChange(int itemId)
+{
+    m_stateManager.SaveState(itemId);
+}
+void CMainWindow::OnWorkspaceItemChanged(int itemId)
+{
+    m_stateManager.ReloadState(itemId);
+    m_stateManager.SetActiveItem(itemId);
+
+    orthia::WorkplaceItem item;
+    if (!m_model->QueryActiveWorkspaceItem(item))
+    {
+        SetDefaultTitle();
+    }
+    else
+    {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        console->SetTitle(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("caption-file")), item.name));
+    }
+}
 void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
 {
     orthia::WorkplaceItem item;
@@ -31,9 +56,7 @@ void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
         return;
     }
 
-    auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-    console->SetTitle(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("caption-file")), item.name));
-
+    // load initial data
     orthia::Address_type addressHint = 0;
     auto it = result.extraInfo.find(orthia::model_OpenResult_extraInfo_InitalAddress);
     if (it != result.extraInfo.end())
@@ -67,6 +90,8 @@ void CMainWindow::ConstructChilds()
         m_disasmWindow = std::make_shared<CDisasmWindow>([=]() {  return disasmNode->QueryValue(ORTHIA_TCSTR("caption"));  },
             m_model);
         defaultGroup->AddPanel(m_disasmWindow);
+
+        m_stateManager.Register(m_disasmWindow);
     }
 
     {

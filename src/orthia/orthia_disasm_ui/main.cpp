@@ -59,6 +59,11 @@ int wmain(int argc, const wchar_t* argv[])
 
         // create root windows
         auto rootWindow = std::make_shared<CMainWindow>(programModel);
+        programModel->SubscribeUI(rootWindow);
+
+        oui::ScopedGuard handlerGuard([&]() {
+            programModel->UnsubscribeUI(rootWindow);
+        });
 #if 0
         rootWindow->AddInitialTextOutputInfo(L"this");
         rootWindow->AddInitialTextOutputInfo(L"is");
