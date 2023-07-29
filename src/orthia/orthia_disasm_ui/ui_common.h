@@ -12,8 +12,8 @@ struct UIState
 struct IUIStatefulWindow
 {
     virtual ~IUIStatefulWindow() {}
-    virtual void ReloadState(const UIState& state) = 0;
-    virtual void SaveState(UIState& state) = 0;
+    virtual void ReloadState(const UIState& state) {}
+    virtual void SaveState(UIState& state) {}
     virtual void SetActiveWorkspaceItem(int itemId) = 0;
 };
 

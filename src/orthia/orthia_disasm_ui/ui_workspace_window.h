@@ -2,9 +2,9 @@
 
 #include "oui_containers.h"
 #include "oui_listbox.h"
-#include "orthia_model.h"
+#include "ui_common.h"
 
-class CWorkspaceWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IListBoxOwner
+class CWorkspaceWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IListBoxOwner, public IUIStatefulWindow
 {
     std::shared_ptr<orthia::CProgramModel> m_model;
     std::shared_ptr<oui::CListBox> m_itemsBox;
@@ -25,4 +25,5 @@ class CWorkspaceWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IListBox
 public:
     CWorkspaceWindow(std::function<oui::String()> getCaption, std::shared_ptr<orthia::CProgramModel> model);
     void OnWorkspaceItemChanged();
+    void SetActiveWorkspaceItem(int itemId) override;
 };

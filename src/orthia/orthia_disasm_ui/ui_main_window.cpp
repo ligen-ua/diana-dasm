@@ -64,8 +64,6 @@ void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
         addressHint = std::any_cast<orthia::Address_type>(it->second);
     }
     m_disasmWindow->SetActiveItem(item.uid, addressHint);
-
-    m_workspaceWindow->OnWorkspaceItemChanged();
 }
 
 void CMainWindow::AddInitialArgument(const InitialOpenFileInfo& info)
@@ -115,7 +113,7 @@ void CMainWindow::ConstructChilds()
             m_model);
         workspacePanel->AddPanel(m_workspaceWindow);
 
-       // m_workspaceWindow->SetBackgroundColor(oui::ColorBlue());
+        m_stateManager.Register(m_workspaceWindow);
     }
     m_model->SetUILog(m_outputWindow);
 

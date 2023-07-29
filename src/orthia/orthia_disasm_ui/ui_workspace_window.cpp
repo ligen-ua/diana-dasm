@@ -92,3 +92,7 @@ void CWorkspaceWindow::OnWorkspaceItemChanged()
 {
     UpdateVisibleItems();
 }
+void CWorkspaceWindow::SetActiveWorkspaceItem(int itemId)
+{
+    OnWorkspaceItemChanged();
+}
