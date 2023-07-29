@@ -1,10 +1,12 @@
 #pragma once
 #include "oui_containers.h"
-#include "orthia_model.h"
 #include "oui_multiline_view.h"
+#include "ui_common.h"
 
-class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineViewOwner
+class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineViewOwner, public IUIStatefulWindow
 {
+    static const int field_peAddress = 1;
+
     using Parent_type = oui::SimpleBrush<oui::CPanelWindow>;
 
     std::shared_ptr<orthia::CProgramModel> m_model;
@@ -28,8 +30,15 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void ConstructChilds() override;
     void OnResize() override;
     void SetFocusImpl() override;
+    void SetActiveItemImpl(int itemUid);
+
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,
         std::shared_ptr<orthia::CProgramModel> model);
     void SetActiveItem(int itemUid, DI_UINT64 initialAddressHint = 0);
+
+    // IUIStatefulWindow
+    void ReloadState(const UIState& state) override;
+    void SaveState(UIState& state) override;
+    void SetActiveWorkspaceItem(int itemId) override;
 };

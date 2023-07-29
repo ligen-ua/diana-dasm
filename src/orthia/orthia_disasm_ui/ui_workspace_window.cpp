@@ -31,16 +31,32 @@ void CWorkspaceWindow::CancelAllQueries()
 void CWorkspaceWindow::UpdateVisibleItems()
 {
     std::vector<orthia::WorkplaceItem> items;
-    m_model->QueryWorkspaceItems(items);
+    auto activeIndex = m_model->QueryWorkspaceItems(items);
+    auto selectedIt = items.end();
+    if (activeIndex != -1)
+    {
+        selectedIt = items.begin() + activeIndex;
+    }
     DefaultUpdateVisibleItems(this, this, m_itemsBox, items,
         [&](auto it, auto vit)
     {
+        auto name = OUI_TO_STR(1 + (it - items.begin())) + OUI_STR(". ") + it->name.native;
+        if (selectedIt == it)
+        {
+            name = OUI_STR("> ") + name;
+        }
         vit->text.clear();
-        vit->text.push_back(it->name);
+        vit->text.push_back(name);  
 
-        vit->openHandler = nullptr;
+        vit->openHandler = [=, uid = it->uid]() {
+            SwitchActiveItem(uid);
+        };
         vit->colorsHandler = nullptr;
     });
+}
+void CWorkspaceWindow::SwitchActiveItem(int uid)
+{
+    m_model->SetActiveItem(uid);
 }
 void CWorkspaceWindow::ShiftViewWindow(int newOffset)
 {

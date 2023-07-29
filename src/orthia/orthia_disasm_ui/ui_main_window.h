@@ -20,7 +20,7 @@ struct InitialOpenFileInfo
     std::shared_ptr<oui::IFile> file;
 };
 
-class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
+class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public orthia::IUIEventHandler
 {
     std::shared_ptr<orthia::CProgramModel> m_model;
 
@@ -34,6 +34,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     std::vector<InitialOpenFileInfo> m_fileToOpen;
     std::vector<oui::String> m_initialText;
 
+    CUIStateManager m_stateManager;
     void ConstuctMenu();
     void ToggleMenu(bool openPopup);
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
@@ -48,6 +49,9 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>
     oui::fsui::OpenResult HandleOpenProcess(std::shared_ptr<oui::COpenProcessDialog> dialog,
         std::shared_ptr<oui::IProcess> process,
         oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
+
+    void OnWorkspaceItemChanged(int itemId) override;
+    void OnPreWorkspaceItemChange(int itemId) override;
 
     void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);

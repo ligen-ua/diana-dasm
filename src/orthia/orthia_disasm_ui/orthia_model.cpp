@@ -55,6 +55,55 @@ namespace orthia
         item.name = it->second->GetShortName();
         return true;
     }
+    bool CProgramModel::SetActiveItem(int uid)
+    {
+        // fire UI subscribers here
+        std::vector<std::shared_ptr<IUIEventHandler>> handlers;
+        int oldUid = 0;
+        {
+            std::unique_lock<std::mutex> lockGuard(m_lock);
+            if (m_activeId == uid)
+            {
+                return false;
+            }
+            oldUid = m_activeId;
+            handlers.assign(m_handlers.begin(), m_handlers.end());
+        }
+        for (auto& handler : handlers)
+        {
+            handler->OnPreWorkspaceItemChange(oldUid);
+        }
+        // switch state
+        {
+            std::unique_lock<std::mutex> lockGuard(m_lock);
+
+            auto it = m_items.find(uid);
+            if (it == m_items.end())
+            {
+                return false;
+            }
+            m_activeId = uid;
+        }
+        // fire UI subscribers here
+        for (auto& handler : handlers)
+        {
+            handler->OnWorkspaceItemChanged(uid);
+        }
+        return true;
+    }
+
+    void CProgramModel::SubscribeUI(std::shared_ptr<IUIEventHandler> handler)
+    {
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+        m_handlers.insert(handler);
+    }
+
+    void CProgramModel::UnsubscribeUI(std::shared_ptr<IUIEventHandler> handler)
+    {
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+        m_handlers.erase(handler);
+    }
+
     int CProgramModel::QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const
     {
         items.clear();
@@ -75,6 +124,19 @@ namespace orthia
         return activePos;
     }
 
+    void CProgramModel::RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive)
+    {
+        int newItemId = 0;
+        {
+            std::unique_lock<std::mutex> lockGuard(m_lock);
+            m_items[++m_lastUid] = item;
+            newItemId = m_lastUid;
+        }
+        if (makeActive)
+        {
+            this->SetActiveItem(newItemId);
+        }
+    }
     void CProgramModel::WriteLog(std::shared_ptr<oui::CWindowThread> thread, const oui::String& line)
     {
         thread->AddTask([=]() {
@@ -123,15 +185,8 @@ namespace orthia
             result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(addressToStart);
         }
 
-        {
-            std::unique_lock<std::mutex> lockGuard(m_lock);
-            m_items[++m_lastUid] = info;
+        RegisterItem(info, makeActive);
 
-            if (makeActive)
-            {
-                m_activeId = m_lastUid;
-            }
-        }
         // OK
         result.error.native.clear();
     }
@@ -295,15 +350,8 @@ namespace orthia
             info->shortName.native,
             0);
 
-        {
-            std::unique_lock<std::mutex> lockGuard(m_lock);
-            m_items[++m_lastUid] = info;
+        RegisterItem(info, makeActive);
 
-            if (makeActive)
-            {
-                m_activeId = m_lastUid;
-            }
-        }
         // OK
         result.error.native.clear();
     }

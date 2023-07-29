@@ -19,9 +19,14 @@ CDisasmWindow::CDisasmWindow(std::function<oui::String()> getCaption,
     oui::IMultiLineViewOwner* param = this;
     m_view = std::make_shared<oui::CMultiLineView>(m_colorProfile, param, false);
 }
-void CDisasmWindow::SetActiveItem(int itemUid, DI_UINT64 initialAddressHint)
+
+void CDisasmWindow::SetActiveItemImpl(int itemUid)
 {
     m_itemUid = itemUid;
+}
+void CDisasmWindow::SetActiveItem(int itemUid, DI_UINT64 initialAddressHint)
+{
+    SetActiveItemImpl(itemUid);
     m_peAddress = 0;
     m_peAddressEnd = 0;
     m_metaInfoPos = 0;
@@ -275,5 +280,28 @@ void CDisasmWindow::SetFocusImpl()
     m_view->SetFocus();
 }
 
+void CDisasmWindow::ReloadState(const UIState& state)
+{
+    {
+        auto it = state.addresses.find(field_peAddress);
+        if (it != state.addresses.end())
+        {
+            m_peAddress = it->second;
+        }
+    }
+    m_peAddressEnd = 0;
+    m_metaInfoPos = 0;
+}
 
+void CDisasmWindow::SaveState(UIState& state)
+{
+    state.addresses[field_peAddress] = m_peAddress;
+}
 
+void CDisasmWindow::SetActiveWorkspaceItem(int itemId)
+{
+    SetActiveItemImpl(itemId);
+    ReloadVisibleData();
+    Invalidate();
+
+}

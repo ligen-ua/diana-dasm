@@ -20,6 +20,7 @@ class CWorkspaceWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IListBox
     void OnVisibleItemChanged() override;
     bool ShiftViewWindowToSymbol(const oui::String & symbol) override;
 
+    void SwitchActiveItem(int uid);
     void UpdateVisibleItems();
 public:
     CWorkspaceWindow(std::function<oui::String()> getCaption, std::shared_ptr<orthia::CProgramModel> model);
