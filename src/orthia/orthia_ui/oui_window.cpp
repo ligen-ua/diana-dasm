@@ -522,11 +522,11 @@ namespace oui
             return { {0, 0}, m_size};
         }
     }
-    void CWindow::Resize(const Size& newSize)
+    bool CWindow::Resize(const Size& newSize)
     {
         if (m_size == newSize)
         {
-            return;
+            return false;
         }
 
         Invalidate();
@@ -541,6 +541,7 @@ namespace oui
             m_size.height = 0;
         }
         OnResize();
+        return true;
     }
     void CWindow::ForceResize()
     {

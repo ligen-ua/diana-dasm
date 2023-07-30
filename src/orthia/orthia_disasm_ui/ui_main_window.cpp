@@ -112,7 +112,7 @@ void CMainWindow::ConstructChilds()
         m_workspaceWindow = std::make_shared<CWorkspaceWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  },
             m_model);
         workspacePanel->AddPanel(m_workspaceWindow);
-
+        workspacePanel->SetVisible(false);
         m_stateManager.Register(m_workspaceWindow);
     }
     m_model->SetUILog(m_outputWindow);

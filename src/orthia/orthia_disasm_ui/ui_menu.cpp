@@ -180,6 +180,12 @@ void CMainWindow::OpenExecutable()
 }
 void CMainWindow::ToggleWorkspaceView()
 {
+    m_workspaceWindow->SetVisible(!m_workspaceWindow->IsVisible());
+    if (m_workspaceWindow->IsVisible())
+    {
+        m_workspaceWindow->OnWorkspaceItemChanged();
+        m_workspaceWindow->SetFocus();
+    }
 }
 void CMainWindow::ConstuctMenu()
 {

@@ -96,3 +96,7 @@ void CWorkspaceWindow::SetActiveWorkspaceItem(int itemId)
 {
     OnWorkspaceItemChanged();
 }
+void CWorkspaceWindow::Invalidate(bool valid)
+{
+    oui::CPanelWindow::Invalidate(valid);
+}

@@ -16,6 +16,10 @@ namespace oui
         m_getCaption(getCaption)
     {
     }
+    void CPanelWindow::InitContext(std::shared_ptr<CPanelCommonContext> panelCommonContext)
+    {
+        m_panelCommonContext = panelCommonContext;
+    }
     String CPanelWindow::GetCaption() const
     {
         return m_getCaption();
@@ -23,6 +27,18 @@ namespace oui
     void CPanelWindow::OnChildFocused()
     {
         ActivateImpl();
+    }
+    void CPanelWindow::SetVisible(bool value)
+    {
+        if (IsVisible() == value)
+        {
+            return;
+        }
+        CWindow::SetVisible(value);
+        if (auto context = m_panelCommonContext.lock())
+        {
+            context->GetContainerWindow()->OnVisibleChange(this);
+        }
     }
     void CPanelWindow::ActivateImpl()
     {
@@ -89,7 +105,7 @@ namespace oui
     void CPanelGroupWindow::ConstructChilds()
     {
         // first panel should be visible
-        bool visiblePanel = true;
+        bool visiblePanel = IsVisible();
         for (auto& panel : m_panels)
         {
             AddChild(panel);
@@ -99,11 +115,19 @@ namespace oui
     }
     void CPanelGroupWindow::AddPanel(std::shared_ptr<CPanelWindow> panel)
     {
+        if (auto context = m_panelCommonContext.lock())
+        {
+            panel->InitContext(context);
+        }
         m_panels.push_back(panel);
     }
     bool CPanelGroupWindow::HasPanels() const
     {
         return !m_panels.empty();
+    }
+    int CPanelGroupWindow::GetPanelsCount() const
+    {
+        return (int)m_panels.size();
     }
     void CPanelGroupWindow::SetPreferredSize(const Size& size)
     {
@@ -212,7 +236,11 @@ namespace oui
         {
             return result;
         }
-
+        auto panelCommonContext = m_panelCommonContext.lock();
+        if (!panelCommonContext)
+        {
+            return result;
+        }
         // climb up for a proper layout
         bool resizeTargetIsMe = true;
         for (;;)
@@ -242,7 +270,7 @@ namespace oui
             {
                 result.resizeTarget = (*myIt);
                 result.resizeTargetIsMe = resizeTargetIsMe;
-                result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                result.applyTarget = panelCommonContext->GetContainerWindow();
                 return result;
             }
             if (parentLayout->type == PanelItemType::Horizontal)
@@ -257,7 +285,7 @@ namespace oui
                     {
                         result.resizeTargetIsMe = false;
                         result.resizeTarget = (*it);
-                        result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                        result.applyTarget = panelCommonContext->GetContainerWindow();
                         return result;
                     }
                 }
@@ -278,7 +306,11 @@ namespace oui
         {
             return result;
         }
-
+        auto panelCommonContext = m_panelCommonContext.lock();
+        if (!panelCommonContext)
+        {
+            return result;
+        }
         // climb up for a proper layout
         bool resizeTargetIsMe = true;
         for (;;)
@@ -308,7 +340,7 @@ namespace oui
             {
                 result.resizeTarget = (*myIt);
                 result.resizeTargetIsMe = resizeTargetIsMe;
-                result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                result.applyTarget = panelCommonContext->GetContainerWindow();
                 return result;
             }
             if (parentLayout->type == PanelItemType::Vertical)
@@ -323,7 +355,7 @@ namespace oui
                     {
                         result.resizeTargetIsMe = false;
                         result.resizeTarget = (*it);
-                        result.applyTarget = m_panelCommonContext->GetContainerWindow();
+                        result.applyTarget = panelCommonContext->GetContainerWindow();
                         return result;
                     }
                 }
@@ -492,6 +524,11 @@ namespace oui
     }
     bool CPanelGroupWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
+        auto panelCommonContext = m_panelCommonContext.lock();
+        if (!panelCommonContext)
+        {
+            return false;
+        }
         if (evt.keyEvent.valid)
         {
             switch (evt.keyEvent.virtualKey)
@@ -504,7 +541,7 @@ namespace oui
                 // switch groups
                 if (!evt.keyState.HasModifiers())
                 {
-                    m_panelCommonContext->ActivateNextGroup(GetPtr_t<CPanelGroupWindow>(this));
+                    panelCommonContext->ActivateNextGroup(GetPtr_t<CPanelGroupWindow>(this));
                     return true;
                 }
 
@@ -691,7 +728,7 @@ namespace oui
     }
     std::shared_ptr<CPanelCommonContext> CPanelGroupWindow::GetPanelCommonContext()
     {
-        return m_panelCommonContext;
+        return m_panelCommonContext.lock();
     }
     void CPanelGroupWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
@@ -1045,5 +1082,35 @@ namespace oui
             return Parent_type::DoPaint(rect, parameters);
         }
         return CWindow::DoPaint(rect, parameters);
+    }
+    void CPanelContainerWindow::OnVisibleChange(CPanelWindow* panel)
+    { 
+        auto groupWindow = oui::GetParent_t<CPanelGroupWindow>(panel);
+        if (!groupWindow)
+        {
+            return;
+        }
+        if (panel->IsVisible())
+        {
+            if (groupWindow->IsVisible())
+            {
+                return;
+            }
+            groupWindow->SetVisible(true);
+        }
+        else
+        {
+            if (groupWindow->GetPanelsCount() != 1)
+            {
+                return;
+            }
+            if (groupWindow->IsFocused())
+            {
+                m_defaultGroup->SetFocus();
+            }
+            groupWindow->SetVisible(false);
+        }
+        m_repositionCacheValid = false;
+        OnResize();
     }
 }

@@ -72,7 +72,7 @@ namespace oui
         CMessageBoxWindow(std::function<String()> getText, std::function<void()> onDestroy);
         void ConstructChilds() override;
         void OnResize() override;
-        void Resize(const Size& newSize) override;
+        bool Resize(const Size& newSize) override;
 
     };
 
