@@ -104,6 +104,17 @@ namespace oui
             ++rect.position.y;
             rect.size.width -= 2;
             rect.size.height -= 2;
+            
+            if (rect.size.width <= 0)
+            {
+                rect.position.x = 0;
+                rect.size.width = 0;
+            }
+            if (rect.size.height <= 0)
+            {
+                rect.position.y = 0;
+                rect.size.height = 0;
+            }
             return rect;
         }
         void DoPaint(const Rect& rect, DrawParameters& parameters) override
