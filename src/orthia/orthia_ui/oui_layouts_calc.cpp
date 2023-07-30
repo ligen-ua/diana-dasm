@@ -47,6 +47,11 @@ namespace oui
                 {
                     break;
                 }
+                if (child->group && !child->group->IsVisible())
+                {
+                    ++it;
+                    continue;
+                }
                 RepositionChilds(child, slidingRect, false, true, newLevel);
                 ++it;
                 if (it == it_end)
@@ -70,6 +75,10 @@ namespace oui
                 --it)
             {
                 auto child = *it;
+                if (child->group && !child->group->IsVisible())
+                {
+                    continue;
+                }
                 RepositionChilds(child, slidingRect, false, true, newLevel);
 
                 Rect renderRect = slidingRect;
@@ -96,6 +105,11 @@ namespace oui
                 {
                     break;
                 }
+                if (child->group && !child->group->IsVisible())
+                {
+                    ++it;
+                    continue;
+                }
                 RepositionChilds(child, slidingRect, true, false, newLevel);
                 ++it;
                 if (it == it_end)
@@ -119,6 +133,10 @@ namespace oui
                 --it)
             {
                 auto child = *it;
+                if (child->group && !child->group->IsVisible())
+                {
+                    continue;
+                }
                 RepositionChilds(child, slidingRect, true, false, newLevel);
 
                 Rect renderRect = slidingRect;

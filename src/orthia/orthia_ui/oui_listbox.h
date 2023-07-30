@@ -105,6 +105,10 @@ namespace oui
         ContainerType& container,
         ItemHandler && itemHandler)
     {
+        if (!owner->IsVisible())
+        {
+            return;
+        }
         auto console = owner->GetConsole();
         if (!console)
         {

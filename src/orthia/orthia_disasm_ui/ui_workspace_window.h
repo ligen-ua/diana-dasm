@@ -26,4 +26,5 @@ public:
     CWorkspaceWindow(std::function<oui::String()> getCaption, std::shared_ptr<orthia::CProgramModel> model);
     void OnWorkspaceItemChanged();
     void SetActiveWorkspaceItem(int itemId) override;
+    void Invalidate(bool valid = false) override;
 };

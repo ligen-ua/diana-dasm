@@ -8,18 +8,24 @@ namespace oui
     struct PanelLayout;
     class CPanelCommonContext;
     class CPanelContainerWindow;
+    class CPanelWindow;
+
 
     class CPanelWindow:public CWindow
     {
         std::function<String()> m_getCaption;
+        std::weak_ptr<CPanelCommonContext> m_panelCommonContext;
+
         void ActivateImpl();
     public:
         CPanelWindow(std::function<String()> getCaption);
+        void InitContext(std::shared_ptr<CPanelCommonContext> panelCommonContext);
         String GetCaption() const;
         void Activate() override;
         void Deactivate() override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         void OnChildFocused() override;
+        void SetVisible(bool value) override;
     };
 
     class CPanelGroupWindow:public CWindow
@@ -59,7 +65,7 @@ namespace oui
         // draw result
         int m_lastTabY = 0;
         std::vector<Range> m_lastTabRanges;
-        std::shared_ptr<CPanelCommonContext> m_panelCommonContext;
+        std::weak_ptr<CPanelCommonContext> m_panelCommonContext;
         std::weak_ptr<PanelLayout> m_layout;
 
         void PaintTitle(const Rect& rect, DrawParameters& parameters);
@@ -93,6 +99,7 @@ namespace oui
         void SetPreferredSize(const Size& size);
 
         bool HasPanels() const;
+        int GetPanelsCount() const;
         Rect GetClientRect() const;
         void ConstructChilds() override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
@@ -170,7 +177,6 @@ namespace oui
         bool m_repositionCacheValid = false;
 
         bool HasPanels() const;
-        std::shared_ptr<CPanelGroupWindow> AttachRootPanel(GroupLocation location);
         std::shared_ptr<CPanelGroupWindow> AttachPanelImpl(std::shared_ptr<PanelLayout> layout, 
             GroupLocation location,
             std::function<void(std::shared_ptr<PanelLayout>)> replaceLayout);
@@ -195,11 +201,10 @@ namespace oui
             GroupLocation location,
             GroupAttachMode mode);
 
-        void AddPanel(std::shared_ptr<CPanelGroupWindow> group,
-            std::shared_ptr<CPanelWindow> panel);
-
         void OnResize() override;
         Rect GetClientRect() const override;
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
+        void OnVisibleChange(CPanelWindow* panel);
+
     };
 }

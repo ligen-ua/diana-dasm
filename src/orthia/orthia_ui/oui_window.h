@@ -184,7 +184,7 @@ namespace oui
 
         // size
         virtual Size GetSize() const;
-        virtual void Resize(const Size& newSize);
+        virtual bool Resize(const Size& newSize);
         void ForceResize();
 
         Rect GetWndRect() const;

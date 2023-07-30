@@ -312,11 +312,11 @@ namespace oui
     {
         AddChild(m_fileLabel);
     }
-    void CMessageBoxWindow::Resize(const Size& newSize)
+    bool CMessageBoxWindow::Resize(const Size& newSize)
     {
         auto size = newSize;
         size.height = 5;
-        Parent_type::Resize(size);
+        return Parent_type::Resize(size);
     }
     void CMessageBoxWindow::OnResize()
     {
