@@ -93,6 +93,10 @@ namespace oui
         {
             m_style = style;
         }
+        BorderStyle GetBorderStyle() const
+        {
+            return m_style;
+        }
         Rect GetClientRect() const override
         {
             Rect rect = Base::GetClientRect();
@@ -107,12 +111,10 @@ namespace oui
             
             if (rect.size.width <= 0)
             {
-                rect.position.x = 0;
                 rect.size.width = 0;
             }
             if (rect.size.height <= 0)
             {
-                rect.position.y = 0;
                 rect.size.height = 0;
             }
             return rect;

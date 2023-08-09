@@ -486,8 +486,12 @@ namespace oui
             }
         }
 
-        const auto borderSize = GetBorderSize(this);
-
+        // Yep, I know this is a hardcode, but what are you gonna do
+        auto borderSize = Size { 2, 2 };
+        if (GetBorderStyle() == BorderStyle::None)
+        {
+            borderSize = Size { 0, 0 };
+        }
         auto menuPosition = menu->GetPosition();
         auto buttonPosition = selectedButton->GetPosition();
         const Size size = { maxWidth + borderSize.width, (int)popupItems->size() + borderSize.height};

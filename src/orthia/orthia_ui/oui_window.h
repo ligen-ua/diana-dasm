@@ -253,13 +253,6 @@ namespace oui
         return Cast_t<Type>(me);
     }
 
-    template<class Type>
-    Size GetBorderSize(Type ptr)
-    {
-        auto size = ptr->GetSize();
-        auto clientRect = ptr->GetClientRect();
-        return { size.width - clientRect.size.width, size.height - clientRect.size.height };
-    }
     void InvalidateParent(CWindow* window);
 
     Rect GetAbsoluteClientRect(CWindow* pWindow, const Rect& rect);
