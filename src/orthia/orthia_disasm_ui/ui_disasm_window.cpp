@@ -172,8 +172,16 @@ void CDisasmWindow::ReloadVisibleData()
         requiredLinesCount,
         writer);
 
-    // query data
+    // determine final size
     const orthia::Address_type maxSizeToUse = maxStepForwardBytes + (m_peAddress - routeStart);
+
+    // query metadata
+    std::vector<orthia::CommonRangeInfo> rangeInfoVec;
+    if (auto moduleManager = item->GetModuleManager())
+    {
+        moduleManager->QueryReferencesToInstructionsRange(routeStart, routeStart + maxSizeToUse, &rangeInfoVec);
+    }
+    // query data
     auto data = item->ReadData(routeStart, maxSizeToUse);
     if (!data.dataSize)
     {
