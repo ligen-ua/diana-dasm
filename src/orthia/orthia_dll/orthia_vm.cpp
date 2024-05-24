@@ -15,6 +15,7 @@ static void PrintVMUsage()
     dprintf("!vm_vm_info <vmid>                                 Displays the information about VM\n");
     dprintf("!vm_vm_d(b,w,d,q,p) <vmid> <address> <range>       Display the contents of memory in the given range\n");
     dprintf("!vm_vm_call <vmid> <address> [<count>] [--print]   Calls the function inside VM\n");
+    dprintf("            [reg=value]                            Specify the registers here like rax=1\n");
     dprintf("!vm_vm_u <vmid> <address> [<range>]                Displays an assembly translation of the specified program code\n");
     dprintf("!vm_vm_def                                         Creates and overwrites the \"Default\" VM with ID == 0\n");
     dprintf("!vm_mod_new <vmid>                                 Creates new module\n");
@@ -522,11 +523,46 @@ ORTHIA_DECLARE_API(vm_mod_ep)
 {
     return VmVmWrite(Client, args, 'p');
 }
+#define CHECK_REG(RegName) if (orthia::Downcase_Ansi(#RegName) == regValue) { \
+    orthia::Address_type value = 0; \
+    const char* pTail = orthia::ReadExpressitonValue(orthia::Utf16ToUtf8(optionsParts[1].ToString()).c_str(), value, true); \
+    context->reg_##RegName.value = value; \
+    return true; \
+ }
+
+static bool ApplyRegister(const std::wstring& arg, Diana_Processor_Registers_Context* context) {
+
+    std::vector<orthia::StringInfo> optionsParts;
+    std::wstring downcaseArg = orthia::Downcase(arg);
+    orthia::SplitString(downcaseArg, L"=", &optionsParts);
+    if (optionsParts.size() != 2) {
+        return false;
+    }
+    std::string regValue = orthia::Utf16ToUtf8(optionsParts[0].ToString());
+    CHECK_REG(RAX);
+    CHECK_REG(RCX);
+    CHECK_REG(RDX);
+    CHECK_REG(RBX);
+    CHECK_REG(RSP);
+    CHECK_REG(RBP);
+    CHECK_REG(RSI);
+    CHECK_REG(RDI);
+    CHECK_REG(R8);
+    CHECK_REG(R9);
+    CHECK_REG(R10);
+    CHECK_REG(R11);
+    CHECK_REG(R12);
+    CHECK_REG(R13);
+    CHECK_REG(R14);
+    CHECK_REG(R15);
+    return false;
+}
 
 static
 void UnparseCallParameters(const char * pTail, 
                           long long & commandsCount,
-                          bool & printData)
+                          bool & printData,
+                          Diana_Processor_Registers_Context * context)
 {
     orthia::Address_type commandsCountRaw = 0;
    
@@ -558,7 +594,13 @@ void UnparseCallParameters(const char * pTail,
             printData = true;
             continue;
         }
-        throw std::runtime_error("Unknown option");
+        
+        if (ApplyRegister(orthia::Trim(it->ToString()), context))
+        {
+            continue;
+        }
+
+        throw std::runtime_error("Unknown option: " + orthia::Utf16ToUtf8(orthia::Trim(it->ToString())));
     }
 }
 
@@ -613,7 +655,8 @@ ORTHIA_DECLARE_API(vm_vm_call)
        long long commandsCount = -1;
        UnparseCallParameters(pTail, 
                              commandsCount,
-                             printData);
+                             printData,
+                             context.get());
 
        // parse options
        orthia::COrthiaDebugger debugger;

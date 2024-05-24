@@ -43,6 +43,7 @@ or
 
 Note: profile command supports environment variables like %temp%, for example you can setup the profile like that:
 > !orthia.profile /f %temp%\test.db
+
 The initial setup is done.
 
 ## Code Analysis
@@ -63,6 +64,7 @@ Note: module reloading could take some time, for example when working with live 
 > !orthia.xr address_expression1 address_expression2
 or
 > !orthia.u  address_expression1 address_expression2
+
 (prints also the code)
 
 5) show all loaded modules
@@ -127,7 +129,7 @@ Start "orthia_test.exe /crash"
     // 2.  How to execute some function
     // .load orthia.dll;!orthia.profile /f %temp%\test.db; 
     // !orthia.vm_vm_def
-    // !orthia.vm_vm_call 0 orthia_test!test_vm_fake --print
+    // !orthia.vm_vm_call 0 orthia_test!test_vm_fake --print rcx=42
 
     
 See !vm_help for more information
@@ -139,3 +141,29 @@ Usage:
 >     dump <module> <functions> [--fmt <json>] [--base <imagebase>] [--pdb <pdbfile>]  
 
 Currently it just dumps export functions addresses.
+
+# PTE Case Study
+
+Sometimes Windbg doesn't show PTE well:
+
+>     7: kd> !pte fffff60f`523e76e8
+>     Levels not implemented for this platform
+
+
+There is a possible approach to emulate MiGetPteAddress and get a PTE for some address
+
+>     7: kd> !orthia.vm_vm_call 0 nt!MiGetPteAddress --print rcx=fffff60f`523e76e8
+>     Diana Error Code: DI_END
+>     rax=ffffabfb07a91f38 rbx=fffff60f4ce17808 rcx=0000007b07a91f38
+>     rdx=fffff60f4ce17808 rsi=0000000000000000 rdi=fffff60f523e7470
+>     rip=0000000000000000 rsp=fffff60f523e72a8 rbp=ffff9881af0a0080
+>      r8=0000000000000000  r9=fffff60f523e7550 r10=0000000000000000
+>     r11=fffff60f523e7550 r12=0000000000000000 r13=ffff800000000000
+>     r14=fffff60f4ce17808 r15=0000000000001000
+>     cs=0010  ss=0018  ds=002b  es=002b  fs=0053  gs=002b  efl=00040282
+>     Commands count: 6
+>     Modified pages:
+>     Done
+
+Where RAX contains PTE address for specified RCX.
+
