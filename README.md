@@ -166,4 +166,10 @@ There is a possible approach to emulate MiGetPteAddress and get a PTE for some a
 >     Done
 
 Where RAX contains PTE address for specified RCX.
+         
+Note: Don't forget to init it VM first, like that
+
+>     .load orthia.dll;!orthia.profile /f %temp%\test.db; !orthia.vm_vm_def
+
+
 
