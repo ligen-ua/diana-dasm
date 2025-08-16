@@ -16,7 +16,7 @@ class CCommonFormatBuilder
     CCommonFormatBuilder(const CCommonFormatBuilder&);
     CCommonFormatBuilder&operator = (const CCommonFormatBuilder&);
 
-    std::auto_ptr<tinyxml2::XMLDocument> m_xml;
+    DIANA_AUTO_PTR<tinyxml2::XMLDocument> m_xml;
     tinyxml2::XMLDocument * m_pXML;
     tinyxml2::XMLElement * m_pRoot;
     bool m_compact;
@@ -49,7 +49,7 @@ class CCommonFormatParser
     CCommonFormatParser(const CCommonFormatParser&);
     CCommonFormatParser&operator = (const CCommonFormatParser&);
 
-    mutable std::auto_ptr<tinyxml2::XMLDocument> m_xml;
+    mutable DIANA_AUTO_PTR<tinyxml2::XMLDocument> m_xml;
     mutable tinyxml2::XMLElement * m_pRoot;
 
     std::vector<char> m_data;

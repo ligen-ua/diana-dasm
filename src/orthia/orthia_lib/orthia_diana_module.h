@@ -30,7 +30,7 @@ class CDianaModule
     friend class CDianaInstructionIterator;
     Address_type m_offset;
     IMemoryReader * m_pMemoryReader;
-    std::auto_ptr<CDianaModuleImpl> m_impl;
+    DIANA_AUTO_PTR<CDianaModuleImpl> m_impl;
 public:
     CDianaModule();
     ~CDianaModule();

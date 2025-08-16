@@ -103,7 +103,7 @@
       <PreprocessorDefinitions>_UNICODE;UNICODE;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Rpcrt4.lib;dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>orthia32.def</ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -129,7 +129,7 @@
       <PreprocessorDefinitions>_UNICODE;UNICODE;_M_AMD64;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Rpcrt4.lib;dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>orthia64.def</ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -149,7 +149,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Rpcrt4.lib;dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>orthia32.def</ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -177,7 +177,7 @@
       <PreprocessorDefinitions>_UNICODE;UNICODE;_M_AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Rpcrt4.lib;dbgeng.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>orthia64.def</ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -208,9 +208,6 @@
     <ClCompile Include="orthia_windbg_utils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="orthia.def" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="orthia.h" />
     <ClInclude Include="orthia_commands.h" />
     <ClInclude Include="orthia_dbgext.h" />
@@ -232,6 +229,10 @@
       <Project>{7e610324-3ec7-46eb-978f-c2c2698783ce}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="orthia32.def" />
+    <None Include="orthia64.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

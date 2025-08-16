@@ -208,7 +208,7 @@ static void * TEST_GetProcAddress(HMODULE hModule, LPCSTR lpProcName)
 static void SelfTest1()
 {
     const int samplesCount = 3;
-    std::auto_ptr<RegionInfo> regionPtr(new RegionInfo());
+    DIANA_AUTO_PTR<RegionInfo> regionPtr(new RegionInfo());
     RegionInfo & region = *regionPtr;
     region.InitOutDir(".", samplesCount);
 

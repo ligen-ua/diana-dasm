@@ -69,6 +69,7 @@ int DbgExt_QueryDianaMode();
 
 IDebugControl * ExtQueryControl();
 IDebugClient4 * ExtQueryClient();
+IDebugControl4 * ExtQueryControl4();
 
 
 #endif

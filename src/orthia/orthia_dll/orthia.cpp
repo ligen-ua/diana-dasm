@@ -5,6 +5,10 @@
 #include "orthia_exec.h"
 #include "orthia_windbg_utils.h"
 #include "orthia_diana_print.h"
+extern "C"
+{
+#include "diana_core_win32_context.h"
+}
 
 struct ModuleManagerObjects
 {
@@ -22,7 +26,7 @@ struct ModuleManagerObjects
     }
 };
 
-static std::auto_ptr<ModuleManagerObjects> g_globals;
+static DIANA_AUTO_PTR<ModuleManagerObjects> g_globals;
 
 
 namespace orthia
@@ -39,6 +43,7 @@ static void PrintUsage()
     dprintf("!a <address>                                       Analyzes the region\n");
     dprintf("!exec <count>                                      Executes <count> instructions (with current registers)\n");
     dprintf("!u <address1> <address2>                           Prints the code and the references\n");
+    dprintf("!scxr                                              Search for cxr's in stack\n");
     dprintf("!vm_help                                           Displays the help for orthia-vm module\n");
 }
 static void SetupPath(const std::wstring & path, bool bForce)
@@ -70,10 +75,38 @@ static void SetupPath(const std::wstring & path, bool bForce)
     g_globals->reader.Init(mode);
 }
 
-static const char * g_pNoProfileMessage = "The current profile is not initialized properly, please run !orthia.profile";
+static ModuleManagerObjects* TryDefaultInit()
+{
+    UUID newGuid;
+    UuidCreate(&newGuid);
+
+    RPC_WSTR stringGuid = 0;
+    UuidToStringW(&newGuid, &stringGuid);
+    if (!stringGuid) 
+    {
+        return 0;
+    }
+    std::wstring wstrGuid((wchar_t*)stringGuid);
+    RpcStringFree(&stringGuid);
+
+    std::wstring fileName = L"%TEMP%\\orthia_" + wstrGuid + L".db";
+    std::wstring path = orthia::ExpandVariable(fileName);
+    orthia::SetupPath(path, false);
+    dprintf("Profile: %S\n", path.c_str());
+    return g_globals.get();
+}
+
+static const char * g_pNoProfileMessage = "The current profile is not initialized properly, please run !orthia.profile\nSample: !orthia.profile /f %temp%\\test.db";
 orthia::IMemoryReader * QueryReader()
 {
     ModuleManagerObjects * pGlobal = g_globals.get();
+    if (!pGlobal)
+    {
+        if ((pGlobal = TryDefaultInit()))
+        {
+            return pGlobal->GetReader();
+        }
+    }
     if (!pGlobal) 
     {
         throw std::runtime_error(g_pNoProfileMessage);
@@ -83,6 +116,13 @@ orthia::IMemoryReader * QueryReader()
 int QueryInitialDianaMode()
 {
     ModuleManagerObjects * pGlobal = g_globals.get();
+    if (!pGlobal)
+    {
+        if ((pGlobal = TryDefaultInit()))
+        {
+            return pGlobal->mode;
+        }
+    }
     if (!pGlobal) 
     {
         throw std::runtime_error(g_pNoProfileMessage);
@@ -92,6 +132,13 @@ int QueryInitialDianaMode()
 orthia::CModuleManager * QueryModuleManager()
 {
     ModuleManagerObjects * pGlobal = g_globals.get();
+    if (!pGlobal)
+    {
+        if ((pGlobal = TryDefaultInit()))
+        {
+            return &pGlobal->moduleManager;
+        }
+    }
     if (!pGlobal) 
     {
         throw std::runtime_error(g_pNoProfileMessage);
@@ -172,6 +219,102 @@ static std::wstring QueryModuleName(orthia::Address_type address)
 {
     std::vector<char> nameBuffer;
     return QueryModuleName(address, nameBuffer);
+}
+
+
+struct SCXRStackAnalyzer :public orthia::IVmMemoryRangesTarget
+{
+    std::vector<char> marker;
+    int offset;
+    IDebugControl4* pDebugControl4;
+
+    SCXRStackAnalyzer()
+        :
+        offset(0),
+        pDebugControl4(0)
+    {
+        pDebugControl4 = ExtQueryControl4();
+    }
+    void OnRange(const orthia::VmMemoryRangeInfo& vmRange,
+        const char* pDataStart)
+    {
+        if (pDataStart)
+        {
+            auto p = pDataStart;
+            auto pEnd = pDataStart + vmRange.size;
+
+            for (;;)
+            {
+                auto resP = std::search(p, pEnd, marker.begin(), marker.end());
+                if (resP == pEnd) 
+                {
+                    break;
+                }
+                auto address = vmRange.address + (resP - pDataStart) - offset;
+                if (pDebugControl4)
+                {
+                    pDebugControl4->ControlledOutputWide(DEBUG_OUTCTL_DML, DEBUG_OUTPUT_NORMAL, L"<link cmd=\".cxr %I64lx\">%I64lx</link>\n", address, address);
+                }
+                else
+                {
+                    dprintf("<link cmd=\".cxr %I64lx\">%I64lx</link>\n", address, address);
+                }
+                p = resP + marker.size();
+            }
+        }
+    }
+};
+
+static void PrepareContext32(Diana_Processor_Registers_Context * regContext, SCXRStackAnalyzer& analyzer)
+{
+    DIANA_CONTEXT_NTLIKE_32 searchObject;
+    searchObject.SegGs = regContext->reg_GS.value;
+    searchObject.SegFs = regContext->reg_FS.value;
+    searchObject.SegEs = regContext->reg_ES.value;
+    searchObject.SegDs = regContext->reg_DS.value;
+    analyzer.offset = (int)((char*)&searchObject.SegGs - (char*)&searchObject);
+    analyzer.marker.assign((char*)&searchObject + analyzer.offset, (char*)&searchObject + analyzer.offset + 2*4);
+}
+static void PrepareContext64(Diana_Processor_Registers_Context* regContext, SCXRStackAnalyzer& analyzer)
+{
+    DIANA_CONTEXT_NTLIKE_64 searchObject;
+    searchObject.SegCs = regContext->reg_CS.value;
+    searchObject.SegDs = regContext->reg_DS.value;
+    searchObject.SegEs = regContext->reg_ES.value;
+    searchObject.SegFs = regContext->reg_FS.value;
+    analyzer.offset = (int)((char*)&searchObject.SegCs - (char*)&searchObject);
+    analyzer.marker.assign((char*)&searchObject + analyzer.offset, (char*)&searchObject + analyzer.offset + 2 * 4);
+}
+
+
+ORTHIA_DECLARE_API(scxr)
+{
+    ORTHIA_CMD_START
+
+
+        DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
+        DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
+        SCXRStackAnalyzer analyzer;
+        switch(contextType)
+        {
+        case decWin32:
+        case decWOW:
+            PrepareContext32(context.get(), analyzer);
+            break;
+
+        case decX64:
+            PrepareContext64(context.get(), analyzer);
+            break;
+        default:;
+            throw std::runtime_error("Can't acquire context");
+        }
+        
+        const int stackSizeToScan = 0x10000;
+        orthia::IMemoryReader* pMemoryReader = orthia::QueryReader();
+        orthia::CMemoryStorageOfModifiedData storage(pMemoryReader);
+        storage.ReportRegions(context->reg_RSP.value, stackSizeToScan, &analyzer, true);
+
+    ORTHIA_CMD_END
 }
 
 ORTHIA_DECLARE_API(lm)
@@ -443,7 +586,7 @@ ORTHIA_DECLARE_API(exec)
            commandsCount = 1;
        }
 
-       std::auto_ptr<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
+       DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
        DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
        if (decNone == contextType)
        {

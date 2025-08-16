@@ -638,7 +638,7 @@ ORTHIA_DECLARE_API(vm_vm_call)
 {
    ORTHIA_CMD_START
         
-       std::auto_ptr<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
+       DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
        DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
        if (decNone == contextType)
        {
@@ -718,7 +718,7 @@ ORTHIA_DECLARE_API(vm_vm_def)
 ORTHIA_DECLARE_API(vm_mod_load)
 {
    ORTHIA_CMD_START
-       std::auto_ptr<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
+       DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
        DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
        if (decNone == contextType)
        {
@@ -808,7 +808,7 @@ ORTHIA_DECLARE_API(vm_mod_shcall)
 {
    ORTHIA_CMD_START
        
-        std::auto_ptr<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
+        DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
         DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
         if (decNone == contextType)
         {

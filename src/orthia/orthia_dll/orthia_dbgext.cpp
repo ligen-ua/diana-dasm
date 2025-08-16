@@ -11,6 +11,7 @@ extern "C"
 WINDBG_EXTENSION_APIS   ExtensionApis = {};
 static PDEBUG_CLIENT4        g_ExtClient = 0;
 static PDEBUG_CONTROL        g_ExtControl = 0;
+static PDEBUG_CONTROL4       g_ExtControl4 = 0;
 static PDEBUG_SYMBOLS2       g_ExtSymbols = 0;
 static IDebugAdvanced * g_DebugAdvanced = 0;
 static ULONG   g_TargetMachine = 0;
@@ -21,6 +22,7 @@ void
 ExtRelease(void)
 {
     g_ExtClient = NULL;
+    EXT_RELEASE(g_ExtControl4);
     EXT_RELEASE(g_DebugAdvanced);
     EXT_RELEASE(g_ExtControl);
     EXT_RELEASE(g_ExtSymbols);
@@ -34,6 +36,10 @@ IDebugClient4 * ExtQueryClient()
 IDebugControl* ExtQueryControl()
 {
     return g_ExtControl;
+}
+IDebugControl4* ExtQueryControl4()
+{
+    return g_ExtControl4;
 }
 HRESULT
 ExtQuery(PDEBUG_CLIENT4 Client)
@@ -54,6 +60,11 @@ ExtQuery(PDEBUG_CLIENT4 Client)
                                          (void **)&g_DebugAdvanced)) != S_OK)
     {
         goto Fail;
+    }
+    if ((Status = Client->QueryInterface(__uuidof(IDebugControl4),
+        (void**)&g_ExtControl4)) != S_OK)
+    {
+        g_ExtControl4 = 0;
     }
     g_ExtClient = Client;
 
@@ -346,25 +357,26 @@ bool DbgExt_GetContext(DbgExt_Context_type * pType, std::vector<char> * pRawCont
     bool wow64 = false;
     ULONG machine = DbgExt_GetCurrentModeOfTargetMachine(&wow64);
     int mode = 0;
-    switch(machine)
+    if (wow64)
     {
-    case IMAGE_FILE_MACHINE_I386:
-        if (wow64)
-        {
-            *pType = decWOW;
-        }
-        else
-        {
-            *pType = decWin32;
-        }
+        *pType = decWOW;
         pRawContext->resize(sizeof(DIANA_CONTEXT_NTLIKE_32));
-        break;
-    case IMAGE_FILE_MACHINE_AMD64:
-        *pType = decX64;
-        pRawContext->resize(sizeof(DIANA_CONTEXT_NTLIKE_64));
-        break;
-    default:
-        return false;
+    }
+    else
+    {
+        switch (machine)
+        {
+        case IMAGE_FILE_MACHINE_I386:
+            *pType = decWin32;
+            pRawContext->resize(sizeof(DIANA_CONTEXT_NTLIKE_32));
+            break;
+        case IMAGE_FILE_MACHINE_AMD64:
+            *pType = decX64;
+            pRawContext->resize(sizeof(DIANA_CONTEXT_NTLIKE_64));
+            break;
+        default:
+            return false;
+        }
     }
 
     HRESULT status = g_DebugAdvanced->GetThreadContext(&pRawContext->front(), (ULONG)pRawContext->size());

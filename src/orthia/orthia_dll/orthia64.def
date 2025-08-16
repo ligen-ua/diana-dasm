@@ -15,6 +15,7 @@ EXPORTS
 	u
     a=?a@@YAJPEAUIDebugClient4@@PEBD@Z
     exec
+    scxr
     vm_help
     vm_vm_new
     vm_vm_del
