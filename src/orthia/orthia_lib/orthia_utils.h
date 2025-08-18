@@ -819,6 +819,7 @@ public:
 };
 
 
+const wchar_t* QueryModuleVersion(HMODULE module);
 
 }
 #endif 

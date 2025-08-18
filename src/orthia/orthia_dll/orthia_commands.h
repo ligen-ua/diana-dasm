@@ -71,6 +71,7 @@ class COrthiaWindbgAPIHandlerDebugInterface:public IAPIHandlerDebugInterface
     typedef std::map<std::string, OPERAND_SIZE> ModulesMapByName_type;
     ModulesMapByName_type m_modulesMapByName;
 
+public:
     struct DianaSharedContext:orthia::RefCountedBase
     {
         DianaMovableReadStreamOverMemory peFileStream;
@@ -97,6 +98,8 @@ class COrthiaWindbgAPIHandlerDebugInterface:public IAPIHandlerDebugInterface
         {
         }
     };
+
+private:
     typedef std::map<OPERAND_SIZE, ModuleInfo> ModulesMapByOffset_type;
     ModulesMapByOffset_type m_modulesMapByOffset;
 
@@ -134,6 +137,8 @@ public:
     Debuggee_type GetDebuggeeType();
     virtual void Print(const std::wstring & text);
     bool HaveSomePrintsHappened() const;
+
+    ModuleInfo *QueryModuleInfo(OPERAND_SIZE address);
 };
 
 class CWindbgAddressSpace:public IAddressSpace

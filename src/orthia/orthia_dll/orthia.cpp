@@ -44,6 +44,7 @@ static void PrintUsage()
     dprintf("!exec <count>                                      Executes <count> instructions (with current registers)\n");
     dprintf("!u <address1> <address2>                           Prints the code and the references\n");
     dprintf("!scxr                                              Search for cxr's in stack\n");
+    dprintf("!pe_info <address>                                 Prints version information for PE\n");
     dprintf("!vm_help                                           Displays the help for orthia-vm module\n");
 }
 static void SetupPath(const std::wstring & path, bool bForce)
@@ -75,20 +76,28 @@ static void SetupPath(const std::wstring & path, bool bForce)
     g_globals->reader.Init(mode);
 }
 
+static std::wstring UUIDToString(const UUID& uid)
+{
+    RPC_WSTR stringGuid = 0;
+    UuidToStringW(&uid, &stringGuid);
+    if (!stringGuid)
+    {
+        return std::wstring();
+    }
+    std::wstring wstrGuid((wchar_t*)stringGuid);
+    RpcStringFree(&stringGuid);
+    return wstrGuid;
+}
+
 static ModuleManagerObjects* TryDefaultInit()
 {
     UUID newGuid;
     UuidCreate(&newGuid);
-
-    RPC_WSTR stringGuid = 0;
-    UuidToStringW(&newGuid, &stringGuid);
-    if (!stringGuid) 
+    std::wstring wstrGuid = UUIDToString(newGuid);
+    if (wstrGuid.empty())
     {
         return 0;
     }
-    std::wstring wstrGuid((wchar_t*)stringGuid);
-    RpcStringFree(&stringGuid);
-
     std::wstring fileName = L"%TEMP%\\orthia_" + wstrGuid + L".db";
     std::wstring path = orthia::ExpandVariable(fileName);
     orthia::SetupPath(path, false);
@@ -286,36 +295,103 @@ static void PrepareContext64(Diana_Processor_Registers_Context* regContext, SCXR
     analyzer.marker.assign((char*)&searchObject + analyzer.offset, (char*)&searchObject + analyzer.offset + 2 * 4);
 }
 
-
 ORTHIA_DECLARE_API(scxr)
 {
     ORTHIA_CMD_START
 
+    DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
+    DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
+    SCXRStackAnalyzer analyzer;
+    switch (contextType)
+    {
+    case decWin32:
+    case decWOW:
+        PrepareContext32(context.get(), analyzer);
+        break;
 
-        DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
-        DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
-        SCXRStackAnalyzer analyzer;
-        switch(contextType)
-        {
-        case decWin32:
-        case decWOW:
-            PrepareContext32(context.get(), analyzer);
-            break;
+    case decX64:
+        PrepareContext64(context.get(), analyzer);
+        break;
+    default:;
+        throw std::runtime_error("Can't acquire context");
+    }
 
-        case decX64:
-            PrepareContext64(context.get(), analyzer);
-            break;
-        default:;
-            throw std::runtime_error("Can't acquire context");
-        }
-        
-        const int stackSizeToScan = 0x10000;
-        orthia::IMemoryReader* pMemoryReader = orthia::QueryReader();
-        orthia::CMemoryStorageOfModifiedData storage(pMemoryReader);
-        storage.ReportRegions(context->reg_RSP.value, stackSizeToScan, &analyzer, true);
+    const int stackSizeToScan = 0x10000;
+    orthia::IMemoryReader* pMemoryReader = orthia::QueryReader();
+    orthia::CMemoryStorageOfModifiedData storage(pMemoryReader);
+    storage.ReportRegions(context->reg_RSP.value, stackSizeToScan, &analyzer, true);
 
     ORTHIA_CMD_END
 }
+
+
+ORTHIA_DECLARE_API(pe_info)
+{
+    ORTHIA_CMD_START
+
+    orthia::IMemoryReader* pMemoryReader = orthia::QueryReader();
+    orthia::CMemoryStorageOfModifiedData storage(pMemoryReader);
+
+    orthia::Address_type peAddress = 0;
+    const char* pTail = orthia::ReadExpressitonValue(args, peAddress, true);
+
+    DIANA_AUTO_PTR<Diana_Processor_Registers_Context> context(new Diana_Processor_Registers_Context());
+    DbgExt_Context_type contextType = DbgExt_GetDianaContext(context.get());
+    if (decNone == contextType)
+    {
+        throw std::runtime_error("Can't acquire context");
+    }
+    int dianaMode = contextType == decX64 ? DIANA_MODE64 : DIANA_MODE32;
+
+    orthia::COrthiaWindbgAPIHandlerDebugInterface debugInterface;
+    debugInterface.Init(&storage);
+    debugInterface.Reload(dianaMode);
+
+    auto module = debugInterface.QueryModuleInfo(peAddress);
+    if (!module) 
+    {
+        throw std::runtime_error("Can't find module: " + orthia::ObjectToString_Ansi(peAddress));
+    }
+    std::vector<char> buffer(module->moduleEnd - module->moduleStart);
+
+    orthia::VmMemoryRangesTargetOverVectorPlain moduleData;
+    storage.ReportRegions(peAddress,
+        buffer.size(),
+        &moduleData,
+        true);
+    if (buffer.empty())
+    {
+        throw std::runtime_error("Can't parse module: " + orthia::ObjectToString_Ansi(peAddress));
+    }
+    const wchar_t* version = orthia::QueryModuleVersion((HMODULE)moduleData.m_data.data());
+
+
+    DianaMovableReadStreamOverMemory peFileStream;
+    Diana_PeFile peFile;
+    diana::Guard<diana::PeFile> peFileGuard;
+
+    DianaMovableReadStreamOverMemory_Init(&peFileStream,
+        moduleData.m_data.data(),
+        moduleData.m_data.size());
+    DI_CHECK_CPP(DianaPeFile_Init(&peFile,
+        &peFileStream.stream,
+        moduleData.m_data.size(),
+        DIANA_PE_FILE_FLAGS_MODULE_MODE));
+    peFileGuard.reset(&peFile);
+
+    DIANA_UUID uid = { 0, };
+    DianaPeFile_QueryGUID(&peFile, &peFileStream.stream, 0, &uid);
+    
+    auto uidStr = orthia::UUIDToString(*((UUID*)&uid));
+    
+    dprintf("Module: %s\n", module->windbgName.c_str());
+    dprintf("Full name: %s\n", module->fullName.c_str());
+    dprintf("Version: %S\n", version);
+    dprintf("Debug GUID: %S\n", uidStr.c_str());
+
+    ORTHIA_CMD_END
+}
+
 
 ORTHIA_DECLARE_API(lm)
 {

@@ -469,4 +469,136 @@ unsigned int orthia_pcg32_random_r(orthia_pcg32_random * rng)
     return (xorshifted >> rot) | (xorshifted << ((0-rot) & 31));
 }
 
+
+static
+BOOL VerParseTranslationID(LPVOID lpData, UINT unBlockSize, WORD wLangId, DWORD* pdwId, BOOL bPrimaryEnough/*= FALSE*/)
+{
+    LPWORD lpwData;
+
+    for (lpwData = (LPWORD)lpData; (LPBYTE)lpwData < ((LPBYTE)lpData) + unBlockSize; lpwData += 2) {
+        if (*lpwData == wLangId) {
+            *pdwId = *((DWORD*)lpwData);
+            return TRUE;
+        }
+    }
+
+    if (!bPrimaryEnough) {
+        return FALSE;
+    }
+
+    for (lpwData = (LPWORD)lpData; (LPBYTE)lpwData < ((LPBYTE)lpData) + unBlockSize; lpwData += 2) {
+        if (((*lpwData) & 0x00FF) == (wLangId & 0x00FF)) {
+            *pdwId = *((DWORD*)lpwData);
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+typedef BOOL
+(APIENTRY
+    * VerQueryValueW_type)(
+        _In_ LPCVOID pBlock,
+        _In_ LPCWSTR lpSubBlock,
+        _Outptr_result_buffer_(_Inexpressible_("buffer can be PWSTR or DWORD*")) LPVOID* lplpBuffer,
+        _Out_ PUINT puLen
+        );
+const wchar_t* QueryModuleVersion(HMODULE module)
+{
+    HMODULE hVersionDll = 0;
+    HRSRC hRsrc = 0;
+    HGLOBAL hGlobal = 0;
+    void* pData = 0;
+    DWORD size = 0;
+    LPVOID lpInfo = 0;
+    UINT unInfoLen = 0;
+    DWORD dwLangCode = 0;
+    DWORD dwCodePage = 0;
+    const wchar_t* pResult = 0;
+    VerQueryValueW_type verQueryValueW = 0;
+    wchar_t textBuffer[256];
+    LPVOID pFileVersion = 0;
+
+    struct LangCodePage
+    {
+        WORD wLanguage;
+        WORD wCodePage;
+    } *lcp = 0;
+    UINT len = 0;
+
+    hVersionDll = LoadLibraryW(L"version.dll");
+    if (!hVersionDll)
+    {
+        goto cleanup;
+    }
+
+    verQueryValueW = (VerQueryValueW_type)GetProcAddress(hVersionDll, "VerQueryValueW");
+
+    hRsrc = FindResourceExW(module, MAKEINTRESOURCEW(16), MAKEINTRESOURCEW(1), MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL));
+    if (hRsrc == NULL)
+    {
+        hRsrc = FindResourceW(module, MAKEINTRESOURCEW(VS_VERSION_INFO), (LPWSTR)VS_FILE_INFO);
+    }
+    if (hRsrc == NULL)
+        goto cleanup;
+    hGlobal = LoadResource(module, hRsrc);
+    if (hGlobal == NULL)
+        goto cleanup;
+
+    pData = LockResource(hGlobal);
+    if (pData == NULL)
+        goto cleanup;
+
+    size = SizeofResource(module, hRsrc);
+    lpInfo = pData;
+    unInfoLen = size;
+    dwLangCode = 0;
+    dwCodePage = 0;
+
+    // Get the string file info
+
+    if (verQueryValueW(pData, L"\\VarFileInfo\\Translation", (LPVOID*)(&lcp), &len) &&
+        len >= 4)
+    {
+        dwLangCode = lcp->wLanguage;
+        dwCodePage = lcp->wCodePage;
+    }
+    else
+    {
+        if (!VerParseTranslationID(lpInfo, unInfoLen, GetUserDefaultLangID(), &dwLangCode, FALSE))
+        {
+            if (!VerParseTranslationID(lpInfo, unInfoLen, GetUserDefaultLangID(), &dwLangCode, TRUE))
+            {
+                if (!VerParseTranslationID(lpInfo, unInfoLen, MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), &dwLangCode, TRUE))
+                {
+                    if (!VerParseTranslationID(lpInfo, unInfoLen, MAKELANGID(LANG_ENGLISH, SUBLANG_NEUTRAL), &dwLangCode, TRUE))
+                    {
+                        dwLangCode = *((DWORD*)lpInfo);
+                    }
+                }
+            }
+        }
+        dwCodePage = (dwLangCode & 0xFFFF0000) >> 16;
+        dwLangCode &= 0x0000FFFF;
+    }
+
+    _snwprintf_s(textBuffer, 256, 256, L"\\StringFileInfo\\%04X%04X\\", dwLangCode, dwCodePage);
+    wcscat_s(textBuffer, 256, L"FileVersion");
+    if (verQueryValueW(pData, textBuffer, &pFileVersion, &len))
+    {
+        pResult = (wchar_t*)pFileVersion;
+    }
+cleanup:
+    if (pData)
+    {
+        UnlockResource(pData);
+    }
+    if (hVersionDll)
+    {
+        FreeLibrary(hVersionDll);
+    }
+    return pResult;
+}
+
 }

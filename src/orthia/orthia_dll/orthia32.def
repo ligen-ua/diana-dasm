@@ -16,6 +16,7 @@ EXPORTS
     a=?a@@YGJPAUIDebugClient4@@PBD@Z
     exec
     scxr
+    pe_info
     vm_help
     vm_vm_new
     vm_vm_del

@@ -742,6 +742,15 @@ OPERAND_SIZE COrthiaWindbgAPIHandlerDebugInterface::QueryFunctionAddress(OPERAND
     }
     return 0;
 }
+COrthiaWindbgAPIHandlerDebugInterface::ModuleInfo* COrthiaWindbgAPIHandlerDebugInterface::QueryModuleInfo(OPERAND_SIZE address)
+{
+    ModulesMapByOffset_type::iterator it = m_modulesMapByOffset.find(address);
+    if (it == m_modulesMapByOffset.end())
+    {
+        return 0;
+    }
+    return &it->second;
+}
 
 CWindbgAddressSpace::CWindbgAddressSpace()
 {
