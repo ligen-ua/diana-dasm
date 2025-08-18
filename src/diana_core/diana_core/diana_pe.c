@@ -744,6 +744,97 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
         return DI_ERROR;
     }
 }
+
+#define MAX_DLL_NAME    512
+#define MAX_IMAGE_IMPORT_BUFFER_SIZE   (MAX_DLL_NAME + sizeof(DIANA_IMAGE_IMPORT_BY_NAME))
+
+
+typedef struct _DIANA_CV_INFO_PDB70
+{
+    DI_UINT32   Magic;
+    DIANA_UUID  Signature;
+    DI_UINT32   Age;
+    char    Path[1];
+}DIANA_CV_INFO_PDB70;
+
+#define DIANA_CV_INFO_MAGIC 0x53445352
+
+int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
+                          /* inout */ DianaMovableReadStream* pOutStream,
+                          /* in */ OPERAND_SIZE address,
+                          /* out */ DIANA_UUID * pPdbUID)
+{
+    DIANA_IMAGE_DATA_DIRECTORY* pDebugDirectory = &pPeFile->pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_DEBUG];
+    int status = 0;
+    void* pCapturedSection = 0;
+    void* pCapturedSection_end = 0;
+    long long debugCounter = 0;
+    OPERAND_SIZE readBytes = 0;
+    PDIANA_IMAGE_DEBUG_DIRECTORY pDebugDescriptor = 0;
+
+    if (!pDebugDirectory)
+    {
+        return DI_SUCCESS;
+    }
+    if (!pDebugDirectory->VirtualAddress || !pDebugDirectory->Size)
+    {
+        return DI_SUCCESS;
+    }
+
+    pCapturedSection = DIANA_MALLOC(pDebugDirectory->Size);
+    if (!pCapturedSection)
+    {
+        return DI_OUT_OF_MEMORY;
+    }
+
+    DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+        address + pDebugDirectory->VirtualAddress,
+        pCapturedSection,
+        pDebugDirectory->Size,
+        &readBytes,
+        0));
+    DI_CHECK_CONDITION_GOTO(readBytes == pDebugDirectory->Size, DI_ERROR);
+
+    pCapturedSection_end = (char*)pCapturedSection + pDebugDirectory->Size - sizeof(DIANA_IMAGE_DEBUG_DIRECTORY) + 1;
+
+    pDebugDescriptor = (PDIANA_IMAGE_DEBUG_DIRECTORY)pCapturedSection;
+    status = DI_NOT_FOUND;
+    for (; (char*)pDebugDescriptor < (char*)pCapturedSection_end; ++pDebugDescriptor, ++debugCounter)
+    {
+        if (pDebugDescriptor->Type == DIANA_IMAGE_DEBUG_TYPE_CODEVIEW)
+        {
+            status = 0;
+            break;
+        }
+    }
+    if (!status)
+    {
+        DIANA_CV_INFO_PDB70 pdbInfo;
+        DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+            address + pDebugDescriptor->AddressOfRawData,
+            &pdbInfo,
+            sizeof(pdbInfo),
+            &readBytes,
+            0));
+
+        DI_CHECK_CONDITION_GOTO(readBytes == sizeof(pdbInfo), DI_ERROR);
+        if (pdbInfo.Magic != DIANA_CV_INFO_MAGIC)
+        {
+            status = DI_INVALID_INPUT;
+        }
+
+        *pPdbUID = pdbInfo.Signature;
+    }
+
+cleanup:
+
+    if (pCapturedSection)
+    {
+        DIANA_FREE(pCapturedSection);
+    }
+    return status;
+}
+
 int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                             /* in */ OPERAND_SIZE address,
                             /* inout */ DianaReadWriteRandomStream * pOutStream,
@@ -752,9 +843,6 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                             /* in */ DianaPeFile_LinkImports_Observer * pObserver
                             )
 {
-#define MAX_DLL_NAME    512
-#define MAX_IMAGE_IMPORT_BUFFER_SIZE   (MAX_DLL_NAME + sizeof(DIANA_IMAGE_IMPORT_BY_NAME))
-
     char * pDllNameBuffer = 0;
     char * pImageImportBuffer = 0;
     DIANA_IMAGE_DATA_DIRECTORY * pImportDirectory = &pPeFile->pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -764,6 +852,10 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
     long long debugCounter = 0;
     OPERAND_SIZE readBytes = 0;
     PDIANA_IMAGE_IMPORT_DESCRIPTOR pImportDescriptor = 0;
+    if (!pImportDescriptor)
+    {
+        return DI_SUCCESS;
+    }
     if (!pImportDirectory->VirtualAddress || !pImportDirectory->Size)
     {
         return DI_SUCCESS;

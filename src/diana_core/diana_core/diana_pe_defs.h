@@ -348,6 +348,23 @@ typedef struct _DIANA_IMAGE_TLS_DIRECTORY32 {
 } DIANA_IMAGE_TLS_DIRECTORY32;
 typedef DIANA_IMAGE_TLS_DIRECTORY32 * PDIANA_IMAGE_TLS_DIRECTORY32;
 
+
+
+#pragma pack(pop)
+
+#pragma pack(push,2)
+
+typedef struct _DIANA_IMAGE_DEBUG_DIRECTORY {
+    DI_UINT32 Characteristics;
+    DI_UINT32 TimeDateStamp;
+    DI_UINT16 MajorVersion;
+    DI_UINT16 MinorVersion;
+    DI_UINT32 Type;
+    DI_UINT32 SizeOfData;
+    DI_UINT32 AddressOfRawData;
+    DI_UINT32 PointerToRawData;
+} DIANA_IMAGE_DEBUG_DIRECTORY, * PDIANA_IMAGE_DEBUG_DIRECTORY;
+
 #pragma pack(pop)
 
 #endif

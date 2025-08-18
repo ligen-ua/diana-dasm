@@ -4,6 +4,7 @@
 #include "diana_pe_defs.h"
 #include "diana_streams.h"
 #include "diana_analyze.h"
+#include "diana_uids.h"
 
 typedef struct _diana_PeFile_impl
 {
@@ -102,6 +103,10 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                             /* in */ int pageSize,
                             /* in */ DianaPeFile_LinkImports_Observer * pObserver
                             );
+int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
+                          /* inout */ DianaMovableReadStream* pOutStream,
+                          /* in */ OPERAND_SIZE address,
+                          /* out */ DIANA_UUID* pPdbUID);
 
 int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                 /* inout */ DianaReadWriteRandomStream * pOutStream,
@@ -123,4 +128,16 @@ int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
                                 const char * pFunctionName,
                                 OPERAND_SIZE * pFunctionOffset,
                                 OPERAND_SIZE * pForwardInformationOffset);
+
+
+#define DIANA_IMAGE_DEBUG_TYPE_UNKNOWN      0
+#define DIANA_IMAGE_DEBUG_TYPE_COFF         1
+#define DIANA_IMAGE_DEBUG_TYPE_CODEVIEW     2
+#define DIANA_IMAGE_DEBUG_TYPE_FPO          3
+#define DIANA_IMAGE_DEBUG_TYPE_MISC         4
+#define DIANA_IMAGE_DEBUG_TYPE_EXCEPTION    5
+#define DIANA_IMAGE_DEBUG_TYPE_FIXUP        6
+#define DIANA_IMAGE_DEBUG_TYPE_BORLAND      9
+
+
 #endif
