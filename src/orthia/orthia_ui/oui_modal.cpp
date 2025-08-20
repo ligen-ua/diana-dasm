@@ -10,6 +10,13 @@ namespace oui
     void CBaseModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
         m_prevFocus = pool->GetFocus();
+        if (auto prevFocus = m_prevFocus.lock())
+        {
+            if (auto target = prevFocus->GetPopupPrevFocusTarget())
+            {
+                m_prevFocus = target;
+            }
+        }
         Activate();
     }
     void CBaseModalWindow::FinishDialog()

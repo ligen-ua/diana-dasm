@@ -42,6 +42,7 @@ namespace oui
         int m_offset = 0;
         int m_visibleSize = 0;
         std::vector<ListBoxItem> m_pageItems;
+        bool m_paintInProgress = false;
 
         // temporary data for painting
         static String m_chunk;

@@ -247,9 +247,12 @@ void CMainWindow::ConstuctMenu()
                 oui::Hotkey(oui::VirtualKey::kW)
             }
         };
-        m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("view")),
+        auto button = m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("view")),
             std::move(view)
-        );
+        );        
+        m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
+            oui::VirtualKey::kV), [=]() { m_menu->SelectAndOpenPopup(button, false);  });
+
     }
     {
         std::vector<oui::PopupItem> help =

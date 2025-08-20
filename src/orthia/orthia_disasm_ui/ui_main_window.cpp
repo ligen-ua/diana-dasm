@@ -5,6 +5,16 @@ CMainWindow::CMainWindow(std::shared_ptr<orthia::CProgramModel> model)
         m_model(model)
 {
 }
+void CMainWindow::SetFocusImpl()
+{
+    if (m_disasmWindow)
+    {
+        m_disasmWindow->SetFocus();
+        return;
+    }
+    oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>::SetFocusImpl();
+}
+
 void CMainWindow::SetDefaultTitle()
 {
     auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
@@ -183,7 +193,7 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
     {       
         // check focused
         if (auto ptr = pool->GetFocus())
-        {
+        {   
             for (; ptr;)
             {
                 if (ptr.get() != this)

@@ -435,7 +435,10 @@ namespace oui
     void CWindow::OnFocusEnter()
     {
     }
-
+    std::shared_ptr<CWindow> CWindow::GetPopupPrevFocusTarget()
+    {
+        return nullptr;
+    }
     bool CWindow::IsFocused() const
     {
         if (auto poolPtr = m_pool.lock())

@@ -130,7 +130,9 @@ namespace oui
 
         if (m_columnsCount)
         {
+            m_paintInProgress = true;
             DoPaintListMode(rect, parameters);
+            m_paintInProgress = false;
         }
 
         Parent_type::DoPaint(rect, parameters);
@@ -263,6 +265,10 @@ namespace oui
     }
     void CListBox::Clear()
     {
+        if (m_paintInProgress)
+        {
+            __debugbreak();
+        }
         m_offset = 0;
         m_pageItems.clear();
     }
@@ -297,6 +303,10 @@ namespace oui
     }
     std::vector<ListBoxItem> & CListBox::GetItems()
     {
+        if (m_paintInProgress)
+        {
+            __debugbreak();
+        }
         return m_pageItems;
     }
     void CListBox::OpenSelectedItem()

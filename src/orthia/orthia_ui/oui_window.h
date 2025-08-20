@@ -174,6 +174,7 @@ namespace oui
         virtual bool IsFocused() const;
         virtual void OnFocusLost();
         virtual void OnFocusEnter();
+        virtual std::shared_ptr<CWindow> GetPopupPrevFocusTarget();
 
         // destroy
         virtual void Destroy();

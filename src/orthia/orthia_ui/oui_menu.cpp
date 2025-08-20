@@ -501,6 +501,15 @@ namespace oui
         Resize(size);
         Invalidate();
     }
+    std::shared_ptr<CWindow> CMenuPopup::GetPopupPrevFocusTarget()
+    {
+        auto menu = m_menuWindow.lock();
+        if (menu)
+        {
+            return menu->GetPopupPrevFocusTarget();
+        }
+        return nullptr;
+    }
 
     // CMenuWindow
     CMenuWindow::CMenuWindow()
@@ -650,6 +659,10 @@ namespace oui
     void CMenuWindow::DontSetFocusOnDeactivate()
     {
         m_setFocusOnDeactivate = false;
+    }
+    std::shared_ptr<CWindow> CMenuWindow::GetPopupPrevFocusTarget()
+    {
+        return m_prevFocus.lock();
     }
     void CMenuWindow::Deactivate()
     {

@@ -61,6 +61,8 @@ namespace oui
         void Detach();
         bool IsPopup() const override { return true; }
         void OnFocusLost() override;
+        std::shared_ptr<CWindow> GetPopupPrevFocusTarget() override;
+
     };
 
     class CMenuWindow:public oui::SimpleBrush<CWindow>
@@ -103,6 +105,7 @@ namespace oui
         void SetPrevFocus(std::shared_ptr<CWindow> prevFocus);
         void Activate() override;
         void Deactivate() override;
+        std::shared_ptr<CWindow> GetPopupPrevFocusTarget() override;
 
         void OpenPopup();
 

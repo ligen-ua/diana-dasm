@@ -55,6 +55,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 
     void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);
+    void SetFocusImpl() override;
 
     void SetDefaultTitle();
 public:
@@ -64,4 +65,5 @@ public:
     void ConstructChilds() override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
     bool AsyncOpenFile(std::shared_ptr<oui::IFile> file);
+
 };

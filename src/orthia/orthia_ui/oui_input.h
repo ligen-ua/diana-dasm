@@ -74,6 +74,8 @@ namespace oui
         VirtualKey hotkey;
 
         Hotkey()
+            :
+            hotkey(VirtualKey::None)
         {
         }
         Hotkey(const KeyState& keyState_in,
