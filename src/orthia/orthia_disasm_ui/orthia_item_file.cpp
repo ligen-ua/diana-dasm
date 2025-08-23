@@ -121,4 +121,8 @@ namespace orthia
     void FileWorkplaceItem::ReloadModules() 
     {
     }
+    void FileWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
+    {
+    }
+
 }

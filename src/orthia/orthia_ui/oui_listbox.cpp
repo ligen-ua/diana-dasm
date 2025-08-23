@@ -12,7 +12,7 @@ namespace oui
         SetBorderStyle(oui::BorderStyle::Thin);
         SetColors(colorProfile->listBox.borderColor, oui::Color());
     }
-    void CListBox::DoPaintListMode(const Rect& rect, DrawParameters& parameters)
+    void CListBox::DoPaintImpl(const Rect& rect, DrawParameters& parameters)
     {
         auto console = GetConsole();
         if (!console)
@@ -23,16 +23,25 @@ namespace oui
         const PanelBorderSymbols symbols = GetPanelBorderSymbols();
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
 
-        int relLeftX = (0 * absClientRect.size.width) / m_columnsCount;
+        int columnsCount = GetColumnsCount();
+        if (!columnsCount)
+        {
+            return;
+        }
+        int relLeftX = (0 * absClientRect.size.width) / columnsCount;
         int leftX = absClientRect.position.x + relLeftX;
 
         auto currentItem = m_pageItems.begin();
         String tmpStr;
         int pos = 0;
 
-        for (int i = 0; i < m_columnsCount; ++i)
+        for (int i = 0; i < columnsCount; ++i)
         {
-            int relRightX = ((i + 1) * absClientRect.size.width) / m_columnsCount;
+            if (HasReportMode()) 
+            {
+                currentItem = m_pageItems.begin();
+            }
+            int relRightX = ((i + 1) * absClientRect.size.width) / columnsCount;
             int rightX = absClientRect.position.x + relRightX;
 
             int size = rightX - leftX;
@@ -54,7 +63,13 @@ namespace oui
                 if (currentItem != m_pageItems.end())
                 {
                     colorsHandler = currentItem->colorsHandler;
-                    tmpStr = currentItem->text.empty() ? String() : currentItem->text[0];
+
+                    int textPosition = 0;
+                    if (HasReportMode())
+                    {
+                        textPosition = i;
+                    }
+                    tmpStr = textPosition >= currentItem->text.size() ? String() : currentItem->text[textPosition];
                     auto prevSize = tmpStr.native.size();
 
                     const auto info = console->GetSymbolsAnalyzer().CutVisibleString(tmpStr.native, symbolsCount);
@@ -128,14 +143,12 @@ namespace oui
             return;
         }
 
-        if (m_columnsCount)
-        {
-            m_paintInProgress = true;
-            DoPaintListMode(rect, parameters);
-            m_paintInProgress = false;
-        }
+        m_paintInProgress = true;
+
+        DoPaintImpl(rect, parameters);
 
         Parent_type::DoPaint(rect, parameters);
+        m_paintInProgress = false;
     }
     void CListBox::OnResize()
     {

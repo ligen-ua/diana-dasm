@@ -53,7 +53,7 @@ namespace oui
 
     protected:
         void OnResize() override;
-        void DoPaintListMode(const Rect& rect, DrawParameters& parameters);
+        void DoPaintImpl(const Rect& rect, DrawParameters& parameters);
 
     public:
         CListBox(std::shared_ptr<DialogColorProfile> colorProfile, IListBoxOwner* owner);
@@ -64,7 +64,8 @@ namespace oui
         int GetColumnsCount() const;
 
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
-
+    
+        bool HasReportMode() const { return !m_columns.empty(); }
         // list mode
         void InitColumns(int columnsCount);
 

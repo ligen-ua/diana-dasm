@@ -18,6 +18,7 @@ namespace orthia
         const std::shared_ptr<CModuleManager> GetModuleManager() const override;
         oui::String GetShortName() const override;
         void ReloadModules() override;
+        void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
     };
 
 }

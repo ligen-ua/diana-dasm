@@ -32,6 +32,14 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Disassembly"))
         ;
 
+    // modules
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Modules"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules.columns"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("name"), ORTHIA_TCSTR("Name"))
+        ;
+
     // output
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.output"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Output"))

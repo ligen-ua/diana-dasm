@@ -66,7 +66,7 @@ namespace orthia
         Address_type processModuleAddress = 0;
         if (!modules.empty() && processModuleOffset != -1 && processModuleOffset < (int)modules.size())
         {
-            processModuleAddress = modules[processModuleOffset].address;
+            processModuleAddress = modules[processModuleOffset].entryPoint;
         }
         std::sort(modules.begin(), modules.begin(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
 
@@ -77,5 +77,9 @@ namespace orthia
             m_processModuleAddress = processModuleAddress;
         }
     }
-
+    void CProcessWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+        modules = m_modules;
+    }
 }

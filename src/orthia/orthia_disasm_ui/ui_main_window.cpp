@@ -101,7 +101,14 @@ void CMainWindow::ConstructChilds()
 
         m_stateManager.Register(m_disasmWindow);
     }
-
+    {
+        // modules window
+        auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.modules"));
+        m_modulesWindow = std::make_shared<CModulesWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  },
+            m_model);
+        defaultGroup->AddPanel(m_modulesWindow);
+        m_stateManager.Register(m_modulesWindow);
+    }
     {
         // output window
         auto bottomPanel = m_panelContainerWindow->AttachNewGroup(defaultGroup, oui::GroupLocation::Bottom, oui::GroupAttachMode::Sibling);

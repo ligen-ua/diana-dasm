@@ -77,6 +77,7 @@ namespace orthia
         virtual WorkAddressData ReadData(Address_type address, Address_type size) = 0;
         virtual oui::String GetShortName() const = 0;
         virtual void ReloadModules() = 0;
+        virtual void GetModules(std::vector<orthia::ModuleInfo>& modules) const = 0;
     };
 
 }

@@ -211,7 +211,7 @@ void CMainWindow::ConstuctMenu()
             {
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_process")),
                 [this]() {  OpenProcess();  },
-                oui::Hotkey(oui::VirtualKey::kX)
+                oui::Hotkey(oui::VirtualKey::kP)
             },
             {
                 orthia::PlatformString_type(),

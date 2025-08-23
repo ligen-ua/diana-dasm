@@ -20,7 +20,7 @@ namespace oui
     };
     class ColumnParam
     {
-        String m_name;
+        std::function<oui::String()> m_getCaption;
         bool m_empty;
         int m_width;
         ColumnFormat m_format;
@@ -34,13 +34,13 @@ namespace oui
             m_flags(0)
         {
         }
-        ColumnParam(const String& name,
+        ColumnParam(std::function<oui::String()> getCaption,
             int width = 100,
             ColumnFormat format = ColumnFormat::ctLeft,
             ColumnType type = ColumnType::ctString,
             int flags = 0)
             :
-            m_name(name),
+            m_getCaption(getCaption),
             m_empty(false),
             m_width(width),
             m_format(format),
@@ -50,7 +50,10 @@ namespace oui
         }
         String GetName() const
         {
-            return m_name;
+            if (!m_getCaption) {
+                return String();
+            }
+            return m_getCaption();
         }
         bool IsEmpty() const
         {

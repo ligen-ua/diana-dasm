@@ -23,6 +23,7 @@ namespace orthia
         WorkAddressRangeInfo GetRangeInfo(Address_type address) const override;
         const std::shared_ptr<CModuleManager> GetModuleManager() const override;
         oui::String GetShortName() const override;
+        void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
 
         Address_type GerProcessModuleAddress();
 

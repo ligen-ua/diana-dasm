@@ -19,6 +19,15 @@ namespace orthia
         m_fileSystem = std::make_shared<oui::CFileSystem>();
         m_processSystem = std::make_shared<oui::CProcessSystem>();
     }
+    ;
+    std::shared_ptr<IWorkPlaceItem> CProgramModel::GetActiveItem()
+    {
+        WorkplaceItem item;
+        if (!QueryActiveWorkspaceItem(item)) {
+            return nullptr;
+        }
+        return GetItem(item.uid);
+    }
     std::shared_ptr<IWorkPlaceItem> CProgramModel::GetItem(int uid)
     {
         std::unique_lock<std::mutex> lockGuard(m_lock);

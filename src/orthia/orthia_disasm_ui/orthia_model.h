@@ -27,6 +27,7 @@ namespace orthia
         const std::shared_ptr<CModuleManager> GetModuleManager() const override;
         oui::String GetShortName() const override;
         void ReloadModules() override;
+        void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
     };
 
     struct WorkplaceItem
@@ -81,6 +82,7 @@ namespace orthia
         bool QueryActiveWorkspaceItem(WorkplaceItem& item) const;
         void SetUILog(std::shared_ptr<IUILogInterface> uiLog);
         std::shared_ptr<IWorkPlaceItem> GetItem(int uid);
+        std::shared_ptr<IWorkPlaceItem> GetActiveItem();
 
         // other thread
         void AddProcess(std::shared_ptr<oui::IProcess> proc,
