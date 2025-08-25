@@ -43,6 +43,7 @@ namespace oui
         int m_visibleSize = 0;
         std::vector<ListBoxItem> m_pageItems;
         bool m_paintInProgress = false;
+        ListBoxItem m_headerListBoxItem;
 
         // temporary data for painting
         static String m_chunk;
@@ -50,6 +51,7 @@ namespace oui
         void InitSize();
         void UIShiftWindow(int newOffset, int newPosition);
         void OpenSelectedItem();
+        void RebuildHeaderListBoxItem();
 
     protected:
         void OnResize() override;

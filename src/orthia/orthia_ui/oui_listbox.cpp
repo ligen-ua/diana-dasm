@@ -31,14 +31,17 @@ namespace oui
         int relLeftX = (0 * absClientRect.size.width) / columnsCount;
         int leftX = absClientRect.position.x + relLeftX;
 
-        auto currentItem = m_pageItems.begin();
+        auto currentItemIt = m_pageItems.begin();
+        bool needPrintHeader = false;
         String tmpStr;
         int pos = 0;
         for (int i = 0; i < columnsCount; ++i)
         {
             if (HasReportMode()) 
             {
-                currentItem = m_pageItems.begin();
+                needPrintHeader = true;
+                currentItemIt = m_pageItems.begin();
+                pos = 0;
             }
             int relRightX = ((i + 1) * absClientRect.size.width) / columnsCount;
             int rightX = absClientRect.position.x + relRightX;
@@ -59,8 +62,18 @@ namespace oui
                 int symbolsCount = size - 1;
                 bool cutHappens = false;
                 decltype(ListBoxItem::colorsHandler) colorsHandler;
-                if (currentItem != m_pageItems.end())
+
+                if (needPrintHeader || currentItemIt != m_pageItems.end())
                 {
+                    const ListBoxItem* currentItem = nullptr;
+                    if (needPrintHeader)
+                    {
+                        currentItem = &m_headerListBoxItem;
+                    }
+                    else
+                    {
+                        currentItem = &*currentItemIt;
+                    }
                     colorsHandler = currentItem->colorsHandler;
 
                     int textPosition = 0;
@@ -79,11 +92,19 @@ namespace oui
                     if (info.visibleSize > info.symbolsCount)
                     {
                         cutSize = info.visibleSize - info.symbolsCount;
-                        m_chunk.native.erase(m_chunk.native.end()-cutSize, m_chunk.native.end());
+                        m_chunk.native.erase(m_chunk.native.end() - cutSize, m_chunk.native.end());
                     }
 
                     cutHappens = newSize != prevSize;
-                    ++currentItem;
+
+                    if (!needPrintHeader)
+                    {
+                        ++currentItemIt;
+                    }
+                    else
+                    {
+                        needPrintHeader = false;
+                    }
                 }
 
                 if ((i + 1) != m_columnsCount)
@@ -122,14 +143,22 @@ namespace oui
                     }
                 }
 
+                auto defBgColor = Color();
+                auto borderColorToUse = &colorProfile.borderColor;
+                const oui::Color * borderBackgroundColorToUse = &defBgColor;
+                if (HasReportMode())
+                {
+                    borderColorToUse = &color->text;
+                    borderBackgroundColorToUse = &color->background;
+                }
                 Point pt{ leftX, yPos };
                 parameters.console.PaintText(pt, 
                     color->text,
                     color->background,
                     m_chunk.native,
                     String::char_type('/'),
-                    colorProfile.borderColor,
-                    Color());
+                    *borderColorToUse,
+                    *borderBackgroundColorToUse);
                 ++pos;
             }
             leftX = rightX;
@@ -271,8 +300,8 @@ namespace oui
         }
         else
         {
-            // report mode
-            m_visibleSize = rect.size.height * (int)m_columns.size();
+            // report mode    
+            m_visibleSize = rect.size.height;
         }
     }
     void CListBox::Clear()
@@ -456,6 +485,7 @@ namespace oui
         const ColumnParam& param13,
         const ColumnParam& param14)
     {
+        m_headerListBoxItem.text.clear();
         m_columns.clear();
         const ColumnParam* items[] = { &param1, &param2, &param3, &param4, &param5,
                                        &param6, &param7, &param8, &param9, &param10,
@@ -469,8 +499,16 @@ namespace oui
             m_columns.push_back(*items[i]);
         }
         InitSize();
+        RebuildHeaderListBoxItem();
     }
-
+    void CListBox::RebuildHeaderListBoxItem()
+    {
+        m_headerListBoxItem.text.clear();
+        for (const auto& column : m_columns)
+        {
+            m_headerListBoxItem.text.push_back(column.GetName());
+        }
+    }
     void DefaultShiftViewWindow(std::shared_ptr<CListBox> filesBox, int newOffset, size_t totalFilesAvailable_in)
     {
         const int visibleSize = filesBox->GetVisibleSize();
