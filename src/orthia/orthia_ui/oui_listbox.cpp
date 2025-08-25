@@ -12,6 +12,28 @@ namespace oui
         SetBorderStyle(oui::BorderStyle::Thin);
         SetColors(colorProfile->listBox.borderColor, oui::Color());
     }
+    void CListBox::RenderColumnText(bool needPrintHeader, int columnPos, const String& inText, String& outText)
+    {
+        auto format = m_columns[columnPos].GetFormat();
+        if (needPrintHeader)
+        {
+            format = ColumnFormat::ctCenter;
+        }
+        size_t renderPos = 0;
+        switch (format)
+        {
+        case ColumnFormat::ctCenter:
+            renderPos = outText.native.size() - inText.native.size();
+            renderPos /= 2;
+            break;
+        case ColumnFormat::ctRight:
+            renderPos = outText.native.size() - inText.native.size();
+            break;
+        default:;
+
+        }
+        std::copy(inText.native.begin(), inText.native.end(), outText.native.begin() + renderPos);
+    }
     void CListBox::DoPaintImpl(const Rect& rect, DrawParameters& parameters)
     {
         auto console = GetConsole();
@@ -41,7 +63,7 @@ namespace oui
             {
                 needPrintHeader = true;
                 currentItemIt = m_pageItems.begin();
-                pos = 0;
+                pos = -m_headerSize;
             }
             int relRightX = ((i + 1) * absClientRect.size.width) / columnsCount;
             int rightX = absClientRect.position.x + relRightX;
@@ -57,7 +79,7 @@ namespace oui
                 const int yPos = u + absClientRect.position.y;
 
                 m_chunk.native.clear();
-                m_chunk.native.resize(size, String::symSpace);
+                m_chunk.native.resize(size, needPrintHeader? String::char_type('_'):String::symSpace);
 
                 int symbolsCount = size - 1;
                 bool cutHappens = false;
@@ -82,17 +104,32 @@ namespace oui
                         textPosition = i;
                     }
                     tmpStr = textPosition >= currentItem->text.size() ? String() : currentItem->text[textPosition];
+                    if (needPrintHeader)
+                    {
+                        tmpStr.native.insert(0, 1, String::symSpace);
+                        tmpStr.native.append(1, String::symSpace);
+                    }
                     auto prevSize = tmpStr.native.size();
 
                     const auto info = console->GetSymbolsAnalyzer().CutVisibleString(tmpStr.native, symbolsCount);
 
                     auto newSize = tmpStr.native.size();
-                    std::copy(tmpStr.native.begin(), tmpStr.native.end(), m_chunk.native.begin());
 
-                    if (info.visibleSize > info.symbolsCount)
+                    if (!HasReportMode() || 
+                        info.visibleSize > info.symbolsCount || 
+                        tmpStr.native.size() == m_chunk.native.size() ||
+                        tmpStr.native.empty())
                     {
-                        cutSize = info.visibleSize - info.symbolsCount;
-                        m_chunk.native.erase(m_chunk.native.end() - cutSize, m_chunk.native.end());
+                        std::copy(tmpStr.native.begin(), tmpStr.native.end(), m_chunk.native.begin());
+                        if (info.visibleSize > info.symbolsCount)
+                        {
+                            cutSize = info.visibleSize - info.symbolsCount;
+                            m_chunk.native.erase(m_chunk.native.end() - cutSize, m_chunk.native.end());
+                        }
+                    }
+                    else
+                    {
+                        RenderColumnText(needPrintHeader, i, tmpStr, m_chunk);
                     }
 
                     cutHappens = newSize != prevSize;
@@ -100,10 +137,6 @@ namespace oui
                     if (!needPrintHeader)
                     {
                         ++currentItemIt;
-                    }
-                    else
-                    {
-                        needPrintHeader = false;
                     }
                 }
 
@@ -123,6 +156,12 @@ namespace oui
 
                 auto color = &colorProfile.normalText;
                 LabelColorState customColor;
+
+                if (needPrintHeader)
+                {
+                    color = &colorProfile.headerText;
+                }
+                else
                 if (m_selectedPosition == pos)
                 {
                     if (IsFocused())
@@ -160,6 +199,7 @@ namespace oui
                     *borderColorToUse,
                     *borderBackgroundColorToUse);
                 ++pos;
+                needPrintHeader = false;
             }
             leftX = rightX;
         }
@@ -259,6 +299,14 @@ namespace oui
                     return true;
                 }
                 newPosition = relativePoint.y;
+                if (newPosition <= m_headerSize)
+                {
+                    newPosition = 0;
+                }
+                else
+                {
+                    newPosition -= m_headerSize;
+                }
             }
             if (newPosition >= (int)m_pageItems.size() && !m_pageItems.empty())
             {
@@ -302,6 +350,10 @@ namespace oui
         {
             // report mode    
             m_visibleSize = rect.size.height;
+            if (m_visibleSize)
+            {
+                --m_visibleSize;
+            }
         }
     }
     void CListBox::Clear()
@@ -508,6 +560,7 @@ namespace oui
         {
             m_headerListBoxItem.text.push_back(column.GetName());
         }
+        m_headerSize = 1;
     }
     void DefaultShiftViewWindow(std::shared_ptr<CListBox> filesBox, int newOffset, size_t totalFilesAvailable_in)
     {
@@ -527,7 +580,11 @@ namespace oui
             if (newSelectedOffset >= totalFilesAvailable)
             {
                 auto sizeToProceed = std::min(totalFilesAvailable - maxOffset, visibleSize);
-                newSelectedPositon = sizeToProceed - 1;
+                newSelectedPositon = sizeToProceed;
+                if (newSelectedPositon)
+                {
+                    newSelectedPositon = sizeToProceed - 1;
+                }
             }
             else
             {

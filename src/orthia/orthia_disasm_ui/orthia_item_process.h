@@ -24,6 +24,7 @@ namespace orthia
         const std::shared_ptr<CModuleManager> GetModuleManager() const override;
         oui::String GetShortName() const override;
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
+        int GetModulesCount() const override;
 
         Address_type GerProcessModuleAddress();
 

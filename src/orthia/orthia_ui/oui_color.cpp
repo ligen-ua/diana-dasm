@@ -178,10 +178,16 @@ namespace oui
             ColorCyan(),     // background
         },
         ColorGray(),
-        {
+        { 
+            // selectedNonFocusedText
             ColorBlack(),     // text
             ColorGray(),     // background
         },
+        {
+            // headerText
+            ColorWhite(),     // text
+            ColorBlack(),     // background
+        }
     };
     static Color g_listBoxFolders = ColorWhite();
 

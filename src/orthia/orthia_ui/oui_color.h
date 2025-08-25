@@ -142,6 +142,7 @@ namespace oui
         LabelColorState selectedText;
         Color borderColor;
         LabelColorState selectedNonFocusedText;
+        LabelColorState headerText;
     };
     void QueryDefaultColorProfile(ListBoxColorProfile& profile);
 

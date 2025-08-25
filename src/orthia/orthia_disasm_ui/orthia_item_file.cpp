@@ -124,5 +124,8 @@ namespace orthia
     void FileWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
     {
     }
-
+    int FileWorkplaceItem::GetModulesCount() const 
+    {
+        return 0;
+    }
 }

@@ -28,6 +28,7 @@ namespace orthia
         oui::String GetShortName() const override;
         void ReloadModules() override;
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
+        int GetModulesCount() const override;
     };
 
     struct WorkplaceItem

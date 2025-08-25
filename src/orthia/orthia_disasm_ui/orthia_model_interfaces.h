@@ -78,6 +78,7 @@ namespace orthia
         virtual oui::String GetShortName() const = 0;
         virtual void ReloadModules() = 0;
         virtual void GetModules(std::vector<orthia::ModuleInfo>& modules) const = 0;
+        virtual int GetModulesCount() const = 0;
     };
 
 }

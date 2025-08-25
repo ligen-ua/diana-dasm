@@ -27,6 +27,12 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption, std::sha
 }
 int CModulesWindow::GetTotalCount() const
 {
+    auto activeItem = m_model->GetActiveItem();
+    std::vector<orthia::ModuleInfo> items;
+    if (activeItem)
+    {
+        return activeItem->GetModulesCount();
+    }
     return 0;
 }
 void CModulesWindow::CancelAllQueries()
@@ -61,6 +67,7 @@ void CModulesWindow::SwitchActiveItem(int uid)
 {
     m_model->SetActiveItem(uid);
 }
+
 void CModulesWindow::ShiftViewWindow(int newOffset)
 {
     auto activeItem = m_model->GetActiveItem();
@@ -90,6 +97,7 @@ void CModulesWindow::OnResize()
 {
     const oui::Rect clientRect = GetClientRect();
     m_itemsBox->Resize(clientRect.size);
+    UpdateVisibleItems();
 }
 void CModulesWindow::SetFocusImpl()
 {

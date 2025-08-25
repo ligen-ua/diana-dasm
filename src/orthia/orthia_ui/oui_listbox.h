@@ -44,6 +44,7 @@ namespace oui
         std::vector<ListBoxItem> m_pageItems;
         bool m_paintInProgress = false;
         ListBoxItem m_headerListBoxItem;
+        int m_headerSize = 0;
 
         // temporary data for painting
         static String m_chunk;
@@ -52,6 +53,7 @@ namespace oui
         void UIShiftWindow(int newOffset, int newPosition);
         void OpenSelectedItem();
         void RebuildHeaderListBoxItem();
+        void RenderColumnText(bool needPrintHeader, int columnPos, const String & inText, String& outText);
 
     protected:
         void OnResize() override;

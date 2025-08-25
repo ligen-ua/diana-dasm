@@ -82,4 +82,8 @@ namespace orthia
         orthia::CAutoCriticalSection guard(m_lock);
         modules = m_modules;
     }
+    int CProcessWorkplaceItem::GetModulesCount() const
+    {
+        return (int)m_modules.size();
+    }
 }
