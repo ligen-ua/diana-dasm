@@ -246,8 +246,10 @@ void ToStringAsHex(long long id, std::basic_string<Type, Traits<Type>, Allocator
     std::hex(stream);
 
 
-    stream << std::setw( sizeof(li.HighPart)*2 ) << std::setfill( CharTraits<Type>::zero );
+    stream << std::setw( sizeof(li.HighPart)*2) << std::setfill( CharTraits<Type>::zero );
     stream << li.HighPart;
+
+    stream << std::setw(sizeof(li.HighPart)*2) << std::setfill(CharTraits<Type>::zero);
     stream << li.LowPart;
     stream >> *pStr;
     if (stream.fail() || stream.bad() || !stream.eof())
@@ -263,8 +265,10 @@ void ToStringAsHex(unsigned long long id, std::basic_string<Type, Traits<Type>, 
     std::basic_stringstream<Type> stream;
     std::hex(stream);
 
-    stream << std::setw( sizeof(li.HighPart)*2 ) << std::setfill( CharTraits<Type>::zero );
+    stream << std::setw( sizeof(li.HighPart)*2) << std::setfill( CharTraits<Type>::zero );
     stream << li.HighPart;   
+
+    stream << std::setw(sizeof(li.HighPart)*2) << std::setfill(CharTraits<Type>::zero);
     stream << li.LowPart;
     stream >> *pStr;
     if (stream.fail() || stream.bad() || !stream.eof())

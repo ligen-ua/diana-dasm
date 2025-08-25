@@ -38,6 +38,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules.columns"))
         << textManager->RegisterValue(ORTHIA_TCSTR("name"), ORTHIA_TCSTR("Name"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("address"), ORTHIA_TCSTR("Address"))
         ;
 
     // output

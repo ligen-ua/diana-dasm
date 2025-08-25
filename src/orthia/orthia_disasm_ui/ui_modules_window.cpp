@@ -20,7 +20,8 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption, std::sha
 
     oui::IListBoxOwner* owner = this;
     m_itemsBox = std::make_shared<oui::CListBox>(m_colorProfile, owner);
-    m_itemsBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  })
+    m_itemsBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  }),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  })
     );
     m_itemsBox->SetBorderStyle(oui::BorderStyle::None);
 }
@@ -48,7 +49,8 @@ void CModulesWindow::UpdateVisibleItems()
         orthia::UnparseFileNameFromFullFileName(it->fullName, &name);
 
         vit->text.clear();
-        vit->text.push_back(name);  
+        vit->text.push_back(name);
+        vit->text.push_back(orthia::ToWideStringAsHex(it->address));
 
         vit->openHandler = []() {
         };

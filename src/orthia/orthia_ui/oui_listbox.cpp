@@ -34,7 +34,6 @@ namespace oui
         auto currentItem = m_pageItems.begin();
         String tmpStr;
         int pos = 0;
-
         for (int i = 0; i < columnsCount; ++i)
         {
             if (HasReportMode()) 
