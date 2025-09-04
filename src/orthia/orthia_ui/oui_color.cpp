@@ -223,14 +223,14 @@ namespace oui
             ColorBrightWhite(),
         },
         {
-            ColorBrightWhite(),     // text
-            ColorCyan(),     // background
-            ColorBrightWhite()
-        },
-        {
             ColorBlack(),     // text
             ColorCyan(),      // background
             ColorBlack(),     
+        },
+        {
+            ColorBrightWhite(),     // text
+            ColorCyan(),     // background
+            ColorBrightWhite()
         }
     };
 
