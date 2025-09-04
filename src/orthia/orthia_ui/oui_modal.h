@@ -6,6 +6,15 @@
 
 namespace oui
 {
+    struct CommonDialogStrings
+    {
+        String caption;
+        String openingText;
+        String errorText;
+        String okText;
+        String cancelText;
+    };
+
     class CBaseModalWindow:public CWindow
     {
     protected:
@@ -19,7 +28,6 @@ namespace oui
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void FinishDialog();
     };
-
 
     class CModalWindow:public WithBorder<CBaseModalWindow>
     {

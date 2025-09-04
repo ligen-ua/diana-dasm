@@ -222,9 +222,7 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
 
         // no focused or focused couldn't process this, check alt menu
         if (evt.keyEvent.virtualKey == oui::VirtualKey::None &&
-            (evt.keyState.state & evt.keyState.AnyAlt) &&
-            !(evt.keyState.state & evt.keyState.AnyCtrl) &&
-            !(evt.keyState.state & evt.keyState.AnyShift))
+            evt.keyState.HasJustAlt())
         {
             ToggleMenu(false);
         }

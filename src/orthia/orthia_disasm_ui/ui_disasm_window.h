@@ -31,6 +31,8 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void OnResize() override;
     void SetFocusImpl() override;
     void SetActiveItemImpl(int itemUid);
+    bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
+    void Event_Goto();
 
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,

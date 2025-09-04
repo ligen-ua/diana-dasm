@@ -1,6 +1,7 @@
 #include "ui_disasm_window.h"
 #include "orthia_diana_print.h"
 #include "orthia_pe.h"
+#include "oui_goto_dialog.h"
 
 // == Structure ==
 // [PE HEADER]
@@ -311,5 +312,51 @@ void CDisasmWindow::SetActiveWorkspaceItem(int itemId)
     SetActiveItemImpl(itemId);
     ReloadVisibleData();
     Invalidate();
+}
 
+void CDisasmWindow::Event_Goto()
+{
+    // create open dialog
+    oui::CommonDialogStrings dialogStrings;
+    GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.goto"), dialogStrings);
+
+    int flags = oui::IProcessSystem::queryFlags_TryOpenProcessAsReader;
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::CGotoDialog>(dialogStrings,
+        [=](std::shared_ptr<oui::CGotoDialog> dlg, const oui::String& text) {
+        return false;
+    }));
+    dialog->Dock();
+}
+
+bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
+{
+    oui::CConsole* console = GetConsole();
+    if (!console)
+    {
+        return false;
+    }
+
+    if (evt.keyEvent.valid)
+    {
+        bool handled = false;
+        switch (evt.keyEvent.virtualKey)
+        {
+        case oui::VirtualKey::kG:
+            if (!evt.keyState.HasModifiers() || evt.keyState.HasJustCtrl())
+            {
+                Event_Goto();
+                handled = true;
+            }
+            break;
+
+        default:
+            break;
+        }
+        if (handled)
+        {
+            Invalidate();
+        }
+        return handled;
+    }
+    return Parent_type::ProcessEvent(evt, evtContext);
 }

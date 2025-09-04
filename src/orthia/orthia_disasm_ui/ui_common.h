@@ -2,7 +2,6 @@
 
 #include "orthia_model.h"
 
-
 struct UIState
 {
     std::map<int, orthia::Address_type> addresses;
@@ -34,3 +33,9 @@ public:
     void SaveState(int itemId);
     void SetActiveItem(int itemId);
 };
+
+namespace oui
+{
+    struct CommonDialogStrings;
+}
+void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings& strs);

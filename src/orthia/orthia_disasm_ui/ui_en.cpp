@@ -52,16 +52,23 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         ;
 
     // dialogs
-    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.openfile"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Open Executable"))
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.basedialog"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("ok"), ORTHIA_TCSTR("OK"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("cancel"), ORTHIA_TCSTR("Cancel"))
         << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: %1"))
         << textManager->RegisterValue(ORTHIA_TCSTR("error"), ORTHIA_TCSTR("Error: %1"))
         ;
 
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.openfile"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Open Executable"))
+        ;
+
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.openprocess"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Open Process"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: %1"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("error"), ORTHIA_TCSTR("Error: %1"))
+        ;
+
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.goto"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Goto Address"))
         ;
 
     // main

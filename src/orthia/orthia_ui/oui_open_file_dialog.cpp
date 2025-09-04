@@ -448,8 +448,7 @@ namespace oui
     }
 
     COpenFileDialog::COpenFileDialog(const String& rootFile, 
-        const String& openingText,
-        const String& errorText,
+        const oui::CommonDialogStrings& dialogStrings,
         FileRecipientHandler_type resultCallback,
         std::shared_ptr<IFileSystem> fileSystem,
         int typesToHighlight)
@@ -457,10 +456,12 @@ namespace oui
             m_resultCallback(resultCallback),
             m_fileSystem(fileSystem),
             m_rootFile(rootFile),
-            m_openingText(openingText),
-            m_errorText(errorText),
+            m_openingText(dialogStrings.openingText),
+            m_errorText(dialogStrings.errorText),
             m_typesToHighlight(typesToHighlight)
     {
+        SetCaption(dialogStrings.caption);
+
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
         m_filesBox->InitColumns(2);
@@ -471,7 +472,9 @@ namespace oui
                 text,
                 false);
         });
-        m_fileLabel = std::make_shared<CLabel>(m_colorProfile, [] { return String(OUI_STR(">"));  });
+
+        auto labelProfile = std::shared_ptr<LabelColorProfile>(m_colorProfile, &m_colorProfile->label);
+        m_fileLabel = std::make_shared<CLabel>(labelProfile, [] { return String(OUI_STR(">"));  });
 
         this->RegisterSwitch(m_fileEdit);
         this->RegisterSwitch(m_filesBox);

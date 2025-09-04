@@ -81,8 +81,7 @@ namespace oui
         String GetWaitBoxText();
 
     public:
-        COpenProcessDialog(const String& openingText,
-            const String& errorText,
+        COpenProcessDialog(const oui::CommonDialogStrings& dialogStrings,
             ProcessRecipientHandler_type resultCallback,
             std::shared_ptr<IProcessSystem> fileSystem,
             int scanFlags = 0);

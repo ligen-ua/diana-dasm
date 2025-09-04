@@ -90,8 +90,7 @@ namespace oui
 
     public:
         COpenFileDialog(const String& rootFile,
-            const String& openingText,
-            const String& errorText,
+            const oui::CommonDialogStrings& dialogStrings,
             FileRecipientHandler_type resultCallback,
             std::shared_ptr<IFileSystem> fileSystem,
             int typesToHighlight = 0);

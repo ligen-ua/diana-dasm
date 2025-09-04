@@ -214,6 +214,31 @@ namespace oui
         profile = g_editBoxColorProfile;
     }
 
+    // button
+    static ButtonColorProfile g_buttonColorProfile =
+    {
+        {
+            ColorGray(),     // text
+            ColorBlack(),     // background
+            ColorBrightWhite(),
+        },
+        {
+            ColorBrightWhite(),     // text
+            ColorCyan(),     // background
+            ColorBrightWhite()
+        },
+        {
+            ColorBlack(),     // text
+            ColorCyan(),      // background
+            ColorBlack(),     
+        }
+    };
+
+    void QueryDefaultColorProfile(ButtonColorProfile& profile)
+    {
+        profile = g_buttonColorProfile;
+    }
+
     // dialog
     void QueryDefaultColorProfile(DialogColorProfile& profile)
     {
@@ -221,7 +246,7 @@ namespace oui
         QueryDefaultColorProfile(profile.listBox);
         profile.listBoxFolders = g_listBoxFolders;
         QueryDefaultColorProfile(profile.editBox);
-
+        QueryDefaultColorProfile(profile.button);
     }
 
 }

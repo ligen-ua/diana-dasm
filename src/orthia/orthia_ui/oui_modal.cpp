@@ -304,7 +304,8 @@ namespace oui
         :
             m_onDestroy(onDestroy)
     {
-        m_fileLabel = std::make_shared<CLabel>(m_colorProfile, getText);
+        auto labelProfile = std::shared_ptr<LabelColorProfile>(m_colorProfile, &m_colorProfile->label);
+        m_fileLabel = std::make_shared<CLabel>(labelProfile, getText);
     }
     void CMessageBoxWindow::OnFinishDialog()
     {

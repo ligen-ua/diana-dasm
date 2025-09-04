@@ -1,17 +1,20 @@
-#include "oui_label.h"
-#include "oui_input.h"
+#include "oui_button.h"
+
 
 namespace oui
 {
-    String CLabel::m_chunk;
+    String CButton::m_chunk;
 
-    CLabel::CLabel(std::shared_ptr<LabelColorProfile> colorProfile, std::function<String()> getText)
+    CButton::CButton(std::shared_ptr<ButtonColorProfile> colorProfile, std::function<String()> getText)
         :
         m_colorProfile(colorProfile),
         m_getText(getText)
     {
     }
-    void CLabel::DoPaint(const Rect& rect, DrawParameters& parameters) 
+    CButton::~CButton()
+    {
+    }
+    void CButton::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
         auto console = GetConsole();
         if (!console)
@@ -34,13 +37,16 @@ namespace oui
         {
             state = &m_colorProfile->mouseHighlight;
         }
+        else if (IsFocused())
+        {
+            state = &m_colorProfile->selected;
+        }
         parameters.console.PaintText(target,
             state->text,
             state->background,
             m_chunk.native);
-
     }
-    String CLabel::GetText() const
+    String CButton::GetText() const
     {
         auto console = GetConsole();
 
@@ -51,7 +57,7 @@ namespace oui
         }
         return text;
     }
-    bool CLabel::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CButton::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
         Invalidate(false);
         return true;

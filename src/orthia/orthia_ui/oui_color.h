@@ -154,6 +154,21 @@ namespace oui
     };
     void QueryDefaultColorProfile(EditBoxColorProfile& profile);
 
+    // button
+    struct ButtonCaptionProfile
+    {
+        Color text;
+        Color background;
+        Color hotkeyText;
+    };
+    struct ButtonColorProfile
+    {
+        ButtonCaptionProfile normal;
+        ButtonCaptionProfile selected;
+        ButtonCaptionProfile mouseHighlight;
+    };
+    void QueryDefaultColorProfile(ButtonColorProfile& profile);
+
     // dialog
     struct DialogColorProfile
     {
@@ -161,6 +176,7 @@ namespace oui
         ListBoxColorProfile listBox;
         Color listBoxFolders;
         EditBoxColorProfile editBox;
+        ButtonColorProfile button;
     };
     void QueryDefaultColorProfile(DialogColorProfile& profile);
 

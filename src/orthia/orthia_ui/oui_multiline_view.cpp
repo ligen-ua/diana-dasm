@@ -202,7 +202,7 @@ namespace oui
             case VirtualKey::Up:
                 handled = true;
                 ScrollUp(1);
-                return true;
+                break;
 
             case VirtualKey::Down:
                 handled = true;

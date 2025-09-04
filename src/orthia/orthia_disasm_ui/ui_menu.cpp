@@ -124,8 +124,6 @@ oui::fsui::OpenResult CMainWindow::HandleOpenProcess(std::shared_ptr<oui::COpenP
 
 void CMainWindow::OpenProcess()
 {
-    auto openFileNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.openprocess"));
-
     auto me = oui::GetPtr_t<CMainWindow>(this);
     std::weak_ptr<CMainWindow> weakMe = me;
     if (!me)
@@ -134,9 +132,11 @@ void CMainWindow::OpenProcess()
     }
 
     // create open dialog
+    oui::CommonDialogStrings dialogStrings;
+    GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.openprocess"), dialogStrings);
+
     int flags = oui::IProcessSystem::queryFlags_TryOpenProcessAsReader;
-    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenProcessDialog>(openFileNode->QueryValue(ORTHIA_TCSTR("opening")),
-        openFileNode->QueryValue(ORTHIA_TCSTR("error")),
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenProcessDialog>(dialogStrings,
         [=](std::shared_ptr<oui::COpenProcessDialog> dlg, std::shared_ptr<oui::IProcess> proc, oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> handler) {
         if (auto p = weakMe.lock())
         {
@@ -147,13 +147,10 @@ void CMainWindow::OpenProcess()
     },
         m_model->GetProcessSystem(),
         flags));
-    dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
     dialog->Dock();
 }
 void CMainWindow::OpenExecutable()
 {
-    auto openFileNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.openfile"));
-
     auto me = oui::GetPtr_t<CMainWindow>(this);
     std::weak_ptr<CMainWindow> weakMe = me;
     if (!me)
@@ -162,9 +159,11 @@ void CMainWindow::OpenExecutable()
     }
     
     // create open dialog
+    oui::CommonDialogStrings dialogStrings;
+    GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.openfile"), dialogStrings);
+
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>(oui::String(),
-        openFileNode->QueryValue(ORTHIA_TCSTR("opening")),
-        openFileNode->QueryValue(ORTHIA_TCSTR("error")),
+        dialogStrings,
         [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler) {
             if (auto p = weakMe.lock())
             {
@@ -175,7 +174,6 @@ void CMainWindow::OpenExecutable()
         },
         m_model->GetFileSystem(),
         oui::FileInfo::flag_any_executable));
-    dialog->SetCaption(openFileNode->QueryValue(ORTHIA_TCSTR("caption")));
     dialog->Dock();
 }
 void CMainWindow::ToggleWorkspaceView()

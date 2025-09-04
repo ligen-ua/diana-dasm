@@ -317,18 +317,19 @@ namespace oui
         }
     }
    
-    COpenProcessDialog::COpenProcessDialog(const String& openingText,
-        const String& errorText,
+    COpenProcessDialog::COpenProcessDialog(const oui::CommonDialogStrings& dialogStrings,
         ProcessRecipientHandler_type resultCallback,
         std::shared_ptr<IProcessSystem> fileSystem,
         int scanFlags)
         :
             m_resultCallback(resultCallback),
             m_fileSystem(fileSystem),
-            m_openingText(openingText),
-            m_errorText(errorText),
+            m_openingText(dialogStrings.openingText),
+            m_errorText(dialogStrings.errorText),
             m_scanFlags(scanFlags)
     {
+        SetCaption(dialogStrings.caption);
+
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
         m_filesBox->InitColumns(2);
@@ -338,7 +339,9 @@ namespace oui
             TryOpenProcess(ProcessUnifiedId(text));
         });
         m_fileEdit->SetSelectAllOnFocus(true);
-        m_fileLabel = std::make_shared<CLabel>(m_colorProfile, [] { return String(OUI_STR(">"));  });
+
+        auto labelProfile = std::shared_ptr<LabelColorProfile>(m_colorProfile, &m_colorProfile->label);
+        m_fileLabel = std::make_shared<CLabel>(labelProfile, [] { return String(OUI_STR(">"));  });
 
         this->RegisterSwitch(m_fileEdit);
         this->RegisterSwitch(m_filesBox);
