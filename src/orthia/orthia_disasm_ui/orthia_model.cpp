@@ -4,6 +4,7 @@
 #include "orthia_helpers.h"
 #include "orthia_database_module.h"
 #include "orthia_item_process.h"
+#include "orthia_item_file.h"
 
 namespace orthia
 {
@@ -183,8 +184,8 @@ namespace orthia
         {
             dianaMode = DIANA_MODE64;
         }
-
-        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode);
+        auto peristentItemStorage = std::make_shared<ÑPeristentItemStorage>();
+        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, peristentItemStorage);
         info->ReloadModules();
 
         if (auto address = info->GerProcessModuleAddress())
@@ -311,7 +312,8 @@ namespace orthia
         }
 
         // fill the model data
-        auto info = std::make_shared<FileWorkplaceItem>();
+        auto peristentItemStorage = std::make_shared<ÑPeristentItemStorage>();
+        auto info = std::make_shared<FileWorkplaceItem>(peristentItemStorage);
         info->fullName = file->GetFullFileName();
         info->peFile = std::move(mappedPE);
         {

@@ -226,6 +226,14 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
         {
             ToggleMenu(false);
         }
+
+        if (evt.keyEvent.virtualKey == oui::VirtualKey::Escape)
+        {
+            if (m_menu->IsActive())
+            {
+                ToggleMenu(false);
+            }
+        }
     }
     return true;
 }

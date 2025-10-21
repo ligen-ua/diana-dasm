@@ -60,3 +60,31 @@ void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings&
     Load(L"ok", strs.okText, baseDialogNode, dialogNode);
     Load(L"cancel", strs.cancelText, baseDialogNode, dialogNode);
 }
+
+
+namespace oui
+{
+
+    orthia::Address_type CaptureAddress(const std::wstring& addressString)
+    {
+        if (addressString.empty())
+        {
+            throw std::runtime_error("Invalid argument");
+        }
+        ULONGLONG address = 0;
+        if (addressString.size() > 2 && addressString[0] == '0' && addressString[1] == 'x')
+        {
+            orthia::HexStringToObject(std::wstring(addressString.begin() + 2, addressString.end()), &address);
+            return address;
+        }
+        if (addressString.size() > 2 && addressString[0] == '0' && addressString[1] == 'n')
+        {
+            orthia::StringToObject(std::wstring(addressString.begin() + 2, addressString.end()), &address);
+            return address;
+        }
+        orthia::HexStringToObject(addressString, &address);
+        return address;
+    }
+
+
+}

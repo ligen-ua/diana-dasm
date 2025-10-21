@@ -2,6 +2,9 @@
 
 #include "orthia_utils.h"
 #include "oui_string.h"
+#include "oui_window_thread.h"
+#include "oui_filesystem.h"
+#include "orthia_common_time.h"
 
 namespace orthia
 {
@@ -69,6 +72,8 @@ namespace orthia
         {
         }
     };
+
+    struct IPeristentItemStorage;
     struct IWorkPlaceItem
     {
         virtual ~IWorkPlaceItem() {}
@@ -79,6 +84,59 @@ namespace orthia
         virtual void ReloadModules() = 0;
         virtual void GetModules(std::vector<orthia::ModuleInfo>& modules) const = 0;
         virtual int GetModulesCount() const = 0;
+        virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
     };
 
+
+    struct GotoItem
+    {
+        orthia::CCommonDateTime lastUpdateTime;
+        orthia::Address_type address = 0;
+        oui::String comment;
+
+        GotoItem()
+        {
+
+        }
+        GotoItem(const orthia::Address_type & address_in)
+            :
+            address(address_in)
+        {
+            lastUpdateTime.InitFromCurrentTime();
+        }
+    };
+    using ThreadPtr_type = std::shared_ptr<oui::CWindowThread>;
+    using QueryGotoItemHandler_type = std::function<void(std::shared_ptr<oui::BaseOperation> operation,
+        const oui::String& filter,
+        const std::vector<GotoItem>& data,
+        int error)>;
+    using GotoCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error)>;
+
+    struct IPeristentItemStorage
+    {
+        virtual ~IPeristentItemStorage() {}
+        virtual void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+            const oui::String& filter,
+            oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
+            int flags) = 0;
+        
+        virtual void AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
+            orthia::Address_type address) = 0;
+    };
+
+
+    class ÑPeristentItemStorage :public IPeristentItemStorage
+    {
+        std::map<orthia::Address_type, GotoItem> m_dataItems;
+    public:
+        void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+            const oui::String& filter,
+            oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
+            int flags);
+
+        void AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
+            orthia::Address_type address);
+    };
 }

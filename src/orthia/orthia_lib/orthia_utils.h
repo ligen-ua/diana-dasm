@@ -675,6 +675,7 @@ inline std::string Downcase_Ansi(const std::string & str)
     return std::string(&temp.front(), &temp.front() + dwSize);
 }
 
+long long GetCurrentUTCTime();
 long long ConvertSystemTimeToFileTime(const SYSTEMTIME * pTime);
 std::wstring SystemTimeToWideString(const SYSTEMTIME & st);
 std::wstring SystemTimeToWideStringJustDate(const SYSTEMTIME & st);

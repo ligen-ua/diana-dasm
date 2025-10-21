@@ -13,10 +13,12 @@ namespace orthia
         int m_dianaMode = 0;
         std::vector<orthia::ModuleInfo> m_modules;
         Address_type m_processModuleAddress = 0;
+        std::shared_ptr<IPeristentItemStorage> m_persistentStorage;
     public:
         CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
             const oui::String& shortName,
-            int dianaMode);
+            int dianaMode,
+            std::shared_ptr<IPeristentItemStorage> persistentStorage);
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;
@@ -27,7 +29,7 @@ namespace orthia
         int GetModulesCount() const override;
 
         Address_type GerProcessModuleAddress();
-
+        std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
     };
 
 }

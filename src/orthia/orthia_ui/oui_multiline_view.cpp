@@ -16,15 +16,30 @@ namespace oui
 
             return this->HandleMouseEvent(myRect, evt);
         };
+        handlers.ctrlCHandler = [&](InputEvent& evt) {
+            return this->CopySelected();
+        };
+        handlers.ctrlAHandler = [&](InputEvent& evt) {
+            return m_owner->SelectAll();
+        };
         m_editBox->SetLowLevelHandlers(std::move(handlers));
+
+        m_editBox->SetEnterHandler([&](const String&) {
+            if (this->SelectionIsActive() || m_editBox->SelectionIsActive()) {
+                this->CopySelected();
+                this->CancelSelection();
+                return;
+            }
+            m_owner->OnEnter();
+        });
     }
-    CMultiLineView::CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, 
+    CMultiLineView::CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile,
         IMultiLineViewOwner* owner,
         bool dynamicLogMode)
         :
-            m_colorProfile(colorProfile),
-            m_owner(owner),
-            m_dynamicLogMode(dynamicLogMode)
+        m_colorProfile(colorProfile),
+        m_owner(owner),
+        m_dynamicLogMode(dynamicLogMode)
     {
         m_editBox = std::make_shared<CEditBox>(m_colorProfile);
         m_editBox->SetReadOnly(true);
@@ -32,7 +47,7 @@ namespace oui
 
         m_paintBox = std::make_shared<CEditBox>(m_colorProfile);
         m_paintBox->SetReadOnly(true);
-        SetBackgroundColor(m_colorProfile->editBox.normal.background); 
+        SetBackgroundColor(m_colorProfile->editBox.normal.background);
     }
     void CMultiLineView::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
@@ -63,7 +78,7 @@ namespace oui
                 m_firstVisibleLineIndex += yResizeCorrection;
             }
         }
-    
+
         if (m_firstVisibleLineIndex < 0)
         {
             m_firstVisibleLineIndex = 0;
@@ -88,6 +103,14 @@ namespace oui
                 m_yCursopPos = 0;
             }
         }
+
+        auto selPosStart = m_selPosStart;
+        auto selPosEnd = m_selPosEnd;
+        if (selPosEnd < selPosStart)
+        {
+            std::swap(selPosEnd, selPosStart);
+        }
+
         auto target = absClientRect.position;
         auto it = m_lines.begin() + m_firstVisibleLineIndex;
         for (int i = 0; i < availableHeight; ++i)
@@ -95,12 +118,31 @@ namespace oui
             if (it == m_lines.end())
             {
                 break;
-            }
+            }   
             if (i != m_yCursopPos)
             {
                 m_paintBox->SetText(it->text);
-
-                oui::Rect childRect{ target, {absClientRect.size.width, 1} };
+                if (SelectionIsActive())
+                {
+                    auto lineIndex = m_owner->GetLineIndex(m_firstVisibleLineIndex + i);
+                    int res1 = lineIndex.CompareWith(selPosStart.y);
+                    int res2 = lineIndex.CompareWith(selPosEnd.y);
+                    if (res1 > 0 && res2 < 0)
+                    {
+                        m_paintBox->SelectAll();
+                    }
+                    else
+                    if (res1 == 0)
+                    {
+                        m_paintBox->Select(selPosStart.x, -1);
+                    }
+                    else
+                    if (res2 == 0)
+                    {
+                        m_paintBox->Select(0, selPosEnd.x);
+                    }
+                }
+                oui::Rect childRect{ target, { absClientRect.size.width, 1 } };
                 m_paintBox->DoPaint(childRect, parameters);
             }
             ++it;
@@ -111,6 +153,35 @@ namespace oui
         if (m_cursorOutOfText)
         {
             m_editBox->SetText(String());
+        }
+        if (SelectionIsActive())
+        {
+            // adjust selections
+            auto lineIndex = m_owner->GetLineIndex(m_firstVisibleLineIndex + m_yCursopPos);
+            int res1 = lineIndex.CompareWith(selPosStart.y);
+            int res2 = lineIndex.CompareWith(selPosEnd.y);
+            if (res1 > 0 && res2 < 0)
+            {
+                // select all case when edit box is inside the selection
+                m_editBox->SelectAll();
+            }
+            else
+            if (res1 == 0 && res2 == 0)
+            {
+                // special case when user selects a lot and then returns back
+                m_editBox->Select(m_selPosStart.x, m_selPosEnd.x);
+            }
+            else
+            {
+                if (res1 == 0)
+                {
+                    m_editBox->Select(-1, selPosStart.x);
+                }
+                else
+                {
+                    m_editBox->Select(0, selPosEnd.x);
+                }
+            }
         }
     }
 
@@ -171,7 +242,7 @@ namespace oui
             if (count > availableItemsCountAfterCursor)
             {
                 // ask owner, need some data
-                MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[m_lines.size()-1];
+                MultiLineViewItem* item = m_lines.empty() ? nullptr : &m_lines[m_lines.size() - 1];
                 if (m_owner->ScrollDown(item, count))
                 {
                     return;
@@ -185,6 +256,37 @@ namespace oui
         SetNewYCursorPosImpl(newCursor);
         Invalidate();
     }
+    bool CMultiLineView::CopySelected()
+    {
+        if (SelectionIsActive())
+        {
+            m_owner->CopySelected(m_selPosStart, m_selPosEnd);
+            return true;
+        }
+        else
+        {
+            // local selection 
+            if (m_editBox->SelectionIsActive())
+            {
+                if (auto console = GetConsole())
+                {
+                    console->CopyTextToClipboard(m_editBox->ExtractSelected(false));
+                }
+            }
+        }
+        return false;
+    }
+    void CMultiLineView::FixupTopSelectionRange() 
+    {
+        if (SelectionIsActive())
+        {
+            m_selPosEnd.y = GetCurrentLineIndex();
+        }
+    }
+    bool CMultiLineView::SelectionIsActive() const
+    {
+        return m_selectionIsActive;
+    }
 
     bool CMultiLineView::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
@@ -196,32 +298,38 @@ namespace oui
 
         if (evt.keyEvent.valid)
         {
+            m_lastKeyState = evt.keyState;
             bool handled = false;
             switch (evt.keyEvent.virtualKey)
             {
             case VirtualKey::Up:
                 handled = true;
+                CancelSelectionIfNecessary();
                 ScrollUp(1);
                 break;
 
             case VirtualKey::Down:
                 handled = true;
+                CancelSelectionIfNecessary();
                 ScrollDown(1);
                 break;
 
             case VirtualKey::PageUp:
                 handled = true;
+                CancelSelectionIfNecessary();
                 ScrollUp(GetClientRect().size.height);
                 break;
 
             case VirtualKey::PageDown:
                 handled = true;
+                CancelSelectionIfNecessary();
                 ScrollDown(GetClientRect().size.height);
                 break;
 
             default:
                 break;
             }
+            m_lastKeyState = KeyState();
             if (handled)
             {
                 Invalidate();
@@ -233,7 +341,7 @@ namespace oui
     void CMultiLineView::OnFocusLost()
     {
         Invalidate();
-       
+
         if (auto console = GetConsole())
         {
             console->HideCursor();
@@ -279,8 +387,48 @@ namespace oui
         Invalidate();
     }
 
+    bool CMultiLineView::KeyStateHasSelection() const
+    {
+        return m_lastKeyState.HasShift();
+    }
+
+    void CMultiLineView::ActivateSelection()
+    {
+        if (m_selectionIsActive)
+        {
+            return;
+        }
+        m_selPosStart.y = GetCurrentLineIndex();
+        m_selPosEnd.y = GetCurrentLineIndex();
+        m_selPosStart.x = m_editBox->GetVirtualCursorPosition();
+        m_selPosEnd.x = m_editBox->GetVirtualCursorPosition();
+        m_selectionIsActive = true;
+    }
+    void CMultiLineView::CancelSelection()
+    {
+        m_selectionIsActive = false;
+        m_editBox->ResetSelection();
+        Invalidate();
+    }
+    void CMultiLineView::CancelSelectionIfNecessary()
+    {
+        if (SelectionIsActive() && !KeyStateHasSelection()) 
+        {
+            CancelSelection();
+        }
+    }
     void CMultiLineView::SetNewYCursorPosImpl(int newCursor)
     {
+        if (KeyStateHasSelection())
+        {
+            ActivateSelection();
+        }
+        else
+        {
+            CancelSelection();
+        }
+        bool selectionActive = SelectionIsActive();
+
         m_yCursopPos = newCursor;
         bool outOfBounds = m_firstVisibleLineIndex + m_yCursopPos >= (int)m_lines.size();
         if (((int)m_lines.size() - m_firstVisibleLineIndex <= 0) || (outOfBounds && m_dynamicLogMode))
@@ -295,11 +443,20 @@ namespace oui
             }
             m_cursorOutOfText = false;
             int offset = m_firstVisibleLineIndex + m_yCursopPos;
-            int cursorPos = m_editBox->GetVirtualCursorPosition(); 
+            int cursorPos = m_editBox->GetVirtualCursorPosition();
+            m_selPosEnd.y = m_owner->GetLineIndex(offset);
+            m_selPosEnd.x = cursorPos;
+
             m_editBox->SetText(m_lines[offset].text);
-            m_editBox->SetVirtualCursorPosition(cursorPos, true, false);            
+            m_editBox->SetVirtualCursorPosition(cursorPos, true, false);
         }
     }
+
+    LineIndex CMultiLineView::GetCurrentLineIndex() const
+    {
+        return m_owner->GetLineIndex(m_yCursopPos + m_firstVisibleLineIndex);
+    }
+
     void CMultiLineView::SetNewCursor(const Point& pt)
     {
         if (m_yCursopPos == pt.y)
@@ -326,8 +483,14 @@ namespace oui
             m_editBox->SetCursorPosition(pt.x, true, false);
         }
     }
-
     bool CMultiLineView::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    {
+        m_lastKeyState = evt.keyState;
+        bool res = HandleMouseEventImpl(rect, evt);
+        m_lastKeyState = KeyState();
+        return res;
+    }
+    bool CMultiLineView::HandleMouseEventImpl(const Rect& rect, InputEvent& evt)
     {
         {
             int pageSize = 1;
@@ -350,6 +513,7 @@ namespace oui
             {
                 return false;
             }
+            CancelSelectionIfNecessary();
             // got click
             SetNewCursor(point);
         }
@@ -392,5 +556,77 @@ namespace oui
     void CMultiLineView::SetCursorYPos(int newPos)
     {
         SetNewYCursorPosImpl(newPos);
+    }
+    void CMultiLineView::SelectAllCached()
+    {
+        if (m_lines.empty())
+        {
+            CancelSelection();
+            return;
+        }
+        m_selPosStart.y = m_owner->GetLineIndex(0);
+        m_selPosEnd.y = m_owner->GetLineIndex((int)m_lines.size());
+        m_selPosStart.x = 0;
+        m_selPosEnd.x = 0;
+        m_selectionIsActive = true;
+        Invalidate();
+    }
+
+    String CMultiLineView::ExtractSelected()
+    {
+        if (!SelectionIsActive())
+        {
+            return m_editBox->ExtractSelected(false);
+        }
+
+        auto startPos = m_selPosStart, endPos = m_selPosEnd;
+        if (endPos < startPos)
+        {
+            std::swap(startPos, endPos);
+        }
+
+        if (startPos.y == endPos.y)
+        {
+            return m_editBox->ExtractSelected(false);
+        }
+        
+        int yPos = -1;
+        String result;
+        for (auto& line : m_lines)
+        {
+            ++yPos;
+            auto index = m_owner->GetLineIndex(yPos);
+            auto res1 = index.CompareWith(startPos.y);
+            auto res2 = index.CompareWith(endPos.y);
+            if (res1 < 0)
+            {
+                // current line is above selection
+                continue;
+            }
+            if (res2 > 0)
+            {
+                // current line is below selection
+                break;
+            }
+            if (res1 == 0)
+            {
+                m_paintBox->SetText(line.text.native);
+                m_paintBox->Select(startPos.x, -1);
+                result.native += m_paintBox->ExtractSelected(false).native;
+                result.native += OUI_TCSTR("\n");
+                continue;
+            }
+            if (res2 == 0)
+            {
+                m_paintBox->SetText(line.text.native);
+                m_paintBox->Select(-1, endPos.x);
+                result.native += m_paintBox->ExtractSelected(false).native;
+                result.native += OUI_TCSTR("\n");
+                break;
+            }
+            result.native += line.text.native;
+            result.native += OUI_TCSTR("\n");
+        }
+        return result;
     }
 }

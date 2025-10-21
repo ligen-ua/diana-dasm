@@ -47,7 +47,7 @@ namespace oui
 
     using ProcessRecipientHandler_type = std::function<void(std::shared_ptr<IProcess>, int error)>;
     using QueryProcessHandler_type = std::function<void(std::shared_ptr<BaseOperation> operation, 
-        const ProcessUnifiedId& filter, 
+        const ProcessUnifiedId& processId, 
         const std::vector<ProcessInfo>& data, 
         int error)>;
 
@@ -57,7 +57,7 @@ namespace oui
 
         virtual ~IProcessSystem() {}
         virtual void AsyncStartQueryProcess(ThreadPtr_type targetThread, 
-            const ProcessUnifiedId& fileId,
+            const ProcessUnifiedId& processId,
             ProcessRecipientHandler_type openHandler,
             OperationPtr_type<QueryProcessHandler_type> filterHandler,
             int flags) = 0;

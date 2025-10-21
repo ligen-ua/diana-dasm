@@ -569,7 +569,7 @@ namespace oui
         }
 
         // scan from start
-        for (int i = 0; i <= selectionOffset; ++i)
+        for (int i = 0; i <= std::min((int)m_currentFiles.size() - 1, selectionOffset); ++i)
         {
             if (StartsWith(m_currentFiles[i].info.fileName.native, symbol.native))
             {

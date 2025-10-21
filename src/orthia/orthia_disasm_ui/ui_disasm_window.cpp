@@ -41,7 +41,7 @@ void CDisasmWindow::SetActiveItem(int itemUid, DI_UINT64 initialAddressHint)
     ReloadVisibleData();
     Invalidate();
 }
-void CDisasmWindow::ReloadVisibleData()
+void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
 {
     const int requiredLinesCount = m_view->GetSize().height;
     if (!requiredLinesCount)
@@ -208,6 +208,10 @@ void CDisasmWindow::ReloadVisibleData()
     {
         // check if can be adjusted
         m_peAddress = printer.GetRealFirstAddress();
+        if (context.scrollUp) 
+        {
+            m_view->FixupTopSelectionRange();
+        }
     }
 
     // clear flag on any next move
@@ -215,6 +219,20 @@ void CDisasmWindow::ReloadVisibleData()
 }
 void CDisasmWindow::CancelAllQueries()
 {
+}
+void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1, const oui::MultiLineSelPoint& p2)
+{
+}
+void CDisasmWindow::OnEnter()
+{
+}
+bool CDisasmWindow::SelectAll()
+{
+    return false;
+}
+oui::LineIndex CDisasmWindow::GetLineIndex(int offsetInPage) const
+{
+    return oui::LineIndex(m_peAddress + offsetInPage, 0);
 }
 bool CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count) 
 {
@@ -238,7 +256,9 @@ bool CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
     {
         m_peAddress = 0;
     }
-    ReloadVisibleData();
+    ReloadVisibleDataContext context;
+    context.scrollUp = true;
+    ReloadVisibleData(context);
     return true;
 }
 bool CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count) 
@@ -314,17 +334,38 @@ void CDisasmWindow::SetActiveWorkspaceItem(int itemId)
     Invalidate();
 }
 
+void CDisasmWindow::DoGoto(orthia::Address_type address)
+{
+    m_peAddress = address;
+    m_view->Clear();
+    ReloadVisibleData();
+    Invalidate();
+}
+
 void CDisasmWindow::Event_Goto()
 {
     // create open dialog
     oui::CommonDialogStrings dialogStrings;
     GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.goto"), dialogStrings);
 
+    auto activeItem = m_model->GetActiveItem();
+    if (!activeItem) {
+        return;
+    }
+    if (!activeItem->GetPersistentStorage()) {
+        return;
+    }
     int flags = oui::IProcessSystem::queryFlags_TryOpenProcessAsReader;
     auto dialog = AddChildAndInit_t(std::make_shared<oui::CGotoDialog>(dialogStrings,
-        [=](std::shared_ptr<oui::CGotoDialog> dlg, const oui::String& text) {
-        return false;
-    }));
+        [=](orthia::Address_type address, int error) {
+
+        if (!error)
+        {
+            DoGoto(address);
+        }
+        return oui::fsui::OpenResult();
+    },
+        activeItem->GetPersistentStorage()));
     dialog->Dock();
 }
 

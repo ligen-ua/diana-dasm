@@ -35,6 +35,14 @@ namespace oui
         {
             return (state & AnyAlt) && !(state & AnyCtrl) && !(state & AnyShift);
         }
+        bool HasJustShift() const
+        {
+            return (state & AnyShift) && !(state & AnyCtrl) && !(state & AnyAlt);
+        }
+        bool HasShift() const
+        {
+            return (state & AnyShift);
+        }
     };
     enum class VirtualKey
     {

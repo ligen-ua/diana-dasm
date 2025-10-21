@@ -12,7 +12,7 @@ namespace oui
 
         std::shared_ptr<ButtonColorProfile> m_colorProfile;
         std::function<String()> m_getText;
-        static String m_chunk;
+        static String m_chunk, m_chunkText;
 
     protected:
 

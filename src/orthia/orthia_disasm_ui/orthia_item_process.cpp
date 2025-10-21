@@ -8,11 +8,13 @@ namespace orthia
     // CProcessWorkplaceItem
     CProcessWorkplaceItem::CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
         const oui::String& shortName,
-        int dianaMode)
+        int dianaMode,
+        std::shared_ptr<IPeristentItemStorage> persistentStorage)
         :
             m_proc(proc),
             m_shortName(shortName),
-            m_dianaMode(dianaMode)
+            m_dianaMode(dianaMode),
+            m_persistentStorage(persistentStorage)
     {
     }
 
@@ -85,5 +87,9 @@ namespace orthia
     int CProcessWorkplaceItem::GetModulesCount() const
     {
         return (int)m_modules.size();
+    }
+    std::shared_ptr<IPeristentItemStorage> CProcessWorkplaceItem::GetPersistentStorage() 
+    {
+        return m_persistentStorage;
     }
 }

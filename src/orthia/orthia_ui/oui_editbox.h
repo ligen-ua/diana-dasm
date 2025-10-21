@@ -2,25 +2,32 @@
 
 #include "oui_window.h"
 #include "oui_win_styles.h"
+#include "oui_text_markup.h"
 
 namespace oui
 {
     struct EditBoxLowLevelHandlers
     {
         std::function<bool(const Rect& rect, InputEvent& evt)> mouseHandler;
+        std::function<bool(InputEvent& evt)> ctrlCHandler;
+        std::function<bool(InputEvent& evt)> ctrlAHandler;
     };
+    
+    struct EditBoxSelectionRange;
+
     class CEditBox:public SimpleBrush<MouseFocusable<CWindow>>
     {
         using Parent_type = SimpleBrush<MouseFocusable<CWindow>>;
 
         std::shared_ptr<DialogColorProfile> m_colorProfile;
         String m_text;
+        TextMarkup m_markup;
         Rect m_lastRect;
         std::vector<SymbolInfo> m_symbols;
         int m_cursorIterator = 0;
         int m_windowRightIterator = 0;
 
-        // selection
+        // selection, in symbols
         int m_selPosStart = 0;
         int m_selPosEnd = 0;
 
@@ -40,11 +47,17 @@ namespace oui
 
         void ProcessDelete();
         void ProcessBackpace();
-        void ResetSelection();
         int GetSymOffset(int symbol) const;
+        void DoPaintMarkupText(DrawParameters& parameters, 
+            std::vector<TextMarkup::Range>::const_iterator& it,
+            int& rangePos,
+            Point& target, String* stringToRender, 
+            int startPos, int endPos,
+            const EditBoxSelectionRange& selectionRange);
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
+        void ResetSelection();
         void SetSelectAllOnFocus(bool selectAllOnFocus);
         void SetLowLevelHandlers(EditBoxLowLevelHandlers&& handlers);
         void SetReadOnly(bool readOnly);
@@ -55,13 +68,19 @@ namespace oui
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void Clear();
         String GetText() const;
+        void SetMarkup(const TextMarkup& markup);
         void SetText(const String& text);
         void ScrollRight();
         void OnFocusLost() override;
         void OnFocusEnter() override;
         bool SelectionIsActive() const;
         String ExtractSelected(bool cut);
-        void SelectAll();
+
+        void SelectAll(bool moveCursor = true);
+        void SelectCurrentWord();
+        void Select(int startX, int endX);
+
+        int AdjustVirtualCursorPosition(int startX);
         void SetCursorPosition(int newScreenX, bool changeSelecton, bool shiftMode);
         int GetVirtualCursorPosition() const;
         void SetVirtualCursorPosition(int newIterator, bool changeSelecton, bool shiftMode);

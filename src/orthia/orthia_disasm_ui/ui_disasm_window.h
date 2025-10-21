@@ -3,8 +3,16 @@
 #include "oui_multiline_view.h"
 #include "ui_common.h"
 
+
 class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineViewOwner, public IUIStatefulWindow
 {
+    struct ReloadVisibleDataContext
+    {
+        bool scrollUp = false;
+        ReloadVisibleDataContext()
+        {
+        }
+    };
     static const int field_peAddress = 1;
 
     using Parent_type = oui::SimpleBrush<oui::CPanelWindow>;
@@ -25,7 +33,7 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void CancelAllQueries() override;
     bool ScrollUp(oui::MultiLineViewItem* item, int count) override;
     bool ScrollDown(oui::MultiLineViewItem* item, int count) override;
-    void ReloadVisibleData();
+    void ReloadVisibleData(const ReloadVisibleDataContext& context = ReloadVisibleDataContext());
 
     void ConstructChilds() override;
     void OnResize() override;
@@ -33,6 +41,11 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void SetActiveItemImpl(int itemUid);
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
     void Event_Goto();
+    void DoGoto(orthia::Address_type address);
+    void CopySelected(const oui::MultiLineSelPoint& p1, const oui::MultiLineSelPoint& p2) override;
+    bool SelectAll() override;
+    oui::LineIndex GetLineIndex(int offsetInPage) const override;
+    void OnEnter() override;
 
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,

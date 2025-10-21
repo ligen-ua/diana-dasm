@@ -39,3 +39,8 @@ namespace oui
     struct CommonDialogStrings;
 }
 void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings& strs);
+
+namespace oui
+{
+    orthia::Address_type CaptureAddress(const std::wstring& addressString);
+}

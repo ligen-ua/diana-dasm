@@ -13,6 +13,10 @@ class COutputWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void ConstructChilds() override;
     void OnResize() override;
     void SetFocusImpl() override;
+    oui::LineIndex GetLineIndex(int offsetInPage) const override;
+    void CopySelected(const oui::MultiLineSelPoint& p1, const oui::MultiLineSelPoint& p2) override;
+    bool SelectAll() override;
+    void OnEnter() override;
 
     // orthia::IUILogInterface
     void WriteLog(const oui::String& line) override;

@@ -45,6 +45,17 @@ int GetAppDataFolderWithSlash_Silent(PlatformString_type& result)
 }
 
 // systemtime
+long long GetCurrentUTCTime()
+{
+    FILETIME fileTime = { 0, };
+    GetSystemTimeAsFileTime(&fileTime);
+
+    LARGE_INTEGER result;
+    result.HighPart = fileTime.dwHighDateTime;
+    result.LowPart = fileTime.dwLowDateTime;
+    return result.QuadPart;
+}
+
 long long ConvertSystemTimeToFileTime(const SYSTEMTIME * pTime)
 {
     FILETIME fileTime = {0,0};

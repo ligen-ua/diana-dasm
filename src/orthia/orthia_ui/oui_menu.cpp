@@ -734,6 +734,7 @@ namespace oui
     }
     void CMenuWindow::OpenPopup()
     {
+        m_setFocusOnDeactivate = true;
         if (m_currentPopup)
         {
             m_currentPopup->Detach();

@@ -166,7 +166,6 @@
     <ClCompile Include="oui_editbox.cpp" />
     <ClCompile Include="oui_filesystem.cpp" />
     <ClCompile Include="oui_filesystem_win32.cpp" />
-    <ClCompile Include="oui_goto_dialog.cpp" />
     <ClCompile Include="oui_hotkey.cpp" />
     <ClCompile Include="oui_input_win32.cpp" />
     <ClCompile Include="oui_label.cpp" />
@@ -182,6 +181,7 @@
     <ClCompile Include="oui_string.cpp" />
     <ClCompile Include="oui_symbols_newterm_win32.cpp" />
     <ClCompile Include="oui_symbols_win32.cpp" />
+    <ClCompile Include="oui_text_markup.cpp" />
     <ClCompile Include="oui_threadpool.cpp" />
     <ClCompile Include="oui_window.cpp" />
     <ClCompile Include="oui_window_thread.cpp" />
@@ -197,7 +197,6 @@
     <ClInclude Include="oui_containers.h" />
     <ClInclude Include="oui_editbox.h" />
     <ClInclude Include="oui_filesystem.h" />
-    <ClInclude Include="oui_goto_dialog.h" />
     <ClInclude Include="oui_hotkey.h" />
     <ClInclude Include="oui_input.h" />
     <ClInclude Include="oui_input_win32.h" />
@@ -214,6 +213,7 @@
     <ClInclude Include="oui_string.h" />
     <ClInclude Include="oui_symbols_newterm_win32.h" />
     <ClInclude Include="oui_symbols_win32.h" />
+    <ClInclude Include="oui_text_markup.h" />
     <ClInclude Include="oui_threadpool.h" />
     <ClInclude Include="oui_window.h" />
     <ClInclude Include="oui_win_styles.h" />

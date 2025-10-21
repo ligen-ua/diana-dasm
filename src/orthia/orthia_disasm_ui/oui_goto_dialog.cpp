@@ -1,5 +1,6 @@
 #define  _CRT_SECURE_NO_WARNINGS
-#include "oui_open_process_dialog.h"
+#include "oui_goto_dialog.h"
+#include "ui_common.h"
 
 namespace oui
 {
@@ -11,18 +12,14 @@ namespace oui
         }
         return info.namePart;
     }
-    static void GenSortKey(ProcessDialogInfo& fileInfo)
+    static void GenSortKey(GotoDialogInfo& fileInfo)
     {
-        auto& info = fileInfo.info;
         fileInfo.sortKey.native.clear();
-
-        String::string_type fixedStr(20, OUI_TCHAR('0'));
-        auto pidStr = OUI_TO_STR(fileInfo.info.pid);
-
-        std::copy(pidStr.begin(), pidStr.end(), fixedStr.begin() + (fixedStr.size() - std::min(fixedStr.size(), pidStr.size())));
-        fileInfo.sortKey = std::move(fixedStr);
+        fileInfo.sortKey.native.append(orthia::ToWideStringAsHex(~fileInfo.info.lastUpdateTime.ToLongLongTime()));
+        fileInfo.sortKey.native.append(OUI_TCSTR("@"));
+        fileInfo.sortKey.native.append(orthia::ToWideStringAsHex(fileInfo.info.address));
     }
-    void COpenProcessDialog::OnResize()
+    void CGotoDialog::OnResize()
     {
         const auto clientRect = GetClientRect();
 
@@ -64,7 +61,7 @@ namespace oui
 
         Parent_type::OnResize();
     }
-    void COpenProcessDialog::CancelAllQueries()
+    void CGotoDialog::CancelAllQueries()
     {
         if (m_currentOperation)
         {
@@ -73,9 +70,9 @@ namespace oui
             return;
         }
     }
-    void COpenProcessDialog::OnOpCompleted(std::shared_ptr<BaseOperation> operation,
-        const ProcessUnifiedId& folderId,
-        const std::vector<ProcessInfo>& data,
+    void CGotoDialog::OnOpCompleted(std::shared_ptr<BaseOperation> operation,
+        const oui::String& filter,
+        const std::vector<orthia::GotoItem>& data,
         int error)
     {
         auto console = GetConsole();
@@ -100,9 +97,9 @@ namespace oui
         {
             m_filesBox->Clear();
 
-            m_currentFolderId = folderId;
-            m_currentProcess.clear();
-            m_currentProcess.reserve(data.size() + 1);
+            m_currentFilter = filter;
+            m_currentItems.clear();
+            m_currentItems.reserve(data.size() + 1);
             m_firstResult = false;
 
             m_parentOffset = m_filesBox->GetOffset();
@@ -116,54 +113,42 @@ namespace oui
         }
         else
         {
-            m_currentProcess.reserve(m_currentProcess.size() + data.size());
+            m_currentItems.reserve(m_currentItems.size() + data.size());
         }
 
         for (auto& info : data)
         {
-            m_currentProcess.push_back(info);
-            GenSortKey(m_currentProcess.back());
-            m_currentProcess.back().visibleName = info.processName;
-            console->FilterOrReplaceUnreadableSymbols(m_currentProcess.back().visibleName);
+            m_currentItems.push_back(info);
+            m_currentItems.back().info = info;
+            GenSortKey(m_currentItems.back());
+            console->FilterOrReplaceUnreadableSymbols(m_currentItems.back().visibleName);
         }
-        std::sort(m_currentProcess.begin(), m_currentProcess.end());
+        std::sort(m_currentItems.begin(), m_currentItems.end());
         UpdateVisibleItems();
     }
 
-    void COpenProcessDialog::UpdateVisibleItems()
+    void CGotoDialog::UpdateVisibleItems()
     {
-        DefaultUpdateVisibleItems(this, this, m_filesBox, m_currentProcess,
+        DefaultUpdateVisibleItems(this, this, m_filesBox, m_currentItems,
             [&](auto it, auto vit)
         {
             vit->text.clear();
-            vit->text.push_back(it->visibleName);
-            vit->fsFlags = it->info.flags;
+            vit->text.push_back(orthia::ToWideStringAsHex(it->info.address));
 
             // open file here
             vit->openHandler = [=, info = it->info]() {
-                TryOpenProcess(info.pid);
+                TryOpenAddress(it->info.address);
             };
 
             vit->colorsHandler = nullptr;
-
-            if (m_scanFlags & IProcessSystem::queryFlags_TryOpenProcessAsReader)
-            {
-                if (it->info.flags & (it->info.flag_hasReaderAccess))
-                {
-                    vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
-                }
-            }
-            else
-            {
-                vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };
-            }
+            vit->colorsHandler = [=]() { return LabelColorState{ m_colorProfile->listBoxFolders, Color() }; };            
         });
     }
-    String COpenProcessDialog::GetWaitBoxText()
+    String CGotoDialog::GetWaitBoxText()
     {
         return m_waitBoxText;
     }
-    void COpenProcessDialog::TryOpenProcess(const ProcessUnifiedId& folderId)
+    void CGotoDialog::TryOpenAddress(orthia::Address_type address)
     {
         if (m_currentOperation)
         {
@@ -171,7 +156,7 @@ namespace oui
             m_currentOperation = nullptr;
         }
 
-        auto me = GetPtr_t<COpenProcessDialog>(this);
+        auto me = GetPtr_t<CGotoDialog>(this);
         if (!me)
         {
             return;
@@ -180,8 +165,8 @@ namespace oui
         {
             return;
         }
-        m_waitBoxText = PassParameter1(m_openingText, ToString(folderId));
-        std::weak_ptr<COpenProcessDialog> weakMe = me;
+        m_waitBoxText = PassParameter1(m_openingText, orthia::ToWideStringAsHex(address));
+        std::weak_ptr<CGotoDialog> weakMe = me;
         m_waitBox = AddChildAndInit_t(std::make_shared<CMessageBoxWindow>(
             [=]() {
             if (auto p = weakMe.lock())
@@ -199,31 +184,52 @@ namespace oui
         m_waitBox->Dock();
 
         ++m_openProcessSeq;
+        if (address) 
+        {
+            auto operation = std::make_shared<Operation<orthia::GotoCompleteHandler_type>>(
+                this->GetThread(),
+                [=, openProcessSeq = m_openProcessSeq](orthia::Address_type address, int error) {
 
+                me->SetOpenProcessResult(openProcessSeq, address, error);
+                return oui::fsui::OpenResult();
+            });
 
-        auto operation = std::make_shared<Operation<QueryProcessHandler_type>>(
-            this->GetThread(),
-            std::bind(&COpenProcessDialog::OnOpCompleted, this,
-                std::placeholders::_1,
-                std::placeholders::_2,
-                std::placeholders::_3,
-                std::placeholders::_4));
+            m_currentOperation = operation;
+            m_firstResult = true;
 
-        m_currentOperation = operation;
-        m_firstResult = true;
+            m_fileSystem->AsyncUpdateGotoInfo(this->GetThread(),
+                operation,
+                address
+            );
+        }
+        else 
+        {
+            auto operation = std::make_shared<Operation<orthia::QueryGotoItemHandler_type>>(
+                this->GetThread(),
+                [=, openProcessSeq = m_openProcessSeq](std::shared_ptr<oui::BaseOperation> operation,
+                    const oui::String& filter,
+                    const std::vector<orthia::GotoItem>& data,
+                    int error) {
 
-        m_fileSystem->AsyncStartQueryProcess(this->GetThread(),
-            folderId,
-            [=, openProcessSeq = m_openProcessSeq](std::shared_ptr<IProcess> file, int error) {
-                if (auto p = weakMe.lock())
-                {
-                    me->SetOpenProcessResult(openProcessSeq, file, error);
-                }
-            },
-            operation,
-            m_scanFlags);
+                OnOpCompleted(operation,
+                    filter,
+                    data,
+                    error);
+
+                return oui::fsui::OpenResult();
+            });
+
+            m_currentOperation = operation;
+            m_firstResult = true;
+
+            m_fileSystem->AsyncQueryGotoInfo(this->GetThread(),
+                m_currentFilter,
+                operation,
+                0
+            );
+        }
     }
-    void COpenProcessDialog::FinishProcessOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result)
+    void CGotoDialog::FinishProcessOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result)
     {
         if (op != m_openOperation || !m_waitBox)
         {
@@ -240,16 +246,16 @@ namespace oui
             return;
         }
 
-        // the owner doesn't approve this particular file
+        // the owner doesn't approve this particular address
         // show it
-        m_result = nullptr;
+        m_result = 0;
         if (m_waitBox)
         {
             m_waitBoxText = result.error.native;
             m_waitBox->Invalidate();
         }
     }
-    void COpenProcessDialog::SetOpenProcessResult(int openProcessSeq, std::shared_ptr<IProcess> file, int error)
+    void CGotoDialog::SetOpenProcessResult(int openProcessSeq, orthia::Address_type address, int error)
     {
         if (openProcessSeq != m_openProcessSeq)
         {
@@ -264,24 +270,24 @@ namespace oui
             }
             return;
         }
-        m_result = file;
-        auto me = GetPtr_t<COpenProcessDialog>(this);
+        m_result = address;
+        auto me = GetPtr_t<CGotoDialog>(this);
         if (m_resultCallback && me)
         {
             // call approve callback
-            std::weak_ptr<COpenProcessDialog> weakMe = me;
-            auto operation = std::make_shared<Operation<oui::fsui::ProcessCompleteHandler_type>>(
-                this->GetThread(),
-                [=](std::shared_ptr<BaseOperation> op, std::shared_ptr<IProcess> file, const oui::fsui::OpenResult& result) {
-                if (auto p = weakMe.lock())
-                {
-                    me->FinishProcessOpen(op, result);
-                }
-            });
-            m_openOperation = operation;
-            auto errorText = m_resultCallback(me, m_result, m_openOperation);
+            auto errorText = m_resultCallback(m_result, error);
             if (errorText.error.native.empty())
             {
+                m_readyToExit = true;
+                m_resultCallback = nullptr;
+                if (m_waitBox)
+                {
+                    m_waitBox->FinishDialog();
+                }
+                else
+                {
+                    FinishDialog();
+                }
                 return;
             }
             if (m_waitBox)
@@ -302,10 +308,10 @@ namespace oui
             FinishDialog();
         }
     }
-    void COpenProcessDialog::OnWaitBoxDestroyed()
+    void CGotoDialog::OnWaitBoxDestroyed()
     {
         m_waitBox = 0;
-        m_result = nullptr;
+        m_result = 0;
         if (m_openOperation)
         {
             m_openOperation->Cancel();
@@ -317,9 +323,9 @@ namespace oui
         }
     }
    
-    COpenProcessDialog::COpenProcessDialog(const oui::CommonDialogStrings& dialogStrings,
-        ProcessRecipientHandler_type resultCallback,
-        std::shared_ptr<IProcessSystem> fileSystem,
+    CGotoDialog::CGotoDialog(const oui::CommonDialogStrings& dialogStrings,
+        orthia::GotoCompleteHandler_type resultCallback,
+        std::shared_ptr<orthia::IPeristentItemStorage> fileSystem,
         int scanFlags)
         :
             m_resultCallback(resultCallback),
@@ -332,11 +338,32 @@ namespace oui
 
         IListBoxOwner* owner = this;
         m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
-        m_filesBox->InitColumns(2);
 
+        auto columnsNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.goto.columns"));
+        m_filesBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }),
+            oui::ColumnParam([=] { return columnsNode->QueryValue(L"comment");  })
+        );
         m_fileEdit = std::make_shared<CEditBox>(m_colorProfile);
         m_fileEdit->SetEnterHandler([this](const String& text) {
-            TryOpenProcess(ProcessUnifiedId(text));
+
+            try
+            {
+                orthia::Address_type address = oui::CaptureAddress(text.native);
+                TryOpenAddress(address);
+            }
+            catch (std::exception& e)
+            {
+                oui::String error(orthia::Utf8ToUtf16(e.what()));
+                
+                auto waitBox = AddChildAndInit_t(std::make_shared<CMessageBoxWindow>(
+                    [=]() {
+                        return error;
+                },
+                    [=]() {
+                    
+                }));
+                waitBox->Dock();
+            }
         });
         m_fileEdit->SetSelectAllOnFocus(true);
 
@@ -346,38 +373,31 @@ namespace oui
         this->RegisterSwitch(m_fileEdit);
         this->RegisterSwitch(m_filesBox);
     }
-    COpenProcessDialog::~COpenProcessDialog()
+    CGotoDialog::~CGotoDialog()
     {
 
     }
-    void COpenProcessDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
+    void CGotoDialog::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
     {
         m_fileEdit->SetFocus();
-        TryOpenProcess(oui::ProcessUnifiedId());
+        TryOpenAddress(0);
     }
-    void COpenProcessDialog::ConstructChilds()
+    void CGotoDialog::ConstructChilds()
     {
         AddChild(m_filesBox);
         AddChild(m_fileEdit);
         AddChild(m_fileLabel);
     }
-    void COpenProcessDialog::OnFinishDialog()
+    void CGotoDialog::OnFinishDialog()
     {
         if (m_waitBox)
         {
             m_waitBox->Destroy();
         }
-        if (m_resultCallback && !m_result)
-        {
-            // report nothing
-            auto me = GetPtr_t<COpenProcessDialog>(this);
-            m_resultCallback(me, m_result, nullptr);
-            m_resultCallback = nullptr;
-        }
         Parent_type::OnFinishDialog();
     }
 
-    void COpenProcessDialog::OnVisibleItemChanged()
+    void CGotoDialog::OnVisibleItemChanged()
     {
         ListBoxItem item;
         if (!m_filesBox->GetSelectedItem(item))
@@ -399,9 +419,9 @@ namespace oui
         m_fileEdit->ScrollRight();
         m_fileEdit->Invalidate();
     }
-    void COpenProcessDialog::HighlightItem(int highlightItemOffset)
+    void CGotoDialog::HighlightItem(int highlightItemOffset)
     {
-        int maxVisibleOffset = std::min(m_filesBox->GetVisibleSize() + m_filesBox->GetOffset(), (int)m_currentProcess.size());
+        int maxVisibleOffset = std::min(m_filesBox->GetVisibleSize() + m_filesBox->GetOffset(), (int)m_currentItems.size());
         if (highlightItemOffset >= m_filesBox->GetOffset() && highlightItemOffset < maxVisibleOffset)
         {
             m_filesBox->SetSelectedPosition(highlightItemOffset - m_filesBox->GetOffset());
@@ -415,7 +435,7 @@ namespace oui
                 newOffset = 0;
                 m_filesBox->SetSelectedPosition(highlightItemOffset);
             }
-            else if (newOffset >= (int)m_currentProcess.size())
+            else if (newOffset >= (int)m_currentItems.size())
             {
                 newOffset = highlightItemOffset;
                 m_filesBox->SetSelectedPosition(0);
@@ -423,15 +443,15 @@ namespace oui
             m_filesBox->SetOffset(newOffset);
         }
     }
-    bool COpenProcessDialog::ShiftViewWindowToSymbol(const String& symbol) 
+    bool CGotoDialog::ShiftViewWindowToSymbol(const String& symbol) 
     {
-        const int totalProcessAvailable = (int)m_currentProcess.size();
+        const int totalProcessAvailable = (int)m_currentItems.size();
         const int selectionOffset = m_filesBox->GetOffset() + m_filesBox->GetSelectedPosition();
 
         // scan forward till end
         for (int i = selectionOffset + 1; i < totalProcessAvailable; ++i)
         {
-            if (StartsWith(m_currentProcess[i].info.processName.native, symbol.native))
+            if (StartsWith(orthia::ObjectToString(m_currentItems[i].info.address), symbol.native))
             {
                 HighlightItem(i);
                 UpdateVisibleItems();
@@ -440,9 +460,9 @@ namespace oui
         }
 
         // scan from start
-        for (int i = 0; i <= std::min((int)m_currentProcess.size() - 1, selectionOffset); ++i)
+        for (int i = 0; i <= std::min((int)m_currentItems.size() - 1, selectionOffset); ++i)
         {
-            if (StartsWith(m_currentProcess[i].info.processName.native, symbol.native))
+            if (StartsWith(orthia::ObjectToString(m_currentItems[i].info.address), symbol.native))
             {
                 HighlightItem(i);
                 UpdateVisibleItems();
@@ -452,16 +472,16 @@ namespace oui
         return false;
     }
 
-    void COpenProcessDialog::ShiftViewWindow(int newOffset)
+    void CGotoDialog::ShiftViewWindow(int newOffset)
     {
-        DefaultShiftViewWindow(m_filesBox, newOffset, m_currentProcess.size());
+        DefaultShiftViewWindow(m_filesBox, newOffset, m_currentItems.size());
         UpdateVisibleItems();
     }
-    int COpenProcessDialog::GetTotalCount() const
+    int CGotoDialog::GetTotalCount() const
     {
-        return (int)m_currentProcess.size();
+        return (int)m_currentItems.size();
     }
-    bool COpenProcessDialog::ProcessEvent(InputEvent& evt, WindowEventContext& evtContext)
+    bool CGotoDialog::ProcessEvent(InputEvent& evt, WindowEventContext& evtContext)
     {
         // it is nice thing to use arrow to go from edit to box
         if (evt.keyEvent.valid)
@@ -473,6 +493,16 @@ namespace oui
                     m_filesBox->SetFocus();
                     return true;
                 }
+            }
+            
+            if (m_filesBox->IsFocused())
+            {
+                if (!evt.keyEvent.rawText.native.empty())
+                {
+                    m_fileEdit->SetFocus();
+                    m_fileEdit->ProcessEvent(evt, evtContext);
+                }
+                return true;
             }
         }
     

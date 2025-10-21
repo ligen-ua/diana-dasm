@@ -11,6 +11,12 @@ namespace orthia
         oui::String fullName, shortName;
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;
+        std::shared_ptr<IPeristentItemStorage> peristentItemStorage;
+
+        FileWorkplaceItem(std::shared_ptr<IPeristentItemStorage> peristentItemStorage_in) 
+            : peristentItemStorage(peristentItemStorage_in)
+        {
+        }
 
         // public interface
         WorkAddressData ReadData(Address_type address, Address_type size) override;
@@ -20,6 +26,7 @@ namespace orthia
         void ReloadModules() override;
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
         int GetModulesCount() const override;
+        std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
     };
 
 }

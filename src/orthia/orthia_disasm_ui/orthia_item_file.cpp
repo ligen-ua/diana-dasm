@@ -128,4 +128,9 @@ namespace orthia
     {
         return 0;
     }
+    std::shared_ptr<IPeristentItemStorage> FileWorkplaceItem::GetPersistentStorage()
+    {
+        return peristentItemStorage;
+    }
+
 }

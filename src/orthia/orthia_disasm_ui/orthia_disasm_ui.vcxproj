@@ -183,7 +183,9 @@
     <ClCompile Include="orthia_item_file.cpp" />
     <ClCompile Include="orthia_item_process.cpp" />
     <ClCompile Include="orthia_model.cpp" />
+    <ClCompile Include="orthia_model_interfaces.cpp" />
     <ClCompile Include="orthia_process_adapter.cpp" />
+    <ClCompile Include="oui_goto_dialog.cpp" />
     <ClCompile Include="oui_open_process_dialog.cpp" />
     <ClCompile Include="oui_processes.cpp" />
     <ClCompile Include="oui_processes_win32.cpp" />
@@ -205,6 +207,7 @@
     <ClInclude Include="orthia_model.h" />
     <ClInclude Include="orthia_model_interfaces.h" />
     <ClInclude Include="orthia_process_adapter.h" />
+    <ClInclude Include="oui_goto_dialog.h" />
     <ClInclude Include="oui_open_process_dialog.h" />
     <ClInclude Include="oui_processes.h" />
     <ClInclude Include="ui_common.h" />

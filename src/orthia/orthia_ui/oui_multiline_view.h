@@ -51,14 +51,86 @@ namespace oui
         int intTag = 0;
         std::shared_ptr<IMultilineViewTag> interfaceTag;
     };
+    
+    class LineIndex
+    {
+        std::uint64_t m_index = 0;
+        int m_subIndex = 0;
+    public:
+        LineIndex()
+        {
+        }
+        LineIndex(std::uint64_t index, int subIndex)
+            : 
+                m_index(index), m_subIndex(subIndex)
+        {
+        }
+        std::uint64_t GetIndex() const
+        {
+            return m_index;
+        }
 
+        int CompareWith(const LineIndex& other) const
+        {
+            if (m_index < other.m_index) {
+                return -2;
+            }
+            if (m_index > other.m_index) {
+                return 2;
+            }
+            if (m_subIndex < other.m_subIndex) {
+                return  -1;
+            }
+            if (m_subIndex > other.m_subIndex) {
+                return 1;
+            }
+            return 0;
+        }
+    };
+
+    inline bool operator < (const LineIndex& l1, const LineIndex& l2)
+    {
+        return l1.CompareWith(l2) < 0;
+    }
+    inline bool operator == (const LineIndex& l1, const LineIndex& l2)
+    {
+        return l1.CompareWith(l2) == 0;
+    }
+
+    struct MultiLineSelPoint
+    {
+        // symbol coordinates
+        int x = 0;
+        LineIndex y;
+    };
+    inline bool operator < (const MultiLineSelPoint& p1, const MultiLineSelPoint& p2)
+    {
+        if (p1.y < p2.y) {
+            return true;
+        }
+        if (p2.y < p1.y) {
+            return false;
+        }
+        if (p1.x < p2.x) {
+            return true;
+        }
+        if (p1.x > p2.x) {
+            return false;
+        }
+        return false;
+    }
     struct IMultiLineViewOwner
     {
         virtual ~IMultiLineViewOwner() {}
         virtual void CancelAllQueries() = 0;
         virtual bool ScrollUp(MultiLineViewItem* item, int count) = 0;
         virtual bool ScrollDown(MultiLineViewItem* item, int count) = 0;
+        virtual LineIndex GetLineIndex(int offsetInPage) const = 0;
+        virtual void CopySelected(const MultiLineSelPoint& selPosStart, const MultiLineSelPoint& selPosEnd) = 0;
+        virtual bool SelectAll() = 0;
+        virtual void OnEnter() = 0;
     };
+
 
     class CMultiLineView:public SimpleBrush<MouseFocusable<CWindow>>
     {
@@ -68,8 +140,9 @@ namespace oui
         std::shared_ptr<DialogColorProfile> m_colorProfile;
 
         int m_firstVisibleLineIndex = 0;
+
+        // screen coordinates
         int m_yCursopPos = 0;
-        int m_xCursopPos = 0;
 
         bool m_cursorOutOfText = true;
         bool m_dynamicLogMode = true;
@@ -78,6 +151,15 @@ namespace oui
 
         std::shared_ptr<CEditBox> m_editBox;
         std::shared_ptr<CEditBox> m_paintBox;
+
+        // selection
+        MultiLineSelPoint m_selPosStart;
+        MultiLineSelPoint m_selPosEnd;
+
+        bool m_selectionIsActive = false;
+        KeyState m_lastKeyState;
+        // end
+
         IMultiLineViewOwner* m_owner = 0;
         void ConstructChilds() override;
         void OnResize() override;
@@ -90,6 +172,13 @@ namespace oui
         void SetNewCursor(const Point& pt);
         void SetNewYCursorPosImpl(int newCursor);
 
+        LineIndex GetCurrentLineIndex() const;
+        bool HandleMouseEventImpl(const Rect& rect, InputEvent& evt);
+        bool KeyStateHasSelection() const;
+        void ActivateSelection();
+        void CancelSelection();
+        void CancelSelectionIfNecessary();
+
     public:
         CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner, bool dynamicLogMode);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
@@ -99,6 +188,10 @@ namespace oui
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
 
+        bool SelectionIsActive() const;
+        void FixupTopSelectionRange();
+        bool CopySelected();
+        void SelectAllCached();
 
         void Clear();
         void Init(std::vector<MultiLineViewItem>&& lines);
@@ -109,6 +202,8 @@ namespace oui
 
         int GetCursorYPos() const;
         void SetCursorYPos(int newPos);
+
+        String ExtractSelected();
     };
 
 }

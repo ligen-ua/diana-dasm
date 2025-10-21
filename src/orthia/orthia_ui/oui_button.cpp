@@ -3,7 +3,9 @@
 
 namespace oui
 {
-    String CButton::m_chunk;
+    static const auto g_braceLeft = String::char_type('[');
+    static const auto g_braceRight = String::char_type(']');
+    String CButton::m_chunk, CButton::m_chunkText;
 
     CButton::CButton(std::shared_ptr<ButtonColorProfile> colorProfile, std::function<String()> getText)
         :
@@ -24,13 +26,38 @@ namespace oui
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
         Point target = absClientRect.position;
 
-        {
-            auto text = GetText();
-            m_chunk = text;
-        }
+        // prepare borders and background
         int symbolsLeft = absClientRect.size.width;
-        console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, symbolsLeft);
+        if (symbolsLeft <= 0)
+        {
+            return;
+        }
 
+        m_chunk.native.clear();
+        m_chunk.native.resize(absClientRect.size.width, String::symSpace);
+        if (m_chunk.native.size() >= 2)
+        {
+            symbolsLeft -= 2;
+            m_chunk.native[0] = g_braceLeft;
+            m_chunk.native[m_chunk.native.size() - 1] = g_braceRight;
+            if (IsFocused())
+            {
+                if (m_chunk.native.size() >= 4)
+                {
+                    symbolsLeft -= 2;
+                    m_chunk.native[1] = g_braceLeft;
+                    m_chunk.native[m_chunk.native.size() - 2] = g_braceRight;
+                }
+            }
+        }
+
+        m_chunkText = GetText();
+        console->GetSymbolsAnalyzer().CutVisibleString(m_chunkText.native, symbolsLeft);
+
+        auto renderPos = m_chunk.native.size() - m_chunkText.native.size();
+        renderPos /= 2;
+        std::copy(m_chunkText.native.begin(), m_chunkText.native.end(), m_chunk.native.begin() + renderPos);
+        
         bool mouseInside = IsMouseOn();
         auto state = &m_colorProfile->normal;
         if (mouseInside)
