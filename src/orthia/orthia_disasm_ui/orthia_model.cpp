@@ -52,6 +52,19 @@ namespace orthia
     {
         return m_processSystem;
     }
+    bool CProgramModel::QueryWorkspaceItem(int id, WorkplaceItem& item) const
+    {
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+
+        auto it = m_items.find(id);
+        if (it == m_items.end())
+        {
+            return false;
+        }
+        item.uid = id;
+        item.name = it->second->GetShortName();
+        return true;
+    }
     bool CProgramModel::QueryActiveWorkspaceItem(WorkplaceItem& item) const
     {
         std::unique_lock<std::mutex> lockGuard(m_lock);
@@ -79,9 +92,12 @@ namespace orthia
             oldUid = m_activeId;
             handlers.assign(m_handlers.begin(), m_handlers.end());
         }
-        for (auto& handler : handlers)
+        if (oldUid)
         {
-            handler->OnPreWorkspaceItemChange(oldUid);
+            for (auto& handler : handlers)
+            {
+                handler->OnPreWorkspaceItemChange(oldUid);
+            }
         }
         // switch state
         {
@@ -134,7 +150,7 @@ namespace orthia
         return activePos;
     }
 
-    void CProgramModel::RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive)
+    int CProgramModel::RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive)
     {
         int newItemId = 0;
         {
@@ -146,6 +162,7 @@ namespace orthia
         {
             this->SetActiveItem(newItemId);
         }
+        return newItemId;
     }
     void CProgramModel::WriteLog(std::shared_ptr<oui::CWindowThread> thread, const oui::String& line)
     {
@@ -157,8 +174,7 @@ namespace orthia
         });
     }
     void CProgramModel::AddProcess(std::shared_ptr<oui::IProcess> proc,
-        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
-        bool makeActive)
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler)
     {
         auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
         auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
@@ -195,14 +211,13 @@ namespace orthia
             result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(addressToStart);
         }
 
-        RegisterItem(info, makeActive);
+        result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
 
         // OK
         result.error.native.clear();
     }
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile> file,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
-        bool makeActive)
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
     {
         // non-ui thread
         
@@ -361,7 +376,7 @@ namespace orthia
             info->shortName.native,
             0);
 
-        RegisterItem(info, makeActive);
+        result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
 
         // OK
         result.error.native.clear();

@@ -25,21 +25,17 @@ void CDisasmWindow::SetActiveItemImpl(int itemUid)
 {
     m_itemUid = itemUid;
 }
-void CDisasmWindow::SetActiveItem(int itemUid, DI_UINT64 initialAddressHint)
+void CDisasmWindow::PrepareParameters(UIState& state, int itemUid, DI_UINT64 initialAddressHint)
 {
-    SetActiveItemImpl(itemUid);
-    m_peAddress = 0;
-    m_peAddressEnd = 0;
-    m_metaInfoPos = 0;
-
-    auto item = m_model->GetItem(m_itemUid);
+    DI_UINT64 address = 0;
+    auto item = m_model->GetItem(itemUid);
     if (item)
     {
         auto range = item->GetRangeInfo(initialAddressHint);
-        m_peAddress = range.entryPoint;
+        address = range.entryPoint;
     }
-    ReloadVisibleData();
-    Invalidate();
+   
+    state.addresses[field_peAddress] = address;
 }
 void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
 {

@@ -53,19 +53,17 @@ void CMainWindow::OnWorkspaceItemChanged(int itemId)
 }
 void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
 {
+
+    auto wit = result.extraInfo.find(orthia::model_OpenResult_extraInfo_WorkspaceId);
+
     orthia::WorkplaceItem item;
-    if (!m_model->QueryActiveWorkspaceItem(item))
-    {
-        SetDefaultTitle();
-        m_disasmWindow->SetActiveItem(-1);
-        return;
-    }
     auto console = GetConsole();
-    if (!console)
+    if (console == nullptr || wit == result.extraInfo.end() || !m_model->QueryWorkspaceItem(std::any_cast<int>(wit->second), item))
     {
         return;
     }
 
+    // TODO: move SetActiveItem call below to UIStateManager
     // load initial data
     orthia::Address_type addressHint = 0;
     auto it = result.extraInfo.find(orthia::model_OpenResult_extraInfo_InitalAddress);
@@ -73,7 +71,13 @@ void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
     {
         addressHint = std::any_cast<orthia::Address_type>(it->second);
     }
-    m_disasmWindow->SetActiveItem(item.uid, addressHint);
+    m_stateManager.SaveState(item.uid);
+    auto state = m_stateManager.GetUIState(item.uid, m_disasmWindow);
+    if (state)
+    {
+        m_disasmWindow->PrepareParameters(*state, item.uid, addressHint);
+    }
+    m_model->SetActiveItem(item.uid);
 }
 
 void CMainWindow::AddInitialArgument(const InitialOpenFileInfo& info)

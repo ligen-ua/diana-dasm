@@ -54,7 +54,7 @@ bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile> file)
     });
 
     m_model->GetFileSystem()->AsyncExecute(GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
-        model->AddExecutable(file, completeHandler, true);
+        model->AddExecutable(file, completeHandler);
     });
     return true;
 }
@@ -84,7 +84,7 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
         });
 
         m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
-            model->AddExecutable(file, completeHandler, true);
+            model->AddExecutable(file, completeHandler);
         });
     }
     return oui::fsui::OpenResult();
@@ -116,7 +116,7 @@ oui::fsui::OpenResult CMainWindow::HandleOpenProcess(std::shared_ptr<oui::COpenP
         });
 
         m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler)] {
-            model->AddProcess(process, completeHandler, true);
+            model->AddProcess(process, completeHandler);
         });
     }
     return oui::fsui::OpenResult();

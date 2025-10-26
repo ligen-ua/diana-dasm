@@ -26,6 +26,7 @@ namespace orthia
 
     // OpenResult extra fields
     const int model_OpenResult_extraInfo_InitalAddress = 1;
+    const int model_OpenResult_extraInfo_WorkspaceId = 2;
 
     struct IUIEventHandler
     {
@@ -50,7 +51,7 @@ namespace orthia
 
         void WriteLog(std::shared_ptr<oui::CWindowThread> thread, const oui::String& line);
 
-        void RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive);
+        int RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive);
     public:
         CProgramModel(std::shared_ptr<orthia::CConfigOptionsStorage> config);
 
@@ -60,6 +61,7 @@ namespace orthia
         std::shared_ptr<oui::CFileSystem> GetFileSystem();
         std::shared_ptr<oui::CProcessSystem> GetProcessSystem();
 
+        bool QueryWorkspaceItem(int id, WorkplaceItem& item) const;
         bool SetActiveItem(int uid);
         int QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const;
         bool QueryActiveWorkspaceItem(WorkplaceItem& item) const;
@@ -69,12 +71,10 @@ namespace orthia
 
         // other thread
         void AddProcess(std::shared_ptr<oui::IProcess> proc,
-            oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
-            bool makeActive);
+            oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
 
         void AddExecutable(std::shared_ptr<oui::IFile> file,
-            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
-            bool makeActive);
+            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
     };
 }

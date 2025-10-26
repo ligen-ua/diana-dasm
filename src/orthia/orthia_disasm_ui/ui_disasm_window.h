@@ -50,7 +50,7 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,
         std::shared_ptr<orthia::CProgramModel> model);
-    void SetActiveItem(int itemUid, DI_UINT64 initialAddressHint = 0);
+    void PrepareParameters(UIState& state, int itemUid, DI_UINT64 initialAddressHint);
 
     // IUIStatefulWindow
     void ReloadState(const UIState& state) override;

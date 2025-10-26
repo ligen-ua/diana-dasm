@@ -11,7 +11,24 @@ void CUIStateManager::SetActiveItem(int itemId)
     {
         wnd->SetActiveWorkspaceItem(itemId);
     }
+}    
+UIState* CUIStateManager::GetUIState(int itemId, std::shared_ptr<IUIStatefulWindow> window)
+{
+    auto item = m_workspaces.find(itemId);
+    if (item == m_workspaces.end())
+    {
+        // no data
+        return 0;
+    }
+    auto wit = item->second.m_states.find(window);
+    if (wit == item->second.m_states.end())
+    {
+        // no data
+        return 0;
+    }
+    return &wit->second;
 }
+
 void CUIStateManager::ReloadState(int itemId)
 {
     auto item = m_workspaces.find(itemId);
