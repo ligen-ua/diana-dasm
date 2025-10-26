@@ -334,6 +334,7 @@ void CDisasmWindow::DoGoto(orthia::Address_type address)
 {
     m_peAddress = address;
     m_view->Clear();
+    m_view->SetCursorYPos(0);
     ReloadVisibleData();
     Invalidate();
 }

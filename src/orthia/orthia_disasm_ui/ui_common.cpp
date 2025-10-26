@@ -99,6 +99,11 @@ namespace oui
             orthia::StringToObject(std::wstring(addressString.begin() + 2, addressString.end()), &address);
             return address;
         }
+        if (addressString.back() == 'h') 
+        {
+            orthia::HexStringToObject(std::wstring(addressString.begin(), addressString.end()-1), &address);
+            return address;
+        }
         orthia::HexStringToObject(addressString, &address);
         return address;
     }
