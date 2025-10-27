@@ -18,6 +18,7 @@ namespace orthia
         int m_bytesIdent;
         int m_countOfSpacesAfterAddress;
         bool m_printInvalidPages;
+        int m_spacesCount;
     public:
         CVmAsmMemoryPrinter(orthia::ITextPrinter* pTextPrinter,
             int dianaMode,
@@ -29,7 +30,8 @@ namespace orthia
             m_currentCommand(0),
             m_bytesIdent(0),
             m_countOfSpacesAfterAddress(1),
-            m_printInvalidPages(false)
+            m_printInvalidPages(false),
+            m_spacesCount(1)
         {
             // default parameters are used in windbg plugin
             m_bytesIdent = 25;
@@ -38,7 +40,16 @@ namespace orthia
                 m_bytesIdent = 31;
             }
         }
-        void PrintCommand(unsigned long long address,
+        int GetDianaMode() const
+        {
+            return m_dianaMode;
+        }
+        void SetSpacesCount(int spacesCount)
+        {
+            m_spacesCount = spacesCount;
+            m_writer.SetSpacesCount(spacesCount);
+        }
+        virtual void PrintCommand(unsigned long long address,
             const std::wstring& bytes,
             const std::wstring& command)
         {
@@ -157,7 +168,9 @@ namespace orthia
                         }
                         else
                         {
-                            PrintCommand(virtualOffset, temp, L"db " + temp);
+                            std::wstring dbCommand = L"db";
+                            dbCommand.append(m_spacesCount, L' ');
+                            PrintCommand(virtualOffset, temp, dbCommand + temp);
                         }
                     }
                     ++offsetInPage;

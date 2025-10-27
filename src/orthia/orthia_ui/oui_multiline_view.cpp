@@ -121,6 +121,7 @@ namespace oui
             }   
             if (i != m_yCursopPos)
             {
+                m_paintBox->SetMarkup(it->markup);
                 m_paintBox->SetText(it->text);
                 if (SelectionIsActive())
                 {
@@ -447,7 +448,9 @@ namespace oui
             m_selPosEnd.y = m_owner->GetLineIndex(offset);
             m_selPosEnd.x = cursorPos;
 
-            m_editBox->SetText(m_lines[offset].text);
+            auto &line = m_lines[offset];
+            m_editBox->SetText(line.text);
+            m_editBox->SetMarkup(line.markup);
             m_editBox->SetVirtualCursorPosition(cursorPos, true, false);
         }
     }
@@ -610,6 +613,7 @@ namespace oui
             }
             if (res1 == 0)
             {
+                m_paintBox->SetMarkup(line.markup);
                 m_paintBox->SetText(line.text.native);
                 m_paintBox->Select(startPos.x, -1);
                 result.native += m_paintBox->ExtractSelected(false).native;
@@ -618,6 +622,7 @@ namespace oui
             }
             if (res2 == 0)
             {
+                m_paintBox->SetMarkup(line.markup); 
                 m_paintBox->SetText(line.text.native);
                 m_paintBox->Select(-1, endPos.x);
                 result.native += m_paintBox->ExtractSelected(false).native;

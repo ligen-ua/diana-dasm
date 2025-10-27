@@ -26,12 +26,21 @@ void DianaTextOutputContext_Init(DianaTextOutputContext * pContext,
                                 DianaOpOutput_type pOpOut,
                                 int spacesCount);
 
+struct _DianaStringOutputContext;
+typedef void (*DianaStringOutputOnOpCallback_type)(struct _DianaStringOutputContext* pContext,
+    void * pUserContext, 
+    const char* pText, int size,
+    OPERAND_SIZE operand, int opSize);
+
 typedef struct _DianaStringOutputContext
 {
     DianaTextOutputContext parent;
     char * pBuffer;
     OPERAND_SIZE curSize;
     OPERAND_SIZE maxBufferSize;
+    DianaStringOutputOnOpCallback_type pOnOpCallback;
+    void* onOpCallbackContext;
+
 }DianaStringOutputContext;
 
 void DianaStringOutputContext_Init(DianaStringOutputContext * pContext,

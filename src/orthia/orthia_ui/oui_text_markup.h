@@ -10,7 +10,7 @@ namespace oui
         struct Range
         {
             std::uint32_t id = 0;
-            std::uint32_t sizeInBytes = 0;
+            std::uint32_t sizeInTChars= 0;
             LabelColorProfile colorProfile;
         };
         std::vector<Range> ranges;
@@ -19,8 +19,9 @@ namespace oui
     class CTextMarkupBuilder
     {
         TextMarkup m_markup;
+        std::uint32_t m_id = 0;
     public:
-        void AddNextRange(std::uint32_t id, std::uint32_t sizeInBytes, const LabelColorProfile& colorProfile);
+        void AddNextRange(size_t sizeInTChars, const LabelColorProfile& colorProfile, std::uint32_t id = 0);
         TextMarkup Build();
     };
 

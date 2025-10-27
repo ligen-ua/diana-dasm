@@ -101,30 +101,60 @@ namespace oui
         int symbolsCount = 0;
         bool selected = false;
     };
-
+    
     void CEditBox::DoPaintMarkupText(DrawParameters& parameters,
-        std::vector<TextMarkup::Range>::const_iterator& it,
+        std::vector<TextMarkup::Range>::const_iterator& rangeIt,
         int& rangePos,
-        Point & target, String* stringToRender,
-        int startPos, int endPos,
-        const EditBoxSelectionRange& selectionRange)
+        Point& target, String* stringToRender,
+        int startPos, int endPos)
     {
-        auto rangeIt = m_markup.ranges.begin();
-        //TODO: if (rangeIt == m_markup.ranges.end())
+        int xToDraw = startPos;
+        if (xToDraw >= endPos)
         {
-            // markup is done, just draw the selection
-            m_chunk2.native.assign(stringToRender->native.begin() + startPos,
-                stringToRender->native.begin() + endPos);
-
-            auto state = &m_colorProfile->editBox.normal;
-            parameters.console.PaintText(target,
-                state->text,
-                state->background,
-                m_chunk2.native);
-            target.x += selectionRange.symbolsCount;
             return;
         }
-        //int rangeEnd = rangePos + (int)rangeIt->sizeInBytes;
+        for (; rangeIt != m_markup.ranges.end(); )
+        {
+            // analyze xToDraw
+            int rangeEnd = rangePos + (int)rangeIt->sizeInTChars;
+            if (xToDraw >= rangeEnd)
+            {
+                rangePos = rangeEnd;
+                ++rangeIt;
+                continue;
+            }
+            int xEnd = std::min(rangeEnd, endPos);
+            m_chunk2.native.assign(stringToRender->native.begin() + xToDraw,
+                stringToRender->native.begin() + xEnd);
+
+            target.x += parameters.console.PaintText(target,
+                rangeIt->colorProfile.normal.text,
+                rangeIt->colorProfile.normal.background,
+                m_chunk2.native);
+
+            xToDraw = xEnd;
+            if (xEnd == endPos)
+            {
+                // end of story
+                return;
+            }
+
+            rangePos = rangeEnd;
+            ++rangeIt;
+        }
+
+        if (rangeIt == m_markup.ranges.end() && xToDraw < endPos)
+        {
+            // markup is done, just draw the regilar text
+            m_chunk2.native.assign(stringToRender->native.begin() + xToDraw,
+                stringToRender->native.begin() + endPos);
+
+            target.x += parameters.console.PaintText(target,
+                m_colorProfile->editBox.normal.text,
+                m_colorProfile->editBox.normal.background,
+                m_chunk2.native);
+        }
+
     }
 
     void CEditBox::DoPaint(const Rect& rect, DrawParameters& parameters)
@@ -259,11 +289,11 @@ namespace oui
 
         for (; rangeIt != m_markup.ranges.end(); ++rangeIt) 
         {
-            if ((rangePos + (int)rangeIt->sizeInBytes) > chunkStartOffset)
+            if ((rangePos + (int)rangeIt->sizeInTChars) > chunkStartOffset)
             {
                 break;
             }
-            rangePos += rangeIt->sizeInBytes;
+            rangePos += rangeIt->sizeInTChars;
         }
 
         // prepare selection ranges
@@ -337,7 +367,7 @@ namespace oui
             }
 
             DoPaintMarkupText(parameters, rangeIt, rangePos, target, 
-                stringToRender, range.start, endPos, range);
+                stringToRender, range.start, endPos);
         }
     }
 
@@ -487,6 +517,51 @@ namespace oui
         }
         m_cursorIterator += symbolsToInsert;
     }
+    void CEditBox::MoveToNextWordRight()
+    {
+        if (m_cursorIterator < 0 || m_cursorIterator >= (int)m_symbols.size())
+        {
+            return;
+        }
+        ++m_cursorIterator;
+        auto offset = GetSymOffset(m_cursorIterator);
+        bool hasSpace = m_text.native[offset] == ' ';
+        for (; m_cursorIterator < (int)m_symbols.size(); ++m_cursorIterator)
+        {
+            auto offset = GetSymOffset(m_cursorIterator);
+            if (hasSpace != (m_text.native[offset] == ' '))
+            {
+                if (m_text.native[offset] == ' ')
+                {
+                    --m_cursorIterator;
+                }
+                break;
+            }
+        }
+    }
+    void CEditBox::MoveToNextWordLeft()
+    {
+        if (m_cursorIterator <= 0 || m_cursorIterator > (int)m_symbols.size())
+        {
+            return;
+        }
+        --m_cursorIterator;
+        auto offset = GetSymOffset(m_cursorIterator);
+        bool hasSpace = m_text.native[offset] == ' ';
+
+        for (; m_cursorIterator > 0; --m_cursorIterator)
+        {
+            auto offset = GetSymOffset(m_cursorIterator);
+            if (hasSpace != (m_text.native[offset] == ' '))
+            {
+                if (m_text.native[offset] == ' ')
+                {
+                    ++m_cursorIterator;
+                }
+                break;
+            }
+        }
+    }
     void CEditBox::ProcessDelete()
     {
         if (IsReadOnly())
@@ -598,20 +673,34 @@ namespace oui
                 break;
 
             case oui::VirtualKey::Left:
-                if (m_cursorIterator > 0)
+                if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
-                    --m_cursorIterator;
+                    MoveToNextWordLeft();
+                }
+                else
+                {
+                    if (m_cursorIterator > 0)
+                    {
+                        --m_cursorIterator;
+                    }
                 }
                 handled = true;
                 cursorMove = true;
                 break;
             case oui::VirtualKey::Right:
-                if (m_cursorIterator < (int)m_symbols.size())
+                if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
-                    ++m_cursorIterator;
-                    if (m_cursorIterator >= (int)m_symbols.size())
+                    MoveToNextWordRight();
+                }
+                else
+                {
+                    if (m_cursorIterator < (int)m_symbols.size())
                     {
-                        m_windowRightIterator = m_cursorIterator + 1;
+                        ++m_cursorIterator;
+                        if (m_cursorIterator >= (int)m_symbols.size())
+                        {
+                            m_windowRightIterator = m_cursorIterator + 1;
+                        }
                     }
                 }
                 handled = true;

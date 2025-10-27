@@ -100,8 +100,17 @@ namespace oui
             return address;
         }
         if (addressString.back() == 'h') 
-        {
+        {  
+            // asm format
             orthia::HexStringToObject(std::wstring(addressString.begin(), addressString.end()-1), &address);
+            return address;
+        }
+        if (addressString.find('`') != addressString.npos)
+        {
+            // windbg format
+            auto copy = addressString;
+            copy.erase(std::remove(copy.begin(), copy.end(), '`'), copy.end());
+            orthia::HexStringToObject(copy, &address);
             return address;
         }
         orthia::HexStringToObject(addressString, &address);

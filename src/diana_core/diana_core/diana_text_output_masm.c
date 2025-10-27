@@ -801,6 +801,8 @@ void DianaStringOutputContext_Init(DianaStringOutputContext * pContext,
     pContext->parent.pReset = DianaTextReset;
     pContext->pBuffer = pBuffer;
     pContext->maxBufferSize = maxBufferSize;
+    pContext->pOnOpCallback = 0;
+    pContext->onOpCallbackContext = 0;
 }
 int DianaTextOutputContext_TextOut(DianaTextOutputContext * pContext,
                                    DianaParserResult * pResult, 

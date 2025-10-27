@@ -44,7 +44,8 @@ namespace oui
 
         EditBoxLowLevelHandlers m_llHandlers;
         void SetTextImpl(const String& text);
-
+        void MoveToNextWordRight();
+        void MoveToNextWordLeft();
         void ProcessDelete();
         void ProcessBackpace();
         int GetSymOffset(int symbol) const;
@@ -52,8 +53,7 @@ namespace oui
             std::vector<TextMarkup::Range>::const_iterator& it,
             int& rangePos,
             Point& target, String* stringToRender, 
-            int startPos, int endPos,
-            const EditBoxSelectionRange& selectionRange);
+            int startPos, int endPos);
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);

@@ -459,7 +459,7 @@ namespace oui
         PaintText(position, textColor, textBgColor, m_separator);
     }
 
-    void CConsoleDrawAdapter::PaintText(const Point& position,
+    int CConsoleDrawAdapter::PaintText(const Point& position,
         Color textColor,
         Color textBgColor,
         const String& text,
@@ -469,16 +469,16 @@ namespace oui
     {
         if (position.x < 0 || position.y < 0)
         {
-            return;
+            return 0;
         }
         String::char_type hotkeySymbolTmp = hotkeySymbol;
         if (position.x >= m_size.width)
         {
-            return;
+            return 0;
         }
         if (position.y >= m_size.height)
         {
-            return;
+            return 0;
         }
         CHAR_INFO* rawData = m_buffer.data();
 
@@ -501,7 +501,7 @@ namespace oui
 
         CHAR_INFO* lineData = rawData + (m_size.width * position.y);
         int xend = std::min((int)m_size.width, (int)text.native.size() + position.x);
-
+        int symbolsCount = 0;
         auto textPtr = text.native.c_str();
         for (CHAR_INFO* p = lineData + position.x, *p_end = lineData + xend; p < p_end; ++p, ++textPtr)
         {
@@ -516,11 +516,13 @@ namespace oui
                 currentAttributes = highAttributes;
                 continue;
             }
+            ++symbolsCount;
             p->Attributes = currentAttributes;
             p->Char.UnicodeChar = *textPtr;
             currentAttributes = normalAttributes;
             hotkeySymbolTmp = hotkeySymbol;
         }
+        return symbolsCount;
     }
     void CConsoleDrawAdapter::PaintBorder(const Rect& rect_in,
         Color textColor,

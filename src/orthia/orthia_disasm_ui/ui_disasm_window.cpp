@@ -1,7 +1,8 @@
 #include "ui_disasm_window.h"
-#include "orthia_diana_print.h"
+#include "ui_disasm_memory_writer.h"
 #include "orthia_pe.h"
 #include "oui_goto_dialog.h"
+#include "oui_disasm_colors.h"
 
 // == Structure ==
 // [PE HEADER]
@@ -37,6 +38,7 @@ void CDisasmWindow::PrepareParameters(UIState& state, int itemUid, DI_UINT64 ini
    
     state.addresses[field_peAddress] = address;
 }
+
 void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
 {
     const int requiredLinesCount = m_view->GetSize().height;
@@ -80,90 +82,8 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
             routeStart = rangeInfo.address;
         }
     }
-    struct DisasmWriter:orthia::ITextPrinter
-    {
-        std::vector<oui::MultiLineViewItem> items;
-        int lastCmdSize = 0;
-        virtual void PrintLine(const std::wstring& line)
-        {
-            oui::MultiLineViewItem item;
-            item.text = line;
-            item.intTag = lastCmdSize;
-            items.push_back(item);
-        }
-    }writer;
-
-    class MemoryPrinter:public orthia::CSubrangeMemoryPrinter<diana::CMasmString>
-    {
-        using Parent_type = orthia::CSubrangeMemoryPrinter<diana::CMasmString>;
-
-        DisasmWriter& m_writer;
-        bool m_firstPrint = true;
-        orthia::Address_type m_firstVirtualOffset;
-        const char* m_pDataFlags = 0;
-        orthia::Address_type m_routeStart = 0;
-    public:
-        MemoryPrinter(orthia::ITextPrinter* pTextPrinter,
-            int dianaMode,
-            orthia::Address_type startAddress,
-            orthia::Address_type sizeInCommands,
-            DisasmWriter& writer)
-            : 
-            Parent_type(pTextPrinter,
-                dianaMode, 
-                startAddress, 
-                sizeInCommands),
-            m_writer(writer),
-            m_firstVirtualOffset(startAddress)
-        {
-            m_bytesIdent += 10;
-            m_countOfSpacesAfterAddress = 3;
-            m_printInvalidPages = true;
-        }
-        void SetFlags(const char* pDataFlags, orthia::Address_type routeStart)
-        {
-            m_pDataFlags = pDataFlags;
-            m_routeStart = routeStart;
-        }
-        bool IsBadByte(orthia::Address_type virtualOffset) override
-        {
-            if (m_pDataFlags)
-            {
-                auto relativeOffset = virtualOffset - m_routeStart;
-                auto & flag = m_pDataFlags[relativeOffset];
-                return flag & orthia::WorkAddressData::dataFlags_Invalid;
-            }
-            return false;
-        }
-        void Preprocess(int iRes,
-            ::DianaContext& context,
-            ::DianaParserResult& result,
-            orthia::Address_type virtualOffset,
-            bool* pPrint,
-            bool* pExit) override
-        {
-            Parent_type::Preprocess(iRes,
-                context,
-                result,
-                virtualOffset,
-                pPrint,
-                pExit);
-            if (*pPrint)
-            {
-                if (m_firstPrint)
-                {
-                    m_firstVirtualOffset = virtualOffset;
-                    m_firstPrint = false;
-                }
-                m_writer.lastCmdSize = result.iFullCmdSize;
-            }
-        }
-        orthia::Address_type GetRealFirstAddress() const
-        {
-            return m_firstVirtualOffset;
-        }
-
-    }printer(&writer, 
+    oui::DisasmWriter writer;
+    oui::MemoryPrinter printer(&writer,
         rangeInfo.dianaMode,
         m_peAddress,
         requiredLinesCount,

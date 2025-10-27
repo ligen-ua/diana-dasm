@@ -73,7 +73,7 @@ namespace oui
             Color background,
             bool keepText);
 
-        void PaintText(const Point& position,
+        int PaintText(const Point& position,
             Color textColor,
             Color textBgColor,
             const String& text,

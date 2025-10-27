@@ -50,6 +50,7 @@ namespace oui
         String text;
         int intTag = 0;
         std::shared_ptr<IMultilineViewTag> interfaceTag;
+        oui::TextMarkup markup;
     };
     
     class LineIndex
