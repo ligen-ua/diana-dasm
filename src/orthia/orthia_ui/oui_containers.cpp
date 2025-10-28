@@ -68,6 +68,31 @@ namespace oui
             }
         }
     }
+    bool CPanelWindow::ProcessEvent(InputEvent& evt, WindowEventContext& evtContext)
+    {
+        if (evt.keyEvent.valid)
+        {
+            bool handled = false;
+            switch (evt.keyEvent.virtualKey)
+            {
+            case oui::VirtualKey::kF5:
+            {
+                ForceResize();
+                handled = true;
+                break;
+            }
+            default:
+                break;
+            }
+            if (handled)
+            {
+                Invalidate();
+            }
+            return handled;
+        }
+        return false;
+    }
+
     bool CPanelWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
         if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)

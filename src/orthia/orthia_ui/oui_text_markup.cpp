@@ -3,11 +3,17 @@
 namespace oui
 {
 
-    void CTextMarkupBuilder::AddNextRange(size_t sizeInTChars, const LabelColorProfile& colorProfile, std::uint32_t id)
+    void CTextMarkupBuilder::AddNextRange(size_t sizeInTChars, const LabelColorProfile& colorProfile, std::uint32_t id, std::uint16_t flags)
     {
+        if (sizeInTChars > std::numeric_limits<uint16_t>::max())
+        {
+            __debugbreak();
+            return;
+        }
         TextMarkup::Range range;
         range.id = id;
-        range.sizeInTChars = (std::uint32_t)sizeInTChars;
+        range.flags = flags;
+        range.sizeInTChars = (std::uint16_t)sizeInTChars;
         range.colorProfile = colorProfile;
         if (!range.id)
         {

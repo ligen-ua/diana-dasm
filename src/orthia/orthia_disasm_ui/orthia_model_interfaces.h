@@ -85,6 +85,7 @@ namespace orthia
         virtual void GetModules(std::vector<orthia::ModuleInfo>& modules) const = 0;
         virtual int GetModulesCount() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
+        virtual int GetDianaMode() const = 0;
     };
 
 

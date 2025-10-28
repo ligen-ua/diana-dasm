@@ -3,7 +3,6 @@
 #include "oui_multiline_view.h"
 #include "ui_common.h"
 
-
 class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineViewOwner, public IUIStatefulWindow
 {
     struct ReloadVisibleDataContext
@@ -46,6 +45,7 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     bool SelectAll() override;
     oui::LineIndex GetLineIndex(int offsetInPage) const override;
     void OnEnter() override;
+    void OnPaintStart(std::shared_ptr<oui::CEditBox> editBox) override;
 
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,

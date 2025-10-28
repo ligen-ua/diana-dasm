@@ -11,6 +11,7 @@ namespace oui
         LabelColorProfile bytes;
         LabelColorProfile command;
         LabelColorProfile spaces;
+        LabelColorProfile operand;
     };
     void QueryDefaultColorProfile(DisasmColorsProfile& profile);
 

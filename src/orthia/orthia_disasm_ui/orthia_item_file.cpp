@@ -132,5 +132,9 @@ namespace orthia
     {
         return peristentItemStorage;
     }
+    int FileWorkplaceItem::GetDianaMode() const
+    {
+        return peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+    }
 
 }

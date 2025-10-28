@@ -13,7 +13,7 @@ namespace oui
                 ColorBlack(),     // background
             },
             {
-                ColorWhite(),     // text
+                ColorBrightGreen(),     // text
                 ColorBlack(),     // background
             }
         },
@@ -48,6 +48,17 @@ namespace oui
             {
                 ColorWhite(),      // text
                 ColorBlack(),      // background
+            }
+        },
+        // operand
+        {
+            {
+                ColorYellow(),      // text
+                ColorBlack(),      // background
+            },
+            {
+                ColorBrightGreen(),      // text
+                ColorBlack(),          // background
             }
         }
     };

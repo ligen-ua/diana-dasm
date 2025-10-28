@@ -14,13 +14,19 @@ namespace oui
             Rect myRect = this->GetWndRect();
             myRect.position = myPosition;
 
-            return this->HandleMouseEvent(myRect, evt);
+            return this->HandleMouseEventImpl(myRect, evt, true);
         };
         handlers.ctrlCHandler = [&](InputEvent& evt) {
             return this->CopySelected();
         };
         handlers.ctrlAHandler = [&](InputEvent& evt) {
             return m_owner->SelectAll();
+        };
+        handlers.onPaintStart = [&](std::shared_ptr<CEditBox> editBox) {
+            m_owner->OnPaintStart(editBox);
+        };
+        handlers.onPaintDone = [&]() {
+            OnEditBoxPaintDone();
         };
         m_editBox->SetLowLevelHandlers(std::move(handlers));
 
@@ -32,6 +38,11 @@ namespace oui
             }
             m_owner->OnEnter();
         });
+        EditBoxLowLevelHandlers handlers2;
+        handlers2.onPaintStart = [&](std::shared_ptr<CEditBox> editBox) {
+            m_owner->OnPaintStart(editBox);
+        };
+        m_paintBox->SetLowLevelHandlers(std::move(handlers2));
     }
     CMultiLineView::CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile,
         IMultiLineViewOwner* owner,
@@ -43,14 +54,65 @@ namespace oui
     {
         m_editBox = std::make_shared<CEditBox>(m_colorProfile);
         m_editBox->SetReadOnly(true);
-        SetupHandlers();
 
         m_paintBox = std::make_shared<CEditBox>(m_colorProfile);
         m_paintBox->SetReadOnly(true);
+
+        SetupHandlers();
         SetBackgroundColor(m_colorProfile->editBox.normal.background);
+    }
+    void CMultiLineView::OnEditBoxPaintDone()
+    {
+        auto range = m_editBox->GetLastSelectedRange();
+        if (range.id)
+        {
+            SelectedRangeInfo info;
+            info.index = GetCurrentLineIndex();
+            info.range = range;
+            info.offsetInPage = m_yCursopPos + m_firstVisibleLineIndex;
+            m_lastSelectedRanges.push_back(info);
+        }
+        std::sort(m_lastSelectedRanges.begin(), m_lastSelectedRanges.end(), [](auto &x, auto &y) { return x.index < y.index; });
+
+        // compare selection
+        bool needInvalidate = false;
+        if (m_prevSelectedRanges.size() != m_lastSelectedRanges.size())
+        {
+            needInvalidate = true;
+        }
+        else
+        {
+            auto it = m_prevSelectedRanges.begin();
+            for (auto& info : m_lastSelectedRanges)
+            {
+                if (it->index != info.index || it->range.id != info.range.id)
+                {
+                    needInvalidate = true;
+                    break;
+                }
+                ++it;
+            }
+        }
+        if (needInvalidate)
+        {
+            Invalidate();
+        }
+    }
+    bool CMultiLineView::PaintInProgress() const
+    {
+        return m_paintIsProgress;
     }
     void CMultiLineView::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
+        m_paintIsProgress = true;
+        DoPaintImpl(rect, parameters);
+        m_paintIsProgress = false;
+    }
+    void CMultiLineView::DoPaintImpl(const Rect& rect, DrawParameters& parameters)
+    {
+        m_prevSelectedRanges = m_lastSelectedRanges;
+        m_lastSelectedRanges.clear();
+
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
         if (absClientRect.size.height <= 0)
         {
@@ -123,11 +185,13 @@ namespace oui
             {
                 m_paintBox->SetMarkup(it->markup);
                 m_paintBox->SetText(it->text);
+                bool lineIndexValid = false;
                 if (SelectionIsActive())
                 {
-                    auto lineIndex = m_owner->GetLineIndex(m_firstVisibleLineIndex + i);
-                    int res1 = lineIndex.CompareWith(selPosStart.y);
-                    int res2 = lineIndex.CompareWith(selPosEnd.y);
+                    lineIndexValid = true;
+                    m_currentPaintedLineIndex = m_owner->GetLineIndex(m_firstVisibleLineIndex + i);
+                    int res1 = m_currentPaintedLineIndex.CompareWith(selPosStart.y);
+                    int res2 = m_currentPaintedLineIndex.CompareWith(selPosEnd.y);
                     if (res1 > 0 && res2 < 0)
                     {
                         m_paintBox->SelectAll();
@@ -144,13 +208,42 @@ namespace oui
                     }
                 }
                 oui::Rect childRect{ target, { absClientRect.size.width, 1 } };
+
+                if (m_lastMouseMovePoint.y == i)
+                {
+                    auto point = m_lastMouseMovePoint;
+                    point.y = 0;
+                    m_paintBox->SetLastMousePoint(point);
+                }
+                else
+                {
+                    m_paintBox->SetLastMousePoint(Point());
+                }
+                if (!lineIndexValid)
+                {
+                    m_currentPaintedLineIndex = m_owner->GetLineIndex(m_firstVisibleLineIndex + i);
+                }
                 m_paintBox->DoPaint(childRect, parameters);
+
+                auto lastRange = m_paintBox->GetLastSelectedRange();
+                if (lastRange.id)
+                {
+                    SelectedRangeInfo info;
+                    info.index = m_currentPaintedLineIndex;
+                    info.range = lastRange;
+                    info.offsetInPage = m_firstVisibleLineIndex + i;
+                    m_lastSelectedRanges.push_back(info);
+                }
             }
             ++it;
             ++target.y;
         }
         Point pt = { 0, m_yCursopPos };
         m_editBox->MoveTo(pt);
+        if (m_lastMouseMovePoint.y != m_yCursopPos)
+        {
+            m_editBox->SetLastMousePoint(Point());
+        }
         if (m_cursorOutOfText)
         {
             m_editBox->SetText(String());
@@ -359,6 +452,8 @@ namespace oui
     void CMultiLineView::ConstructChilds()
     {
         AddChild(m_editBox);
+        GetPool()->RegisterWindow(m_paintBox);
+        m_paintBox->Init(GetPool());
     }
     void CMultiLineView::OnResize()
     {
@@ -455,6 +550,10 @@ namespace oui
         }
     }
 
+    oui::LineIndex CMultiLineView::GetCurrentPaintedLineIndex() const
+    {
+        return m_currentPaintedLineIndex;
+    }
     LineIndex CMultiLineView::GetCurrentLineIndex() const
     {
         return m_owner->GetLineIndex(m_yCursopPos + m_firstVisibleLineIndex);
@@ -488,12 +587,14 @@ namespace oui
     }
     bool CMultiLineView::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
+        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+        m_lastMouseMovePoint = relativePoint;
         m_lastKeyState = evt.keyState;
-        bool res = HandleMouseEventImpl(rect, evt);
+        bool res = HandleMouseEventImpl(rect, evt, false);
         m_lastKeyState = KeyState();
         return res;
     }
-    bool CMultiLineView::HandleMouseEventImpl(const Rect& rect, InputEvent& evt)
+    bool CMultiLineView::HandleMouseEventImpl(const Rect& rect, InputEvent& evt, bool fromEditBox)
     {
         {
             int pageSize = 1;
@@ -508,31 +609,69 @@ namespace oui
                 return true;
             }
         }
+        auto clientRect = GetClientRect();
+        auto point = GetRelativeMousePoint(rect, evt.mouseEvent.point);
+        bool handled = false;
+
+
+        bool tryGoLink = 0;
         if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
         {
-            auto clientRect = GetClientRect();
-            auto point = GetRelativeMousePoint(rect, evt.mouseEvent.point);
             if (point.y < 0 || point.y >= clientRect.size.height)
             {
                 return false;
             }
             CancelSelectionIfNecessary();
-            // got click
-            SetNewCursor(point);
+
+            if (!fromEditBox)
+            {
+                // got click
+                SetNewCursor(point);
+                handled = true;
+            }
+            tryGoLink = evt.keyState.HasJustCtrl();
+        }        
+        if (tryGoLink)
+        {
+            m_owner->OnEnter();
         }
         Invalidate(false);
-        return true;
+        return handled;
     }
     void CMultiLineView::SetFocusImpl()
     {
         m_editBox->SetFocus();
+    }
+    std::pair<MultiLineViewItem, bool> CMultiLineView::GetItem(int offsetInPage)
+    {
+        if (m_lines.empty())
+        {
+            return std::make_pair(MultiLineViewItem(), false);
+        }
+        if (offsetInPage >= m_lines.size())
+        {
+            return std::make_pair(m_lines[m_lines.size() - 1], false);
+        }
+        return std::make_pair(m_lines[offsetInPage], true);
     }
     void CMultiLineView::AddLine(MultiLineViewItem&& item)
     {
         m_lines.push_back(std::move(item));
         Invalidate();
     }
-
+    TextMarkup::Range CMultiLineView::GetCurrentItemRange() const
+    {
+        return m_editBox->GetCursorRange();
+    }
+    MultiLineViewItem CMultiLineView::GetCurrentItem() const
+    {
+        bool outOfBounds = (m_firstVisibleLineIndex + m_yCursopPos) >= (int)m_lines.size();
+        if (outOfBounds)
+        {
+            return MultiLineViewItem();
+        }
+        return m_lines[(m_firstVisibleLineIndex + m_yCursopPos)];
+    }
     std::vector<MultiLineViewItem>::iterator CMultiLineView::VisibleItemsBegin()
     {
         if (m_firstVisibleLineIndex > m_lines.size())
@@ -634,4 +773,10 @@ namespace oui
         }
         return result;
     }
+
+    const std::vector<CMultiLineView::SelectedRangeInfo>& CMultiLineView::GetPrevSelectedRanges()
+    {
+        return m_prevSelectedRanges;
+    }
 }
+

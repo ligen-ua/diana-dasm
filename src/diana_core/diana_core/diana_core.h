@@ -505,5 +505,7 @@ int Diana_SafeAdd(OPERAND_SIZE * pResult, OPERAND_SIZE arg);
 // returns 0 if code is unknown
 const char * Diana_QueryErrorText_Silent(int value);
 
+OPERAND_SIZE Diana_ReadValue(const void* buffer,
+    int size);
 
 #endif

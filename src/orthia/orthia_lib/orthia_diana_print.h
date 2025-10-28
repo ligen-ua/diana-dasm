@@ -9,6 +9,13 @@ namespace orthia
     class CVmAsmMemoryPrinter:public orthia::IVmMemoryRangesTarget
     {
     protected:
+        struct DianaPrintContext
+        {
+            ::DianaParserResult result;
+            ::DianaMemoryStream stream;
+            ::DianaContext context;
+        };
+
         orthia::ITextPrinter* m_pTextPrinter;
         int m_dianaMode;
         AsmCommandWriterType m_writer;
@@ -19,6 +26,7 @@ namespace orthia
         int m_countOfSpacesAfterAddress;
         bool m_printInvalidPages;
         int m_spacesCount;
+        DianaPrintContext* m_pDianaPrintContext;
     public:
         CVmAsmMemoryPrinter(orthia::ITextPrinter* pTextPrinter,
             int dianaMode,
@@ -31,7 +39,8 @@ namespace orthia
             m_bytesIdent(0),
             m_countOfSpacesAfterAddress(1),
             m_printInvalidPages(false),
-            m_spacesCount(1)
+            m_spacesCount(1),
+            m_pDianaPrintContext(0)
         {
             // default parameters are used in windbg plugin
             m_bytesIdent = 25;
@@ -106,9 +115,11 @@ namespace orthia
                 reportNoData = true;
             }
 
-            ::DianaParserResult result;
-            ::DianaMemoryStream stream;
-            ::DianaContext context;
+            DianaPrintContext ctx;
+            m_pDianaPrintContext = &ctx;
+            ::DianaParserResult & result = ctx.result;
+            ::DianaMemoryStream & stream = ctx.stream;
+            ::DianaContext & context = ctx.context;
 
             Diana_InitContext(&context, m_dianaMode);
             Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
@@ -206,6 +217,8 @@ namespace orthia
                     break;
                 }
             }
+
+            m_pDianaPrintContext = 0;
         }
     };
 

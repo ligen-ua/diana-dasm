@@ -11,15 +11,15 @@ namespace oui
         item.intTag = lastCmdSize;
         items.push_back(item);
     }
-    void DisasmWriter::PrintLine(const std::wstring& line, const oui::TextMarkup& markup)
+    void DisasmWriter::PrintLine(const std::wstring& line, const oui::TextMarkup& markup, std::shared_ptr<IMultilineViewTag> tag)
     {
         oui::MultiLineViewItem item;
         item.text = line;
         item.intTag = lastCmdSize;
         item.markup = markup;
+        item.interfaceTag = tag;
         items.push_back(item);
     }
-
 
     static void DianaStringOutputOnOpCallback(struct _DianaStringOutputContext* pContext,
         void* pUserContext,
@@ -62,7 +62,7 @@ namespace oui
         info.operand = operand;
         info.offset = offset;
         info.size = size;
-        m_operators.push_back(info);
+        m_operands.push_back(info);
     }
     void MemoryPrinter::PrintCommand(unsigned long long address,
         const std::wstring& bytes,
@@ -78,7 +78,7 @@ namespace oui
         {
             m_currentBlock.append(orthia::Address64ToString(address));
         }
-        m_textMarkupBuilder.AddNextRange(m_currentBlock.size(), m_colors.address);
+        m_textMarkupBuilder.AddNextRange(m_currentBlock.size(), m_colors.address,   g_region_id_address, oui::TextMarkup::flag_ManualHighlight);
 
         // pack spaces
         m_currentBlock.append(m_countOfSpacesAfterAddress, L' ');
@@ -100,10 +100,48 @@ namespace oui
 
         // pack command
         m_currentBlock.append(command);
-        m_textMarkupBuilder.AddNextRange(command.size(), m_colors.spaces);
+        size_t lastOffset = 0;
+        for (auto& op : m_operands)
+        {
+            m_textMarkupBuilder.AddNextRange(op.offset - lastOffset, m_colors.command);
+            m_textMarkupBuilder.AddNextRange(op.size, m_colors.operand, g_region_id_operand);
+            lastOffset = op.offset + op.size;
+        }
+        if (command.size() > lastOffset)
+        {
+            m_textMarkupBuilder.AddNextRange(command.size() - lastOffset, m_colors.command);
+        }
+        
+        std::shared_ptr<DisasmLineContextTag> tag = std::make_shared<DisasmLineContextTag>();
+        tag->address = address;
+        Diana_AnalyzeJumps(&m_pDianaPrintContext->result, 
+            address + m_pDianaPrintContext->result.iFullCmdSize, 
+            &tag->newOffset, 
+            &tag->absoluteAddress, 
+            &tag->linksToData);
 
-        m_pTextPrinter->PrintLine(m_currentBlock, m_textMarkupBuilder.Build());
-        m_operators.clear();
+        if (tag->newOffset && !tag->linksToData && 
+            (m_pDianaPrintContext->result.pInfo->m_pGroupInfo->m_pLinkedInfo->flags & DIANA_GT_IS_JUMP))
+        {
+            oldSize = m_currentBlock.size();
+
+            m_currentBlock.append(3, L' ');
+            m_currentBlock.append(L"; ");
+            if (tag->newOffset > tag->address)
+            {
+                m_currentBlock.append(1, L'\x2193');
+            }
+            else
+            {
+                m_currentBlock.append(1, L'\x2191');
+            }
+            m_textMarkupBuilder.AddNextRange(bytes.size(), m_colors.bytes);
+            m_textMarkupBuilder.AddNextRange(m_currentBlock.size() - oldSize, m_colors.bytes);
+        }
+
+        m_pTextPrinter->PrintLine(m_currentBlock, m_textMarkupBuilder.Build(), tag);
+
+        m_operands.clear();
     }
 
     void MemoryPrinter::SetFlags(const char* pDataFlags, orthia::Address_type routeStart)

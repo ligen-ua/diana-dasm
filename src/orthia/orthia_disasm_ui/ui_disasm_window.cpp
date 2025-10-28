@@ -9,6 +9,13 @@
 // [SECTION HEADER]
 // [FUNCTION HEADER]
 // [INSTRUCTION HEADER]
+
+std::shared_ptr<oui::DisasmLineContextTag> GetDisasmTag(oui::MultiLineViewItem& item)
+{
+    return std::static_pointer_cast<oui::DisasmLineContextTag>(item.interfaceTag);
+}
+
+
 CDisasmWindow::CDisasmWindow(std::function<oui::String()> getCaption,
     std::shared_ptr<orthia::CProgramModel> model)
     :
@@ -141,14 +148,82 @@ void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1, const oui::Mu
 }
 void CDisasmWindow::OnEnter()
 {
+    auto item = m_model->GetItem(m_itemUid);
+    if (!item)
+    {
+        return;
+    }
+
+    auto lineItem = m_view->GetCurrentItem();
+    if (lineItem.interfaceTag)
+    {
+        auto tag = GetDisasmTag(lineItem);
+        if (tag && tag->newOffset)
+        {
+            auto gotoAddress = tag->newOffset;
+            if (tag->linksToData)
+            {
+                // dereference
+                auto data = item->ReadData(tag->newOffset, item->GetDianaMode());
+                if (data.pDataStart && data.dataSize == item->GetDianaMode())
+                {
+                    gotoAddress = Diana_ReadValue(data.pDataStart, item->GetDianaMode());
+                }
+            }
+            DoGoto(gotoAddress);
+        }
+    }
 }
 bool CDisasmWindow::SelectAll()
 {
     return false;
 }
+void CDisasmWindow::OnPaintStart(std::shared_ptr<oui::CEditBox> editBox)
+{
+    auto& ranges = m_view->GetPrevSelectedRanges();
+    if (ranges.empty())
+    {
+        return;
+    }
+    oui::LineIndex index;
+    if (m_view->PaintInProgress())
+    {
+        index = m_view->GetCurrentPaintedLineIndex();
+    }
+    else
+    {
+        index = m_view->GetCurrentLineIndex();
+    }
+    for (auto& r : ranges)
+    {
+        auto pair = m_view->GetItem(r.offsetInPage);
+        auto tag = GetDisasmTag(pair.first);
+
+        if (tag && tag->newOffset == index.GetIndex())
+        {
+            // highlight it
+            editBox->HighlightRegion(oui::g_region_id_address);
+        }
+    }
+}
+
 oui::LineIndex CDisasmWindow::GetLineIndex(int offsetInPage) const
 {
-    return oui::LineIndex(m_peAddress + offsetInPage, 0);
+    OPERAND_SIZE address = 0;
+    auto pair = m_view->GetItem(offsetInPage);
+    auto tag = GetDisasmTag(pair.first);
+    if (tag)
+    {
+        if (pair.second)
+        {
+            address = tag->address;
+        }
+        else
+        {
+            address = tag->address + pair.first.intTag;
+        }
+    }
+    return oui::LineIndex(address, 0);
 }
 bool CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count) 
 {
@@ -313,8 +388,8 @@ bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& 
         if (handled)
         {
             Invalidate();
+            return true;
         }
-        return handled;
     }
     return Parent_type::ProcessEvent(evt, evtContext);
 }

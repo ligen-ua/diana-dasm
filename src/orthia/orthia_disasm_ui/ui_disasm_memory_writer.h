@@ -5,14 +5,24 @@
 
 namespace oui
 {
+    const std::uint32_t g_region_id_address = oui::g_id_user_range + 1;
+    const std::uint32_t g_region_id_operand = oui::g_id_user_range + 2;
+
     struct DisasmWriter :orthia::ITextPrinter
     {
         std::vector<oui::MultiLineViewItem> items;
         int lastCmdSize = 0;
         void PrintLine(const std::wstring& line) override;
-        void PrintLine(const std::wstring& line, const oui::TextMarkup& markup);
+        void PrintLine(const std::wstring& line, const oui::TextMarkup& markup, std::shared_ptr<IMultilineViewTag> tag);
     };
 
+    struct DisasmLineContextTag:IMultilineViewTag
+    {
+        OPERAND_SIZE address = 0;
+        OPERAND_SIZE newOffset = 0;
+        int absoluteAddress = 0;
+        int linksToData = 0;
+    };
     struct MemoryPrinterOperandInfo
     {
         OPERAND_SIZE operand = 0;
@@ -31,7 +41,7 @@ namespace oui
         orthia::Address_type m_routeStart = 0;
         oui::DisasmColorsProfile m_colors;
         DisasmWriter* m_pTextPrinter;
-        std::vector<MemoryPrinterOperandInfo> m_operators;
+        std::vector<MemoryPrinterOperandInfo> m_operands;
     public:
         MemoryPrinter(DisasmWriter* pTextPrinter,
             int dianaMode,

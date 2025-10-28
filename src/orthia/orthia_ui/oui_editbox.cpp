@@ -106,13 +106,17 @@ namespace oui
         std::vector<TextMarkup::Range>::const_iterator& rangeIt,
         int& rangePos,
         Point& target, String* stringToRender,
-        int startPos, int endPos)
+        int startPos, int endPos,
+        int chunkStartOffset)
     {
         int xToDraw = startPos;
         if (xToDraw >= endPos)
         {
             return;
         }
+
+        auto cursorOffset = GetSymOffset(m_cursorIterator) - chunkStartOffset;
+
         for (; rangeIt != m_markup.ranges.end(); )
         {
             // analyze xToDraw
@@ -127,9 +131,25 @@ namespace oui
             m_chunk2.native.assign(stringToRender->native.begin() + xToDraw,
                 stringToRender->native.begin() + xEnd);
 
+            auto colorState = &rangeIt->colorProfile.normal;
+            if (((rangeIt->flags & TextMarkup::flag_ManualHighlight) == 0) &&
+                ((cursorOffset >= xToDraw && cursorOffset <= xEnd) ||
+                (m_lastMouseMovePoint.x >= xToDraw && m_lastMouseMovePoint.x <= xEnd)))
+            {
+                if (rangeIt->id > g_id_user_range)
+                {
+                    // special selected
+                    m_lastSelectedRange = *rangeIt;
+                }
+                colorState = &rangeIt->colorProfile.mouseHighlight;
+            }
+            if (m_manualHighlight == rangeIt->id)
+            {
+                colorState = &rangeIt->colorProfile.mouseHighlight;
+            }
             target.x += parameters.console.PaintText(target,
-                rangeIt->colorProfile.normal.text,
-                rangeIt->colorProfile.normal.background,
+                colorState->text,
+                colorState->background,
                 m_chunk2.native);
 
             xToDraw = xEnd;
@@ -156,14 +176,30 @@ namespace oui
         }
 
     }
-
-    void CEditBox::DoPaint(const Rect& rect, DrawParameters& parameters)
+    void CEditBox::DoPaint(const Rect & rect, DrawParameters & parameters)
     {
+        if (m_llHandlers.onPaintStart)
+        {
+            auto pthis = this->GetPtr();
+            m_llHandlers.onPaintStart(Cast_t<CEditBox>(pthis));
+        }
+        DoPaintImpl(rect, parameters);
+
+        m_manualHighlight = 0;
+        if (m_llHandlers.onPaintDone)
+        {
+            m_llHandlers.onPaintDone();
+        }
+    }
+    void CEditBox::DoPaintImpl(const Rect& rect, DrawParameters& parameters)
+    {
+        m_lastSelectedRange = oui::TextMarkup::Range();
         CConsole* console = GetConsole();
         if (!console)
         {
             return;
         }
+        
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
         m_lastRect = absClientRect;
 
@@ -367,7 +403,7 @@ namespace oui
             }
 
             DoPaintMarkupText(parameters, rangeIt, rangePos, target, 
-                stringToRender, range.start, endPos);
+                stringToRender, range.start, endPos, chunkStartOffset);
         }
     }
 
@@ -413,6 +449,10 @@ namespace oui
         }
         return x;
     }
+    void CEditBox::HighlightRegion(std::uint16_t id)
+    {
+        m_manualHighlight = id;
+    }
     void CEditBox::Select(int startX, int endX)
     {
         m_selPosStart = AdjustVirtualCursorPosition(startX);
@@ -457,7 +497,22 @@ namespace oui
     }
     bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
-        if (evt.mouseEvent.button == MouseButton::Left && (evt.mouseEvent.state == MouseState::Pressed ||
+        if (!m_markup.ranges.empty())
+        {
+            Invalidate(false);
+        }
+        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+        m_lastMouseMovePoint = relativePoint;
+        if (m_llHandlers.mouseHandler)
+        {
+            if (m_llHandlers.mouseHandler(rect, evt))
+            {
+                return true;
+            }
+        }
+
+        if (evt.mouseEvent.button == MouseButton::Left && 
+            (evt.mouseEvent.state == MouseState::Pressed ||
             evt.mouseEvent.state == MouseState::DoubleClick))
         {
             auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
@@ -466,16 +521,13 @@ namespace oui
                 return false;
             }
             SetCursorPosition(relativePoint.x, true, evt.keyState.HasShift());
-            if (evt.mouseEvent.state == MouseState::DoubleClick) {
+            if (evt.mouseEvent.state == MouseState::DoubleClick) 
+            {
                 SelectCurrentWord();
             }
+            return true;
         }
-
-        if (m_llHandlers.mouseHandler)
-        {
-            return m_llHandlers.mouseHandler(rect, evt);
-        }
-        return true;
+        return false;
     }
     void CEditBox::InsertText(const String& text_in)
     {
@@ -794,6 +846,10 @@ namespace oui
         }
         Invalidate();
     }
+    void CEditBox::SetLastMousePoint(Point lastMouseMovePoint)
+    {
+        m_lastMouseMovePoint = lastMouseMovePoint;
+    }
     void CEditBox::ResetSelection()
     {
         m_selPosStart = m_cursorIterator;
@@ -824,6 +880,24 @@ namespace oui
 
         Parent_type::OnFocusEnter();
     }
+    TextMarkup::Range CEditBox::GetLastSelectedRange() const
+    {
+        return m_lastSelectedRange;
+    }
+    TextMarkup::Range CEditBox::GetCursorRange() const
+    {
+        auto rangeIt = m_markup.ranges.begin();
+        int rangePos = 0;
+        auto cursorOffset = GetSymOffset(m_cursorIterator);
 
-
+        for (; rangeIt != m_markup.ranges.end(); ++rangeIt)
+        {
+            if (cursorOffset >= rangePos && cursorOffset <= (rangePos + (int)rangeIt->sizeInTChars))
+            {
+                return *rangeIt;
+            }
+            rangePos += rangeIt->sizeInTChars;
+        }
+        return TextMarkup::Range();
+    }
 }

@@ -267,7 +267,17 @@ namespace orthia
         auto mappedPE = std::make_unique<orthia::CSimplePeFile>();
         orthia::MapFileParameters params;
         mappedPE->MapFile(binPeFile, params);
+        
 
+        // TODO: load imports
+        //CLinkObserverOverWin32 win32Loader;
+        //DI_CHECK_CPP(DianaPeFile_LinkImports(&dianaPeFile,
+        //    (OPERAND_SIZE)hModule,
+        //    &writeStream,
+        //    &page.front(),
+        //    (ULONG)page.size(),
+        //    win32Loader.GetParent()));
+       
         // check folder
         auto fileHash = CalcSha1(binPeFile);
         auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());

@@ -480,3 +480,22 @@ const char * Diana_QueryErrorText_Silent(int value)
 #undef DI_ERR_DEF_CASE
     return 0;
 }
+
+
+OPERAND_SIZE Diana_ReadValue(const void* buffer,
+    int size)
+{
+    switch (size)
+    {
+    case 1:
+        return *(unsigned char*)buffer;
+    case 2:
+        return *(unsigned short*)buffer;
+    case 4:
+        return *(unsigned int*)buffer;
+    case 8:
+        return *(OPERAND_SIZE*)buffer;
+    }
+    Diana_FatalBreak();
+    return 0;
+}

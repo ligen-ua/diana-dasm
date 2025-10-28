@@ -94,11 +94,7 @@ static int DianaOpOutput(DianaTextOutputContext * pContext,
                          int size)
 {
     DI_CHECK((*pContext->pOpOutputFnc)(pContext, operand, size));
-    if (size == 1 && operand < 10)
-    {
-        return DI_SUCCESS;
-    }
-    return DianaTextOutput(pContext, "h");
+    return DI_SUCCESS;
 }
 static int PrintRegister(DianaTextOutputContext * pContext, DianaUnifiedRegister recognizedRegister)
 {

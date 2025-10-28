@@ -6,11 +6,14 @@
 
 namespace oui
 {
+    class CEditBox;
     struct EditBoxLowLevelHandlers
     {
         std::function<bool(const Rect& rect, InputEvent& evt)> mouseHandler;
         std::function<bool(InputEvent& evt)> ctrlCHandler;
         std::function<bool(InputEvent& evt)> ctrlAHandler;
+        std::function<void(std::shared_ptr<CEditBox> editBox)> onPaintStart;
+        std::function<void()> onPaintDone;
     };
     
     struct EditBoxSelectionRange;
@@ -43,6 +46,10 @@ namespace oui
         std::function<void(const String&text)> m_enterHandler;
 
         EditBoxLowLevelHandlers m_llHandlers;
+        Point m_lastMouseMovePoint;
+        TextMarkup::Range m_lastSelectedRange;
+
+        std::uint16_t m_manualHighlight = 0;
         void SetTextImpl(const String& text);
         void MoveToNextWordRight();
         void MoveToNextWordLeft();
@@ -53,10 +60,13 @@ namespace oui
             std::vector<TextMarkup::Range>::const_iterator& it,
             int& rangePos,
             Point& target, String* stringToRender, 
-            int startPos, int endPos);
+            int startPos, int endPos,
+            int chunkStartOffset);
+        void DoPaintImpl(const Rect& rect, DrawParameters& parameters);
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
+        void SetLastMousePoint(Point lastMouseMovePoint);
         void ResetSelection();
         void SetSelectAllOnFocus(bool selectAllOnFocus);
         void SetLowLevelHandlers(EditBoxLowLevelHandlers&& handlers);
@@ -69,6 +79,9 @@ namespace oui
         void Clear();
         String GetText() const;
         void SetMarkup(const TextMarkup& markup);
+        TextMarkup::Range GetCursorRange() const;
+        TextMarkup::Range GetLastSelectedRange() const;
+
         void SetText(const String& text);
         void ScrollRight();
         void OnFocusLost() override;
@@ -80,6 +93,7 @@ namespace oui
         void SelectCurrentWord();
         void Select(int startX, int endX);
 
+        void HighlightRegion(std::uint16_t id);
         int AdjustVirtualCursorPosition(int startX);
         void SetCursorPosition(int newScreenX, bool changeSelecton, bool shiftMode);
         int GetVirtualCursorPosition() const;

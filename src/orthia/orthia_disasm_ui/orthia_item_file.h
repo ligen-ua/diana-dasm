@@ -27,6 +27,8 @@ namespace orthia
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
         int GetModulesCount() const override;
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
+        int GetDianaMode() const override;
+
     };
 
 }

@@ -97,6 +97,10 @@ namespace oui
     {
         return l1.CompareWith(l2) == 0;
     }
+    inline bool operator != (const LineIndex& l1, const LineIndex& l2)
+    {
+        return l1.CompareWith(l2) != 0;
+    }
 
     struct MultiLineSelPoint
     {
@@ -130,11 +134,20 @@ namespace oui
         virtual void CopySelected(const MultiLineSelPoint& selPosStart, const MultiLineSelPoint& selPosEnd) = 0;
         virtual bool SelectAll() = 0;
         virtual void OnEnter() = 0;
+        virtual void OnPaintStart(std::shared_ptr<CEditBox> ) {}
     };
 
 
     class CMultiLineView:public SimpleBrush<MouseFocusable<CWindow>>
     {
+    public:
+        struct SelectedRangeInfo
+        {
+            LineIndex index;
+            TextMarkup::Range range;
+            int offsetInPage = 0;
+        };
+    private:
         using Parent_type = SimpleBrush<MouseFocusable<CWindow>>;
         using SelectionContext = MultiLineEditSelectionContext;
 
@@ -161,7 +174,14 @@ namespace oui
         KeyState m_lastKeyState;
         // end
 
+        Point m_lastMouseMovePoint;
+
         IMultiLineViewOwner* m_owner = 0;
+        std::vector<SelectedRangeInfo> m_lastSelectedRanges, m_prevSelectedRanges;
+
+        bool m_paintIsProgress = false;
+        oui::LineIndex m_currentPaintedLineIndex;
+
         void ConstructChilds() override;
         void OnResize() override;
         void SetFocusImpl() override;
@@ -173,12 +193,13 @@ namespace oui
         void SetNewCursor(const Point& pt);
         void SetNewYCursorPosImpl(int newCursor);
 
-        LineIndex GetCurrentLineIndex() const;
-        bool HandleMouseEventImpl(const Rect& rect, InputEvent& evt);
+        bool HandleMouseEventImpl(const Rect& rect, InputEvent& evt, bool fromEditBox);
         bool KeyStateHasSelection() const;
         void ActivateSelection();
         void CancelSelection();
         void CancelSelectionIfNecessary();
+        void OnEditBoxPaintDone();
+        void DoPaintImpl(const Rect& rect, DrawParameters& parameters);
 
     public:
         CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner, bool dynamicLogMode);
@@ -188,15 +209,23 @@ namespace oui
         void Destroy() override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
+        const std::vector<SelectedRangeInfo>& GetPrevSelectedRanges();
+
+        LineIndex GetCurrentLineIndex() const;
+        oui::LineIndex GetCurrentPaintedLineIndex() const;
 
         bool SelectionIsActive() const;
         void FixupTopSelectionRange();
         bool CopySelected();
         void SelectAllCached();
+        bool PaintInProgress() const;
 
         void Clear();
         void Init(std::vector<MultiLineViewItem>&& lines);
         void AddLine(MultiLineViewItem && item);
+        std::pair<MultiLineViewItem, bool> GetItem(int offsetInPage);
+        MultiLineViewItem GetCurrentItem() const;
+        TextMarkup::Range GetCurrentItemRange() const;
 
         std::vector<MultiLineViewItem>::iterator VisibleItemsBegin();
         std::vector<MultiLineViewItem>::iterator VisibleItemsEnd();

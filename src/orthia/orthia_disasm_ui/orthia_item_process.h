@@ -27,7 +27,7 @@ namespace orthia
         oui::String GetShortName() const override;
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
         int GetModulesCount() const override;
-
+        int GetDianaMode() const override { return m_dianaMode;}
         Address_type GerProcessModuleAddress();
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
     };

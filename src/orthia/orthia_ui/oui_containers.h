@@ -23,6 +23,7 @@ namespace oui
         String GetCaption() const;
         void Activate() override;
         void Deactivate() override;
+        bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
         void OnChildFocused() override;
         void SetVisible(bool value) override;

@@ -154,14 +154,13 @@ static int Diana_CreateXRef(Diana_InstructionsOwner * pOwner,
 }
 
 static
-int AnalyzeJumps(DianaAnalyzeSession * pSession,
+int AnalyzeJumps(DianaParserResult* pResult,
                  Diana_LinkedAdditionalGroupInfo * pLinkedInfo,
                  OPERAND_SIZE * pNewOffset,
                  OPERAND_SIZE offset,
                  int * pAbsoluteAddress,
                  int * pLinksToData)
 {
-    DianaParserResult * pResult = &pSession->result;
     const DianaLinkedOperand * pOp = pResult->linkedOperands + pLinkedInfo->relArgrumentNumber;
     *pNewOffset = 0;
     *pAbsoluteAddress = 0;
@@ -193,6 +192,44 @@ int AnalyzeJumps(DianaAnalyzeSession * pSession,
         return DI_UNSUPPORTED_COMMAND;
     }
     return DI_SUCCESS;
+}
+
+int Diana_AnalyzeJumps(DianaParserResult* pResult,
+    OPERAND_SIZE offset,
+    OPERAND_SIZE* pNewOffset,
+    int* pAbsoluteAddress,
+    int* pLinksToData)
+{
+    *pNewOffset = 0;
+    *pAbsoluteAddress = 0;
+    *pLinksToData = 0;
+    if (!pResult->pInfo || !pResult->pInfo->m_pGroupInfo)
+    {
+        return DI_NOT_FOUND;
+    }
+    Diana_LinkedAdditionalGroupInfo* pLinkedInfo = pResult->pInfo->m_pGroupInfo->m_pLinkedInfo;
+    if (!pLinkedInfo)
+    {
+        return DI_NOT_FOUND;
+    }
+    else
+    if (!(pLinkedInfo->flags & DIANA_GT_CAN_CHANGE_RIP))
+    {
+        return DI_NOT_FOUND;
+    }
+
+    // handle ret case
+    if (pLinkedInfo->flags & DIANA_GT_RET)
+    {
+        return DI_NOT_FOUND;
+    }
+
+    return AnalyzeJumps(pResult,
+        pLinkedInfo,
+        pNewOffset,
+        offset,
+        pAbsoluteAddress,
+        pLinksToData);
 }
 
 static
@@ -489,7 +526,7 @@ int AnalyzeAndConstructInstruction(DianaAnalyzeSession * pSession,
     }
 
     newOffset = 0;
-    iRes = AnalyzeJumps(pSession, 
+    iRes = AnalyzeJumps(&pSession->result,
                         pLinkedInfo, 
                         &newOffset,
                         nextInstructionOffset,
