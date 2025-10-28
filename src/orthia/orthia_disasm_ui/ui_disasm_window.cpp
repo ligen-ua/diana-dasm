@@ -63,7 +63,7 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     const int maxStepForwardBytes = 1024;
     const int maxStepBackwardBytes = m_userSuppliedPeAddress ? 0: 256 ;
 
-    orthia::Address_type routeStart = m_peAddress;
+    orthia::Address_type routeStart = 0;
     if (auto moduleManager = item->GetModuleManager())
     {
         routeStart = moduleManager->QueryRouteStart(m_peAddress);
