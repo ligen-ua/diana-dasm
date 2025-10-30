@@ -61,7 +61,7 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     auto rangeInfo = item->GetRangeInfo(m_peAddress);
 
     const int maxStepForwardBytes = 1024;
-    const int maxStepBackwardBytes = m_userSuppliedPeAddress ? 0: 256 ;
+    const int maxStepBackwardBytes = context.scrollUp ? 256: 0;
 
     orthia::Address_type routeStart = 0;
     if (auto moduleManager = item->GetModuleManager())
@@ -127,18 +127,12 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
 
     m_view->Init(std::move(writer.items));
 
-    if (!m_userSuppliedPeAddress)
+    if (context.scrollUp)
     {
         // check if can be adjusted
         m_peAddress = printer.GetRealFirstAddress();
-        if (context.scrollUp) 
-        {
-            m_view->FixupTopSelectionRange();
-        }
+        m_view->FixupTopSelectionRange();
     }
-
-    // clear flag on any next move
-    m_userSuppliedPeAddress = false;
 }
 void CDisasmWindow::CancelAllQueries()
 {
@@ -170,7 +164,25 @@ void CDisasmWindow::OnEnter()
                     gotoAddress = Diana_ReadValue(data.pDataStart, item->GetDianaMode());
                 }
             }
-            DoGoto(gotoAddress);
+
+
+            if (auto storage = item->GetPersistentStorage())
+            {
+                auto operation = std::make_shared<oui::Operation<orthia::GotoCompleteHandler_type>>(
+                    this->GetThread(),
+                    [](orthia::Address_type address, int error) {
+                    return oui::fsui::OpenResult();
+                });
+
+                AsyncRememberCurrentPosition(operation);
+
+                storage->AsyncUpdateGotoInfo(this->GetThread(),
+                    operation,
+                    gotoAddress,
+                    0,
+                    0);
+            }
+            DoGoto(gotoAddress, 0, false);
         }
     }
 }
@@ -278,7 +290,6 @@ bool CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
         bytesCount += it->intTag;
     }
     m_peAddress += bytesCount;
-    m_userSuppliedPeAddress = true;
     ReloadVisibleData();
     return true;
 }
@@ -324,14 +335,74 @@ void CDisasmWindow::SetActiveWorkspaceItem(int itemId)
     ReloadVisibleData();
     Invalidate();
 }
-
-void CDisasmWindow::DoGoto(orthia::Address_type address)
+bool CDisasmWindow::DoGotoOnPage(orthia::Address_type address)
 {
-    m_peAddress = address;
+    oui::LineIndex lineIndex(address, 0);
+    return m_view->SetCursorYPos(lineIndex);
+}
+void CDisasmWindow::DoGoto(orthia::Address_type address, orthia::Address_type pageAddress, bool hasPageAddress)
+{
+    if (!hasPageAddress)
+    {
+        if (DoGotoOnPage(address))
+        {
+            Invalidate();
+            return;
+        }
+    }
+    if (hasPageAddress)
+    {
+        m_peAddress = pageAddress;
+        auto wndHeight = m_view->GetClientRect().size.height;
+        if (wndHeight)
+        {
+            if (address > wndHeight && m_peAddress < (address - wndHeight))
+            {
+                m_peAddress = address - wndHeight + 1;
+            }
+        }
+    }
+    else
+    {
+        m_peAddress = address;
+    }
     m_view->Clear();
     m_view->SetCursorYPos(0);
     ReloadVisibleData();
+    if (hasPageAddress && !DoGotoOnPage(address))
+    {
+        m_peAddress = address;
+        m_view->Clear();
+        ReloadVisibleData();
+    }
     Invalidate();
+}
+void CDisasmWindow::AsyncRememberCurrentPosition(oui::OperationPtr_type<orthia::GotoCompleteHandler_type> operation)
+{
+    auto activeItem = m_model->GetActiveItem();
+    if (!activeItem) 
+    {
+        return;
+    }
+    if (!activeItem->GetPersistentStorage()) 
+    {
+        return;
+    }
+    if (!operation)
+    {
+        operation = std::make_shared<oui::Operation<orthia::GotoCompleteHandler_type>>(
+            this->GetThread(),
+            [this](orthia::Address_type address, int error) {
+            return oui::fsui::OpenResult();
+        });
+    }
+    auto currentItem = m_view->GetCurrentLineIndex();
+
+    activeItem->GetPersistentStorage()->AsyncUpdateGotoInfo(this->GetThread(),
+        operation,
+        currentItem.GetIndex(),
+        orthia::IPeristentItemStorage::goto_flags_history_mode,
+        m_peAddress);
 }
 
 void CDisasmWindow::Event_Goto()
@@ -341,19 +412,21 @@ void CDisasmWindow::Event_Goto()
     GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.goto"), dialogStrings);
 
     auto activeItem = m_model->GetActiveItem();
-    if (!activeItem) {
+    if (!activeItem) 
+    {
         return;
     }
-    if (!activeItem->GetPersistentStorage()) {
+    if (!activeItem->GetPersistentStorage())
+    {
         return;
     }
-    int flags = oui::IProcessSystem::queryFlags_TryOpenProcessAsReader;
     auto dialog = AddChildAndInit_t(std::make_shared<oui::CGotoDialog>(dialogStrings,
         [=](orthia::Address_type address, int error) {
 
         if (!error)
         {
-            DoGoto(address);
+            AsyncRememberCurrentPosition();
+            DoGoto(address, 0, false);
         }
         return oui::fsui::OpenResult();
     },
@@ -374,6 +447,27 @@ bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& 
         bool handled = false;
         switch (evt.keyEvent.virtualKey)
         {
+        case oui::VirtualKey::Backspace:
+            {
+                auto activeItem = m_model->GetActiveItem();
+                if (activeItem)
+                {
+                    if (auto storage = activeItem->GetPersistentStorage())
+                    {
+                        auto operation = std::make_shared<oui::Operation<orthia::FetchCompleteHandler_type>>(
+                            this->GetThread(),
+                            [this](orthia::Address_type address, int error, orthia::Address_type pageAddress) {
+                                if (!error)
+                                {
+                                    DoGoto(address, pageAddress, true);
+                                }
+                                return oui::fsui::OpenResult();
+                        });
+                        storage->AsyncFetchPrevHistory(this->GetThread(), operation);
+                    }
+                }
+                break;
+            }
         case oui::VirtualKey::kG:
             if (!evt.keyState.HasModifiers() || evt.keyState.HasJustCtrl())
             {

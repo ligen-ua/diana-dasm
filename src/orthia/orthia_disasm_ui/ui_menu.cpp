@@ -36,7 +36,7 @@ void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::
             result.error));
     }
 }
-bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile> file)
+bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile2> file)
 {
     auto me = oui::GetPtr_t<CMainWindow>(this);
     std::weak_ptr<CMainWindow> weakMe = me;
@@ -59,7 +59,7 @@ bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile> file)
     return true;
 }
 oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
-    std::shared_ptr<oui::IFile> file, 
+    std::shared_ptr<oui::IFile2> file, 
     oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
 { 
     if (dialog && file && completeHandler)
@@ -74,7 +74,7 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
         }
         oui::fsui::FileCompleteHandler_type rawHandler = completeHandler->GetHandler();
         completeHandler->SetHandler(
-            [=](std::shared_ptr<oui::BaseOperation> op, std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result) {
+            [=](std::shared_ptr<oui::BaseOperation> op, std::shared_ptr<oui::IFile2> file, const oui::fsui::OpenResult& result) {
     
             if (auto p = weakMe.lock())
             {
@@ -164,7 +164,7 @@ void CMainWindow::OpenExecutable()
 
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>(oui::String(),
         dialogStrings,
-        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler) {
+        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile2> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler) {
             if (auto p = weakMe.lock())
             {
                 return p->HandleOpenExecutable(dlg, file, handler);

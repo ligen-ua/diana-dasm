@@ -30,7 +30,7 @@ namespace oui
     class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
     public:
-        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile>, OperationPtr_type<fsui::FileCompleteHandler_type>)>;
+        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile2>, OperationPtr_type<fsui::FileCompleteHandler_type>)>;
 
     private:
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
@@ -54,7 +54,7 @@ namespace oui
         std::shared_ptr<CMessageBoxWindow> m_waitBox;
         int m_openFileSeq = 0;
         String m_waitBoxText;
-        std::shared_ptr<IFile> m_result;
+        std::shared_ptr<IFile2> m_result;
         OperationPtr_type<oui::fsui::FileCompleteHandler_type> m_openOperation;
         int m_typesToHighlight = 0;
         bool m_readyToExit = false;
@@ -73,7 +73,7 @@ namespace oui
             const String& fileName,
             bool combine);
         void OnWaitBoxDestroyed();
-        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error, const String& folderName);
+        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName);
         void FinishFileOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
     protected:
         void OnResize() override;

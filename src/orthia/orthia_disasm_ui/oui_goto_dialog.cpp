@@ -199,7 +199,9 @@ namespace oui
 
             m_fileSystem->AsyncUpdateGotoInfo(this->GetThread(),
                 operation,
-                address
+                address,
+                0,
+                0
             );
         }
         else 

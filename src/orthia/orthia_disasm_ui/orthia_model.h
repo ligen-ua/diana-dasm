@@ -6,6 +6,7 @@
 #include "orthia_config.h"
 #include "orthia_module_manager.h"
 #include "oui_processes.h"
+#include <optional>
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -73,8 +74,10 @@ namespace orthia
         void AddProcess(std::shared_ptr<oui::IProcess> proc,
             oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
 
-        void AddExecutable(std::shared_ptr<oui::IFile> file,
+        void AddExecutable(std::shared_ptr<oui::IFile2> file,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
     };
+    oui::String ReadFileToVector(std::shared_ptr<oui::IFile> file, std::vector<char>& data, std::shared_ptr<oui::BaseOperation> operation = nullptr, intrusive_ptr<CTextNode> errorNode = nullptr);
+
 }

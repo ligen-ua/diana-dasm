@@ -307,7 +307,7 @@ namespace oui
         }
         m_fileSystem->AsyncOpenFile(this->GetThread(),
             FileUnifiedId(targetFile),
-            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile> file, int error, const oui::String& folderName) {
+            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile2> file, int error, const oui::String& folderName) {
             if (auto p = weakMe.lock())
             {
                 me->SetOpenFileResult(openFileSeq, file, error, folderName);
@@ -340,7 +340,7 @@ namespace oui
             m_waitBox->Invalidate();
         }
     }
-    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile> file, int error, const String& folderName)
+    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName)
     {
         if (openFileSeq != m_openFileSeq)
         {
@@ -373,7 +373,7 @@ namespace oui
             std::weak_ptr<COpenFileDialog> weakMe = me;
             auto operation = std::make_shared<Operation<oui::fsui::FileCompleteHandler_type>>(
                 this->GetThread(),
-                [=](std::shared_ptr<BaseOperation> op, std::shared_ptr<IFile> file, const oui::fsui::OpenResult& result) {
+                [=](std::shared_ptr<BaseOperation> op, std::shared_ptr<IFile2> file, const oui::fsui::OpenResult& result) {
                 if (auto p = weakMe.lock())
                 {
                     me->FinishFileOpen(op, result);

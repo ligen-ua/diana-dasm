@@ -9,11 +9,18 @@ namespace oui
         m_pool.Start(g_threadsCount);
     }
 
-    std::tuple<int, std::shared_ptr<IFile>> CFileSystem::SyncOpenFile(const FileUnifiedId& fileId)
+    std::tuple<int, std::shared_ptr<IFile2>> CFileSystem::SyncOpenFile(const FileUnifiedId& fileId)
     {
         return m_fsImpl->SyncOpenFile(fileId);
     }
-
+    std::tuple<int, String> CFileSystem::SyncLocateFile(const String& fileName, int dianaMode)
+    {
+        return m_fsImpl->SyncLocateFile(fileName, dianaMode);
+    }
+    std::tuple<int, String> CFileSystem::SyncNormalizeName(const String& fileName, bool expectDll)
+    {
+        return m_fsImpl->SyncNormalizeName(fileName, expectDll);
+    }
     // id-based stuff
     void CFileSystem::AsyncOpenFile(ThreadPtr_type targetThread, 
         const FileUnifiedId& fileId,

@@ -78,7 +78,7 @@ int wmain(int argc, const wchar_t* argv[])
         for (auto& name : filenamesToOpen)
         {
             int platformError = 0;
-            std::shared_ptr<oui::IFile> file;
+            std::shared_ptr<oui::IFile2> file;
             std::tie(platformError, file) = programModel->GetFileSystem()->SyncOpenFile(oui::FileUnifiedId(name));
             rootWindow->AddInitialArgument({platformError, name, file});
         }

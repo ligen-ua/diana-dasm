@@ -95,6 +95,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)orthia\orthia_lib;$(SolutionDir)orthia\orthia_ui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -114,6 +115,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)orthia\orthia_lib;$(SolutionDir)orthia\orthia_ui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +135,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)orthia\orthia_lib;$(SolutionDir)orthia\orthia_ui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -152,6 +155,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)orthia\orthia_lib;$(SolutionDir)orthia\orthia_ui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -184,6 +188,7 @@
     <ClCompile Include="orthia_item_process.cpp" />
     <ClCompile Include="orthia_model.cpp" />
     <ClCompile Include="orthia_model_interfaces.cpp" />
+    <ClCompile Include="orthia_model_modules.cpp" />
     <ClCompile Include="orthia_process_adapter.cpp" />
     <ClCompile Include="oui_disasm_colors.cpp" />
     <ClCompile Include="oui_goto_dialog.cpp" />
@@ -208,6 +213,7 @@
     <ClInclude Include="orthia_item_process.h" />
     <ClInclude Include="orthia_model.h" />
     <ClInclude Include="orthia_model_interfaces.h" />
+    <ClInclude Include="orthia_model_modules.h" />
     <ClInclude Include="orthia_process_adapter.h" />
     <ClInclude Include="oui_disasm_colors.h" />
     <ClInclude Include="oui_goto_dialog.h" />

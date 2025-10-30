@@ -95,6 +95,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -112,6 +113,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -129,6 +131,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,6 +149,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

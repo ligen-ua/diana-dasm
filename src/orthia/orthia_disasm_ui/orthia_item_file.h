@@ -2,12 +2,11 @@
 
 #include "orthia_model_interfaces.h"
 
-
 namespace orthia
 {
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, IWorkPlaceItem
     {
-        std::unique_ptr<orthia::CSimplePeFile> peFile;
+        std::shared_ptr<orthia::CSimplePeFile> peFile;
         oui::String fullName, shortName;
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;

@@ -22,7 +22,6 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     int m_metaInfoPos = 0;
     DI_UINT64 m_peAddress = 0;
     DI_UINT64 m_peAddressEnd = 0;
-    bool m_userSuppliedPeAddress = false;
 
     int m_itemUid = -1;
 
@@ -40,12 +39,14 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void SetActiveItemImpl(int itemUid);
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
     void Event_Goto();
-    void DoGoto(orthia::Address_type address);
+    void DoGoto(orthia::Address_type address, orthia::Address_type pageAddress, bool hasPageAddress);
     void CopySelected(const oui::MultiLineSelPoint& p1, const oui::MultiLineSelPoint& p2) override;
     bool SelectAll() override;
     oui::LineIndex GetLineIndex(int offsetInPage) const override;
     void OnEnter() override;
     void OnPaintStart(std::shared_ptr<oui::CEditBox> editBox) override;
+    void AsyncRememberCurrentPosition(oui::OperationPtr_type<orthia::GotoCompleteHandler_type> operation = nullptr);
+    bool DoGotoOnPage(orthia::Address_type address);
 
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,

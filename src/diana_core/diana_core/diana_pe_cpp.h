@@ -7,6 +7,37 @@
 namespace diana
 {
 
+inline int ParseForwarderString(const std::string& fwString, std::string& dllName, std::string& functionName, OPERAND_SIZE& ordinal)
+{
+    dllName.clear();
+    functionName.clear();
+    ordinal = DI_MAX_OPERAND_SIZE;
+
+    auto pos = fwString.find('.');
+    if (pos == fwString.npos)
+    {
+        return DI_ERROR;
+    }
+    dllName.assign(fwString.begin(), fwString.begin() + pos);
+    if (pos + 1 >= fwString.size())
+    {
+        return DI_ERROR;
+    }
+    if (fwString[pos + 1] == '#')
+    {
+        char* endPtr = 0;
+        long value = strtol(fwString.data() + pos + 2, &endPtr, 10);
+        if (endPtr != fwString.c_str() + fwString.size())
+        {
+            return DI_ERROR;
+        }
+        ordinal = value;
+        return DI_SUCCESS;
+    }
+    functionName.assign(fwString.begin() + pos + 1, fwString.begin() + fwString.size());
+    return DI_SUCCESS;
+}
+
 int DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_proxy(void * pThis, 
                                                                          const char * pDllName,
                                                                          DI_UINT32 ordinal,

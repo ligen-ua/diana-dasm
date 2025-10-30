@@ -122,6 +122,8 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                             /* out */ int * callbacksCount,
                             /* out */ OPERAND_SIZE * pAddressOfTLSIndex
                             );
+
+#define DIANA_PE_INVALID_ORDINAL_VALUE    ((DI_UINT16)(-1))
 int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
                                 const char * pCapturedDataStart,
                                 const char * pCapturedDataEnd,
@@ -129,6 +131,14 @@ int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
                                 OPERAND_SIZE * pFunctionOffset,
                                 OPERAND_SIZE * pForwardInformationOffset);
 
+
+int DianaPeFile_GetProcAddressEx(Diana_PeFile * pPeFile,
+                                const char * pCapturedDataStart,
+                                const char * pCapturedDataEnd,
+                                const char * pFunctionName,
+                                OPERAND_SIZE * pFunctionOffset,
+                                OPERAND_SIZE * pForwardInformationOffset,
+                                DI_UINT16 ordinal);
 
 #define DIANA_IMAGE_DEBUG_TYPE_UNKNOWN      0
 #define DIANA_IMAGE_DEBUG_TYPE_COFF         1

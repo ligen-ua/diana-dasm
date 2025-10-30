@@ -174,20 +174,26 @@ namespace oui
         return 0;
     }
 
-    class CFile:public IFile, Noncopyable
+    class CFile:public IFile2, Noncopyable
     {
         String m_fullName;
         HANDLE m_hFile;
+        std::shared_ptr<IFileSystem> m_pFs;
     public:
-        CFile(const String& fullname, HANDLE hFile)
+        CFile(const String& fullname, HANDLE hFile, std::shared_ptr<IFileSystem> pFs)
             :
                 m_fullName(fullname),
-                m_hFile(hFile)
+                m_hFile(hFile), 
+                m_pFs(pFs)
         {
         }
         ~CFile()
         {
             Reset(String(), 0);
+        }
+        std::shared_ptr<IFileSystem> GetFileSystem()
+        {
+            return m_pFs;
         }
         void Reset(const String& fullname, HANDLE hFile)
         {
@@ -268,7 +274,7 @@ namespace oui
                 ptr += readBytes;
                 sizeToCopy -= readBytes;
 
-                if (operation->IsCancelled())
+                if (operation && operation->IsCancelled())
                 {
                     return ERROR_CANCELLED;
                 }
@@ -277,7 +283,7 @@ namespace oui
         }
 
     };
-    class CFileSystemImpl:public IFileSystem
+    class CFileSystemImpl:public std::enable_shared_from_this< CFileSystemImpl>, public IFileSystem
     {
         std::unordered_map<std::wstring, int> m_knownExtensions;
     public:
@@ -290,13 +296,60 @@ namespace oui
             m_knownExtensions[L"CPL"] = FileInfo::flag_any_executable;
             m_knownExtensions[L"SCR"] = FileInfo::flag_any_executable;
         }
-        std::tuple<int, std::shared_ptr<IFile>> SyncOpenFile(const FileUnifiedId& fileId_in)
+
+        std::tuple<int, String> SyncLocateFile(const String& fileName, int dianaMode)
+        {
+            String result;
+            std::wstring name;
+            name.resize(MAX_PATH);
+            if (!SearchPathW(NULL, fileName.native.c_str(), NULL, MAX_PATH, name.data(), NULL))
+            {
+                return std::make_tuple(GetLastError(), result);
+            }
+#if defined(_M_AMD64)
+            if (dianaMode == 4)
+            {
+                std::vector<wchar_t> buffer(256);
+                if (auto sysCharsCount = GetSystemDirectoryW(buffer.data(), (UINT)buffer.size() - 1))
+                {
+                    if (_wcsnicmp(buffer.data(), name.c_str(), sysCharsCount) == 0)
+                    {
+                        if (auto wow64CharsCount = GetSystemWow64DirectoryW(buffer.data(), (UINT)buffer.size() - 1))
+                        {
+                            std::wstring relPath = name.data() + sysCharsCount;
+                            name = std::wstring(buffer.data()) + relPath;
+                        }
+                    }
+                }
+            }
+#endif
+            result = name.data();
+            return std::make_tuple(0, result);
+        }
+        std::tuple<int, String> SyncNormalizeName(const String& fileName, bool expectDll)
+        {
+            String result = fileName;
+            DWORD size = (DWORD)result.native.size();
+            if (CharLowerBuffW(result.native.data(), size) != size)
+            {
+                return std::make_tuple(GetLastError(), result);
+            }
+            if (expectDll)
+            {
+                if (result.native.find('.') == result.native.npos)
+                {
+                    result.native += L".dll";
+                }
+            }
+            return std::make_tuple(0, result);
+        }
+        std::tuple<int, std::shared_ptr<IFile2>> SyncOpenFile(const FileUnifiedId& fileId_in)
         {
             FileUnifiedId fileId = fileId_in;
             Normalize(fileId.fullFileName.native);
 
             std::wstring folderName;
-            std::shared_ptr<IFile> file;
+            std::shared_ptr<IFile2> file;
             int error = 0;
             HANDLE hValue = CreateFileW(fileId.fullFileName.native.c_str(),
                 GENERIC_READ,
@@ -310,7 +363,7 @@ namespace oui
                 auto err = GetLastError();
                 return std::make_tuple(err, file);
             }
-            file = std::make_shared<CFile>(fileId.fullFileName, hValue);
+            file = std::make_shared<CFile>(fileId.fullFileName, hValue, shared_from_this());
             return std::make_tuple(0, file);
         }
         void AsyncOpenFile(ThreadPtr_type targetThread, 
@@ -321,7 +374,7 @@ namespace oui
             Normalize(fileId.fullFileName.native);
 
             std::wstring folderName;
-            std::shared_ptr<IFile> file;
+            std::shared_ptr<IFile2> file;
             int error = 0;
             HANDLE hValue = CreateFileW(fileId.fullFileName.native.c_str(),
                 GENERIC_READ,
@@ -353,7 +406,7 @@ namespace oui
             }
             else
             {
-                file = std::make_shared<CFile>(fileId.fullFileName, hValue);
+                file = std::make_shared<CFile>(fileId.fullFileName, hValue, this->shared_from_this());
             }
 
             auto operation = std::make_shared<Operation<FileRecipientHandler_type>>(

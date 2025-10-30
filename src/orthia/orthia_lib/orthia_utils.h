@@ -847,6 +847,10 @@ inline std::string PlatformStringToUtf8(const std::wstring& wstr)
 {
     return Utf16ToUtf8(wstr);
 }
+inline std::wstring Utf8ToPlatformString(const std::string& wstr)
+{
+    return Utf8ToUtf16(wstr);
+}
 #endif
 
 const wchar_t* QueryModuleVersion(HMODULE module);

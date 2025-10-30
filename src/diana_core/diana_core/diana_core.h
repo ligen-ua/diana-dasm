@@ -90,6 +90,9 @@ typedef enum
 #define DI_OPERAND_SIZE         unsigned long long
 #define DI_OPERAND_SIZE_SIGNED  long long
 
+#define DI_MAX_OPERAND_SIZE         ((unsigned long long)(-1))
+
+
 #define DI_FULL_CHAR           unsigned int
 #define DI_FULL_CHAR_NULL      ((unsigned int)(-1))
 #define DI_MAX_OPERANDS_COUNT  (4)

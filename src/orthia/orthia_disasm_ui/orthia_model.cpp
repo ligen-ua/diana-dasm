@@ -5,12 +5,39 @@
 #include "orthia_database_module.h"
 #include "orthia_item_process.h"
 #include "orthia_item_file.h"
+#include "orthia_model_modules.h"
 
 namespace orthia
 {
     const unsigned long long g_maxSizeBytes = 512 * 1024 * 1024;
     const unsigned long long g_minSizeBytes = 1;
 
+    oui::String ReadFileToVector(std::shared_ptr<oui::IFile> file, std::vector<char>& binPeFile, std::shared_ptr<oui::BaseOperation> operation, intrusive_ptr<CTextNode> errorNode)
+    {
+        if (!errorNode)
+        {
+            errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+        }
+
+        int error = 0;
+        unsigned long long fileSize = 0;
+        std::tie(error, fileSize) = file->GetSizeInBytes();
+        if (fileSize < g_minSizeBytes)
+        {
+            return errorNode->QueryValue(ORTHIA_TCSTR("empty"));
+        }
+        if (fileSize > g_maxSizeBytes)
+        {
+            return errorNode->QueryValue(ORTHIA_TCSTR("too-big"));
+        }
+
+        error = file->ReadExact(operation, 0, (size_t)fileSize, binPeFile);
+        if (error)
+        {
+            return oui::GetErrorText(error);
+        }
+        return oui::String();
+    }
 
     // CProgramModel
     CProgramModel::CProgramModel(std::shared_ptr<orthia::CConfigOptionsStorage> config)
@@ -216,7 +243,7 @@ namespace orthia
         // OK
         result.error.native.clear();
     }
-    void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile> file,
+    void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
     {
         // non-ui thread
@@ -235,28 +262,13 @@ namespace orthia
             file->GetFullFileNameForUI()));
 
         // read entire file in memory
-        int error = 0;
-        unsigned long long fileSize = 0;
-        std::tie(error, fileSize) = file->GetSizeInBytes();
-        if (fileSize < g_minSizeBytes)
+        std::vector<char> binPeFile;
+        result.error = ReadFileToVector(file, binPeFile, completeHandler, errorNode);
+        if (!result.error.native.empty())
         {
-            result.error = errorNode->QueryValue(ORTHIA_TCSTR("empty"));
-            return;
-        }
-        if (fileSize > g_maxSizeBytes)
-        {
-            result.error = errorNode->QueryValue(ORTHIA_TCSTR("too-big"));
             return;
         }
 
-        std::vector<char> binPeFile;
-        error = file->ReadExact(completeHandler, 0, (size_t)fileSize, binPeFile);
-        if (error)
-        {
-            result.error.native = oui::GetErrorText(error);
-            return;
-        }
-        
         if (completeHandler->IsCancelled())
         {
             handlerGuard.Release();
@@ -264,20 +276,14 @@ namespace orthia
         }
 
         // try map it first
-        auto mappedPE = std::make_unique<orthia::CSimplePeFile>();
+        auto mappedPE = std::make_shared<orthia::CSimplePeFile>();
         orthia::MapFileParameters params;
         mappedPE->MapFile(binPeFile, params);
         
-
-        // TODO: load imports
-        //CLinkObserverOverWin32 win32Loader;
-        //DI_CHECK_CPP(DianaPeFile_LinkImports(&dianaPeFile,
-        //    (OPERAND_SIZE)hModule,
-        //    &writeStream,
-        //    &page.front(),
-        //    (ULONG)page.size(),
-        //    win32Loader.GetParent()));
-       
+        // load imports        
+        CImportsLoader importsLoader;
+        importsLoader.LoadModules(file->GetFullFileName(), mappedPE, file->GetFileSystem());
+     
         // check folder
         auto fileHash = CalcSha1(binPeFile);
         auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
@@ -289,6 +295,7 @@ namespace orthia
 
         // check binary file
         bool hashIsValid = false;
+        int error = 0;
         try
         {
             orthia::CFile existingFile;
@@ -339,6 +346,7 @@ namespace orthia
         // fill the model data
         auto peristentItemStorage = std::make_shared<ÑPeristentItemStorage>();
         auto info = std::make_shared<FileWorkplaceItem>(peristentItemStorage);
+
         info->fullName = file->GetFullFileName();
         info->peFile = std::move(mappedPE);
         {

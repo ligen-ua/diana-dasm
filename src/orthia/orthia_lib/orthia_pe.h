@@ -31,11 +31,15 @@ namespace orthia
         CSimplePeFile();
         ~CSimplePeFile();
         void MapFile(const std::vector<char>& peFile, const MapFileParameters& params);
-        DI_UINT64 DiGetProcAddress(const char * pFunctionName, OPERAND_SIZE* pForwardOffset = 0);
-
+        DI_UINT64 DiGetProcAddress(const char * pFunctionName, OPERAND_SIZE* pForwardOffset = 0, DI_UINT16 ordinal = DIANA_PE_INVALID_ORDINAL_VALUE);
+        std::string DiReadForwardingString(OPERAND_SIZE forwardingOffset);
         PeDianaContext* GetImpl();
         const PeDianaContext* GetImpl() const;
         DI_UINT64 GetImageBase() const;
+        DI_UINT64 GetImageEnd() const;
+
         const std::vector<char> & GetMappedPeFile() const;
     };
+
+    void ParseForwarderString(const std::string& fwString, std::string& dllName, std::string& functionName, OPERAND_SIZE &operand);
 }

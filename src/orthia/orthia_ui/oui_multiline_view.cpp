@@ -180,7 +180,7 @@ namespace oui
             if (it == m_lines.end())
             {
                 break;
-            }   
+            }
             if (i != m_yCursopPos)
             {
                 m_paintBox->SetMarkup(it->markup);
@@ -479,6 +479,7 @@ namespace oui
         m_cursorOutOfText = false;
         m_firstVisibleLineIndex = 0;
         m_lines = std::move(lines);
+        CancelSelection();
         SetNewYCursorPosImpl(m_yCursopPos);
         Invalidate();
     }
@@ -512,6 +513,39 @@ namespace oui
         {
             CancelSelection();
         }
+    }
+    bool CMultiLineView::SetCursorYPos(const oui::LineIndex& index)
+    {
+        CancelSelection();
+
+        const auto clientRect = GetClientRect();
+        if (clientRect.size.height <= 0)
+        {
+            return false;
+        }
+
+        int availableHeight = clientRect.size.height;
+        if (m_cursorOutOfText)
+        {
+            --availableHeight;
+        }
+
+        auto it = m_lines.begin() + m_firstVisibleLineIndex;
+        for (int i = 0; i < availableHeight; ++i)
+        {
+            if (it == m_lines.end())
+            {
+                break;
+            }
+            auto curIndex = m_owner->GetLineIndex(m_firstVisibleLineIndex + i);
+            if (curIndex == index)
+            {
+                SetNewYCursorPosImpl(i);
+                return true;
+            }
+            ++it;
+        }
+        return false;
     }
     void CMultiLineView::SetNewYCursorPosImpl(int newCursor)
     {

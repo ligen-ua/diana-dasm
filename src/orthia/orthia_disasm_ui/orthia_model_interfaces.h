@@ -94,14 +94,15 @@ namespace orthia
         orthia::CCommonDateTime lastUpdateTime;
         orthia::Address_type address = 0;
         oui::String comment;
+        int flags = 0;
 
         GotoItem()
         {
 
         }
-        GotoItem(const orthia::Address_type & address_in)
+        GotoItem(const orthia::Address_type & address_in, int flags_in)
             :
-            address(address_in)
+            address(address_in), flags(flags_in)
         {
             lastUpdateTime.InitFromCurrentTime();
         }
@@ -112,10 +113,13 @@ namespace orthia
         const std::vector<GotoItem>& data,
         int error)>;
     using GotoCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error)>;
+    using FetchCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error, orthia::Address_type pageAddress)>;
 
     struct IPeristentItemStorage
     {
         virtual ~IPeristentItemStorage() {}
+
+        const static int goto_flags_history_mode = 1;
         virtual void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
             const oui::String& filter,
             oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
@@ -123,13 +127,30 @@ namespace orthia
         
         virtual void AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
             oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
-            orthia::Address_type address) = 0;
+            orthia::Address_type address,
+            int flags,
+            orthia::Address_type pageAddress) = 0;
+
+        virtual void AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler) = 0;
     };
 
 
     class ÑPeristentItemStorage :public IPeristentItemStorage
     {
         std::map<orthia::Address_type, GotoItem> m_dataItems;
+
+        struct HistoryGotoItem :public GotoItem
+        {
+            orthia::Address_type pageAddress = 0;
+            HistoryGotoItem(orthia::Address_type address_in, int flags_in, orthia::Address_type pageAddress_in)
+                :
+                GotoItem(address_in, flags_in), pageAddress(pageAddress_in)
+            {
+            }
+        };
+        std::vector<HistoryGotoItem> m_history;
+        int m_historyIndex = -1;
     public:
         void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
             const oui::String& filter,
@@ -138,6 +159,11 @@ namespace orthia
 
         void AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
             oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
-            orthia::Address_type address);
+            orthia::Address_type address,
+            int flags,
+            orthia::Address_type pageAddress);
+
+        void AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler);
     };
 }

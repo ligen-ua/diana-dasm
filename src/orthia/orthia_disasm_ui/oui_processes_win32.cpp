@@ -419,7 +419,7 @@ namespace oui
                 ptr += readBytes;
                 sizeToCopy -= readBytes;
 
-                if (operation->IsCancelled())
+                if (operation && operation->IsCancelled())
                 {
                     return ERROR_CANCELLED;
                 }

@@ -857,7 +857,7 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
     long long debugCounter = 0;
     OPERAND_SIZE readBytes = 0;
     PDIANA_IMAGE_IMPORT_DESCRIPTOR pImportDescriptor = 0;
-    if (!pImportDescriptor)
+    if (!pImportDirectory)
     {
         return DI_SUCCESS;
     }
@@ -1225,12 +1225,30 @@ int CaptureValue16(const char * pTable,
     return DI_SUCCESS;
 }
 
-int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
+
+int DianaPeFile_GetProcAddress(Diana_PeFile* pPeFile,
+    const char* pCapturedDataStart,
+    const char* pCapturedDataEnd,
+    const char* pFunctionName,
+    OPERAND_SIZE* pFunctionOffset,
+    OPERAND_SIZE* pForwardInformationOffset)
+{
+    return DianaPeFile_GetProcAddressEx(pPeFile,
+        pCapturedDataStart,
+        pCapturedDataEnd,
+        pFunctionName,
+        pFunctionOffset,
+        pForwardInformationOffset,
+        DIANA_PE_INVALID_ORDINAL_VALUE);
+}
+
+int DianaPeFile_GetProcAddressEx(Diana_PeFile * pPeFile,
                                 const char * pCapturedDataStart,
                                 const char * pCapturedDataEnd,
                                 const char * pFunctionName,
                                 OPERAND_SIZE * pFunctionOffset,
-                                OPERAND_SIZE * pForwardInformationOffset)
+                                OPERAND_SIZE * pForwardInformationOffset,
+                                DI_UINT16 ordinalIn)
 {
     OPERAND_SIZE moduleSize = pCapturedDataEnd - pCapturedDataStart;
     const DIANA_IMAGE_DATA_DIRECTORY * pExportDirectory = &pPeFile->pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_EXPORT];
@@ -1262,89 +1280,89 @@ int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
     }
     
     pCapturedExportDirectory = (const DIANA_IMAGE_EXPORT_DIRECTORY * )(pCapturedDataStart + pExportDirectory->VirtualAddress);
-    if (!pCapturedExportDirectory->NumberOfNames)
+    DI_UINT32 ordinal = ordinalIn;
     {
-        return DI_ERROR;
-    }
+        const char* pNameTable = 0;
+        const char* pNameOrdinalTable = 0;
+        const char* pFunctionsTable = 0;
 
-    {
-    const char * pNameTable = 0;
-    const char * pNameOrdinalTable = 0;
-    const char * pFunctionsTable = 0;
+        DI_UINT32 low = 0;
+        DI_UINT32 middle = 0;
+        DI_UINT32 high = pCapturedExportDirectory->NumberOfNames - 1;
 
-    DI_UINT32 low = 0;
-    DI_UINT32 middle = 0;
-    DI_UINT32 high = pCapturedExportDirectory->NumberOfNames - 1;
+        // get the tables
+        DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfFunctions,
+            pCapturedDataStart,
+            pCapturedDataEnd,
+            &pFunctionsTable));
 
-    // get the tables
-    DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNames,
-                                    pCapturedDataStart,
-                                    pCapturedDataEnd,
-                                    &pNameTable));
-    DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNameOrdinals,
-                                    pCapturedDataStart,
-                                    pCapturedDataEnd,
-                                    &pNameOrdinalTable));
-    DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfFunctions,
-                                    pCapturedDataStart,
-                                    pCapturedDataEnd,
-                                    &pFunctionsTable));
-
-
-    while (high >= low && (DI_INT32)high >= 0) 
-    {
-        int compareResult = 0;
-        DI_UINT32 functionNameOffset = 0;
-        const char * pFunctionPointer = 0;
-        middle = (low + high) >> 1;
-
-        DI_CHECK(CaptureValue32(pNameTable, pCapturedDataEnd, middle, &functionNameOffset));
-
-        DI_CHECK(ValidateVirtualAddress(functionNameOffset,
-                                        pCapturedDataStart,
-                                        pCapturedDataEnd,
-                                        &pFunctionPointer));
-
-        compareResult = DIANA_STRNICMP(pFunctionName, pFunctionPointer, pCapturedDataEnd-pFunctionPointer);
-        if (!compareResult)
+        if (ordinalIn == DIANA_PE_INVALID_ORDINAL_VALUE)
         {
-            break;
-        }
-        if (compareResult > 0)
-        {
-            low = middle + 1;
-            continue;
-        }
-        high = middle - 1;
-    }
+            DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNames,
+                pCapturedDataStart,
+                pCapturedDataEnd,
+                &pNameTable));
+            DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNameOrdinals,
+                pCapturedDataStart,
+                pCapturedDataEnd,
+                &pNameOrdinalTable));
 
-    if ((DI_INT32)high < (DI_INT32)low)
-    {
-        return DI_NOT_FOUND;
-    }
-
-
-    {
-        DI_UINT32 ordinal = 0;
-        DI_UINT32 functionOffset = 0;
-        DI_CHECK(CaptureValue16(pNameOrdinalTable, pCapturedDataEnd, middle, &ordinal));
-        DI_CHECK(CaptureValue32(pFunctionsTable, pCapturedDataEnd, ordinal, &functionOffset));
-
-        if ((functionOffset >= pExportDirectory->VirtualAddress) && (functionOffset < (pExportDirectory->VirtualAddress + pExportDirectory->Size)))
-        {
-            const char * p = pCapturedDataStart;
-            for(; p < pCapturedDataEnd; ++p)
+            if (!pCapturedExportDirectory->NumberOfNames)
             {
-                if (!*p)
+                return DI_ERROR;
+            }
+
+            while (high >= low && (DI_INT32)high >= 0)
+            {
+                int compareResult = 0;
+                DI_UINT32 functionNameOffset = 0;
+                const char* pFunctionPointer = 0;
+                middle = (low + high) >> 1;
+
+                DI_CHECK(CaptureValue32(pNameTable, pCapturedDataEnd, middle, &functionNameOffset));
+
+                DI_CHECK(ValidateVirtualAddress(functionNameOffset,
+                    pCapturedDataStart,
+                    pCapturedDataEnd,
+                    &pFunctionPointer));
+
+                compareResult = DIANA_STRNICMP(pFunctionName, pFunctionPointer, pCapturedDataEnd - pFunctionPointer);
+                if (!compareResult)
+                {
+                    break;
+                }
+                if (compareResult > 0)
+                {
+                    low = middle + 1;
+                    continue;
+                }
+                high = middle - 1;
+            }
+
+            if ((DI_INT32)high < (DI_INT32)low)
+            {
+                return DI_NOT_FOUND;
+            }
+
+            // capture ordinal
+            DI_CHECK(CaptureValue16(pNameOrdinalTable, pCapturedDataEnd, middle, &ordinal));
+        }
+
+        {
+            DI_UINT32 functionOffset = 0;
+            DI_CHECK(CaptureValue32(pFunctionsTable, pCapturedDataEnd, ordinal, &functionOffset));
+
+            if ((functionOffset >= pExportDirectory->VirtualAddress) && (functionOffset < (pExportDirectory->VirtualAddress + pExportDirectory->Size)))
+            {
+                if (pForwardInformationOffset)
                 {
                     *pForwardInformationOffset = functionOffset;
                     return DI_SUCCESS;
                 }
+                return DI_ERROR;
             }
-            return DI_ERROR;
+            *pFunctionOffset = functionOffset;
+            return DI_SUCCESS;
         }
-        *pFunctionOffset = functionOffset;
-        return DI_SUCCESS;
-    }
     }
 }

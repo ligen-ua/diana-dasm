@@ -71,7 +71,28 @@ namespace orthia
         m_dianaContext.swap(dianaContext);
         m_imageBase = imageBase;
     }
-    DI_UINT64 CSimplePeFile::DiGetProcAddress(const char* pFunctionName, OPERAND_SIZE* pForwardOffset)
+    std::string CSimplePeFile::DiReadForwardingString(OPERAND_SIZE forwardingOffset)
+    {
+        if (m_mappedPeFile.empty() || !m_dianaContext.get())
+        {
+            throw diana::CException(DI_ERROR, "Invalid object state");
+        }
+        if (forwardingOffset >= (OPERAND_SIZE)m_mappedPeFile.size())
+        {
+            throw diana::CException(DI_ERROR, "Invalid RVA");
+        }
+        const char* pStart = m_mappedPeFile.data() + (size_t)forwardingOffset;
+        const char* pEnd = m_mappedPeFile.data() + m_mappedPeFile.size();
+        for (auto p = pStart; p != pEnd; ++p)
+        {
+            if (!*p)
+            {
+                return std::string(pStart, p);
+            }
+        }
+        throw diana::CException(DI_ERROR, "Invalid forwarging string");
+    }
+    DI_UINT64 CSimplePeFile::DiGetProcAddress(const char* pFunctionName, OPERAND_SIZE* pForwardOffset, DI_UINT16 ordinal)
     {
         if (m_mappedPeFile.empty() || !m_dianaContext.get())
         {
@@ -80,12 +101,13 @@ namespace orthia
         auto moduleEnd = m_mappedPeFile.data() + m_mappedPeFile.size();
         OPERAND_SIZE result = 0;
         OPERAND_SIZE forwardOffset = 0;
-        int dianaErr = DianaPeFile_GetProcAddress(&m_dianaContext->mappedPE,
+        int dianaErr = DianaPeFile_GetProcAddressEx(&m_dianaContext->mappedPE,
             m_mappedPeFile.data(),
             moduleEnd,
             pFunctionName,
             &result,
-            &forwardOffset);
+            &forwardOffset,
+            ordinal);
         if (dianaErr)
         {
             return 0;
@@ -108,6 +130,13 @@ namespace orthia
     DI_UINT64 CSimplePeFile::GetImageBase() const
     {
         return m_imageBase;
+    }
+    DI_UINT64 CSimplePeFile::GetImageEnd() const
+    {
+        auto modAddress = GetImageBase();
+        auto modEnd = modAddress;
+        DI_CHECK_CPP(Diana_SafeAdd(&modEnd, GetMappedPeFile().size()));
+        return modEnd;
     }
     const std::vector<char>& CSimplePeFile::GetMappedPeFile() const
     {

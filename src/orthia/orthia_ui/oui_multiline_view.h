@@ -232,7 +232,7 @@ namespace oui
 
         int GetCursorYPos() const;
         void SetCursorYPos(int newPos);
-
+        bool SetCursorYPos(const oui::LineIndex& index);
         String ExtractSelected();
     };
 

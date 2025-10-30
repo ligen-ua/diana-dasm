@@ -18,7 +18,7 @@ struct InitialOpenFileInfo
 {
     int errorCode = 0;
     oui::String name;
-    std::shared_ptr<oui::IFile> file;
+    std::shared_ptr<oui::IFile2> file;
 };
 
 class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public orthia::IUIEventHandler
@@ -45,7 +45,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     void ToggleWorkspaceView();
 
     oui::fsui::OpenResult HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
-        std::shared_ptr<oui::IFile> file,
+        std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
     oui::fsui::OpenResult HandleOpenProcess(std::shared_ptr<oui::COpenProcessDialog> dialog,
@@ -66,6 +66,6 @@ public:
     void AddInitialTextOutputInfo(const oui::String& text);
     void ConstructChilds() override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
-    bool AsyncOpenFile(std::shared_ptr<oui::IFile> file);
+    bool AsyncOpenFile(std::shared_ptr<oui::IFile2> file);
 
 };

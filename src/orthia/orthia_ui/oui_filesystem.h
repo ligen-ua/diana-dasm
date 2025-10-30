@@ -19,6 +19,11 @@ namespace oui
         virtual oui::String GetFullFileNameForUI() const = 0;
     };
 
+    struct IFileSystem;
+    struct IFile2:IFile
+    {
+        virtual std::shared_ptr<IFileSystem> GetFileSystem() = 0;
+    };
     struct FileUnifiedId
     {
         std::vector<char> fileId;
@@ -50,7 +55,7 @@ namespace oui
     };
 
     using ThreadPtr_type = std::shared_ptr<CWindowThread>;
-    using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile>, int error, const String& folderName)>;
+    using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile2>, int error, const String& folderName)>;
     using QueryFilesHandler_type = std::function<void(std::shared_ptr<BaseOperation> operation, 
         const FileUnifiedId& folderId, 
         const std::vector<FileInfo>& data, 
@@ -65,7 +70,10 @@ namespace oui
         const static int queryFlags_OpenChild  = 0x0002;
 
         virtual ~IFileSystem() {}
-        virtual std::tuple<int, std::shared_ptr<IFile>> SyncOpenFile(const FileUnifiedId& fileId) = 0;
+
+        virtual std::tuple<int, String> SyncLocateFile(const String& fileName, int dianaMode) = 0;
+        virtual std::tuple<int, std::shared_ptr<IFile2>> SyncOpenFile(const FileUnifiedId& fileId) = 0;
+        virtual std::tuple<int, String> SyncNormalizeName(const String& fileName, bool expectDll) = 0;
 
         virtual void AsyncOpenFile(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId, 
@@ -92,7 +100,9 @@ namespace oui
     public:
         CFileSystem();
 
-        std::tuple<int, std::shared_ptr<IFile>> SyncOpenFile(const FileUnifiedId& fileId);
+        std::tuple<int, std::shared_ptr<IFile2>> SyncOpenFile(const FileUnifiedId& fileId) override;
+        std::tuple<int, String> SyncLocateFile(const String& fileName, int dianaMode) override;
+        std::tuple<int, String> SyncNormalizeName(const String& fileName, bool expectDll) override;
 
         // id-based stuff
         void AsyncOpenFile(ThreadPtr_type targetThread, 
@@ -137,6 +147,6 @@ namespace oui
             }
         };
 
-        using FileCompleteHandler_type = std::function<void(std::shared_ptr<BaseOperation>, std::shared_ptr<IFile>, const OpenResult&)>;
+        using FileCompleteHandler_type = std::function<void(std::shared_ptr<BaseOperation>, std::shared_ptr<IFile2>, const OpenResult&)>;
     }
 }
