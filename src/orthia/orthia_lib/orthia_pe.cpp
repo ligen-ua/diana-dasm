@@ -3,6 +3,7 @@
 #include "orthia_files.h"
 #include "orthia_streams.h"
 
+#undef max
 
 namespace orthia
 {
@@ -12,6 +13,36 @@ namespace orthia
     }
     CSimplePeFile::~CSimplePeFile()
     {
+    }
+    void CSimplePeFile::Relocate(OPERAND_SIZE newAddress)
+    {
+        if (m_mappedPeFile.empty() || !m_dianaContext.get() || m_mappedPeFile.empty())
+        {
+            throw diana::CException(DI_ERROR, "Invalid object state");
+        }
+
+        OPERAND_SIZE lastPossibleAddress = DI_MAX_OPERAND_SIZE;
+        switch (m_dianaContext->mappedPE.pImpl->dianaMode)
+        {
+        case 4:
+            lastPossibleAddress = std::numeric_limits<uint32_t>::max();
+            break;
+        case 2:
+            lastPossibleAddress = std::numeric_limits<uint16_t>::max();
+            break;
+        }
+        if (newAddress >= lastPossibleAddress ||
+            m_mappedPeFile.size() > (lastPossibleAddress - newAddress))
+        {
+            throw diana::CException(DI_ERROR, "Can't map module");
+        }
+        ::DianaMemoryStream rwStream;
+        Diana_InitMemoryStreamEx2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 1, newAddress);
+
+        DI_CHECK_CPP(DianaPeFile_Relocate(&m_dianaContext->mappedPE, newAddress, &rwStream.parent));
+
+        m_dianaContext->mappedPE.pImpl->imageBase = newAddress;
+        m_imageBase = newAddress;
     }
     void CSimplePeFile::MapFile(const std::vector<char>& peFile, const MapFileParameters& params)
     {
@@ -37,12 +68,13 @@ namespace orthia
             imageBase = params.imageBase;
         }
 
-        DI_CHECK_CPP(DianaPeFile_Map(&dianaPeFile,
+        DI_CHECK_CPP(DianaPeFile_MapEx(&dianaPeFile,
             &peFileStream.stream,
             imageBase,
             &writeStream,
             &page.front(),
-            (ULONG)page.size()));
+            (ULONG)page.size(),
+            params.mapFlags));
 
 
         // copy content to vector
@@ -52,7 +84,7 @@ namespace orthia
             return;
         }
 
-        // module
+        // load as module
         char* pModuleStart = ranges.m_data.data();
         size_t moduleSize = ranges.m_data.size();
 

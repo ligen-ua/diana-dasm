@@ -10,10 +10,10 @@ namespace orthia
         oui::String fullName, shortName;
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;
-        std::shared_ptr<IPeristentItemStorage> peristentItemStorage;
+        std::shared_ptr<IPeristentItemStorage> persistentItemStorage;
 
         FileWorkplaceItem(std::shared_ptr<IPeristentItemStorage> peristentItemStorage_in) 
-            : peristentItemStorage(peristentItemStorage_in)
+            : persistentItemStorage(peristentItemStorage_in)
         {
         }
 

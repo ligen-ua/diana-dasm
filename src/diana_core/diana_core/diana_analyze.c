@@ -246,6 +246,13 @@ int SaveNewExternalRoute(DianaAnalyzeSession * pSession,
         // skip first region
         return DI_SUCCESS;
     }
+    if (pSession->mode == DIANA_MODE32)
+    {
+        if (newOffset >= 0xFFFFFFFFULL)
+        {
+            return DI_SUCCESS;
+        }
+    }
     pTargetInstruction = DIANA_MALLOC(sizeof(Diana_Instruction));
     DI_CHECK_ALLOC(pTargetInstruction);
     flags = DI_INSTRUCTION_EXTERNAL;

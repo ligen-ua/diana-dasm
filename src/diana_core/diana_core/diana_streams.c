@@ -1,8 +1,19 @@
 #include "diana_streams.h"
 
+static  int Translate(DianaMemoryStream* pStream, OPERAND_SIZE offset, OPERAND_SIZE * pResult)
+{
+    if (offset < pStream->addressDifference)
+    {
+        return DI_END_OF_STREAM;
+    }
+    *pResult = offset - pStream->addressDifference;
+    return DI_SUCCESS;
+}
+
 static int MemoryStream_Read(void * pThis, void * pBuffer, int iBufferSize, int * readBytes)
 {
     DianaMemoryStream * pStream = pThis;
+
     int sizeToGive = (int)(pStream->bufferSize - pStream->curSize);
     if (sizeToGive > iBufferSize)
         sizeToGive = iBufferSize;
@@ -14,14 +25,16 @@ static int MemoryStream_Read(void * pThis, void * pBuffer, int iBufferSize, int 
 }
 
 int DianaMemoryStream_RandomRead(void * pThis, 
-                                   OPERAND_SIZE offset,
+                                   OPERAND_SIZE offset_in,
                                    void * pBuffer, 
                                    int iBufferSize, 
                                    OPERAND_SIZE * readBytes)
 {
     DianaMemoryStream * pStream = pThis;
     int sizeToGive = 0;
-    
+    OPERAND_SIZE offset = 0;
+
+    DI_CHECK(Translate(pStream, offset_in, &offset));
     if (offset >= pStream->bufferSize)
     {
         return DI_END_OF_STREAM;
@@ -36,14 +49,18 @@ int DianaMemoryStream_RandomRead(void * pThis,
     return 0;
 }
 int DianaMemoryStream_RandomReadMoveTo(void * pThis, 
-                                       OPERAND_SIZE offset)
+                                       OPERAND_SIZE offset_in)
 {
     DianaMemoryStream * pStream = (DianaMemoryStream * )pThis;
+    OPERAND_SIZE offset = 0;
+
+    DI_CHECK(Translate(pStream, offset_in, &offset));
+
     pStream->curSize = (DIANA_SIZE_T)offset;
     return DI_SUCCESS;
 }
 int DianaMemoryStream_RandomWrite_V(void * pThis, 
-                                   OPERAND_SIZE offset,
+                                   OPERAND_SIZE offset_in,
                                    void * pBuffer, 
                                    int iBufferSize, 
                                    OPERAND_SIZE * readBytes,
@@ -51,7 +68,9 @@ int DianaMemoryStream_RandomWrite_V(void * pThis,
 {
     DianaMemoryStream * pStream = (DianaMemoryStream * )pThis;
     OPERAND_SIZE sizeToGive = 0;
-    
+    OPERAND_SIZE offset = 0;
+
+    DI_CHECK(Translate(pStream, offset_in, &offset));
     if (flags & DIANA_ANALYZE_RANDOM_READ_ABSOLUTE)
     {
         return DI_END_OF_STREAM;
@@ -71,7 +90,7 @@ int DianaMemoryStream_RandomWrite_V(void * pThis,
 }
                                   
 int DianaMemoryStream_RandomRead_V(void * pThis, 
-                                   OPERAND_SIZE offset,
+                                   OPERAND_SIZE offset_in,
                                    void * pBuffer, 
                                    int iBufferSize, 
                                    OPERAND_SIZE * readBytes,
@@ -79,7 +98,10 @@ int DianaMemoryStream_RandomRead_V(void * pThis,
 {
     DianaMemoryStream * pStream = (DianaMemoryStream * )pThis;
     OPERAND_SIZE sizeToGive = 0;
-    
+    OPERAND_SIZE offset = 0;
+
+    DI_CHECK(Translate(pStream, offset_in, &offset));
+
     if (flags & DIANA_ANALYZE_RANDOM_READ_ABSOLUTE)
     {
         return DI_END_OF_STREAM;
@@ -98,10 +120,11 @@ int DianaMemoryStream_RandomRead_V(void * pThis,
     return 0;
 }
 
-void Diana_InitMemoryStreamEx(DianaMemoryStream * pStream,
+void Diana_InitMemoryStreamEx2(DianaMemoryStream * pStream,
                               void * pBuffer,
                               DIANA_SIZE_T bufferSize,
-                              int bWritable)
+                              int bWritable, 
+                              OPERAND_SIZE addressDifference)
 {
     DianaAnalyzeRandomWrite_fnc pWriteFunction = 0;
     if (bWritable)
@@ -116,13 +139,20 @@ void Diana_InitMemoryStreamEx(DianaMemoryStream * pStream,
     pStream->pBuffer = pBuffer;
     pStream->bufferSize = bufferSize;
     pStream->curSize = 0;
+    pStream->addressDifference = addressDifference;
 }
-                              
+void Diana_InitMemoryStreamEx(DianaMemoryStream* pStream,
+    void* pBuffer,
+    DIANA_SIZE_T bufferSize,
+    int bWritable)
+{
+    Diana_InitMemoryStreamEx2(pStream, pBuffer, bufferSize, bWritable, 0);
+}
 void Diana_InitMemoryStream(DianaMemoryStream * pStream,
                             void * pBuffer,
                             DIANA_SIZE_T bufferSize)
 {
-    Diana_InitMemoryStreamEx(pStream, pBuffer, bufferSize, 0);
+    Diana_InitMemoryStreamEx2(pStream, pBuffer, bufferSize, 0, 0);
 }
 
 

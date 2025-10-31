@@ -23,6 +23,9 @@ namespace orthia
 
         using ModuleIterator = decltype(m_mappedModules)::iterator;
         std::shared_ptr<oui::IFileSystem> m_pFs;
+
+        std::shared_ptr<oui::BaseOperation> m_operation;
+
         oui::String NormalizeName(const std::string& dllName);
         oui::String NormalizeName(const oui::String& str);
 
@@ -35,8 +38,10 @@ namespace orthia
             OPERAND_SIZE ordinal,
             OPERAND_SIZE* pAddress);
         bool CheckConflicts(std::shared_ptr<orthia::CSimplePeFile> peFile);
+        void CheckCancel();
 
     public:
+        CImportsLoader(std::shared_ptr<oui::BaseOperation> operation = nullptr);
         void QueryFunctionByOrdinal(const char* pDllName,
             DI_UINT32 ordinal,
             OPERAND_SIZE* pAddress) override;
@@ -49,5 +54,7 @@ namespace orthia
         void LoadModules(const oui::String& fileName, 
             std::shared_ptr<orthia::CSimplePeFile> peFile,
             std::shared_ptr<oui::IFileSystem> pFs);
+
+        void ReportModules(std::shared_ptr<CModuleManager> moduleManager);
     };
 }

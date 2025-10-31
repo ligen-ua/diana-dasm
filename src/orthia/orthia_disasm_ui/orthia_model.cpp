@@ -227,8 +227,8 @@ namespace orthia
         {
             dianaMode = DIANA_MODE64;
         }
-        auto peristentItemStorage = std::make_shared<ÑPeristentItemStorage>();
-        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, peristentItemStorage);
+        auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
+        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
         info->ReloadModules();
 
         if (auto address = info->GerProcessModuleAddress())
@@ -280,10 +280,6 @@ namespace orthia
         orthia::MapFileParameters params;
         mappedPE->MapFile(binPeFile, params);
         
-        // load imports        
-        CImportsLoader importsLoader;
-        importsLoader.LoadModules(file->GetFullFileName(), mappedPE, file->GetFileSystem());
-     
         // check folder
         auto fileHash = CalcSha1(binPeFile);
         auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
@@ -344,11 +340,11 @@ namespace orthia
         }
 
         // fill the model data
-        auto peristentItemStorage = std::make_shared<ÑPeristentItemStorage>();
-        auto info = std::make_shared<FileWorkplaceItem>(peristentItemStorage);
+        auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
+        auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
 
         info->fullName = file->GetFullFileName();
-        info->peFile = std::move(mappedPE);
+        info->peFile = mappedPE;
         {
             oui::String shortName;
             orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
@@ -382,20 +378,30 @@ namespace orthia
         }
 
         CMemoryReaderOnLoadedData reader(info->peFile->GetImageBase(), mappedFile.data(), mappedFile.size());
+
+        bool firstOpen = false;
         if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->peFile->GetImageBase()))
         {
+            firstOpen = true;
             // first open, warn user it may take quite a time
             WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
         }
 
-        info->moduleManager->ReloadModule(info->peFile->GetImageBase(),
-            &reader,
-            false,
-            info->shortName.native,
-            0);
+        if (firstOpen)
+        {
+            // load imports        
+            CImportsLoader importsLoader(completeHandler);
+            importsLoader.LoadModules(file->GetFullFileName(), info->peFile, file->GetFileSystem());
+            importsLoader.ReportModules(info->moduleManager);
+
+            info->moduleManager->ReloadModule(info->peFile->GetImageBase(),
+                &reader,
+                false,
+                info->shortName.native,
+                0);
+        }
 
         result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
-
         // OK
         result.error.native.clear();
     }

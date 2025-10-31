@@ -3,7 +3,7 @@
 namespace orthia
 {
 
-    void ÑPeristentItemStorage::AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+    void ÑPersistentItemStorage::AsyncQueryGotoInfo(ThreadPtr_type targetThread,
         const oui::String& filter,
         oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
         int flags)
@@ -41,7 +41,7 @@ namespace orthia
         filterHandler->Reply(filterHandler, filter, items, error);
     }
 
-    void ÑPeristentItemStorage::AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+    void ÑPersistentItemStorage::AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
         oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
         orthia::Address_type address,
         int flags,
@@ -74,7 +74,7 @@ namespace orthia
         gotoHandler->ReplyWithRetain(gotoHandler, address, error);
     }
 
-    void ÑPeristentItemStorage::AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+    void ÑPersistentItemStorage::AsyncFetchPrevHistory(ThreadPtr_type targetThread,
         oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler)
     {
         orthia::Address_type address = 0;

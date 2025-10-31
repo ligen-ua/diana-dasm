@@ -1,6 +1,7 @@
 #include "orthia_item_file.h"
 #include "orthia_pe.h"
-
+#include "orthia_module_manager.h"
+#include "orthia_database_module.h"
 
 namespace orthia
 {
@@ -120,9 +121,34 @@ namespace orthia
     }
     void FileWorkplaceItem::ReloadModules() 
     {
+        // do nothing
     }
     void FileWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
     {
+        modules.clear();
+        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+
+        std::vector<CommonModuleInfo> dbModules;
+        classicDatabase->QueryModules(&dbModules);
+
+        for (auto& dbm:dbModules)
+        {
+            orthia::ModuleInfo info;
+            info.fullName = dbm.name;
+            info.address = dbm.address;
+            if (dbm.size)
+            {
+                info.lastValidAddress = dbm.address + (dbm.size - 1);
+            }
+            else
+            {
+                info.lastValidAddress = dbm.address;
+            }
+            info.entryPoint = info.address;
+            info.size = dbm.size;
+            info.dianaMode = peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+            modules.push_back(info);
+        }
     }
     int FileWorkplaceItem::GetModulesCount() const 
     {
@@ -130,7 +156,7 @@ namespace orthia
     }
     std::shared_ptr<IPeristentItemStorage> FileWorkplaceItem::GetPersistentStorage()
     {
-        return peristentItemStorage;
+        return persistentItemStorage;
     }
     int FileWorkplaceItem::GetDianaMode() const
     {

@@ -67,6 +67,23 @@ int DianaPeFile_Map(/* in */ Diana_PeFile * pPeFile,
                     /* inout */ DianaReadWriteRandomStream * pOutStream,
                     /* in */ void * pPage,
                     /* in */ int pageSize);
+
+
+#define DIANA_PE_MAP_DO_NOT_RELOCATE       1
+
+int DianaPeFile_MapEx(/* in */ Diana_PeFile* pPeFile,
+    /* in */ DianaMovableReadStream* pStream,
+    /* in */ OPERAND_SIZE address,
+    /* inout */ DianaReadWriteRandomStream* pOutStream,
+    /* in */ void* pPage,
+    /* in */ int pageSize,
+    /* in */ int flags);
+
+
+int DianaPeFile_Relocate(/* in */ Diana_PeFile* pPeFile,
+                         /* in */ OPERAND_SIZE address,
+                         /* inout */ DianaReadWriteRandomStream* pOutStream);
+
 DIANA_IMAGE_SECTION_HEADER * DianaPeFile_FindSection(Diana_PeFile * pPeFile,
                                                      const char * pSectionName,
                                                      int nameSize);

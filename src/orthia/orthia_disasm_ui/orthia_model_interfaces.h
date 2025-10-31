@@ -136,7 +136,7 @@ namespace orthia
     };
 
 
-    class ÑPeristentItemStorage :public IPeristentItemStorage
+    class ÑPersistentItemStorage :public IPeristentItemStorage
     {
         std::map<orthia::Address_type, GotoItem> m_dataItems;
 

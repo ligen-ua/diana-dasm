@@ -3,9 +3,23 @@
 #include "diana_pe_cpp.h"
 #include "orthia_streams.h"
 #include "orthia_memory_cache.h"
+#include "orthia_database_saver.h"
 
 namespace orthia
 {
+    CImportsLoader::CImportsLoader(std::shared_ptr<oui::BaseOperation> operation)
+        :
+        m_operation(operation)
+    {
+    }
+    void CImportsLoader::CheckCancel()
+    {
+        if (m_operation && m_operation->IsCancelled())
+        {
+            throw std::runtime_error("Cancelled");
+        }
+    }
+
     oui::String CImportsLoader::NormalizeName(const std::string& dllName)
     {
         oui::String str = orthia::Utf8ToPlatformString(dllName);
@@ -38,6 +52,10 @@ namespace orthia
         auto modAddress = peFile->GetImageBase();
         auto modEnd = peFile->GetImageEnd();
 
+        if (!modAddress)
+        {
+            return true;
+        }
         for (auto& mod : m_mappedModules)
         {
             auto curAddress = mod.second.peFile->GetImageBase();
@@ -66,6 +84,17 @@ namespace orthia
         }
         return false;
     }
+    static OPERAND_SIZE RoundUp(OPERAND_SIZE lastPossibleAddress, OPERAND_SIZE alignment)
+    {
+        if ((lastPossibleAddress % alignment) == 0)
+        {
+            return lastPossibleAddress;
+        }
+
+        auto newAddress = lastPossibleAddress - (lastPossibleAddress % alignment);
+        return newAddress + alignment;
+    }
+
     void CImportsLoader::RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile)
     {
         // check 
@@ -86,10 +115,12 @@ namespace orthia
         }
 
         auto freeSpaceSize = lastPossibleAddress - m_freeSpaceStart;
-        if (freeSpaceSize < peFile->GetImageEnd())
+        if (freeSpaceSize < peFile->GetImageEnd() || peFile->GetImageEnd() > lastPossibleAddress)
         {
             throw std::runtime_error("Can't load module");
         }
+        auto possibleAddress = RoundUp(m_freeSpaceStart, 0x10000);
+        peFile->Relocate(possibleAddress);
     }
     CImportsLoader::ModuleIterator CImportsLoader::LoadModule(const std::string& dllName)
     {
@@ -120,11 +151,16 @@ namespace orthia
 
         auto mappedPE = std::make_shared<orthia::CSimplePeFile>();
         orthia::MapFileParameters params;
+        params.mapFlags = DIANA_PE_MAP_DO_NOT_RELOCATE;
         mappedPE->MapFile(binPeFile, params);
 
         if (CheckConflicts(mappedPE))
         {
             RelocateModule(mappedPE);
+        }
+        else
+        {
+            mappedPE->Relocate(mappedPE->GetImageBase());
         }
         ModuleInfo info;
         info.peFile = mappedPE;
@@ -193,6 +229,7 @@ namespace orthia
         {
             oui::LogOutput(oui::LogFlags::Error, e.what());
         }
+        CheckCancel();
     }
 
     // CImportsLoader
@@ -200,6 +237,7 @@ namespace orthia
         std::shared_ptr<orthia::CSimplePeFile> peFile,
         std::shared_ptr<oui::IFileSystem> pFs)
     {
+        CheckCancel();
         m_pFs = pFs;
         if (!m_pFs)
         {
@@ -215,6 +253,11 @@ namespace orthia
         info.fullName = fileName;
         m_mappedModules[NormalizeName(shortFileName).native] = info;
     
+        if (m_freeSpaceStart < peFile->GetImageEnd())
+        {
+            m_freeSpaceStart = peFile->GetImageEnd();
+        }
+
         auto imageBase = peFile->GetImageBase();
 
         orthia::CReaderOverVector reader(imageBase, peFile->GetMappedPeFile());
@@ -228,5 +271,35 @@ namespace orthia
             &page.front(),
             (ULONG)page.size(),
             GetParent()));
+    }
+
+    void CImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)
+    {
+        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+
+        CClassicDatabaseModuleCleaner cleaner(classicDatabase.get());
+
+        for (auto& mod : m_mappedModules)
+        {
+            if (mod.second.originalFile)
+            {
+                continue;
+            }
+            oui::String shortName;
+            orthia::UnparseFileNameFromFullFileName(mod.second.fullName.native, &shortName.native);
+
+
+            CAutoRollbackClassicDatabase rollback;
+            classicDatabase->StartSaveModule(mod.second.peFile->GetImageBase(),
+                mod.second.peFile->GetMappedPeFile().size(), 
+                shortName.native,
+                &rollback);
+
+            // add metainfo
+            // 1. flags
+            // 2. fullname
+            // 3. import functions address
+            classicDatabase->DoneSave();
+        }
     }
 }

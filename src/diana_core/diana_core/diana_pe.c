@@ -406,6 +406,23 @@ int DianaPeFile_Map(/* in */ Diana_PeFile * pPeFile,
                     /* in */ void * pPage,
                     /* in */ int pageSize)
 {
+    return DianaPeFile_MapEx(pPeFile,
+        pStream,
+        address,
+        pOutStream,
+        pPage,
+        pageSize,
+        0);
+}
+
+int DianaPeFile_MapEx(/* in */ Diana_PeFile * pPeFile,
+                    /* in */ DianaMovableReadStream * pStream,
+                    /* in */ OPERAND_SIZE address,
+                    /* inout */ DianaReadWriteRandomStream * pOutStream,
+                    /* in */ void * pPage,
+                    /* in */ int pageSize,
+                    /* in */ int flags)
+{
     int i = 0;
     OPERAND_SIZE lastSectionOffset = 0;
     OPERAND_SIZE sizeOfHeaders = pPeFile->pImpl->sizeOfHeaders;
@@ -491,7 +508,19 @@ int DianaPeFile_Map(/* in */ Diana_PeFile * pPeFile,
 
         }
     }
+    if (flags & DIANA_PE_MAP_DO_NOT_RELOCATE)
+    {
+        return DI_SUCCESS;
+    }
+    return DianaPeFile_Relocate(pPeFile,
+        address,
+        pOutStream);
+}
 
+int DianaPeFile_Relocate(/* in */ Diana_PeFile* pPeFile,
+    /* in */ OPERAND_SIZE address,
+    /* inout */ DianaReadWriteRandomStream* pOutStream)
+{
     DI_CHECK(DianaPeFile_FixRelocs(pPeFile,
                                    address,
                                    pOutStream));
