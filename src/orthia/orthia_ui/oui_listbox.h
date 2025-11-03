@@ -27,6 +27,12 @@ namespace oui
 
     class CListBox:public MouseFocusable<WithBorder<CWindow>>
     {
+        struct ResizeState
+        {
+            int columnPos = 0;
+            int columnSize = 0;
+        };
+
         using Parent_type = MouseFocusable<WithBorder<CWindow>>;
 
         std::shared_ptr<DialogColorProfile> m_colorProfile;
@@ -58,6 +64,7 @@ namespace oui
     protected:
         void OnResize() override;
         void DoPaintImpl(const Rect& rect, DrawParameters& parameters);
+        bool StartColumnDrag(const Point& lastMousePoint, int columnPos);
 
     public:
         CListBox(std::shared_ptr<DialogColorProfile> colorProfile, IListBoxOwner* owner);
@@ -97,6 +104,7 @@ namespace oui
         void SetSelectedPosition(int selectedPosition);
         std::vector<ListBoxItem>& GetItems();
 
+        void SelectRow();
         bool GetSelectedItem(ListBoxItem& item) const;
     };
 

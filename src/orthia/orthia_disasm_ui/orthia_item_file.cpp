@@ -2,6 +2,7 @@
 #include "orthia_pe.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
+#include "orthia_common_format.h"
 
 namespace orthia
 {
@@ -149,6 +150,32 @@ namespace orthia
             info.dianaMode = peFile->GetImpl()->mappedPE.pImpl->dianaMode;
             modules.push_back(info);
         }
+
+        auto moduleIt = modules.begin();
+        classicDatabase->QueryMetaInfo(g_database_flags_moduleMetaInfo, [&](Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress)
+        {
+            for (;; ++moduleIt)
+            {
+                if (moduleIt == modules.end())
+                {
+                    return false;
+                }
+                if (moduleIt->address > moduleAddress)
+                {
+                    return true;
+                }
+                if (moduleIt->address == moduleAddress)
+                {
+                    break;
+                }
+            }
+
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &moduleIt->fullName);
+            return true;
+        });
+
     }
     int FileWorkplaceItem::GetModulesCount() const 
     {
@@ -161,6 +188,17 @@ namespace orthia
     int FileWorkplaceItem::GetDianaMode() const
     {
         return peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+    }
+
+    // InsertModuleMetaInfo
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName)
+    {
+        orthia::CCommonFormatBuilder builder;
+        builder.AddMetadata(ORTHIA_TCSTR("fullname"), fullName.native);
+        std::string metaInfo;
+        builder.Produce(&metaInfo);
+
+        database->InsertMetaInfo(moduleAddress, g_database_flags_moduleMetaInfo, metaInfo, moduleAddress);
     }
 
 }

@@ -399,6 +399,10 @@ namespace orthia
                 false,
                 info->shortName.native,
                 0);
+
+            InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
+                info->peFile->GetImageBase(),
+                info->fullName.native);
         }
 
         result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));

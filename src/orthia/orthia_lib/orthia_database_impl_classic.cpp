@@ -55,6 +55,18 @@ void CClassicDatabase::Init()
 
     buffer = "SELECT ref_address_to FROM tbl_references WHERE UINT_LESSOE(ref_address_to, ?1) ORDER BY ref_address_to DESC LIMIT 1";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtQueryRouteStart.Get2(), NULL));
+
+    buffer = "INSERT INTO tbl_metainfo(meta_mod_id, meta_address, meta_flags, meta_info) VALUES(?1, ?2, ?3, ?4)";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtInsertMetainfo.Get2(), NULL));
+
+    buffer = "INSERT INTO tbl_modules (mod_address, mod_size, mod_name) VALUES(?1, ?2, ?3)";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtInsertModule.Get2(), NULL));
+
+    buffer = "INSERT INTO tbl_references (ref_address_from, ref_address_to) VALUES(?1, ?2)";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtInsertReferences.Get2(), NULL));
+
+    buffer = "SELECT meta_mod_id, meta_address, meta_flags, meta_info FROM tbl_metainfo WHERE ((meta_flags & ?1) == ?1) ORDER BY meta_mod_id, meta_address";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_All.Get2(), NULL));
 }
 
 void CClassicDatabase::InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to)
@@ -92,34 +104,39 @@ void CClassicDatabase::InsertModule(Address_type baseAddress,
                              Address_type size, 
                              const std::wstring & moduleName)
 {
-    std::stringstream sql;
-    sql<<"INSERT INTO tbl_modules VALUES("<<(long long)baseAddress<<","<<size<<",\""<<orthia::ToAnsiString_Silent(orthia::Escape(moduleName))<<"\")";
-    std::string sqlString = sql.str();
-    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),sqlString.c_str()), L"Can't insert module");
+    CSQLAutoReset autoStatement(m_stmtInsertModule.Get());
+    sqlite3_bind_int64(m_stmtInsertModule.Get(), 1, baseAddress);
+    sqlite3_bind_int64(m_stmtInsertModule.Get(), 2, size);
+    SQLBindWideString(m_stmtInsertModule.Get(), orthia::Escape(moduleName), 3);
+
+    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertModule.Get()), L"Can't insert module");
 }
 void CClassicDatabase::StartSaveModule(Address_type baseAddress, 
                                 Address_type size, 
                                 const std::wstring & moduleName,
                                 CAutoRollbackClassicDatabase * pRollback)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
     ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "BEGIN TRANSACTION"));
     pRollback->Init(this);
-    char * buffer = 0;
-    buffer = "INSERT INTO tbl_references VALUES(?1, ?2)";
-    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtInsertReferences.Get2(), NULL));
     InsertModule(baseAddress, size, moduleName);
 }
 void CClassicDatabase::DoneSave()
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     m_cache.clear();
     ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "COMMIT TRANSACTION"));
 }
 void CClassicDatabase::CleanupResources()
 {
-    m_stmtInsertReferences.Finalize();    
+    orthia::CAutoCriticalSection guard(m_lock);
+    m_stmtInsertReferences.SQLReset();
 }
 void CClassicDatabase::InsertReferencesToInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     for(std::vector<CommonReferenceInfo>::const_iterator it = references.begin(), it_end = references.end();
         it != it_end;
         ++it)
@@ -133,6 +150,8 @@ void CClassicDatabase::InsertReferencesToInstruction(Address_type offset, const 
 }
 void CClassicDatabase::InsertReferencesFromInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     for(std::vector<CommonReferenceInfo>::const_iterator it = references.begin(), it_end = references.end();
         it != it_end;
         ++it)
@@ -142,6 +161,8 @@ void CClassicDatabase::InsertReferencesFromInstruction(Address_type offset, cons
 }
 void CClassicDatabase::QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     CSQLAutoReset autoStatement(m_stmtSelectReferencesToRange.Get());
     sqlite3_bind_int64(m_stmtSelectReferencesToRange.Get(), 1, address1);
     sqlite3_bind_int64(m_stmtSelectReferencesToRange.Get(), 2, address2);
@@ -172,6 +193,8 @@ void CClassicDatabase::QueryReferencesToInstructionsRange(Address_type address1,
 }
 Address_type CClassicDatabase::QueryRouteStart(Address_type offset)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     CSQLAutoReset autoStatement(m_stmtQueryRouteStart.Get());
     SQLBindInt64(m_stmtQueryRouteStart.Get(), offset, 1);
     return SQLite_ReadInt64(m_stmtQueryRouteStart.Get(), true, 0);
@@ -179,6 +202,8 @@ Address_type CClassicDatabase::QueryRouteStart(Address_type offset)
 
 void CClassicDatabase::QueryReferencesFromInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pReferences)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     CSQLAutoReset autoStatement(m_stmtSelectReferencesFrom.Get());
     sqlite3_bind_int64(m_stmtSelectReferencesFrom.Get(), 1, offset);
     pReferences->reserve(10);
@@ -203,6 +228,8 @@ void CClassicDatabase::QueryReferencesFromInstruction(Address_type offset, std::
 
 void CClassicDatabase::QueryReferencesToInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pReferences)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     CSQLAutoReset autoStatement(m_stmtSelectReferencesTo.Get());
     sqlite3_bind_int64(m_stmtSelectReferencesTo.Get(), 1, offset);
     pReferences->reserve(10);
@@ -227,6 +254,8 @@ void CClassicDatabase::QueryReferencesToInstruction(Address_type offset, std::ve
 
 void CClassicDatabase::UnloadModule(Address_type address, bool bSilent)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     try
     {
         Address_type size = 0;
@@ -278,6 +307,8 @@ void CClassicDatabase::UnloadModule(Address_type address, bool bSilent)
 }
 bool CClassicDatabase::IsModuleExists(Address_type address)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     CSQLAutoReset autoStatement(m_stmtSelectModule.Get());
     sqlite3_bind_int64(m_stmtSelectModule.Get(), 1, address);
     int stepResult = SQLiteStep_Wrapper(m_stmtSelectModule.Get());
@@ -289,6 +320,8 @@ bool CClassicDatabase::IsModuleExists(Address_type address)
 }
 void CClassicDatabase::QueryReferencesFromInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     CSQLAutoReset autoStatement(m_stmtSelectReferencesFromRange.Get());
     sqlite3_bind_int64(m_stmtSelectReferencesFromRange.Get(), 1, address1);
     sqlite3_bind_int64(m_stmtSelectReferencesFromRange.Get(), 2, address2);
@@ -319,6 +352,8 @@ void CClassicDatabase::QueryReferencesFromInstructionsRange(Address_type address
 
 void CClassicDatabase::QueryModules(std::vector<CommonModuleInfo> * pResult)
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     CSQLAutoReset autoStatement(m_stmtQueryModules.Get());
     pResult->reserve(10);
     pResult->clear();
@@ -343,8 +378,56 @@ void CClassicDatabase::QueryModules(std::vector<CommonModuleInfo> * pResult)
 }
 void CClassicDatabase::RollbackTransactionSilent()
 {
+    orthia::CAutoCriticalSection guard(m_lock);
+
     m_cache.clear();
     SQLiteExec_Wrapper(m_pDatabase->Get(), "ROLLBACK TRANSACTION");
 }
+
+void CClassicDatabase::InsertMetaInfo(Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress)
+{
+    orthia::CAutoCriticalSection guard(m_lock);
+
+    CSQLAutoReset autoStatement(m_stmtInsertMetainfo.Get());
+    sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 1, moduleAddress);
+    if (metaAddress != DI_MAX_OPERAND_SIZE)
+    {
+        sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 2, metaAddress);
+    }
+    sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 3, flags);
+    SQLBindUtf8String(m_stmtInsertMetainfo.Get(), text, 4);
+
+    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertMetainfo.Get()), L"Can't insert meta info");
+}
+void CClassicDatabase::QueryMetaInfo(int flags, std::function<bool(Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress)> handler)
+{
+    orthia::CAutoCriticalSection guard(m_lock);
+
+    CSQLAutoReset autoStatement(m_stmtSelectMetainfo_All.Get());
+    sqlite3_bind_int64(m_stmtSelectMetainfo_All.Get(), 1, flags);
+    for (;;)
+    {
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_All.Get());
+        if (stepResult == SQLITE_DONE)
+        {
+            break;
+        }
+        if (stepResult != SQLITE_ROW)
+        {
+            throw std::runtime_error("SQLiteStep_Wrapper failed");
+        }
+
+        // meta_mod_id, meta_address, meta_flags, meta_info
+        Address_type moduleAddress = sqlite3_column_int64(m_stmtSelectMetainfo_All.Get(), 0);
+        Address_type metaAddress = sqlite3_column_int64(m_stmtSelectMetainfo_All.Get(), 1);
+        Address_type flags = sqlite3_column_int64(m_stmtSelectMetainfo_All.Get(), 2);
+        auto text = SQLReadUtf8String(m_stmtSelectMetainfo_All.Get(), 3);
+        if (!handler(moduleAddress, (int)flags, text, metaAddress))
+        {
+            break;
+        }
+    }
+}
+
 
 }

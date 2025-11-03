@@ -35,7 +35,7 @@ namespace oui
         {
         }
         ColumnParam(std::function<oui::String()> getCaption,
-            int width = 100,
+            int width = 50,
             ColumnFormat format = ColumnFormat::ctLeft,
             ColumnType type = ColumnType::ctString,
             int flags = 0)
@@ -47,6 +47,10 @@ namespace oui
             m_type(type),
             m_flags(flags)
         {
+        }
+        void SetWidth(int width) 
+        {
+            m_width = width;
         }
         String GetName() const
         {

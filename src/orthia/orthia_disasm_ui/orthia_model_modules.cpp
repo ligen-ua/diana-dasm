@@ -4,6 +4,7 @@
 #include "orthia_streams.h"
 #include "orthia_memory_cache.h"
 #include "orthia_database_saver.h"
+#include "orthia_item_file.h"
 
 namespace orthia
 {
@@ -294,6 +295,10 @@ namespace orthia
                 mod.second.peFile->GetMappedPeFile().size(), 
                 shortName.native,
                 &rollback);
+
+            InsertModuleMetaInfo(classicDatabase,
+                mod.second.peFile->GetImageBase(),
+                mod.second.fullName.native);
 
             // add metainfo
             // 1. flags

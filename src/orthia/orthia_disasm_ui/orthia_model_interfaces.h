@@ -166,4 +166,8 @@ namespace orthia
         void AsyncFetchPrevHistory(ThreadPtr_type targetThread,
             oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler);
     };
+
+
+    // database flags
+    const static int g_database_flags_moduleMetaInfo = 1;
 }

@@ -6,6 +6,7 @@ namespace orthia
 {
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, IWorkPlaceItem
     {
+
         std::shared_ptr<orthia::CSimplePeFile> peFile;
         oui::String fullName, shortName;
         std::shared_ptr<CModuleManager> moduleManager;
@@ -30,4 +31,6 @@ namespace orthia
 
     };
 
+    class CClassicDatabase;
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String & fullName);
 }

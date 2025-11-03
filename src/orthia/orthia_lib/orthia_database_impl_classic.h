@@ -4,7 +4,7 @@
 #include "orthia_utils.h"
 #include "orthia_interfaces.h"
 #include "orthia_sqlite_utils.h"
-
+#include <functional>
 
 namespace orthia
 {
@@ -24,6 +24,7 @@ public:
 
 class CClassicDatabase:public orthia::RefCountedBase
 {
+    orthia::CCriticalSection m_lock;
     intrusive_ptr<CSQLDatabase2> m_pDatabase;
     std::set<Address_type> m_cache;
     CClassicDatabase(const CClassicDatabase &);
@@ -39,6 +40,12 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtSelectReferencesFromRange;
 
     CSQLStatement m_stmtQueryRouteStart;
+
+    CSQLStatement m_stmtInsertMetainfo;
+    CSQLStatement m_stmtInsertModule;
+
+    CSQLStatement m_stmtSelectMetainfo_All;
+
 
     void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to);
     void InsertModule(Address_type baseAddress, Address_type size, const std::wstring & moduleName);
@@ -59,6 +66,9 @@ public:
 
     void InsertReferencesToInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
     void InsertReferencesFromInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
+
+    void InsertMetaInfo(Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress = DI_MAX_OPERAND_SIZE);
+    void QueryMetaInfo(int flags, std::function<bool (Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress)> handler);
 
     // queries
     Address_type QueryRouteStart(Address_type offset);

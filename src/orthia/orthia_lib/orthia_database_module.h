@@ -38,6 +38,8 @@ class CDatabase:public orthia::RefCountedBase
     void Init();
     void DoVersionScripts();
     void DoUpdate_0_1();
+    void DoUpdate_1_2();
+
 public:
     CDatabase();
     ~CDatabase();

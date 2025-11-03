@@ -57,15 +57,34 @@ namespace oui
         bool needPrintHeader = false;
         String tmpStr;
         int pos = 0;
-        for (int i = 0; i < columnsCount; ++i)
+        // NOTE: render +1 column extra
+        for (int i = 0; i < columnsCount + 1; ++i)
         {
+            if (leftX >= absClientRect.size.width)
+            {
+                break;
+            }
+
+            int relRightX = 0;
             if (HasReportMode()) 
             {
+                relRightX = leftX;
+                if (i < columnsCount)
+                {
+                    relRightX += m_columns[i].GetWidth();
+                }
+                else
+                {
+                    relRightX = absClientRect.size.width;
+                }
                 needPrintHeader = true;
                 currentItemIt = m_pageItems.begin();
                 pos = -m_headerSize;
             }
-            int relRightX = ((i + 1) * absClientRect.size.width) / columnsCount;
+            else
+            {
+                relRightX = ((i + 1) * absClientRect.size.width) / columnsCount;
+            }
             int rightX = absClientRect.position.x + relRightX;
 
             int size = rightX - leftX;
@@ -104,7 +123,7 @@ namespace oui
                         textPosition = i;
                     }
                     tmpStr = textPosition >= currentItem->text.size() ? String() : currentItem->text[textPosition];
-                    if (needPrintHeader)
+                    if (needPrintHeader && i < columnsCount)
                     {
                         tmpStr.native.insert(0, 1, String::symSpace);
                         tmpStr.native.append(1, String::symSpace);
@@ -129,7 +148,10 @@ namespace oui
                     }
                     else
                     {
-                        RenderColumnText(needPrintHeader, i, tmpStr, m_chunk);
+                        if (i < (int)m_columns.size())
+                        {
+                            RenderColumnText(needPrintHeader, i, tmpStr, m_chunk);
+                        }
                     }
 
                     cutHappens = newSize != prevSize;
@@ -203,6 +225,7 @@ namespace oui
             }
             leftX = rightX;
         }
+
     }
     void CListBox::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
@@ -228,6 +251,44 @@ namespace oui
         auto guard = GetPtr();
         m_owner->CancelAllQueries();
         Parent_type::Destroy();
+    }
+    bool CListBox::StartColumnDrag(const Point& lastMousePoint, int columnPos)
+    {
+        if (columnPos >= (int)m_columns.size())
+        {
+            return true;
+        }
+        CListBox::ResizeState resizeState;
+        resizeState.columnPos = columnPos;
+        resizeState.columnSize = m_columns[columnPos].GetWidth();
+
+        RegisterDragEvent(lastMousePoint, [this, resizeState = resizeState](DragEvent evt,
+            const Point& initialPoint,
+            const Point& currentPoint,
+            std::shared_ptr<CWindow> wnd) {
+  
+            switch (evt)
+            {
+            default:
+                return false;
+
+            case DragEvent::Progress:
+            case DragEvent::Drop:
+            {
+                int differenceX = currentPoint.x - initialPoint.x;
+                m_columns[resizeState.columnPos].SetWidth(resizeState.columnSize + differenceX);
+            }
+            break;
+            case DragEvent::Cancel:
+                m_columns[resizeState.columnPos].SetWidth(resizeState.columnSize);
+            }
+
+            Invalidate();
+            OnResize();
+            return true;
+
+        });
+        return true;
     }
     bool CListBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
     {
@@ -306,6 +367,21 @@ namespace oui
                 else
                 {
                     newPosition -= m_headerSize;
+                }
+                auto columnsCount = GetColumnsCount(); 
+                int leftX = 0;
+                for (int i = 0; i < columnsCount; ++i)
+                {
+                    int relRightX = leftX + m_columns[i].GetWidth();
+                    if (relRightX == relativePoint.x + 1)
+                    {
+                        return StartColumnDrag(relativePoint, i);
+                    }
+                    if (leftX > relativePoint.x)
+                    {
+                        break;
+                    }
+                    leftX = relRightX;
                 }
             }
             if (newPosition >= (int)m_pageItems.size() && !m_pageItems.empty())
@@ -414,6 +490,29 @@ namespace oui
             }
         }
     }
+    void CListBox::SelectRow()
+    {
+        ListBoxItem item;
+        if (!GetSelectedItem(item))
+        {
+            return;
+        }
+        oui::String res;
+        for (auto& t : item.text)
+        {
+            res.native += t.native + OUI_TCSTR(" | ");
+        }
+        if (!res.native.empty())
+        {
+            res.native.resize(res.native.size() - 3);
+        }
+
+        if (auto console = GetConsole())
+        {
+            console->CopyTextToClipboard(res);
+        }
+    }
+
     bool CListBox::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
         CConsole* console = GetConsole();
@@ -429,6 +528,13 @@ namespace oui
             bool handled = false;
             switch (evt.keyEvent.virtualKey)
             {
+            case oui::VirtualKey::kC:
+                if (evt.keyState.state & evt.keyState.AnyCtrl)
+                {
+                    SelectRow();
+                }
+                return true;
+
             case VirtualKey::Enter:
                 OpenSelectedItem();
                 return true;
