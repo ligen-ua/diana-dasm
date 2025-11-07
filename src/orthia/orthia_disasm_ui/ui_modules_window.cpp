@@ -21,7 +21,7 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption, std::sha
     oui::IListBoxOwner* owner = this;
     m_itemsBox = std::make_shared<oui::CListBox>(m_colorProfile, owner);
     m_itemsBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  }),
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  })
+        oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }, 19, oui::ColumnFormat::ctCenter)
     );
     m_itemsBox->SetBorderStyle(oui::BorderStyle::None);
 }

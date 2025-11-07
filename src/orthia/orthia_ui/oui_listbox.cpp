@@ -44,7 +44,6 @@ namespace oui
         const auto colorProfile = m_colorProfile->listBox;
         const PanelBorderSymbols symbols = GetPanelBorderSymbols();
         const auto absClientRect = GetAbsoluteClientRect(this, rect);
-
         int columnsCount = GetColumnsCount();
         if (!columnsCount)
         {
@@ -69,6 +68,7 @@ namespace oui
             if (HasReportMode()) 
             {
                 relRightX = leftX;
+                relRightX -= absClientRect.position.x;
                 if (i < columnsCount)
                 {
                     relRightX += m_columns[i].GetWidth();
@@ -375,7 +375,7 @@ namespace oui
                     int relRightX = leftX + m_columns[i].GetWidth();
                     if (relRightX == relativePoint.x + 1)
                     {
-                        return StartColumnDrag(relativePoint, i);
+                        return StartColumnDrag(evt.mouseEvent.point, i);
                     }
                     if (leftX > relativePoint.x)
                     {

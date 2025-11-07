@@ -58,6 +58,33 @@ bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile2> file)
     });
     return true;
 }
+
+bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process)
+{
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    std::weak_ptr<CMainWindow> weakMe = me;
+    if (!me)
+    {
+        return false;
+    }
+    auto completeHandler = std::make_shared<oui::Operation<oui::fsui::ProcessCompleteHandler_type>>(
+        this->GetThread(),
+        [=](std::shared_ptr<oui::BaseOperation> op, std::shared_ptr<oui::IProcess> proc, const oui::fsui::OpenResult& result) {
+        if (auto p = weakMe.lock())
+        {
+            if (auto p = weakMe.lock())
+            {
+                p->OnFileOpen(proc, result);
+            }
+        }
+    });
+
+    m_model->GetFileSystem()->AsyncExecute(GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler)] {
+        model->AddProcess(process, completeHandler);
+    });
+    return true;
+}
+
 oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
     std::shared_ptr<oui::IFile2> file, 
     oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)

@@ -182,6 +182,7 @@
     <ClCompile Include="oui_open_file_dialog.cpp" />
     <ClCompile Include="oui_param.cpp" />
     <ClCompile Include="oui_screen.cpp" />
+    <ClCompile Include="oui_scrollable.cpp" />
     <ClCompile Include="oui_string.cpp" />
     <ClCompile Include="oui_symbols_newterm_win32.cpp" />
     <ClCompile Include="oui_symbols_win32.cpp" />
@@ -214,6 +215,7 @@
     <ClInclude Include="oui_multiline_view.h" />
     <ClInclude Include="oui_open_file_dialog.h" />
     <ClInclude Include="oui_param.h" />
+    <ClInclude Include="oui_scrollable.h" />
     <ClInclude Include="oui_string.h" />
     <ClInclude Include="oui_symbols_newterm_win32.h" />
     <ClInclude Include="oui_symbols_win32.h" />

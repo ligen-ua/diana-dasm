@@ -434,26 +434,11 @@ namespace oui
         CProcessSystemImpl()
         {
         }
-        void AsyncStartQueryProcess(ThreadPtr_type targetThread,
-            const ProcessUnifiedId& fileId,
-            ProcessRecipientHandler_type openHandler,
-            OperationPtr_type<QueryProcessHandler_type> filterHandler,
-            int flags)
+        std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) override
         {
-            if (!fileId.pid)
-            {
-                ScanProcesses(targetThread,
-                    fileId,
-                    std::move(openHandler),
-                    std::move(filterHandler),
-                    flags);
-                return;
-            }
-
-            // here we need to open it
             int error = 0;
             std::shared_ptr<IProcess> proc;
-            if (HANDLE hProc = OpenProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)fileId.pid))
+            if (HANDLE hProc = OpenProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)procId.pid))
             {
                 oui::ScopedGuard handlerGuard([&]() {
                     CloseHandle(hProc);
@@ -472,9 +457,9 @@ namespace oui
                     orthia::UnparseFileNameFromFullFileName<oui::String::string_type>(buf.data(), &shortName.native);
 
                     oui::String::StringStream_type res;
-                    res << OUI_TCSTR("[") << fileId.pid << OUI_TCSTR("] ") << shortName.native;
-                    
-                    proc = std::make_shared<CProcess>(res.str(), hProc, is32bit, (DWORD)fileId.pid);
+                    res << OUI_TCSTR("[") << procId.pid << OUI_TCSTR("] ") << shortName.native;
+
+                    proc = std::make_shared<CProcess>(res.str(), hProc, is32bit, (DWORD)procId.pid);
                     handlerGuard.Release();
                 }
             }
@@ -482,11 +467,36 @@ namespace oui
             {
                 error = GetLastError();
             }
+            return std::make_tuple(error, proc);
+        }
+
+        void AsyncStartQueryProcess(ThreadPtr_type targetThread,
+            const ProcessUnifiedId& fileId,
+            ProcessRecipientHandler_type openHandler,
+            OperationPtr_type<QueryProcessHandler_type> filterHandler,
+            int flags)
+        {
+            if (!fileId.pid)
+            {
+                ScanProcesses(targetThread,
+                    fileId,
+                    std::move(openHandler),
+                    std::move(filterHandler),
+                    flags);
+                return;
+            }
+
+            // here we need to open it
+
+            int platformError = 0;
+            std::shared_ptr<oui::IProcess> proc;
+            std::tie(platformError, proc) = SyncOpenProcess(oui::ProcessUnifiedId((DWORD)fileId.pid));
+
             auto operation = std::make_shared<Operation<ProcessRecipientHandler_type>>(
                 targetThread,
                 openHandler);
 
-            operation->ReplyWithRetain(operation, proc, error);
+            operation->ReplyWithRetain(operation, proc, platformError);
         }
         void ScanProcesses(ThreadPtr_type targetThread,
             const ProcessUnifiedId& fileId,

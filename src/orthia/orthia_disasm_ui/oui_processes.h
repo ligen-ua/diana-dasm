@@ -61,6 +61,8 @@ namespace oui
             ProcessRecipientHandler_type openHandler,
             OperationPtr_type<QueryProcessHandler_type> filterHandler,
             int flags) = 0;
+
+        virtual std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) = 0;
     };
 
     // default filesystem
@@ -76,6 +78,8 @@ namespace oui
             ProcessRecipientHandler_type openHandler,
             OperationPtr_type<QueryProcessHandler_type> filterHandler, 
             int flags) override;
+
+        std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) override;
     };
 
     std::shared_ptr<IProcessSystem> CreateDefaultProcessProvider();

@@ -40,7 +40,6 @@ namespace oui
 
         bool CopyTextToClipboard(const String& text);
         String PasteTextFromClipboard();
-
     };
 
     struct PanelBorderSymbols
@@ -91,6 +90,8 @@ namespace oui
         void StartDraw(Size size, 
             CConsole* console);
         void FinishDraw();
+
+        void CopyRectWindow(const Size & m_realSize, CConsoleDrawAdapter& consoleOut, Rect& rect, int xPercentage) const;
     };
     class CConsoleStateSaver:Noncopyable
     {
@@ -112,4 +113,8 @@ namespace oui
             return m_screenInfo;
         }
     };
+
+
+    void CopyRectWindow(const CConsoleDrawAdapter& consoleIn, CConsoleDrawAdapter &  consoleOut, Rect & rect, int xPercentage);
+
 }

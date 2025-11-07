@@ -20,7 +20,7 @@ namespace oui
         {
             return;
         }
-        m_pool.AddTask([=, 
+        m_pool.AddTask([=,
             filterHandler = std::move(filterHandler),
             openHandler = std::move(openHandler)]() {
 
@@ -28,4 +28,8 @@ namespace oui
         });
     }
 
+    std::tuple<int, std::shared_ptr<IProcess>> CProcessSystem::SyncOpenProcess(const oui::ProcessUnifiedId& procId)
+    {
+        return m_fsImpl->SyncOpenProcess(procId);
+    }
 }

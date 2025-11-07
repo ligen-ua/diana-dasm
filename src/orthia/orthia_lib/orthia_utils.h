@@ -61,6 +61,9 @@ std::wstring ToWideString(Address_type address);
 Address_type ToAddress(const std::wstring & sourceStr);
 std::string ToAnsiString_Silent(const std::wstring & sourceStr,
                                 ULONG codePage = CP_ACP);
+inline std::string ToAnsiString_Silent(const std::string& sourceStr) {
+    return sourceStr;
+}
 
 template<class CharType>
 struct CharTraits
@@ -125,7 +128,7 @@ void HexStringToObject(const std::basic_string<Type, Traits<Type>, AllocatorType
 {
     if (!HexStringToObject_Silent(str, pObject))
     {
-        throw std::runtime_error("Can't convert");
+        throw std::runtime_error("Can't convert: " + orthia::ToAnsiString_Silent(str));
     }
 }
 
@@ -140,7 +143,7 @@ void StringToObject(const std::basic_string<Type, Traits<Type>, AllocatorType<Ty
     stream >> *pObject;
     if (stream.fail() || stream.bad() || !stream.eof())
     {
-        throw std::runtime_error("Can't convert");
+        throw std::runtime_error("Can't convert: " + orthia::ToAnsiString_Silent(str));
     }
 }
 

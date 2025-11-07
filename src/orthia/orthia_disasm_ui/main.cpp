@@ -20,29 +20,41 @@ int wmain(int argc, const wchar_t* argv[])
 {
     // MessageBox(0, 0, 0, 0);
     std::vector<std::wstring> filenamesToOpen;
-    if (argc == 2)
-    {
-        if (wcscmp(argv[1], L"--run-tests") == 0)
-        {
-            return RunTests();
-        }
-        filenamesToOpen.push_back(argv[1]);
-    }
-    else
-    {
-        if (argc > 2)
-        {
-            // there is no support of that currently
-            PrintUsage();
-            return 1;
-        }
-    }
-
-    std::cout << "Welcome to Orthia Disasm\n\n";
-    std::cout.flush();
+    std::vector<unsigned long long> processesToOpen;
 
     try
     {
+        bool nextIsPid = false;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (nextIsPid)
+            {
+                unsigned long long pid = 0;
+                orthia::StringToObject(std::wstring(argv[i]), &pid);
+                processesToOpen.push_back(pid);
+                nextIsPid = false;
+                continue;
+            }
+            if (wcscmp(argv[i], L"--run-tests") == 0)
+            {
+                return RunTests();
+            }
+            if (wcscmp(argv[i], L"--pid") == 0)
+            {
+                nextIsPid = true;
+                continue;
+            }
+            if (wcsncmp(argv[i], L"--", 2) == 0)
+            {
+                PrintUsage();
+                return 1;
+            }
+            filenamesToOpen.push_back(argv[i]);
+        }
+
+        std::cout << "Welcome to Orthia Disasm\n\n";
+        std::cout.flush();
+
         g_textManager = new orthia::CTextManager();
         InitLanguage_EN(g_textManager);
 
@@ -80,9 +92,24 @@ int wmain(int argc, const wchar_t* argv[])
             int platformError = 0;
             std::shared_ptr<oui::IFile2> file;
             std::tie(platformError, file) = programModel->GetFileSystem()->SyncOpenFile(oui::FileUnifiedId(name));
-            rootWindow->AddInitialArgument({platformError, name, file});
+            if (!file)
+            {
+                throw orthia::CWin32Exception("Can't open file: " + orthia::ToAnsiString_Silent(name), platformError);
+            }
+            rootWindow->AddInitialArgument({ platformError, name, file, nullptr });
         }
-
+        for (auto& pid : processesToOpen)
+        {
+            int platformError = 0;
+            std::shared_ptr<oui::IProcess> process;
+            std::tie(platformError, process) = programModel->GetProcessSystem()->SyncOpenProcess(oui::ProcessUnifiedId(pid));
+            if (!process)
+            {
+                throw orthia::CWin32Exception("Can't open process: " + orthia::ObjectToString_Ansi(pid), platformError);
+            }
+            auto uiName = process->GetFullFileNameForUI();
+            rootWindow->AddInitialArgument({ platformError, uiName, nullptr, process });
+        }
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

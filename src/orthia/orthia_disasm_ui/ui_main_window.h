@@ -19,6 +19,8 @@ struct InitialOpenFileInfo
     int errorCode = 0;
     oui::String name;
     std::shared_ptr<oui::IFile2> file;
+    std::shared_ptr<oui::IProcess> process;
+
 };
 
 class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public orthia::IUIEventHandler
@@ -67,5 +69,5 @@ public:
     void ConstructChilds() override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
     bool AsyncOpenFile(std::shared_ptr<oui::IFile2> file);
-
+    bool AsyncOpenProcess(std::shared_ptr<oui::IProcess> process);
 };
