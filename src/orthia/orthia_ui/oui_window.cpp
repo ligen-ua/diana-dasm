@@ -576,6 +576,10 @@ namespace oui
             force = true;
         }
 
+        DrawChilds(rect, parameters, force);
+    }
+    void CWindow::DrawChilds(const Rect& rect, DrawParameters& parameters, bool& force)
+    {
         RenderChilds(rect, [&](std::shared_ptr<CWindow> child, const Rect& childRect) {
             child->DrawTo(childRect, parameters, force);
             return true;
@@ -656,6 +660,13 @@ namespace oui
     }
     void CWindow::Invalidate(bool valid)
     {
+        if (!valid)
+        {
+            for (auto parent = GetParent(); parent; parent = parent->GetParent())
+            {
+                parent->Invalidate(valid);
+            }
+        }
         m_valid = valid;
         if (!valid)
         {

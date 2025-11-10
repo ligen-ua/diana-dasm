@@ -524,6 +524,34 @@ namespace oui
         }
         return symbolsCount;
     }
+
+    void CConsoleDrawAdapter::PaintScrollMark(const Point& position, ScrollMarkType type, Color textColor, Color textBgColor)
+    {
+        int consoleColor = m_console->TranslateColorEx(textBgColor, true) | m_console->TranslateColorEx(textColor, false);
+
+        wchar_t signText = 0;
+        if (position.x >= m_size.width || position.y >= m_size.height)
+        {
+            return;
+        }
+        switch (type)
+        {
+        case ScrollMarkType::Left:
+            signText = '<';
+            break;
+        case ScrollMarkType::Right:
+            signText = '>';
+            break;
+        default:
+            return;
+        }
+
+        auto targetLine = m_buffer.data() + m_size.width * position.y;
+        auto & info = targetLine[position.x];
+        info.Attributes = consoleColor;
+        info.Char.UnicodeChar = signText;
+    }
+
     void CConsoleDrawAdapter::PaintBorder(const Rect& rect_in,
         Color textColor,
         Color textBgColor,
@@ -659,7 +687,6 @@ namespace oui
             }
         }
     }
-
     void CConsoleDrawAdapter::StartDraw(Size size,
         CConsole* console)
     {
@@ -687,7 +714,30 @@ namespace oui
 
         int cccc = 1;
     }
-    
+
+    void CConsoleDrawAdapter::CopyRectWindow(const Rect& rect, const Point& targetPosition, CConsoleDrawAdapter& consoleOut) const
+    {
+        if (m_size.height < rect.position.y || m_size.width < rect.position.x)
+        {
+            return;
+        }
+        if (consoleOut.m_size.height < targetPosition.y || consoleOut.m_size.width < targetPosition.x)
+        {
+            return;
+        }
+        int heightToCopy = std::min(m_size.height - rect.position.y, consoleOut.m_size.height - targetPosition.y);
+        int widthToCopy = std::min(m_size.width - rect.position.x, consoleOut.m_size.width - targetPosition.x);
+
+        int sourceY = rect.position.y;
+        int targetY = targetPosition.y;
+        auto sourceLine = m_buffer.data() + m_size.width * sourceY;
+        auto targetLine = consoleOut.m_buffer.data() + consoleOut.m_size.width * targetY;
+        for (int i = 0; i < heightToCopy; ++i, sourceLine += m_size.width, targetLine += consoleOut.m_size.width)
+        {
+            memcpy(targetLine + targetPosition.x, sourceLine + rect.position.x, widthToCopy*sizeof(m_buffer[0]));
+        }
+    }
+
     // CConsoleStateSaver
     CConsoleStateSaver::CConsoleStateSaver()
     {

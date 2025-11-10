@@ -134,6 +134,7 @@ namespace oui
         LabelColorState mouseHighlight;
     };
     void QueryDefaultColorProfile(LabelColorProfile& profile);
+    void QueryScrollBarColorProfile(LabelColorProfile& profile);
 
     // listbox
     struct ListBoxColorProfile

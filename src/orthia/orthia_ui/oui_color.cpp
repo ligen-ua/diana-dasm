@@ -166,6 +166,22 @@ namespace oui
         profile = g_labelColorProfile;
     }
 
+    static LabelColorProfile g_scrollbarColorProfile =
+    {
+        {
+            ColorYellow(),      // text
+            ColorBlack(),      // background
+        },
+        {
+            ColorBrightGreen(),      // text
+            ColorBlack(),          // background
+        }
+    };
+    void QueryScrollBarColorProfile(LabelColorProfile& profile)
+    {
+        profile = g_scrollbarColorProfile;
+    }
+
     // listbox
     static ListBoxColorProfile g_listBoxColorProfile =
     {

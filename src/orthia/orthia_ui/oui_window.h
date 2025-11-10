@@ -107,12 +107,11 @@ namespace oui
 
         virtual bool HandleMouseEvent(const Rect& rect, InputEvent& evt);
 
-        virtual bool ProcessMouseEvent(const Rect& rect, InputEvent& evt, WindowEventContext& evtContext);
-
         virtual void OnInit(std::shared_ptr<CWindowsPool> pool);
         virtual void OnAfterInit(std::shared_ptr<CWindowsPool> pool);
         virtual void OnHandleMouseEvent(bool result, const Rect& rect, InputEvent& evt);
 
+        virtual void DrawChilds(const Rect& rect, DrawParameters& parameters, bool& force);
         void RenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler);
         void ReverseRenderChilds(const Rect& rect, std::function<bool(std::shared_ptr<CWindow> child, const Rect& childRect)> handler);
 
@@ -148,6 +147,8 @@ namespace oui
         CWindow();
         virtual ~CWindow();
         virtual void OnChildFocused();
+        virtual bool ProcessMouseEvent(const Rect& rect, InputEvent& evt, WindowEventContext& evtContext);
+
 
         static void InitDefConsole(CConsole* defConsole);
 

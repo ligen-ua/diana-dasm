@@ -39,6 +39,8 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules.columns"))
         << textManager->RegisterValue(ORTHIA_TCSTR("name"), ORTHIA_TCSTR("Name"))
         << textManager->RegisterValue(ORTHIA_TCSTR("address"), ORTHIA_TCSTR("Address"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("mapped-size"), ORTHIA_TCSTR("Size"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("full-path"), ORTHIA_TCSTR("Path"))
         ;
 
     // output

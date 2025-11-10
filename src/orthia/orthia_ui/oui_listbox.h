@@ -51,6 +51,7 @@ namespace oui
         bool m_paintInProgress = false;
         ListBoxItem m_headerListBoxItem;
         int m_headerSize = 0;
+        bool m_dockable = false;
 
         // temporary data for painting
         static String m_chunk;
@@ -106,6 +107,8 @@ namespace oui
 
         void SelectRow();
         bool GetSelectedItem(ListBoxItem& item) const;
+
+        void Dock();
     };
 
 

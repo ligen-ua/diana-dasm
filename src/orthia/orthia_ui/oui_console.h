@@ -58,7 +58,7 @@ namespace oui
     {
         Size m_size;
         std::vector<CHAR_INFO> m_buffer;
-        CConsole* m_console = 0;
+        mutable CConsole* m_console = 0;
         std::wstring m_separator;
 
     public:
@@ -86,12 +86,21 @@ namespace oui
             Color textBgColor,
             BorderStyle style);
 
-        // main
-        void StartDraw(Size size, 
-            CConsole* console);
+        enum class ScrollMarkType
+        {
+            Left,
+            Right
+        };
+        void PaintScrollMark(const Point& position, ScrollMarkType type, Color textColor, Color textBgColor);
+
+        // main interface
+        CConsole* GetConsole() { return m_console; }
+        Size GetSize() const { return m_size; }
+
+        void StartDraw(Size size, CConsole* console);
         void FinishDraw();
 
-        void CopyRectWindow(const Size & m_realSize, CConsoleDrawAdapter& consoleOut, Rect& rect, int xPercentage) const;
+        void CopyRectWindow(const Rect & rect, const Point& targetPosition, CConsoleDrawAdapter& consoleOut) const;
     };
     class CConsoleStateSaver:Noncopyable
     {
@@ -113,8 +122,5 @@ namespace oui
             return m_screenInfo;
         }
     };
-
-
-    void CopyRectWindow(const CConsoleDrawAdapter& consoleIn, CConsoleDrawAdapter &  consoleOut, Rect & rect, int xPercentage);
 
 }

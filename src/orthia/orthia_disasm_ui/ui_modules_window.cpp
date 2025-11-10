@@ -20,10 +20,16 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption, std::sha
 
     oui::IListBoxOwner* owner = this;
     m_itemsBox = std::make_shared<oui::CListBox>(m_colorProfile, owner);
-    m_itemsBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  }),
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }, 19, oui::ColumnFormat::ctCenter)
+    m_itemsBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  }, 25),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }, 19, oui::ColumnFormat::ctCenter),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(L"mapped-size");  }, 11, oui::ColumnFormat::ctCenter),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(L"full-path");  }, 55, oui::ColumnFormat::ctLeft)
+
     );
     m_itemsBox->SetBorderStyle(oui::BorderStyle::None);
+    m_itemsBox->Dock();
+
+    m_scrollable = std::make_shared<oui::CScrollable>(m_itemsBox);
 }
 int CModulesWindow::GetTotalCount() const
 {
@@ -57,6 +63,8 @@ void CModulesWindow::UpdateVisibleItems()
         vit->text.clear();
         vit->text.push_back(name);
         vit->text.push_back(orthia::ToWideStringAsHex(it->address));
+        vit->text.push_back(orthia::ToWideStringAsHex((unsigned int)it->size));
+        vit->text.push_back(it->fullName);
 
         vit->openHandler = []() {
         };
@@ -91,18 +99,18 @@ bool CModulesWindow::ShiftViewWindowToSymbol(const oui::String& symbol)
 }
 void CModulesWindow::ConstructChilds()
 {
-    AddChild(m_itemsBox);
+    AddChild(m_scrollable);
 }
 void CModulesWindow::OnResize()
 {
     const oui::Rect clientRect = GetClientRect();
-    m_itemsBox->Resize(clientRect.size);
+    m_scrollable->Resize(clientRect.size);
     UpdateVisibleItems();
 }
 void CModulesWindow::SetFocusImpl()
 {
     UpdateVisibleItems();
-    m_itemsBox->SetFocus();
+    m_scrollable->SetFocus();
 }
 void CModulesWindow::OnWorkspaceItemChanged()
 {

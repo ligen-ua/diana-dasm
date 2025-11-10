@@ -283,6 +283,10 @@ namespace oui
                 m_columns[resizeState.columnPos].SetWidth(resizeState.columnSize);
             }
 
+            if (m_dockable)
+            {
+                Dock();
+            }
             Invalidate();
             OnResize();
             return true;
@@ -563,13 +567,19 @@ namespace oui
 
             // arrows
             case VirtualKey::Left:
-                handled = true;
-                newPosition -= GetVisibleSize() / 2;
+                if (!evt.keyState.AnyCtrl) 
+                {
+                    handled = true;
+                    newPosition -= GetVisibleSize() / 2;
+                }
                 break;
 
             case VirtualKey::Right:
-                handled = true;
-                newPosition += GetVisibleSize() / 2;
+                if (!evt.keyState.AnyCtrl)
+                {
+                    handled = true;
+                    newPosition += GetVisibleSize() / 2;
+                }
                 break;
 
             case VirtualKey::Up:
@@ -709,5 +719,17 @@ namespace oui
         }
         filesBox->SetSelectedPosition(newSelectedPositon);
         filesBox->SetOffset(newOffset);
+    }
+    void CListBox::Dock()
+    {
+        int width = 0;
+        for (auto& column : m_columns)
+        {
+            width += column.GetWidth();
+        }
+        Size newSize = GetSize();
+        newSize.width = width;
+        m_dockable = true;
+        Resize(newSize);
     }
 }

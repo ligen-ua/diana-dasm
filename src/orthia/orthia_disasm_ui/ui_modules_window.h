@@ -3,11 +3,13 @@
 #include "oui_containers.h"
 #include "oui_listbox.h"
 #include "ui_common.h"
+#include "oui_scrollable.h"
 
 class CModulesWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IListBoxOwner, public IUIStatefulWindow
 {
     std::shared_ptr<orthia::CProgramModel> m_model;
     std::shared_ptr<oui::CListBox> m_itemsBox;
+    std::shared_ptr<oui::CScrollable> m_scrollable;
     std::shared_ptr<oui::DialogColorProfile> m_colorProfile;
 
     void ConstructChilds() override;
