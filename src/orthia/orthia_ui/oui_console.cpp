@@ -605,7 +605,15 @@ namespace oui
         }
 
         lineData[xend - 1].Attributes = consoleColor;
-        lineData[xend - 1].Char.UnicodeChar = syms[2];
+
+        if (rect.size.width == 1)
+        {
+            lineData[xend - 1].Char.UnicodeChar = syms[3];
+        }
+        else
+        {
+            lineData[xend - 1].Char.UnicodeChar = syms[2];
+        }
 
         lineData += m_size.width;
         for (int i = 0; i < linesCount - 2; ++i, lineData += m_size.width)
@@ -625,8 +633,15 @@ namespace oui
         {
             lineData[u].Char.UnicodeChar = syms[5];
             lineData[u].Attributes = consoleColor;
+        }        
+        if (rect.size.width == 1)
+        {
+            lineData[xend - 1].Char.UnicodeChar = syms[3];
         }
-        lineData[xend - 1].Char.UnicodeChar = syms[6];
+        else
+        {
+            lineData[xend - 1].Char.UnicodeChar = syms[6];
+        }
         lineData[xend - 1].Attributes = consoleColor;
     }
 
@@ -727,6 +742,9 @@ namespace oui
         }
         int heightToCopy = std::min(m_size.height - rect.position.y, consoleOut.m_size.height - targetPosition.y);
         int widthToCopy = std::min(m_size.width - rect.position.x, consoleOut.m_size.width - targetPosition.x);
+
+        heightToCopy = std::min(heightToCopy, rect.size.height);
+        widthToCopy = std::min(widthToCopy, rect.size.width);
 
         int sourceY = rect.position.y;
         int targetY = targetPosition.y;

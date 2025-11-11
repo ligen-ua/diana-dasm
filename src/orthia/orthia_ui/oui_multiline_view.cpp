@@ -6,7 +6,7 @@ namespace oui
     void CMultiLineView::SetupHandlers()
     {
         EditBoxLowLevelHandlers handlers;
-        handlers.mouseHandler = [&](const Rect& rect, InputEvent& evt) {
+        handlers.mouseHandler = [&](const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) {
             // translate edit box rect to my rect
             auto myPosition = rect.position;
             myPosition.y -= m_yCursopPos;
@@ -14,7 +14,7 @@ namespace oui
             Rect myRect = this->GetWndRect();
             myRect.position = myPosition;
 
-            return this->HandleMouseEventImpl(myRect, evt, true);
+            return this->HandleMouseEventImpl(myRect, evt, true, mouseEventContext);
         };
         handlers.ctrlCHandler = [&](InputEvent& evt) {
             return this->CopySelected();
@@ -619,16 +619,16 @@ namespace oui
             m_editBox->SetCursorPosition(pt.x, true, false);
         }
     }
-    bool CMultiLineView::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CMultiLineView::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
-        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+        auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
         m_lastMouseMovePoint = relativePoint;
         m_lastKeyState = evt.keyState;
-        bool res = HandleMouseEventImpl(rect, evt, false);
+        bool res = HandleMouseEventImpl(rect, evt, false, mouseEventContext);
         m_lastKeyState = KeyState();
         return res;
     }
-    bool CMultiLineView::HandleMouseEventImpl(const Rect& rect, InputEvent& evt, bool fromEditBox)
+    bool CMultiLineView::HandleMouseEventImpl(const Rect& rect, InputEvent& evt, bool fromEditBox, MouseEventContext& mouseEventContext)
     {
         {
             int pageSize = 1;
@@ -644,7 +644,7 @@ namespace oui
             }
         }
         auto clientRect = GetClientRect();
-        auto point = GetRelativeMousePoint(rect, evt.mouseEvent.point);
+        auto point = GetRelativeMousePoint(mouseEventContext, rect, evt.mouseEvent.point);
         bool handled = false;
 
 

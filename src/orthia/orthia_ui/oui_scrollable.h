@@ -11,6 +11,8 @@ namespace oui
         using Parent_type = oui::SimpleBrush<CWindow>;
         std::shared_ptr<CWindow> m_pTarget;
         int m_xPosPercentage = 0;
+        Point m_leftScroll, m_rightScroll;
+        bool m_highlightLeftScroll = false, m_highlightRightScroll = false;
 
         void ConstructChilds() override;
         void DrawChilds(const Rect& rect, DrawParameters& parameters, bool& force) override;
@@ -34,5 +36,13 @@ namespace oui
         bool IsActiveOrFocused() const override;
         
         void OnResize() override;
+        void DrawTo(const Rect& rect, DrawParameters& parameters, bool& force) override;
+
+    };
+
+    class CVerticalScrollBar : public WithBorder<CWindow>
+    {
+    public:
+        bool Resize(const Size& newSize) override;
     };
 }

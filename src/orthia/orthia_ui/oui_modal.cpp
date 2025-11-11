@@ -214,7 +214,7 @@ namespace oui
         }
         return true;
     }
-    bool CModalWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CModalWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         m_lastMouseMovePoint = evt.mouseEvent.point;
 

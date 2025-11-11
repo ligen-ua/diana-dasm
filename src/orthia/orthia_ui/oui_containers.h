@@ -24,7 +24,7 @@ namespace oui
         void Activate() override;
         void Deactivate() override;
         bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override;
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
         void OnChildFocused() override;
         void SetVisible(bool value) override;
     };
@@ -71,7 +71,7 @@ namespace oui
 
         void PaintTitle(const Rect& rect, DrawParameters& parameters);
         void PaintLeftBorder(const Rect& rect, DrawParameters& parameters);
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
 
         // drag handlers
         bool Drag_ResizeHandler_TopBottom(DragEvent event,

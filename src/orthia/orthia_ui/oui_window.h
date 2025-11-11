@@ -74,10 +74,16 @@ namespace oui
         CConsoleDrawAdapter console;
     };
 
+    struct MouseEventContext
+    {
+        int scrollXDifference = 0;
+    };
+
     struct WindowEventContext
     {
         std::function<void(std::shared_ptr<CWindow>)> onMouseEventCallback;
         bool finishedProcessing = false;
+        MouseEventContext mouseContext;
     };
 
     class CWindow:Noncopyable
@@ -105,7 +111,7 @@ namespace oui
         virtual void ConstructChilds();
         virtual void OnResize();
 
-        virtual bool HandleMouseEvent(const Rect& rect, InputEvent& evt);
+        virtual bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext);
 
         virtual void OnInit(std::shared_ptr<CWindowsPool> pool);
         virtual void OnAfterInit(std::shared_ptr<CWindowsPool> pool);
@@ -258,6 +264,6 @@ namespace oui
     void InvalidateParent(CWindow* window);
 
     Rect GetAbsoluteClientRect(CWindow* pWindow, const Rect& rect);
-    Point GetRelativeMousePoint(const Rect& rect, const Point& point);
-    Point GetClientMousePoint(CWindow* pWindow, const Rect& rect, const Point& point);
+    Point GetRelativeMousePoint(const MouseEventContext& mouseEventContext, const Rect& rect, const Point& point);
+    Point GetClientMousePoint(const MouseEventContext& mouseEventContext, CWindow* pWindow, const Rect& rect, const Point& point);
 }

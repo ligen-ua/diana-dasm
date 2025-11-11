@@ -51,6 +51,10 @@ namespace oui
         void SetWidth(int width) 
         {
             m_width = width;
+            if (m_width <= 0)
+            {
+                m_width = 1;
+            }
         }
         String GetName() const
         {

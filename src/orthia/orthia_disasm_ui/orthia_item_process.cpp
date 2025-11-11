@@ -92,4 +92,9 @@ namespace orthia
     {
         return m_persistentStorage;
     }
+
+    void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo>& names)
+    {
+        names.clear();
+    }
 }

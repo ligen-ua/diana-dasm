@@ -9,7 +9,7 @@ namespace oui
     class CEditBox;
     struct EditBoxLowLevelHandlers
     {
-        std::function<bool(const Rect& rect, InputEvent& evt)> mouseHandler;
+        std::function<bool(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)> mouseHandler;
         std::function<bool(InputEvent& evt)> ctrlCHandler;
         std::function<bool(InputEvent& evt)> ctrlAHandler;
         std::function<void(std::shared_ptr<CEditBox> editBox)> onPaintStart;
@@ -74,7 +74,7 @@ namespace oui
         bool IsReadOnly() const;
         void SetEnterHandler(std::function<void(const String& text)> enterHandler);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void Clear();
         String GetText() const;

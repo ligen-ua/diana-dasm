@@ -28,7 +28,7 @@ namespace orthia
         int GetModulesCount() const override;
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         int GetDianaMode() const override;
-
+        void QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo>& names) override;
     };
 
     class CClassicDatabase;

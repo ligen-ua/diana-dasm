@@ -51,7 +51,7 @@ namespace oui
         }
         return text;
     }
-    bool CLabel::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CLabel::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         Invalidate(false);
         return true;

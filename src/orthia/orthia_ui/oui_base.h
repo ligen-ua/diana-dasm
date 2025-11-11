@@ -31,6 +31,14 @@ namespace oui
     {
         int x = 0;
         int y = 0;
+        Point()
+        {
+        }
+        Point(int x_in, int y_in)
+            :
+                x(x_in), y(y_in)
+        {
+        }
     };
     inline Point operator + (const Point& pt1, const Point& pt2)
     {

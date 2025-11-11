@@ -30,6 +30,7 @@ namespace orthia
         int GetDianaMode() const override { return m_dianaMode;}
         Address_type GerProcessModuleAddress();
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
+        void QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo>& names) override;
     };
 
 }

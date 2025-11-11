@@ -73,6 +73,25 @@ namespace orthia
         }
     };
 
+    struct NameInfo
+    {
+        static const int flags_Function = 1;
+        static const int flags_Import = 2;
+        static const int flags_Export = 4;
+        Address_type address;
+        oui::String name;
+        int flags = 0;
+    };
+    struct NameSelectionKey 
+    {
+        static const int flags_FilterByName = 1;
+        static const int flags_ExcludeFirstResult = 2;
+        Address_type address;
+        oui::String name;
+        int flags = 0;
+    };
+
+
     struct IPeristentItemStorage;
     struct IWorkPlaceItem
     {
@@ -86,6 +105,7 @@ namespace orthia
         virtual int GetModulesCount() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
         virtual int GetDianaMode() const = 0;
+        virtual void QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo> & names) = 0;
     };
 
 

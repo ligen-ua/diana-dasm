@@ -84,7 +84,7 @@ namespace oui
         }
         return text;
     }
-    bool CButton::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CButton::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         Invalidate(false);
         return true;

@@ -683,7 +683,7 @@ namespace oui
     void CWindow::OnHandleMouseEvent(bool result, const Rect& rect, InputEvent& evt)
     {
     }
-    bool CWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         return false;
     }
@@ -735,7 +735,7 @@ namespace oui
         {
             return false;
         }
-        handled = HandleMouseEvent(rect, evt);
+        handled = HandleMouseEvent(rect, evt, evtContext.mouseContext);
         OnHandleMouseEvent(handled, rect, evt);
         if (handled && evtContext.onMouseEventCallback)
         {
@@ -773,15 +773,15 @@ namespace oui
         }
         return nullptr;
     }
-    Point GetClientMousePoint(CWindow* pWindow, const Rect& rect, const Point& point)
+    Point GetClientMousePoint(const MouseEventContext& mouseEventContext, CWindow* pWindow, const Rect& rect, const Point& point)
     {
-        auto relPoint = GetRelativeMousePoint(rect, point);
+        auto relPoint = GetRelativeMousePoint(mouseEventContext, rect, point);
         auto clientRect = pWindow->GetClientRect();
         return { relPoint.x - clientRect.position.x, relPoint.y - clientRect.position.y };
     }
-    Point GetRelativeMousePoint(const Rect& rect, const Point& point)
+    Point GetRelativeMousePoint(const MouseEventContext& mouseEventContext, const Rect& rect, const Point& point)
     {
-        return Point{ point.x - rect.position.x, point.y - rect.position.y };
+        return Point{ point.x - rect.position.x + mouseEventContext.scrollXDifference, point.y - rect.position.y };
     }
     Rect GetAbsoluteClientRect(CWindow* pWindow, const Rect& rect)
     {

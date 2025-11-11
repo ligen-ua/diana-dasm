@@ -32,7 +32,7 @@ namespace oui
         void DoPaint(const Rect& rect, 
             DrawParameters& parameters) override;
 
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
         void Dock();
         std::shared_ptr<const std::vector<PopupItem>> GetPopupItems();
     };
@@ -56,7 +56,7 @@ namespace oui
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void Dock();
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
         void Destroy() override;
         void Detach();
         bool IsPopup() const override { return true; }

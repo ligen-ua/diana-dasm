@@ -495,17 +495,17 @@ namespace oui
             ++m_selPosEnd;
         }
     }
-    bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         if (!m_markup.ranges.empty())
         {
             Invalidate(false);
         }
-        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+        auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
         m_lastMouseMovePoint = relativePoint;
         if (m_llHandlers.mouseHandler)
         {
-            if (m_llHandlers.mouseHandler(rect, evt))
+            if (m_llHandlers.mouseHandler(rect, evt, mouseEventContext))
             {
                 return true;
             }
@@ -515,7 +515,7 @@ namespace oui
             (evt.mouseEvent.state == MouseState::Pressed ||
             evt.mouseEvent.state == MouseState::DoubleClick))
         {
-            auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+            auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
             if (relativePoint.x < 0 || relativePoint.y < 0 || relativePoint.y != 0)
             {
                 return false;

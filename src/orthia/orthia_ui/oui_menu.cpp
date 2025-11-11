@@ -14,7 +14,7 @@ namespace oui
         m_items(std::move(items))
     {
     }
-    bool CMenuButtonWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CMenuButtonWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         auto parentMenu = GetParent_t<CMenuWindow>(this);
         if (!parentMenu)
@@ -149,7 +149,7 @@ namespace oui
             menu->Deactivate();
         }
     }
-    bool CMenuPopup::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CMenuPopup::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         auto menu = m_menuWindow.lock();
         if (!menu)
@@ -167,7 +167,7 @@ namespace oui
             return false;
         }
 
-        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+        auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
         if (relativePoint.x < 0 || relativePoint.y < 0 || relativePoint.y >= popupItems->size())
         {
             return true;

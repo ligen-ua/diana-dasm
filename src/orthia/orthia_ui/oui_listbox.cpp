@@ -56,10 +56,12 @@ namespace oui
         bool needPrintHeader = false;
         String tmpStr;
         int pos = 0;
+        int absClientRectEnd = absClientRect.position.x + absClientRect.size.width;
+
         // NOTE: render +1 column extra
         for (int i = 0; i < columnsCount + 1; ++i)
         {
-            if (leftX >= absClientRect.size.width)
+            if (leftX >= absClientRectEnd)
             {
                 break;
             }
@@ -294,7 +296,7 @@ namespace oui
         });
         return true;
     }
-    bool CListBox::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CListBox::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         {
             int pageSize = 1;
@@ -313,7 +315,7 @@ namespace oui
             (evt.mouseEvent.state == MouseState::Pressed ||
             evt.mouseEvent.state == MouseState::DoubleClick))
         {
-            auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+            auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
             int newPosition = 0;
             if (m_columnsCount)
             {
@@ -567,7 +569,7 @@ namespace oui
 
             // arrows
             case VirtualKey::Left:
-                if (!evt.keyState.AnyCtrl) 
+                if (!(evt.keyState.state & evt.keyState.AnyCtrl))
                 {
                     handled = true;
                     newPosition -= GetVisibleSize() / 2;
@@ -575,7 +577,7 @@ namespace oui
                 break;
 
             case VirtualKey::Right:
-                if (!evt.keyState.AnyCtrl)
+                if (!(evt.keyState.state & evt.keyState.AnyCtrl))
                 {
                     handled = true;
                     newPosition += GetVisibleSize() / 2;

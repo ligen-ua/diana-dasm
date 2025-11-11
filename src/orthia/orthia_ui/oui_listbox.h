@@ -24,6 +24,56 @@ namespace oui
         virtual void OnVisibleItemChanged() = 0;
         virtual bool ShiftViewWindowToSymbol(const String& symbol) = 0;
     };
+    class ListBoxOwnerProxy :public IListBoxOwner
+    {
+    public:
+        std::function<int()> getTotalCount;
+        std::function<void()> cancelAllQueries;
+        std::function<void(int newOffset)> shiftViewWindow;
+        std::function<void()> onVisibleItemChanged;
+        std::function<bool(const String& symbol)> shiftViewWindowToSymbol;
+
+        int GetTotalCount() const
+        {
+            if (!getTotalCount)
+            {
+                return 0;
+            }
+            return getTotalCount();
+        }
+        void CancelAllQueries()
+        {
+            if (!cancelAllQueries)
+            {
+                return;
+            }
+            return cancelAllQueries();
+        }
+        void ShiftViewWindow(int newOffset)
+        {
+            if (!shiftViewWindow)
+            {
+                return;
+            }
+            return shiftViewWindow(newOffset);
+        }
+        void OnVisibleItemChanged()
+        {
+            if (!onVisibleItemChanged)
+            {
+                return;
+            }
+            return onVisibleItemChanged();
+        }
+        bool ShiftViewWindowToSymbol(const String& symbol) 
+        {
+            if (!shiftViewWindowToSymbol)
+            {
+                return false;
+            }
+            return shiftViewWindowToSymbol(symbol);
+        }
+    };
 
     class CListBox:public MouseFocusable<WithBorder<CWindow>>
     {
@@ -70,7 +120,7 @@ namespace oui
     public:
         CListBox(std::shared_ptr<DialogColorProfile> colorProfile, IListBoxOwner* owner);
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
         void Destroy() override;
 
         int GetColumnsCount() const;

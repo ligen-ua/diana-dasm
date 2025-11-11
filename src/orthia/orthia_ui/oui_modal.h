@@ -63,7 +63,7 @@ namespace oui
         void SetCaption(const String& caption);
         String GetCaption() const;
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
     };
 
 

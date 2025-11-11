@@ -93,7 +93,7 @@ namespace oui
         return false;
     }
 
-    bool CPanelWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CPanelWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
         {
@@ -104,7 +104,7 @@ namespace oui
         {
             return true;
         }
-        return CWindow::HandleMouseEvent(rect, evt);
+        return CWindow::HandleMouseEvent(rect, evt, mouseEventContext);
     }
     // CPanelGroupWindow
     CPanelGroupWindow::CPanelGroupWindow(std::shared_ptr<PanelColorProfile> panelColorProfile,
@@ -451,9 +451,9 @@ namespace oui
         }
         return true;
     }
-    bool CPanelGroupWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt)
+    bool CPanelGroupWindow::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
-        auto relativePoint = GetClientMousePoint(this, rect, evt.mouseEvent.point);
+        auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
 
         if (!HasPanels())
         {

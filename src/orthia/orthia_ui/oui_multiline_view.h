@@ -193,7 +193,7 @@ namespace oui
         void SetNewCursor(const Point& pt);
         void SetNewYCursorPosImpl(int newCursor);
 
-        bool HandleMouseEventImpl(const Rect& rect, InputEvent& evt, bool fromEditBox);
+        bool HandleMouseEventImpl(const Rect& rect, InputEvent& evt, bool fromEditBox, MouseEventContext& mouseEventContext);
         bool KeyStateHasSelection() const;
         void ActivateSelection();
         void CancelSelection();
@@ -207,7 +207,7 @@ namespace oui
         void OnFocusLost() override;
         void OnFocusEnter() override;
         void Destroy() override;
-        bool HandleMouseEvent(const Rect& rect, InputEvent& evt) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         const std::vector<SelectedRangeInfo>& GetPrevSelectedRanges();
 
