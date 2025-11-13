@@ -146,7 +146,8 @@ int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                 /* inout */ DianaReadWriteRandomStream * pOutStream,
                                 /* in */ OPERAND_SIZE virtualAddress,
                                 /* in */ OPERAND_SIZE sizeToRead,
-                                /* out */ void ** ppSection
+                                /* out */ void ** ppSection,
+                                /* in */ int streamFlags
                                );
 
 int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
@@ -154,8 +155,8 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                             /* inout */ DianaReadWriteRandomStream * pOutStream,
                             /* out */ void ** ppTlsCallbacks,
                             /* out */ int * callbacksCount,
-                            /* out */ OPERAND_SIZE * pAddressOfTLSIndex
-                            );
+                            /* out */ OPERAND_SIZE * pAddressOfTLSIndex,
+                            /* in */ int streamFlags);
 
 #define DIANA_PE_INVALID_ORDINAL_VALUE    ((DI_UINT16)(-1))
 int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,

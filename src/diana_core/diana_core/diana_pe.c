@@ -1078,15 +1078,14 @@ int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                 /* inout */ DianaReadWriteRandomStream * pOutStream,
                                 /* in */ OPERAND_SIZE virtualAddress,
                                 /* in */ OPERAND_SIZE sizeToRead,
-                                /* out */ void ** ppSection
+                                /* out */ void ** ppSection,
+                                /* in */ int streamFlags
                                )
 {
     int status = 0;
     void * pResult = 0;
     OPERAND_SIZE startOfRegion = 0;
     OPERAND_SIZE readBytes = 0;
-    if (virtualAddress < peStartAddress)
-        return DI_ERROR;
     
     *ppSection = 0;
     startOfRegion = peStartAddress;
@@ -1104,7 +1103,7 @@ int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                                  pResult,
                                                  (int)sizeToRead,
                                                  &readBytes,
-                                                 0));
+                                                 streamFlags));
     if (readBytes != sizeToRead)
     {
         status = DI_ERROR;
@@ -1126,7 +1125,8 @@ static
 int DianaPeFile_ReadTLSCallbacks32(OPERAND_SIZE addressOfCallbacks,
                                    DianaReadWriteRandomStream * pOutStream,
                                    void ** ppTlsCallbacks,
-                                   int * pCallbacksCount)
+                                   int * pCallbacksCount,
+                                   int streamFlags)
 {
     int status = 0, i = 0;
     OPERAND_SIZE readBytes = 0;
@@ -1143,7 +1143,7 @@ int DianaPeFile_ReadTLSCallbacks32(OPERAND_SIZE addressOfCallbacks,
                                                  *ppTlsCallbacks,
                                                  MAX_CALLBACKS_COUNT_SUPPORTED*sizeof(DI_UINT32),
                                                  &readBytes,
-                                                 0));
+                                                 streamFlags));
 
     pCallbacksArray = *ppTlsCallbacks;
     for(i = 0; i < MAX_CALLBACKS_COUNT_SUPPORTED; ++i, ++*pCallbacksCount)
@@ -1166,7 +1166,8 @@ static
 int DianaPeFile_ReadTLSCallbacks64(OPERAND_SIZE addressOfCallbacks,
                                    DianaReadWriteRandomStream * pOutStream,
                                    void ** ppTlsCallbacks,
-                                   int * pCallbacksCount)
+                                   int * pCallbacksCount,
+                                   int streamFlags)
 {
     int status = 0, i = 0;
     OPERAND_SIZE readBytes = 0;
@@ -1183,7 +1184,7 @@ int DianaPeFile_ReadTLSCallbacks64(OPERAND_SIZE addressOfCallbacks,
                                                  *ppTlsCallbacks,
                                                  MAX_CALLBACKS_COUNT_SUPPORTED*sizeof(DI_UINT64),
                                                  &readBytes,
-                                                 0));
+                                                 streamFlags));
 
     pCallbacksArray = *ppTlsCallbacks;
     for(i = 0; i < MAX_CALLBACKS_COUNT_SUPPORTED; ++i, ++*pCallbacksCount)
@@ -1208,7 +1209,8 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                                   /* inout */ DianaReadWriteRandomStream * pOutStream,
                                   /* out */ void ** ppTlsCallbacks,
                                   /* out */ int * pCallbacksCount,
-                                  /* out */ OPERAND_SIZE * pAddressOfTLSIndex)
+                                  /* out */ OPERAND_SIZE * pAddressOfTLSIndex,
+                                  /* in */ int streamFlags)
 {
     OPERAND_SIZE callbacksAddress = 0;
     int status = 0;
@@ -1227,7 +1229,8 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                                         pOutStream, 
                                         pTLSDirectory->VirtualAddress, 
                                         pTLSDirectory->Size,
-                                        &pSection));
+                                        &pSection,
+                                        streamFlags));
 
 
     switch(pPeFile->pImpl->dianaMode)
@@ -1237,25 +1240,27 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
             {
                 DI_CHECK_GOTO(DI_ERROR);
             }
-            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY32*)pTLSDirectory)->AddressOfCallBacks;
-            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY32*)pTLSDirectory)->AddressOfIndex;
+            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY32*)pSection)->AddressOfCallBacks;
+            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY32*)pSection)->AddressOfIndex;
 
             DI_CHECK_GOTO(DianaPeFile_ReadTLSCallbacks32(callbacksAddress,
                                                          pOutStream,
                                                          ppTlsCallbacks,
-                                                         pCallbacksCount));
+                                                         pCallbacksCount,
+                                                         streamFlags));
             break;
         case DIANA_MODE64:
             if (pTLSDirectory->Size < sizeof(DIANA_IMAGE_TLS_DIRECTORY64))
             {
                 DI_CHECK_GOTO(DI_ERROR);
             }
-            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY64*)pTLSDirectory)->AddressOfCallBacks;
-            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY64*)pTLSDirectory)->AddressOfIndex;
+            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY64*)pSection)->AddressOfCallBacks;
+            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY64*)pSection)->AddressOfIndex;
             DI_CHECK_GOTO(DianaPeFile_ReadTLSCallbacks64(callbacksAddress,
                                                          pOutStream,
                                                          ppTlsCallbacks,
-                                                         pCallbacksCount));
+                                                         pCallbacksCount,
+                                                         streamFlags));
             break;
         default:
             DI_CHECK_GOTO(DI_ERROR);

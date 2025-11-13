@@ -164,6 +164,10 @@ namespace orthia
             m_nameFilter(nameFilter)
         {
         }
+        bool IsMarkFound() const
+        {
+            return m_found;
+        }
         void QueryFunctionByOrdinal(const char* pDllName,
             DI_UINT32 ordinal,
             OPERAND_SIZE* pAddress)
@@ -232,6 +236,10 @@ namespace orthia
             m_moduleStart(moduleStart)
         {
         }
+        void SetFound(bool markFound)
+        {
+            m_found = markFound;
+        }
         void QueryFunctionByOrdinal(const char* pDllName,
             DI_UINT32 ordinal,
             OPERAND_SIZE* pAddress)
@@ -246,7 +254,14 @@ namespace orthia
             {
                 return;
             }
-            const auto address = *pAddressIn + m_moduleStart;
+            auto address = *pAddressIn;
+            if (!pDllName || *pDllName != '$') 
+            {
+                if (Diana_SafeAdd(&address, m_moduleStart))
+                {
+                    return;
+                }
+            };
             auto functionName = orthia::Utf8ToPlatformString(pFunctionName);
             ++m_totalCount;
             if (!m_found)
@@ -270,7 +285,11 @@ namespace orthia
                 m_names.push_back(info);
                 ++m_deliveredCount;
             }
+        }
 
+        int GetDeliveredCount() const
+        {
+            return m_deliveredCount;
         }
     };
 
@@ -281,7 +300,7 @@ namespace orthia
             *totalCount = 0;
         }
         names.clear(); 
-        Address_type moduleSize = 0;
+        Address_type moduleSize = 0, entryPoint = 0;
         {
             orthia::CAutoCriticalSection guard(m_lock);
 
@@ -290,7 +309,9 @@ namespace orthia
             {
                 return;
             }
-            moduleSize = m_modules.at(it->second).size;
+            auto & module = m_modules.at(it->second);
+            moduleSize = module.size;
+            entryPoint = module.entryPoint;
         }
        
         // diana PE analyzer uses relative pointers
@@ -354,10 +375,10 @@ namespace orthia
             *totalCount = importsCount;
         }
 
-        int exportsCount = 0;
         int maxCount = count - importsCollector.GetDeliveredCount();
         if (maxCount || totalCount)
         {
+            int exportsCount = 0;
             // deliver exports
             ModuleExportsCollector exportsCollector(nameFilter,
                 names,
@@ -366,6 +387,34 @@ namespace orthia
                 importsCollector.GetDeliveredCount(),
                 moduleAddress);
 
+            exportsCollector.SetFound(importsCollector.IsMarkFound());
+            if (entryPoint && entryPoint != moduleAddress)
+            {
+                exportsCollector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
+            }
+            // report tls callbacks
+            void* pTlsCallbacks = 0;
+            int tlsCallbacksCount = 0;
+            OPERAND_SIZE addressOfTLSIndex = 0;
+            if (!DianaPeFile_QueryTLSCallbacks(&dianaPeFile, 
+                moduleAddress, 
+                &stream, 
+                &pTlsCallbacks, 
+                &tlsCallbacksCount, 
+                &addressOfTLSIndex, 
+                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE))
+            {
+                char * pTls = (char* )pTlsCallbacks;
+                for (int i = 0; i < tlsCallbacksCount; ++i)
+                {
+                    OPERAND_SIZE callback = Diana_ReadValue(pTls, dianaPeFile.pImpl->dianaMode);
+                    auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
+                    exportsCollector.QueryFunctionByName("$", name.c_str(), 0, &callback);
+                    pTls += dianaPeFile.pImpl->dianaMode;
+                }
+            }
+
+            // report regular exports
             DianaPeFile_QueryExports(&dianaPeFile,
                     &stream.parent,
                     page.data(),
@@ -377,6 +426,7 @@ namespace orthia
             {
                 *totalCount += exportsCount;
             }
+            maxCount -= exportsCollector.GetDeliveredCount();
         }
     }
     void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names)const
