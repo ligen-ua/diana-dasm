@@ -187,7 +187,7 @@ namespace oui
         const int maxSize = (int)container.size();
 
         auto offset = filesBox->GetOffset();
-        if (offset >= maxSize)
+        if ((offset + visibleSize) >= maxSize)
         {
             // set to the last file here
             visibleItems.clear();

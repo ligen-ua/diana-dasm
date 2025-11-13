@@ -120,6 +120,23 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                             /* in */ int pageSize,
                             /* in */ DianaPeFile_LinkImports_Observer * pObserver
                             );
+
+int DianaPeFile_QueryImports(/* in */ Diana_PeFile* pPeFile,
+                            /* in */ OPERAND_SIZE address,
+                            /* inout */ DianaReadWriteRandomStream* pOutStream,
+                            /* in */ void* pPage,
+                            /* in */ int pageSize,
+                            /* in */ DianaPeFile_LinkImports_Observer* pObserver,
+                            /* in */ int streamFlags);
+
+
+int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
+                            /* inout */ DianaMovableReadStream* pOutStream,
+                            /* in */ void* pPage,
+                            /* in */ int pageSize,
+                            /* in */ DianaPeFile_LinkImports_Observer* pObserver,
+                            /* in */ int streamFlags);
+
 int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
                           /* inout */ DianaMovableReadStream* pOutStream,
                           /* in */ OPERAND_SIZE address,

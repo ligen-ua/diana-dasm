@@ -124,9 +124,13 @@ namespace orthia
     {
         // do nothing
     }
-    void FileWorkplaceItem::QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo>& names)
+    void FileWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const
     {
         names.clear();
+    }
+    int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
+    {
+        return 0;
     }
 
     void FileWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const

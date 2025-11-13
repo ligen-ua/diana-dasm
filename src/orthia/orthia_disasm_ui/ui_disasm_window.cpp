@@ -405,6 +405,12 @@ void CDisasmWindow::AsyncRememberCurrentPosition(oui::OperationPtr_type<orthia::
         m_peAddress);
 }
 
+void CDisasmWindow::DoGotoRequest(orthia::Address_type address)
+{
+    AsyncRememberCurrentPosition();
+    DoGoto(address, 0, false);
+}
+
 void CDisasmWindow::Event_Goto()
 {
     // create open dialog
@@ -425,8 +431,7 @@ void CDisasmWindow::Event_Goto()
 
         if (!error)
         {
-            AsyncRememberCurrentPosition();
-            DoGoto(address, 0, false);
+            DoGotoRequest(address);
         }
         return oui::fsui::OpenResult();
     },

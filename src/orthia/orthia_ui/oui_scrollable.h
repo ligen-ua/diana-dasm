@@ -42,7 +42,12 @@ namespace oui
 
     class CVerticalScrollBar : public WithBorder<CWindow>
     {
+        Point m_lastMouseMovePoint;
+        std::function<void(const Point& point)> m_onStartDrag;
     public:
+        void SetDragHandler(std::function<void (const Point &point)> onStartDrag);
         bool Resize(const Size& newSize) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
+
     };
 }

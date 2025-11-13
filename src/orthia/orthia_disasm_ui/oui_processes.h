@@ -3,14 +3,23 @@
 #include "oui_filesystem.h"
 #include "orthia_model_interfaces.h"
 
+namespace orthia
+{
+    struct DianaMemoryStream;
+}
 namespace oui
 {
-
+    struct ModuleDisasmContext
+    {
+        orthia::DianaMemoryStream * stream = nullptr;
+        Diana_PeFile * dianaPeFile = nullptr;
+    };
     struct IProcess:IFile
     {
         virtual orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) = 0;
         virtual int ReadExactEx2(unsigned long long offset, void* pBuffer, size_t size) = 0;
-        virtual int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset) = 0;
+        virtual int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset, 
+            std::function<void (const orthia::ModuleInfo& info, ModuleDisasmContext&)> contextCallback) = 0;
     };
 
     struct ProcessUnifiedId

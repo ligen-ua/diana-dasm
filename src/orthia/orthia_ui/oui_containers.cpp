@@ -234,7 +234,7 @@ namespace oui
         {
             ResizeLayoutY(state.resizeTarget, newState.panelSize.height, state.resizeTargetIsMe);
         }
-        
+
         if (flags & statef_Horizontal)
         {
             ResizeLayoutX(state.resizeTarget, newState.panelSize.width, state.resizeTargetIsMe);
@@ -251,7 +251,7 @@ namespace oui
         }
         return false;
     }
-    
+
     CPanelGroupWindow::ResizeState CPanelGroupWindow::GetHorizontalResizeState()
     {
         CPanelGroupWindow::ResizeState result;
@@ -478,41 +478,41 @@ namespace oui
                 // TODO handle caption drag-n-drop
             }
             else
-            if (relativePoint.y == 0)
-            {
-                ResizeState resiseState = GetHeaderResizeState();
-                if (resiseState.SaveState())
+                if (relativePoint.y == 0)
                 {
-                    RegisterDragEvent(m_lastMouseMovePoint, [this, resiseState = resiseState](DragEvent evt,
-                        const Point& initialPoint,
-                        const Point& currentPoint,
-                        std::shared_ptr<CWindow> wnd) {
-                        return Drag_ResizeHandler_TopBottom(evt,
-                        initialPoint,
-                        currentPoint,
-                        wnd,
-                        resiseState);
-                    });
+                    ResizeState resiseState = GetHeaderResizeState();
+                    if (resiseState.SaveState())
+                    {
+                        RegisterDragEvent(m_lastMouseMovePoint, [this, resiseState = resiseState](DragEvent evt,
+                            const Point& initialPoint,
+                            const Point& currentPoint,
+                            std::shared_ptr<CWindow> wnd) {
+                            return Drag_ResizeHandler_TopBottom(evt,
+                            initialPoint,
+                            currentPoint,
+                            wnd,
+                            resiseState);
+                        });
+                    }
                 }
-            }
-            else
-            if (relativePoint.x == 0)
-            {
-                ResizeState resiseState = GetHorizontalResizeState();
-                if (resiseState.SaveState())
-                {
-                    RegisterDragEvent(m_lastMouseMovePoint, [this, resiseState = resiseState](DragEvent evt,
-                        const Point& initialPoint,
-                        const Point& currentPoint,
-                        std::shared_ptr<CWindow> wnd) {
-                        return Drag_ResizeHandler_LeftRight(evt,
-                        initialPoint,
-                        currentPoint,
-                        wnd,
-                        resiseState);
-                    });
-                }
-            }
+                else
+                    if (relativePoint.x == 0)
+                    {
+                        ResizeState resiseState = GetHorizontalResizeState();
+                        if (resiseState.SaveState())
+                        {
+                            RegisterDragEvent(m_lastMouseMovePoint, [this, resiseState = resiseState](DragEvent evt,
+                                const Point& initialPoint,
+                                const Point& currentPoint,
+                                std::shared_ptr<CWindow> wnd) {
+                                return Drag_ResizeHandler_LeftRight(evt,
+                                initialPoint,
+                                currentPoint,
+                                wnd,
+                                resiseState);
+                            });
+                        }
+                    }
 
             if (index != m_activePanelIndex)
             {
@@ -525,6 +525,15 @@ namespace oui
         }
         Invalidate(false);
         return true;
+    }
+    bool CPanelGroupWindow::SwitchPanel(std::shared_ptr<CPanelWindow> panel)
+    {
+        auto it = std::find(m_panels.begin(), m_panels.end(), panel);
+        if (it == m_panels.end())
+        {
+            return false;
+        }
+        return SwitchPanel((int)(it - m_panels.begin()));
     }
     bool CPanelGroupWindow::SwitchPanel(int index)
     {
@@ -546,6 +555,30 @@ namespace oui
         m_activePanelIndex = index;
         newPanel->Activate();
         return true;
+    }
+    bool CPanelGroupWindow::SwitchChildWindow()
+    {
+        auto panelCommonContext = m_panelCommonContext.lock();
+        if (!panelCommonContext)
+        {
+            return false;
+        }
+        panelCommonContext->ActivateNextGroup(GetPtr_t<CPanelGroupWindow>(this));
+        return true;
+    }
+    bool CPanelGroupWindow::SwitchNextPanel() 
+    {
+        if (!m_panels.empty())
+        {
+            int newIndex = m_activePanelIndex + 1;
+            if (newIndex >= (int)m_panels.size())
+            {
+                newIndex = 0;
+            }
+            this->SwitchPanel(newIndex);
+            return true;
+        }
+        return false;
     }
     bool CPanelGroupWindow::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
@@ -573,14 +606,8 @@ namespace oui
                 // switch panels
                 if ((evt.keyState.state & (evt.keyState.AnyShift | evt.keyState.AnyCtrl)) != 0)
                 {
-                    if (!m_panels.empty())
+                    if (SwitchNextPanel())
                     {
-                        int newIndex = m_activePanelIndex + 1;
-                        if (newIndex >= (int)m_panels.size())
-                        {
-                            newIndex = 0;
-                        }
-                        this->SwitchPanel(newIndex);
                         return true;
                     }
                 }

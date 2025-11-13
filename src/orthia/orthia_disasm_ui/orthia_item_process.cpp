@@ -1,6 +1,8 @@
 #include "orthia_item_process.h"
 #include "orthia_pe.h"
-
+#include "orthia_memory_cache.h"
+#include "orthia_streams.h"
+#include "orthia_process_adapter.h"
 
 namespace orthia
 {
@@ -11,10 +13,10 @@ namespace orthia
         int dianaMode,
         std::shared_ptr<IPeristentItemStorage> persistentStorage)
         :
-            m_proc(proc),
-            m_shortName(shortName),
-            m_dianaMode(dianaMode),
-            m_persistentStorage(persistentStorage)
+        m_proc(proc),
+        m_shortName(shortName),
+        m_dianaMode(dianaMode),
+        m_persistentStorage(persistentStorage)
     {
     }
 
@@ -59,11 +61,50 @@ namespace orthia
     {
         return m_processModuleAddress;
     }
+
+    struct ExportsCollector:public diana::CBasePeLinkImportsObserver
+    {
+        const orthia::ModuleInfo* m_moduleInfo = 0;
+        std::unordered_map<orthia::Address_type, oui::String> m_exports;
+    
+        ExportsCollector()
+        {
+        }
+        void SetCurrentModule(const orthia::ModuleInfo * moduleInfo)
+        {
+            m_moduleInfo = moduleInfo;
+        }
+        void QueryFunctionByOrdinal(const char* pDllName,
+            DI_UINT32 ordinal,
+            OPERAND_SIZE* pAddress)
+        {
+        }
+        void QueryFunctionByName(const char* pDllName,
+            const char* pFunctionName,
+            DI_UINT32 hint,
+            OPERAND_SIZE* pAddress)
+        {
+            if (!*pAddress)
+            {
+                return;
+            }
+            orthia::Address_type fncAddress = m_moduleInfo->address + *pAddress;
+            m_exports[fncAddress] = m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName);
+        }
+    };
+
     void CProcessWorkplaceItem::ReloadModules()
     {
+        std::vector<char> page(0x4000);
+        ExportsCollector exportsCollector;
         std::vector<orthia::ModuleInfo> modules;
         int processModuleOffset = 0;
-        m_proc->QueryModules(modules, processModuleOffset);
+        m_proc->QueryModules(modules, processModuleOffset,
+            [&](const orthia::ModuleInfo& moduleInfo, oui::ModuleDisasmContext& context) {
+
+            exportsCollector.SetCurrentModule(&moduleInfo);
+            DianaPeFile_QueryExports(context.dianaPeFile, &context.stream->parent, page.data(), (int)page.size(), exportsCollector.GetParent(), 0);
+        });
 
         Address_type processModuleAddress = 0;
         if (!modules.empty() && processModuleOffset != -1 && processModuleOffset < (int)modules.size())
@@ -73,7 +114,13 @@ namespace orthia
         std::sort(modules.begin(), modules.begin(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
 
         orthia::CAutoCriticalSection guard(m_lock);
-        m_modules = std::move(modules);
+        m_modules = std::move(modules); 
+        m_exports = std::move(exportsCollector.m_exports);
+        m_modulesIndex.clear();
+        for (int i = 0, size = (int)m_modules.size(); i < size; ++i)
+        {
+            m_modulesIndex[m_modules[i].address] = i;
+        }
         if (m_processModuleAddress == 0)
         {
             m_processModuleAddress = processModuleAddress;
@@ -88,13 +135,260 @@ namespace orthia
     {
         return (int)m_modules.size();
     }
-    std::shared_ptr<IPeristentItemStorage> CProcessWorkplaceItem::GetPersistentStorage() 
+    std::shared_ptr<IPeristentItemStorage> CProcessWorkplaceItem::GetPersistentStorage()
     {
         return m_persistentStorage;
     }
 
-    void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo>& names)
+
+    class CImportsCollector :public diana::CBasePeLinkImportsObserver
     {
-        names.clear();
+        std::vector<NameInfo>& m_names;
+        std::function<oui::String(OPERAND_SIZE address)> m_getName;
+        int m_maxCount = 0;
+        int & m_totalCount;
+        int m_deliveredCount = 0;
+        const NameSelectionKey& m_nameFilter;
+        bool m_found = false;
+    public:
+        CImportsCollector(const NameSelectionKey& nameFilter, 
+            std::vector<NameInfo>& names,
+            std::function<oui::String (OPERAND_SIZE address)> getName,
+            int maxCount,
+            int & totalCount)
+            :
+            m_names(names),
+            m_getName(getName),
+            m_maxCount(maxCount),
+            m_totalCount(totalCount),
+            m_nameFilter(nameFilter)
+        {
+        }
+        void QueryFunctionByOrdinal(const char* pDllName,
+            DI_UINT32 ordinal,
+            OPERAND_SIZE* pAddress)
+        {
+        }
+        void QueryFunctionByName(const char* pDllName,
+            const char* pFunctionName,
+            DI_UINT32 hint,
+            OPERAND_SIZE* pAddress)
+        {
+            ++m_totalCount;
+
+            if (!m_found)
+            {
+                if (m_nameFilter.flags & m_nameFilter.flags_ContinueFrom)
+                {
+                    if (m_nameFilter.address == *pAddress)
+                    {
+                        m_found = true;
+                    }
+                    return;
+                }
+                m_found = true;
+            }
+            if (m_deliveredCount < m_maxCount)
+            {
+                NameInfo info;
+                info.flags = NameInfo::flags_Import;
+                info.address = *pAddress;
+                info.name = m_getName(info.address);
+                m_names.push_back(info);
+                ++m_deliveredCount;
+            }
+        }
+
+        int GetDeliveredCount() const
+        {
+            return m_deliveredCount;
+        }
+    };
+
+
+
+    struct ModuleExportsCollector :public diana::CBasePeLinkImportsObserver
+    {
+        const NameSelectionKey& m_nameFilter;
+        std::vector<NameInfo>& m_names;
+        int m_maxCount = 0;
+        int& m_totalCount;
+        int m_deliveredCount = 0;
+        bool m_found = false;
+        OPERAND_SIZE m_moduleStart;
+
+        ModuleExportsCollector(const NameSelectionKey& nameFilter, 
+            std::vector<NameInfo>& names,
+            int maxCount, 
+            int& totalCount, 
+            int deliveredCount,
+            OPERAND_SIZE moduleStart)
+            :
+            m_nameFilter(nameFilter),
+            m_names(names),
+            m_maxCount(maxCount),
+            m_totalCount(totalCount),
+            m_deliveredCount(deliveredCount),
+            m_moduleStart(moduleStart)
+        {
+        }
+        void QueryFunctionByOrdinal(const char* pDllName,
+            DI_UINT32 ordinal,
+            OPERAND_SIZE* pAddress)
+        {
+        }
+        void QueryFunctionByName(const char* pDllName,
+            const char* pFunctionName,
+            DI_UINT32 hint,
+            OPERAND_SIZE* pAddressIn)
+        {
+            if (!*pAddressIn)
+            {
+                return;
+            }
+            const auto address = *pAddressIn + m_moduleStart;
+            auto functionName = orthia::Utf8ToPlatformString(pFunctionName);
+            ++m_totalCount;
+            if (!m_found)
+            {
+                if (m_nameFilter.flags & m_nameFilter.flags_ContinueFrom)
+                {
+                    if (m_nameFilter.address == address)
+                    {
+                        m_found = true;
+                    }
+                    return;
+                }
+                m_found = true;
+            }
+            if (m_deliveredCount < m_maxCount)
+            {
+                NameInfo info;
+                info.flags = NameInfo::flags_Export;
+                info.address = address;
+                info.name = functionName;
+                m_names.push_back(info);
+                ++m_deliveredCount;
+            }
+
+        }
+    };
+
+    void CProcessWorkplaceItem::QueryNamesEx(Address_type moduleAddress, const NameSelectionKey& nameFilter, int count, std::vector<NameInfo>& names, int * totalCount)const
+    {
+        if (totalCount)
+        {
+            *totalCount = 0;
+        }
+        names.clear(); 
+        Address_type moduleSize = 0;
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+
+            auto it = m_modulesIndex.find(moduleAddress);
+            if (it == m_modulesIndex.end())
+            {
+                return;
+            }
+            moduleSize = m_modules.at(it->second).size;
+        }
+       
+        // diana PE analyzer uses relative pointers
+        orthia::ProcessReaderAdapter memReader(m_proc.get());
+        orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x4000);
+        orthia::CMemoryCache module(&writeCache, moduleAddress);
+        // adapter to C-code
+        orthia::DianaMemoryStream stream(0, &module, moduleSize);
+
+        Diana_PeFile dianaPeFile;
+        if (DianaPeFile_Init(&dianaPeFile,
+            &stream.parent,
+            moduleSize,
+            DIANA_PE_FILE_FLAGS_MODULE_MODE))
+        {
+            return;
+        }
+
+        int importsCount = 0;
+        CImportsCollector importsCollector(nameFilter, names, [this](auto address) {
+         
+            {
+                auto it = m_exports.find(address);
+                if (it != m_exports.end())
+                {
+                    return it->second;
+                }
+            }
+            auto it = m_modulesIndex.lower_bound(address), it_end = m_modulesIndex.upper_bound(address);
+            if (it != m_modulesIndex.begin())
+            {
+                --it;
+            }
+            for ( ;it != it_end; ++it)
+            {
+                auto & module = m_modules[it->second];
+                if (module.IsInRange(address))
+                {
+                    oui::String res;
+                    res = module.name + OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(address - module.address));
+                    return res;
+                }
+            }
+            return oui::String(OUI_TCSTR("<unknown>"));
+
+        },
+            count,
+            importsCount);
+
+        std::vector<char> page(4096);
+        DianaPeFile_QueryImports(&dianaPeFile,
+            moduleAddress,
+            &stream,
+            page.data(),
+            (int)page.size(),
+            importsCollector.GetParent(),
+            DIANA_ANALYZE_RANDOM_READ_ABSOLUTE);
+
+        if (totalCount)
+        {
+            *totalCount = importsCount;
+        }
+
+        int exportsCount = 0;
+        int maxCount = count - importsCollector.GetDeliveredCount();
+        if (maxCount || totalCount)
+        {
+            // deliver exports
+            ModuleExportsCollector exportsCollector(nameFilter,
+                names,
+                maxCount,
+                exportsCount,
+                importsCollector.GetDeliveredCount(),
+                moduleAddress);
+
+            DianaPeFile_QueryExports(&dianaPeFile,
+                    &stream.parent,
+                    page.data(),
+                    (int)page.size(),
+                    exportsCollector.GetParent(),
+                    0);
+
+            if (totalCount)
+            {
+                *totalCount += exportsCount;
+            }
+        }
+    }
+    void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names)const
+    {
+        QueryNamesEx(moduleAddress, name, count, names, nullptr);
+    }
+
+    int CProcessWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
+    {
+        int totalCount = 0;
+        std::vector<NameInfo> names;
+        QueryNamesEx(moduleAddress, name, 0, names, &totalCount);
+        return totalCount;
     }
 }

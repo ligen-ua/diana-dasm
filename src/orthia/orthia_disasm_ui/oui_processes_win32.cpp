@@ -268,7 +268,7 @@ namespace oui
         {
             return m_name;
         }
-        int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset) override
+        int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset, std::function<void(const orthia::ModuleInfo & info, ModuleDisasmContext&)> contextCallback) override
         {
             processModuleOffset = 0;
             modules.clear();
@@ -308,7 +308,7 @@ namespace oui
                 Diana_SafeAdd(&info.lastValidAddress, info.size - 1);
 
                 info.fullName = moduleEntry.szExePath;
-
+                info.name = moduleEntry.szModule;
 
                 {
                     // diana PE analyzer uses relative pointers
@@ -329,6 +329,15 @@ namespace oui
 
                         info.entryPoint = dianaPeFile.pImpl->addressOfEntryPoint;
                         Diana_SafeAdd(&info.entryPoint, info.address);
+
+
+                        if (contextCallback)
+                        {
+                            ModuleDisasmContext context;
+                            context.dianaPeFile = &dianaPeFile;
+                            context.stream = &stream;
+                            contextCallback(info, context);
+                        }
                     }
                 }
                 modules.push_back(info);

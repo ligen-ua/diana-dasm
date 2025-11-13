@@ -109,7 +109,13 @@ void CMainWindow::ConstructChilds()
         // modules window
         auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.modules"));
         m_modulesWindow = std::make_shared<CModulesWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  },
-            m_model);
+            m_model,
+            defaultGroup,
+            [this, defaultGroup](auto address) {
+
+            defaultGroup->SwitchPanel(m_disasmWindow);
+            m_disasmWindow->DoGotoRequest(address);
+        });
         defaultGroup->AddPanel(m_modulesWindow);
         m_stateManager.Register(m_modulesWindow);
     }

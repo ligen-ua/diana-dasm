@@ -11,9 +11,16 @@ namespace orthia
         std::shared_ptr<oui::IProcess> m_proc;
         oui::String m_shortName;
         int m_dianaMode = 0;
+
         std::vector<orthia::ModuleInfo> m_modules;
+        std::map<orthia::Address_type, int> m_modulesIndex;
+        std::unordered_map<orthia::Address_type, oui::String> m_exports;
+
         Address_type m_processModuleAddress = 0;
         std::shared_ptr<IPeristentItemStorage> m_persistentStorage;
+
+        void QueryNamesEx(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names, int* totalCount) const;
+
     public:
         CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
             const oui::String& shortName,
@@ -30,7 +37,8 @@ namespace orthia
         int GetDianaMode() const override { return m_dianaMode;}
         Address_type GerProcessModuleAddress();
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
-        void QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo>& names) override;
+        void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
+        int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
     };
 
 }

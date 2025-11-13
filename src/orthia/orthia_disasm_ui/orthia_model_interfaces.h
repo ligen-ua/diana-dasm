@@ -32,6 +32,7 @@ namespace orthia
         
         PlatformString_type fullName;
         int flags = 0;
+        PlatformString_type name;
     };
 
     struct WorkAddressData :oui::Noncopyable
@@ -84,8 +85,7 @@ namespace orthia
     };
     struct NameSelectionKey 
     {
-        static const int flags_FilterByName = 1;
-        static const int flags_ExcludeFirstResult = 2;
+        static const int flags_ContinueFrom = 1;
         Address_type address;
         oui::String name;
         int flags = 0;
@@ -105,7 +105,8 @@ namespace orthia
         virtual int GetModulesCount() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
         virtual int GetDianaMode() const = 0;
-        virtual void QueryNames(Address_type moduleAddress, NameSelectionKey& name, int count, std::vector<NameInfo> & names) = 0;
+        virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo> & names) const = 0;
+        virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
     };
 
 

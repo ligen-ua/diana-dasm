@@ -248,12 +248,31 @@ namespace oui
         return m_pTarget->ProcessMouseEvent(rect, evt, evtContext);
     }
 
-
     // CVerticalScrollBar
     bool CVerticalScrollBar::Resize(const Size& newSize)
     {
         Size s2 = newSize;
         s2.width = 1;
         return CWindow::Resize(s2);
+    }
+    void CVerticalScrollBar::SetDragHandler(std::function<void(const Point& point)> onStartDrag)
+    {
+        m_onStartDrag = onStartDrag;
+    }
+    bool CVerticalScrollBar::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
+    {
+        auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
+
+        m_lastMouseMovePoint = evt.mouseEvent.point;
+        if (evt.mouseEvent.button == MouseButton::Left && evt.mouseEvent.state == MouseState::Pressed)
+        {
+            if (m_onStartDrag)
+            {
+                m_onStartDrag(evt.mouseEvent.point);
+                Invalidate();
+                return true;
+            }
+        }
+        return WithBorder<CWindow>::HandleMouseEvent(rect, evt, mouseEventContext);
     }
 }

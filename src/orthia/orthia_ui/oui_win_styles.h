@@ -170,34 +170,79 @@ namespace oui
     };
 
 
+    struct IChildSwitcher
+    {
+        virtual ~IChildSwitcher() {}
+        virtual bool SwitchChildWindow() = 0;
+    };
 
-    template<class Base>
-    class ChildSwitcher:public Base
+    template<class Base, class ChildSwitcherInterface = IChildSwitcher>
+    class ChildSwitcher:public Base, public IChildSwitcher
     {
         std::vector<std::shared_ptr<CWindow>> m_childs;
+        std::weak_ptr<ChildSwitcherInterface> m_parent;
     public:
+        std::shared_ptr<ChildSwitcherInterface> ChildSwitcher_GetParent()
+        {
+            return m_parent.lock();
+        }
+        ChildSwitcher()
+        {
+        }
+        template<class Type>
+        ChildSwitcher(Type&& obj)
+            :
+            Base(std::forward<Type>(obj))
+        {
+        }
         void RegisterSwitch(std::shared_ptr<CWindow> child)
         {
             m_childs.push_back(child);
         }
+        void RegisterSwitchParent(std::shared_ptr<ChildSwitcherInterface> parent)
+        {
+            m_parent = parent;
+        }
+        virtual bool OnTabNewCycle()
+        {   
+            if (auto parent = m_parent.lock())
+            {
+                return parent->SwitchChildWindow();
+            }
+            return false;
+        }
+        bool SwitchChildWindow() override
+        {
+            if (auto poolPtr = this->GetPool())
+            {
+
+                auto focused = poolPtr->GetFocus();
+                auto it = std::find(m_childs.begin(), m_childs.end(), focused);
+                if (it == m_childs.end())
+                {
+                    m_childs[0]->SetFocus();
+                    return true;
+                }
+                if (++it == m_childs.end())
+                {
+                    it = m_childs.begin();
+                    if (OnTabNewCycle())
+                    {
+                        return true;
+                    }
+                }
+                (*it)->SetFocus();
+                return true;
+            }
+            return false;
+        }
+
         bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override
         {
             if (evt.keyEvent.valid && evt.keyEvent.virtualKey == VirtualKey::Tab && !m_childs.empty())
             {
-                if (auto poolPtr = this->GetPool())
+                if (SwitchChildWindow())
                 {
-                    auto focused = poolPtr->GetFocus();
-                    auto it = std::find(m_childs.begin(), m_childs.end(), focused);
-                    if (it == m_childs.end())
-                    {
-                        m_childs[0]->SetFocus();
-                        return true;
-                    }
-                    if (++it == m_childs.end())
-                    {
-                        it = m_childs.begin();
-                    }
-                    (*it)->SetFocus();
                     return true;
                 }
             }

@@ -28,8 +28,12 @@ namespace oui
         void OnChildFocused() override;
         void SetVisible(bool value) override;
     };
+    struct IPanelChildSwitcher:public IChildSwitcher
+    {
+        virtual bool SwitchNextPanel() = 0;
+    };
+    class CPanelGroupWindow:public CWindow, public IPanelChildSwitcher
 
-    class CPanelGroupWindow:public CWindow
     {
         struct ResizeState
         {
@@ -84,6 +88,8 @@ namespace oui
             const Point& currentPoint,
             std::shared_ptr<CWindow> wnd,
             const ResizeState& originalState);
+
+        bool SwitchChildWindow() override;
     public:
         CPanelGroupWindow(std::shared_ptr<PanelColorProfile> panelColorProfile,
             std::shared_ptr<CPanelCommonContext> panelCommonContext);
@@ -111,7 +117,8 @@ namespace oui
         std::shared_ptr<CPanelWindow> GetActivePanel();
         std::shared_ptr<CPanelCommonContext> GetPanelCommonContext();
         bool SwitchPanel(int index);
-
+        bool SwitchPanel(std::shared_ptr<CPanelWindow> panel);
+        bool SwitchNextPanel() override;
         void SetLeftBorderState(bool state);
     };
 
