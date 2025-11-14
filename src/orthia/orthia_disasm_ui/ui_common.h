@@ -8,6 +8,18 @@ struct UIState
     std::map<int, oui::String> strings;
 };
 
+template<class Container, class Key, class Handler, class Handler2>
+void Apply(Container& container, Key key, Handler handler, Handler2 handler2)
+{
+    auto it = container.find(key);
+    if (it == container.end())
+    {
+        handler2();
+        return;
+    }
+    handler(it->second);
+}
+
 struct IUIStatefulWindow
 {
     virtual ~IUIStatefulWindow() {}
@@ -29,7 +41,7 @@ class CUIStateManager
     std::set<std::shared_ptr<IUIStatefulWindow>> m_windows;
 public:
     void Register(std::shared_ptr<IUIStatefulWindow> window);
-    void ReloadState(int itemId);
+    bool ReloadState(int itemId);
     void SaveState(int itemId);
     void SetActiveItem(int itemId);
     UIState * GetUIState(int itemId, std::shared_ptr<IUIStatefulWindow> window);

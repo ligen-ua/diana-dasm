@@ -32,7 +32,15 @@ void CMainWindow::OnPreWorkspaceItemChange(int itemId)
 }
 void CMainWindow::OnWorkspaceItemChanged(int itemId)
 {
-    m_stateManager.ReloadState(itemId);
+    if (m_stateManager.ReloadState(itemId))
+    {
+        if (m_workspaceInitializer)
+        {
+            m_workspaceInitializer();
+            m_workspaceInitializer = 0;
+            m_stateManager.ReloadState(itemId);
+        }
+    }
     m_stateManager.SetActiveItem(itemId);
 
     orthia::WorkplaceItem item;
@@ -63,20 +71,21 @@ void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
         return;
     }
 
-    // TODO: move SetActiveItem call below to UIStateManager
-    // load initial data
-    orthia::Address_type addressHint = 0;
-    auto it = result.extraInfo.find(orthia::model_OpenResult_extraInfo_InitalAddress);
-    if (it != result.extraInfo.end())
-    {
-        addressHint = std::any_cast<orthia::Address_type>(it->second);
-    }
-    m_stateManager.SaveState(item.uid);
-    auto state = m_stateManager.GetUIState(item.uid, m_disasmWindow);
-    if (state)
-    {
-        m_disasmWindow->PrepareParameters(*state, item.uid, addressHint);
-    }
+    m_workspaceInitializer = [=]() {
+        // load initial data
+        orthia::Address_type addressHint = 0;
+        auto it = result.extraInfo.find(orthia::model_OpenResult_extraInfo_InitalAddress);
+        if (it != result.extraInfo.end())
+        {
+            addressHint = std::any_cast<orthia::Address_type>(it->second);
+        }
+        m_stateManager.SaveState(item.uid);
+        auto state = m_stateManager.GetUIState(item.uid, m_disasmWindow);
+        if (state)
+        {
+            m_disasmWindow->PrepareParameters(*state, item.uid, addressHint);
+        }
+    };
     m_model->SetActiveItem(item.uid);
 }
 
@@ -158,6 +167,8 @@ void CMainWindow::ConstructChilds()
         m_panelContainerWindow->MoveTo({0, menuSize.height });
         m_panelContainerWindow->Resize(panelSize);
     });
+
+    RegisterAsLog(m_outputWindow);
 }
 
 void CMainWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)

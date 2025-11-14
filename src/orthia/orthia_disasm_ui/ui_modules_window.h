@@ -30,10 +30,23 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     orthia::Address_type m_selectedModuleAddress = 0;
     oui::String m_selectedModuleName;
 
+    int m_requiredNamesCacheSize = 0;
+    int m_requiredNamesOffset = 0;
+    int m_requiredModulesBoxOffset = 0;
+    int m_requiredModulesBoxPosition = 0;
+    bool m_needUpdateModulesBox = false;
+
     std::vector<orthia::NameInfo> m_cachedNamesPage;
     static const int g_nameCacheSize = 100;
     int m_lastTotalNamesCount = 0;
     int m_modulesWidthPercent = 42;
+
+    static const int field_selectedModuleAddress = 1;
+    static const int field_selectedModuleName = 2;
+    static const int field_namesBox_Offset = 3;
+    static const int field_cachedNamesPage_size = 4;
+    static const int field_modulesBox_Offset = 5;
+    static const int field_modulesBox_Position = 6;
 
     std::function<void(orthia::Address_type address)> m_onGotoAddress;
     void SelectModule(orthia::Address_type address, const oui::String& name);
@@ -64,4 +77,6 @@ public:
     void SetActiveWorkspaceItem(int itemId) override;
     void Invalidate(bool valid = false) override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
+    void ReloadState(const UIState& state) override;
+    void SaveState(UIState& state)override;
 };

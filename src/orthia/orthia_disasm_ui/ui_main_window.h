@@ -39,6 +39,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     std::vector<oui::String> m_initialText;
 
     CUIStateManager m_stateManager;
+
+    std::function<void()> m_workspaceInitializer;
     void ConstuctMenu();
     void ToggleMenu(bool openPopup);
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;

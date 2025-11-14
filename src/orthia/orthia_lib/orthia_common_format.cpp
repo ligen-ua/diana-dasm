@@ -70,7 +70,36 @@ void CCommonFormatBuilder::AddMetadata(const std::string & name, long long value
     orthia::ToStringAsHex_Short(value, &text);
     AddMetadata(name, text);
 }
-
+void CCommonFormatBuilder::AddMetadata(const std::string& name, unsigned long long value)
+{
+    std::string text;
+    orthia::ToStringAsHex_Short(value, &text);
+    AddMetadata(name, text);
+}
+void CCommonFormatBuilder::AddMetadata(const std::wstring& name, long long value)
+{
+    std::wstring text;
+    orthia::ToStringAsHex_Short(value, &text);
+    AddMetadata(name, text);
+}
+void CCommonFormatBuilder::AddMetadata(const std::wstring& name, unsigned long long value)
+{
+    std::wstring text;
+    orthia::ToStringAsHex_Short(value, &text);
+    AddMetadata(name, text);
+}
+void CCommonFormatBuilder::AddMetadata(const std::string& name, int value)
+{
+    std::string text;
+    orthia::ToStringAsHex_Short((long long)value, &text);
+    AddMetadata(name, text);
+}
+void CCommonFormatBuilder::AddMetadata(const std::wstring& name, int value)
+{
+    std::wstring text;
+    orthia::ToStringAsHex_Short((long long)value, &text);
+    AddMetadata(name, text);
+}
 void CCommonFormatBuilder::Produce(const std::vector<char> & value, std::vector<char> * pResult)
 {
     if (value.empty())

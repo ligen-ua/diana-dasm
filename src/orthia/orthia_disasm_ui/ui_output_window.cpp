@@ -2,7 +2,40 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "ui_output_window.h"
-#include <ctime>
+#include "orthia_log.h"
+
+class OutputLogProxy :public orthia::RefCountedBase_t<orthia::ILowLevelLog>
+{
+    std::weak_ptr<COutputWindow> m_outputWindow;
+public:
+    OutputLogProxy(std::shared_ptr<COutputWindow> outputWindow)
+        :
+            m_outputWindow(outputWindow)
+    {
+
+    }
+    ~OutputLogProxy()
+    {
+
+    }
+    void LogData(const ORTHIA_TCHAR* pData, ULONG size)
+    {
+        if (auto out = m_outputWindow.lock())
+        {
+            out->AddLine(orthia::PlatformString_type(pData, size));
+        }
+    }
+    orthia::log_meta::LogEncoding_type QueryEncoding() const
+    {
+        return orthia::log_meta::leUtf16LE;
+    }
+};
+
+void RegisterAsLog(std::shared_ptr<COutputWindow> outputWindow)
+{
+    orthia::intrusive_ptr<orthia::ILowLevelLog> lowLevelLog(new OutputLogProxy(outputWindow));
+    orthia::DefLog_Init(new orthia::CProgramLog(lowLevelLog, false));
+}
 
 COutputWindow::COutputWindow(std::function<oui::String()> getCaption)
     : 
@@ -18,8 +51,10 @@ COutputWindow::COutputWindow(std::function<oui::String()> getCaption)
     m_view = std::make_shared<oui::CMultiLineView>(m_colorProfile, param, true);
 
 }
-void COutputWindow::AddLine(const oui::String& line)
+void COutputWindow::AddLine(const oui::String& line_in)
 {
+    oui::String line = line_in;
+    orthia::TrimRightIf(line.native, orthia::IsWhiteSpace);
     auto timeval = std::chrono::system_clock::now();
     std::time_t time = std::chrono::system_clock::to_time_t(timeval);
     tm tm = { 0 };

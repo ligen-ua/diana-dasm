@@ -132,18 +132,22 @@ namespace orthia
     {
         return 0;
     }
-
-    void FileWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
+    int FileWorkplaceItem::GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const
     {
+        int count = 0;
         modules.clear();
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
         std::vector<CommonModuleInfo> dbModules;
         classicDatabase->QueryModules(&dbModules);
-
+        if (calcCount)
+        {
+            return (int)dbModules.size();
+        }
         for (auto& dbm:dbModules)
         {
             orthia::ModuleInfo info;
+            info.name = dbm.name;
             info.fullName = dbm.name;
             info.address = dbm.address;
             if (dbm.size)
@@ -161,7 +165,7 @@ namespace orthia
         }
 
         auto moduleIt = modules.begin();
-        classicDatabase->QueryMetaInfo(g_database_flags_moduleMetaInfo, [&](Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress)
+        classicDatabase->QueryMetaInfo(g_database_type_moduleMetaInfo, [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
             for (;; ++moduleIt)
             {
@@ -185,10 +189,18 @@ namespace orthia
             return true;
         });
 
+
+        return count;
+    }
+
+    void FileWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
+    {
+        GetModulesEx(false, modules);
     }
     int FileWorkplaceItem::GetModulesCount() const 
     {
-        return 0;
+        std::vector<orthia::ModuleInfo> modules;
+        return GetModulesEx(true, modules);
     }
     std::shared_ptr<IPeristentItemStorage> FileWorkplaceItem::GetPersistentStorage()
     {
@@ -207,7 +219,25 @@ namespace orthia
         std::string metaInfo;
         builder.Produce(&metaInfo);
 
-        database->InsertMetaInfo(moduleAddress, g_database_flags_moduleMetaInfo, metaInfo, moduleAddress);
+        database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, metaInfo, moduleAddress);
+    }
+    void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info)
+    {
+        orthia::CCommonFormatBuilder builder;
+        builder.AddMetadata(ORTHIA_TCSTR("address"), info.address);
+        builder.AddMetadata(ORTHIA_TCSTR("name"), info.name.native);
+        std::string metaInfo;
+        builder.Produce(&metaInfo);
+
+        if (info.flags & orthia::NameInfo::flags_Export)
+        {
+            database->InsertMetaInfo(moduleAddress, g_database_type_fnc_Export, metaInfo, moduleAddress);
+            return;
+        }
+        if (info.flags & orthia::NameInfo::flags_Import)
+        {
+            database->InsertMetaInfo(moduleAddress, g_database_type_fnc_Import, metaInfo, moduleAddress);
+        }
     }
 
 }

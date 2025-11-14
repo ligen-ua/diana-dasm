@@ -67,8 +67,8 @@ public:
     void InsertReferencesToInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
     void InsertReferencesFromInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
 
-    void InsertMetaInfo(Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress = DI_MAX_OPERAND_SIZE);
-    void QueryMetaInfo(int flags, std::function<bool (Address_type moduleAddress, int flags, const std::string& text, Address_type metaAddress)> handler);
+    void InsertMetaInfo(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress = DI_MAX_OPERAND_SIZE);
+    void QueryMetaInfo(int metaType, std::function<bool (Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
 
     // queries
     Address_type QueryRouteStart(Address_type offset);

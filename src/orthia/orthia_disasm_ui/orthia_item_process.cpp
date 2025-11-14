@@ -384,7 +384,7 @@ namespace orthia
                 names,
                 maxCount,
                 exportsCount,
-                importsCollector.GetDeliveredCount(),
+                0,
                 moduleAddress);
 
             exportsCollector.SetFound(importsCollector.IsMarkFound());

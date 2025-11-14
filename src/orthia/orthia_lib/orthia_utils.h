@@ -37,13 +37,31 @@ class CHandleGuard
     CHandleGuard & operator = (const CHandleGuard&);
     HANDLE m_hFile;
 public:
+    CHandleGuard()
+        :
+            m_hFile(0)
+    {
+    }
     explicit CHandleGuard(HANDLE hFile)
         : m_hFile(hFile)
     {
     }
     ~CHandleGuard()
     {
-        CloseHandle(m_hFile);
+        Reset(0);
+    }
+    HANDLE Get()
+    {
+        return m_hFile;
+    }
+    void Reset(HANDLE hFile)
+    {
+        if (m_hFile && m_hFile != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(m_hFile);
+            m_hFile = 0;
+        }
+        m_hFile = hFile;
     }
 };
 #define ORTHIA_THROW_WIN32(Text) { ULONG orthia____code = ::GetLastError(); std::stringstream orthia____stream; orthia____stream<<Text; throw orthia::CWin32Exception(orthia____stream.str(), orthia____code);} 

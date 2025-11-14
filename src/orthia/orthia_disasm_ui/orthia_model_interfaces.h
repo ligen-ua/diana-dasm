@@ -190,5 +190,8 @@ namespace orthia
 
 
     // database flags
-    const static int g_database_flags_moduleMetaInfo = 1;
+    const static int g_database_type_moduleMetaInfo = 1;
+    const static int g_database_type_fnc_Import = 2;
+    const static int g_database_type_fnc_Export = 3;
+
 }

@@ -26,3 +26,5 @@ public:
     bool ScrollUp(oui::MultiLineViewItem* item, int count) override;
     bool ScrollDown(oui::MultiLineViewItem* item, int count) override;
 };
+
+void RegisterAsLog(std::shared_ptr<COutputWindow> outputWindow);

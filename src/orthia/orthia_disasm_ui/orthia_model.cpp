@@ -227,6 +227,9 @@ namespace orthia
         {
             dianaMode = DIANA_MODE64;
         }
+
+        WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
+
         auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
         info->ReloadModules();
@@ -247,167 +250,173 @@ namespace orthia
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
     {
         // non-ui thread
-        
-        // prepare the message on unknown error
-        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-        auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
         oui::fsui::OpenResult result;
-        result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
-        oui::ScopedGuard handlerGuard([&]() {  
-            completeHandler->Reply(completeHandler, file, result);  
-        });
-
-        // opening
-        WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opening")),
-            file->GetFullFileNameForUI()));
-
-        // read entire file in memory
-        std::vector<char> binPeFile;
-        result.error = ReadFileToVector(file, binPeFile, completeHandler, errorNode);
-        if (!result.error.native.empty())
-        {
-            return;
-        }
-
-        if (completeHandler->IsCancelled())
-        {
-            handlerGuard.Release();
-            return;
-        }
-
-        // try map it first
-        auto mappedPE = std::make_shared<orthia::CSimplePeFile>();
-        orthia::MapFileParameters params;
-        mappedPE->MapFile(binPeFile, params);
-        
-        // check folder
-        auto fileHash = CalcSha1(binPeFile);
-        auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
-        auto dbFolder = m_config->GetDBFolder() + AddSlash2(fileHashStr);
-        auto dbFileName = dbFolder + m_config->GetDBFileName();
-        auto binFileName = dbFolder + m_config->GetBinFileName();
-        auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
-        CreateAllDirectoriesForFile(dbFileName);
-
-        // check binary file
-        bool hashIsValid = false;
-        int error = 0;
         try
         {
-            orthia::CFile existingFile;
-            error = existingFile.Open_Silent(binFileName, g_desired_read, g_share_read, g_open_existing);
-            if (!error)
-            {
-                auto savedFileHash = CalcSha1(existingFile, completeHandler);
-                hashIsValid = savedFileHash == fileHash;
-            }
-        }
-        catch (std::exception&)
-        {
-            hashIsValid = false;
-        }
-        
-        WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("module-sha1")),
-            fileHashStr));
+            // prepare the message on unknown error
+            auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+            auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+            result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
+            oui::ScopedGuard handlerGuard([&]() {
+                completeHandler->Reply(completeHandler, file, result);
+            });
 
-        if (!hashIsValid)
-        {
-            // save file to local dir
-            orthia::CFile localFile;
-            error = localFile.Open_Silent(binFileName, g_desired_write, g_share_read, g_create_always);
-            if (error)
+            // opening
+            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opening")),
+                file->GetFullFileNameForUI()));
+
+            // read entire file in memory
+            std::vector<char> binPeFile;
+            result.error = ReadFileToVector(file, binPeFile, completeHandler, errorNode);
+            if (!result.error.native.empty())
             {
-                result.error = errorNode->QueryValue(ORTHIA_TCSTR("too-big"));
                 return;
             }
-            localFile.WriteToFile(binPeFile.data(), binPeFile.size());
 
-            // save readme file 
-            orthia::CFile readmeFile;
-            readmeFile.Open_Silent(readmeFileName, g_desired_write, g_share_read, g_create_always);
-            if (!error)
+            if (completeHandler->IsCancelled())
             {
-                auto readmeHeader = mainNode->QueryValue(ORTHIA_TCSTR("readme-header"));
-                auto originalName = oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("original-name")),
-                    file->GetFullFileNameForUI());
-
-                std::stringstream textInfo;                
-                textInfo << Utf16ToUtf8(readmeHeader) << "\n";
-                textInfo << Utf16ToUtf8(originalName.native) << "\n";
-                auto str = textInfo.str();
-                readmeFile.WriteToFile_Silent(str.c_str(), str.size());
+                handlerGuard.Release();
+                return;
             }
-        }
 
-        // fill the model data
-        auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
-        auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
+            // try map it first
+            auto mappedPE = std::make_shared<orthia::CSimplePeFile>();
+            orthia::MapFileParameters params;
+            mappedPE->MapFile(binPeFile, params);
 
-        info->fullName = file->GetFullFileName();
-        info->peFile = mappedPE;
-        {
-            oui::String shortName;
-            orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
-            info->shortName = std::move(shortName);
-        }
-        info->moduleManager = std::make_shared<CModuleManager>();
-        info->moduleManager->Reinit(dbFileName, false);
+            // check folder
+            auto fileHash = CalcSha1(binPeFile);
+            auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
+            auto dbFolder = m_config->GetDBFolder() + AddSlash2(fileHashStr);
+            auto dbFileName = dbFolder + m_config->GetDBFileName();
+            auto binFileName = dbFolder + m_config->GetBinFileName();
+            auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
+            CreateAllDirectoriesForFile(dbFileName);
 
-        if (info->shortName.native == m_config->GetBinFileName())
-        {
-            // opening own database, give more info
-            std::vector<char> readmeBuffer;
-            if (!orthia::LoadFileToVector_Silent(readmeFileName, readmeBuffer))
+            // check binary file
+            bool hashIsValid = false;
+            int error = 0;
+            try
             {
-                readmeBuffer.push_back(0);
-                WriteLog(completeHandler->GetThread(), Utf8ToUtf16(readmeBuffer.data()));
+                orthia::CFile existingFile;
+                error = existingFile.Open_Silent(binFileName, g_desired_read, g_share_read, g_open_existing);
+                if (!error)
+                {
+                    auto savedFileHash = CalcSha1(existingFile, completeHandler);
+                    hashIsValid = savedFileHash == fileHash;
+                }
             }
-        }
+            catch (std::exception&)
+            {
+                hashIsValid = false;
+            }
 
-        const auto& mappedFile = info->peFile->GetMappedPeFile();
-        if (mappedFile.empty())
+            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("module-sha1")),
+                fileHashStr));
+
+            if (!hashIsValid)
+            {
+                // save file to local dir
+                orthia::CFile localFile;
+                error = localFile.Open_Silent(binFileName, g_desired_write, g_share_read, g_create_always);
+                if (error)
+                {
+                    result.error = errorNode->QueryValue(ORTHIA_TCSTR("too-big"));
+                    return;
+                }
+                localFile.WriteToFile(binPeFile.data(), binPeFile.size());
+
+                // save readme file 
+                orthia::CFile readmeFile;
+                readmeFile.Open_Silent(readmeFileName, g_desired_write, g_share_read, g_create_always);
+                if (!error)
+                {
+                    auto readmeHeader = mainNode->QueryValue(ORTHIA_TCSTR("readme-header"));
+                    auto originalName = oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("original-name")),
+                        file->GetFullFileNameForUI());
+
+                    std::stringstream textInfo;
+                    textInfo << Utf16ToUtf8(readmeHeader) << "\n";
+                    textInfo << Utf16ToUtf8(originalName.native) << "\n";
+                    auto str = textInfo.str();
+                    readmeFile.WriteToFile_Silent(str.c_str(), str.size());
+                }
+            }
+
+            // fill the model data
+            auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
+            auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
+
+            info->fullName = file->GetFullFileName();
+            info->peFile = mappedPE;
+            {
+                oui::String shortName;
+                orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
+                info->shortName = std::move(shortName);
+            }
+            info->moduleManager = std::make_shared<CModuleManager>();
+            info->moduleManager->Reinit(dbFileName, false);
+
+            if (info->shortName.native == m_config->GetBinFileName())
+            {
+                // opening own database, give more info
+                std::vector<char> readmeBuffer;
+                if (!orthia::LoadFileToVector_Silent(readmeFileName, readmeBuffer))
+                {
+                    readmeBuffer.push_back(0);
+                    WriteLog(completeHandler->GetThread(), Utf8ToUtf16(readmeBuffer.data()));
+                }
+            }
+
+            const auto& mappedFile = info->peFile->GetMappedPeFile();
+            if (mappedFile.empty())
+            {
+                result.error = errorNode->QueryValue(ORTHIA_TCSTR("empty"));
+                return;
+            }
+            info->moduleLastValidAddress = mappedFile.size() - 1;
+            if (Diana_SafeAdd(&info->moduleLastValidAddress, info->peFile->GetImageBase()))
+            {
+                result.error = errorNode->QueryValue(ORTHIA_TCSTR("invalid-image-base"));
+                return;
+            }
+
+            CMemoryReaderOnLoadedData reader(info->peFile->GetImageBase(), mappedFile.data(), mappedFile.size());
+
+            bool firstOpen = false;
+            if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->peFile->GetImageBase()))
+            {
+                firstOpen = true;
+                // first open, warn user it may take quite a time
+                WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
+            }
+
+            if (firstOpen)
+            {
+                // load imports        
+                CImportsLoader importsLoader(completeHandler);
+                importsLoader.LoadModules(file->GetFullFileName(), info->peFile, file->GetFileSystem());
+                importsLoader.ReportModules(info->moduleManager);
+
+                info->moduleManager->ReloadModule(info->peFile->GetImageBase(),
+                    &reader,
+                    false,
+                    info->shortName.native,
+                    0);
+
+                InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
+                    info->peFile->GetImageBase(),
+                    info->fullName.native);
+            }
+
+            result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
+            // OK
+            result.error.native.clear();
+        }
+        catch (std::exception& e)
         {
-            result.error = errorNode->QueryValue(ORTHIA_TCSTR("empty"));
-            return;
+            result.error.native = orthia::Utf8ToPlatformString(e.what());
         }
-        info->moduleLastValidAddress = mappedFile.size() - 1;
-        if (Diana_SafeAdd(&info->moduleLastValidAddress, info->peFile->GetImageBase()))
-        {
-            result.error = errorNode->QueryValue(ORTHIA_TCSTR("invalid-image-base"));
-            return;
-        }
-
-        CMemoryReaderOnLoadedData reader(info->peFile->GetImageBase(), mappedFile.data(), mappedFile.size());
-
-        bool firstOpen = false;
-        if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->peFile->GetImageBase()))
-        {
-            firstOpen = true;
-            // first open, warn user it may take quite a time
-            WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
-        }
-
-        if (firstOpen)
-        {
-            // load imports        
-            CImportsLoader importsLoader(completeHandler);
-            importsLoader.LoadModules(file->GetFullFileName(), info->peFile, file->GetFileSystem());
-            importsLoader.ReportModules(info->moduleManager);
-
-            info->moduleManager->ReloadModule(info->peFile->GetImageBase(),
-                &reader,
-                false,
-                info->shortName.native,
-                0);
-
-            InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
-                info->peFile->GetImageBase(),
-                info->fullName.native);
-        }
-
-        result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
-        // OK
-        result.error.native.clear();
     }
 
 }

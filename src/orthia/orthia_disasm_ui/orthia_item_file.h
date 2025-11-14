@@ -30,8 +30,11 @@ namespace orthia
         int GetDianaMode() const override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
+
+        int GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const;
     };
 
     class CClassicDatabase;
     void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String & fullName);
+    void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo& info);
 }

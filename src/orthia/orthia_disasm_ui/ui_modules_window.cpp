@@ -178,6 +178,16 @@ void CModulesWindow::UpdateVisibleItems()
     {
         activeItem->GetModules(modules);
     }
+    auto firstRunAfterReload = m_needUpdateModulesBox;
+    if (firstRunAfterReload)
+    {
+        m_needUpdateModulesBox = false;
+        m_modulesBox->SetOffset(m_requiredModulesBoxOffset);
+        m_modulesBox->SetSelectedPosition(m_requiredModulesBoxPosition);
+
+        m_requiredModulesBoxOffset = 0;
+        m_requiredModulesBoxPosition = 0;
+    }
 
     DefaultUpdateVisibleItems(this, &m_modulesOwner, m_modulesBox, modules,
         [&](auto it, auto vit)
@@ -194,13 +204,26 @@ void CModulesWindow::UpdateVisibleItems()
         vit->colorsHandler = [=]() { return oui::LabelColorState{ m_colorProfile->listBoxFolders, oui::Color() }; };
     });
 
+    if (firstRunAfterReload)
+    {
+        // first run after reload state
+        activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), m_requiredNamesCacheSize, m_cachedNamesPage);
+        m_namesBox->SetOffset(m_requiredNamesOffset);
+        m_namesBox->SetSelectedPosition(0);
+
+        m_requiredNamesOffset = 0;
+        m_requiredNamesCacheSize = 0;
+    }
+    else
     if (m_cachedNamesPage.empty() && m_selectedModuleAddress)
     {
+        // usual first run
         m_namesBox->SetSelectedPosition(0);
         activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), g_nameCacheSize, m_cachedNamesPage);
     }
     else if (!m_cachedNamesPage.empty())
     {
+        // need next page
         auto offset = m_namesBox->GetOffset();
         auto visibleSize = m_namesBox->GetVisibleSize();
         auto itemsHandled = offset + visibleSize;
@@ -314,5 +337,53 @@ void CModulesWindow::SetActiveWorkspaceItem(int itemId)
 }
 void CModulesWindow::Invalidate(bool valid)
 {
-    oui::CPanelWindow::Invalidate(valid);
+    ParentType::Invalidate(valid);
+}
+void CModulesWindow::ReloadState(const UIState& state) 
+{
+    Apply(state.addresses, field_selectedModuleAddress, 
+        [&](auto& value) { m_selectedModuleAddress = value; },
+        [&]() { m_selectedModuleAddress = 0; }
+    );
+    Apply(state.addresses, field_namesBox_Offset, 
+        [&](auto& value) { m_requiredNamesOffset = (int)value; },
+        [&]() { m_requiredNamesOffset = 0; }
+    );
+    Apply(state.addresses, field_cachedNamesPage_size, 
+        [&](auto& value) { m_requiredNamesCacheSize = (int)value; },
+        [&]() { m_requiredNamesCacheSize = 0; }
+    );
+    Apply(state.strings, field_selectedModuleName, 
+        [&](auto& value) { m_selectedModuleName = value; },
+        [&]() { m_selectedModuleName.native.clear(); }
+    );
+    Apply(state.addresses, field_modulesBox_Offset,
+        [&](auto& value) { m_requiredModulesBoxOffset = (int)value; },
+        [&]() { m_requiredModulesBoxOffset = 0; }
+    );
+    Apply(state.addresses, field_modulesBox_Position,
+        [&](auto& value) { m_requiredModulesBoxPosition = (int)value; },
+        [&]() { m_requiredModulesBoxPosition = 0; }
+    );
+    m_needUpdateModulesBox = true;
+    Invalidate();
+}
+
+void CModulesWindow::SaveState(UIState& state)
+{
+    state.addresses[field_selectedModuleAddress] = m_selectedModuleAddress;
+    state.addresses[field_namesBox_Offset] = m_namesBox->GetOffset();
+    state.addresses[field_cachedNamesPage_size] = m_cachedNamesPage.size();
+    state.strings[field_selectedModuleName] = m_selectedModuleName;
+
+    if (m_needUpdateModulesBox)
+    {
+        state.addresses[field_modulesBox_Offset] = m_requiredModulesBoxOffset;
+        state.addresses[field_modulesBox_Position] = m_requiredModulesBoxPosition;
+    }
+    else
+    {
+        state.addresses[field_modulesBox_Offset] = m_modulesBox->GetOffset();
+        state.addresses[field_modulesBox_Position] = m_modulesBox->GetSelectedPosition();
+    }
 }

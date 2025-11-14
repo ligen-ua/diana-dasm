@@ -29,19 +29,25 @@ UIState* CUIStateManager::GetUIState(int itemId, std::shared_ptr<IUIStatefulWind
     return &wit->second;
 }
 
-void CUIStateManager::ReloadState(int itemId)
+bool CUIStateManager::ReloadState(int itemId)
 {
-    auto item = m_workspaces.find(itemId);
-    if (item == m_workspaces.end())
-    {
-        // no data
-        return;
-    }
+    auto pair = m_workspaces.insert(std::make_pair(itemId, UIWorkspaceState()));
+    auto item = pair.first;
     auto & workItem = item->second;
+
+    if (pair.second)
+    {
+        // new item
+        for (auto& wnd : m_windows)
+        {
+            workItem.m_states.insert(std::make_pair(wnd, UIState()));
+        }
+    }
     for (auto& state : workItem.m_states)
     {
         state.first->ReloadState(state.second);
     }
+    return pair.second;
 }
 
 void CUIStateManager::SaveState(int itemId)

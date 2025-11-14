@@ -7,6 +7,7 @@
 #include "orthia_process_adapter.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
+#include "orthia_log.h"
 
 namespace oui
 {
@@ -207,6 +208,36 @@ namespace oui
         }
         return CheckIsWow64Process(hProcess);
     }
+
+
+    int LoadModulesFromProcess(HANDLE hProc, std::vector<HMODULE>& modules)
+    {
+        const int initialModulesCount = 1024;
+        if (modules.empty())
+        {
+            modules.resize(initialModulesCount);
+        }
+        for (;;)
+        {
+            DWORD sizeNeeded = 0;
+            BOOL res = EnumProcessModules(hProc,
+                &modules[0],
+                (DWORD)(modules.size() * sizeof(HMODULE)),
+                &sizeNeeded);
+            if (!res)
+            {
+                return GetLastError();
+            }
+            DWORD maxCount = sizeNeeded / sizeof(HMODULE);
+            if (maxCount < modules.size())
+            {
+                modules.resize(maxCount);
+                break;
+            }
+            modules.resize(maxCount * 2);
+        }
+        return 0;
+    }
     class CProcess :public IProcess, Noncopyable
     {
         String m_name;
@@ -273,31 +304,50 @@ namespace oui
             processModuleOffset = 0;
             modules.clear();
 
-            HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, m_processID);
-            if (hSnapshot == INVALID_HANDLE_VALUE) 
+            std::vector<HMODULE> modulesVec;
+            int errorCode = LoadModulesFromProcess(m_hProc, modulesVec);
+            if (errorCode)
             {
-                return GetLastError();
+                return errorCode;
             }
-            oui::ScopedGuard guard([=]() {  CloseHandle(hSnapshot);   });
 
-            MODULEENTRY32 moduleEntry;
-            moduleEntry.dwSize = sizeof(MODULEENTRY32);
-
-            if (!Module32First(hSnapshot, &moduleEntry))
-            {
-                return GetLastError();
-            }
 
             SYSTEM_INFO sysInfo;
             GetSystemInfo(&sysInfo);
             orthia::ProcessReaderAdapter memReader(this);
             orthia::CMemoryStorageOfModifiedData writeCache(&memReader, sysInfo.dwPageSize);
 
-            do 
+            std::vector<wchar_t> buffer(4096);
+            for (auto hmod : modulesVec)
             {
                 orthia::ModuleInfo info;
-                info.address = (orthia::Address_type)moduleEntry.modBaseAddr;
-                info.size = moduleEntry.modBaseSize;
+                if (GetModuleFileNameEx(m_hProc,
+                    hmod,
+                    buffer.data(),
+                    (DWORD)buffer.size() - 1))
+                {
+                    info.fullName = buffer.data();
+                    orthia::UnparseFileNameFromFullFileName(info.fullName, &info.name);
+                }
+                else
+                {
+                    info.name = orthia::ToWideStringAsHex((OPERAND_SIZE)hmod);
+                    info.fullName = L"<unknown>";
+                }
+                info.address = (orthia::Address_type)hmod;
+
+                MODULEINFO lowLevelInfo = { 0, };
+                if (GetModuleInformation(m_hProc,
+                    hmod,
+                    &lowLevelInfo,
+                    sizeof(lowLevelInfo)))
+                {
+                    info.size = lowLevelInfo.SizeOfImage;
+                }
+                else
+                {
+                    info.size = 0x10000000;
+                }
                 if (!info.size)
                 {
                     continue;
@@ -307,8 +357,6 @@ namespace oui
                 info.lastValidAddress = info.address;
                 Diana_SafeAdd(&info.lastValidAddress, info.size - 1);
 
-                info.fullName = moduleEntry.szExePath;
-                info.name = moduleEntry.szModule;
 
                 {
                     // diana PE analyzer uses relative pointers
@@ -330,7 +378,6 @@ namespace oui
                         info.entryPoint = dianaPeFile.pImpl->addressOfEntryPoint;
                         Diana_SafeAdd(&info.entryPoint, info.address);
 
-
                         if (contextCallback)
                         {
                             ModuleDisasmContext context;
@@ -342,7 +389,6 @@ namespace oui
                 }
                 modules.push_back(info);
             } 
-            while (Module32Next(hSnapshot, &moduleEntry));
 
             return 0;
         }
@@ -437,17 +483,96 @@ namespace oui
         }
     };
 
+
+    typedef HANDLE (WINAPI *OpenProcess_type)(
+            __in DWORD dwDesiredAccess,
+            __in BOOL bInheritHandle,
+            __in DWORD dwProcessId
+        );
+    typedef int(WINAPI *OrthiaInit_type)(
+        );
+    typedef void(WINAPI* OrthiaUninit_type)(
+        );
+
     class CProcessSystemImpl :public IProcessSystem
     {
+        OpenProcess_type m_openProcess;
+        orthia::CDll m_plugin;
+        OrthiaInit_type m_pluginInit;
+        OrthiaUninit_type m_pluginUninit;
     public:
         CProcessSystemImpl()
         {
+            m_openProcess = &::OpenProcess;
+        }
+        ~CProcessSystemImpl()
+        {
+            if (m_pluginUninit)
+            {
+                m_pluginUninit();
+                m_pluginUninit = 0;
+            }
+        }
+        void LoadPlugins()
+        {
+            if (m_openProcess != &::OpenProcess)
+            {
+                return;
+            }
+            auto pluginFileName = orthia::GetCurrentModuleDir();
+            pluginFileName += L"orthia_proc_win32.dll";
+            int error = m_plugin.Reset_Silent(pluginFileName.c_str());
+            if (error)
+            {
+                return;
+            }
+            std::string orthiaOpenProcessName("OrthiaOpenProcess");
+            std::string orthiaInitName("OrthiaInit");
+            std::string orthiaUninitName("OrthiaUninit");
+
+            OpenProcess_type orthiaOpenProcess = 0;
+            m_plugin.QueryFunction(orthiaOpenProcessName.c_str(), &orthiaOpenProcess, true);
+            m_plugin.QueryFunction(orthiaInitName.c_str(), &m_pluginInit, true);
+            m_plugin.QueryFunction(orthiaUninitName.c_str(), &m_pluginUninit, true);
+
+            int errorCode = 0;
+            if (m_pluginInit)
+            {
+                errorCode = m_pluginInit();
+                ORTHIA_LOG(orthia::LogSeverity::Info, "PluginLoader: Plugin loaded: ", pluginFileName);
+            }
+            if (errorCode || !orthiaOpenProcess || !m_pluginInit || !m_pluginUninit)
+            {
+                if (errorCode)
+                {
+                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Can't init plugin, code = ", orthia::ObjectToString_Ansi(errorCode));
+                }
+                if (!orthiaOpenProcess)
+                {
+                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Function not found: ", orthiaOpenProcessName);
+                }
+                if (!m_pluginInit)
+                {
+                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Function not found: ", orthiaInitName);
+                }
+                if (!m_pluginUninit)
+                {
+                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Function not found: " + orthiaUninitName);
+                }
+                m_pluginInit = 0;
+                m_pluginUninit = 0;
+                m_plugin.Reset(0);
+                return;
+            }
+
+            m_openProcess = orthiaOpenProcess;
         }
         std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) override
         {
+            LoadPlugins();
             int error = 0;
             std::shared_ptr<IProcess> proc;
-            if (HANDLE hProc = OpenProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)procId.pid))
+            if (HANDLE hProc = m_openProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)procId.pid))
             {
                 oui::ScopedGuard handlerGuard([&]() {
                     CloseHandle(hProc);
@@ -564,7 +689,7 @@ namespace oui
 
                 if (flags & oui::IProcessSystem::queryFlags_TryOpenProcessAsReader)
                 {
-                    if (HANDLE hProc = OpenProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)info.pid))
+                    if (HANDLE hProc = ::OpenProcess(g_ProcReaderDesiredAccess, FALSE, (DWORD)info.pid))
                     {
                         CloseHandle(hProc);
                         info.flags |= ProcessInfo::flag_hasReaderAccess;
@@ -572,7 +697,7 @@ namespace oui
                 }
 
                 const DWORD desiredAccess = PROCESS_QUERY_LIMITED_INFORMATION;
-                if (HANDLE hProc = OpenProcess(desiredAccess, FALSE, (DWORD)info.pid))
+                if (HANDLE hProc = ::OpenProcess(desiredAccess, FALSE, (DWORD)info.pid))
                 {
                     oui::ScopedGuard handlerGuard([&]() {
                         CloseHandle(hProc);

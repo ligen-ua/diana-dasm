@@ -2,6 +2,8 @@
 #include "orthia_config.h"
 #include <iostream>
 #include "diana_core_cpp.h"
+#include "orthia_log.h"
+
 extern "C"
 {
 #include "diana_processor/diana_processor_core.h"
@@ -18,6 +20,11 @@ static void PrintUsage()
 }
 int wmain(int argc, const wchar_t* argv[])
 {
+    orthia::intrusive_ptr<orthia::ILowLevelLog> lowLevelLog(new orthia::CDebugOutputLog());
+    orthia::DefLog_Init(new orthia::CProgramLog(lowLevelLog));
+
+    ORTHIA_DEV_LOG(orthia::LogSeverity::Info, "Logging enabled");
+
     // MessageBox(0, 0, 0, 0);
     std::vector<std::wstring> filenamesToOpen;
     std::vector<unsigned long long> processesToOpen;
