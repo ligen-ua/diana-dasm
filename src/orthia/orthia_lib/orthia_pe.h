@@ -41,6 +41,10 @@ namespace orthia
         DI_UINT64 GetImageEnd() const;
 
         const std::vector<char> & GetMappedPeFile() const;
+
+        int QueryImports(diana::CBasePeLinkImportsObserver* observer);
+        int QueryExports(diana::CBasePeLinkImportsObserver* observer);
+        int QueryTLSCallbacks(std::vector<OPERAND_SIZE>& callbacks);
     };
 
     void ParseForwarderString(const std::string& fwString, std::string& dllName, std::string& functionName, OPERAND_SIZE &operand);

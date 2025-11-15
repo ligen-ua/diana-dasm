@@ -15,9 +15,10 @@ namespace orthia
             std::shared_ptr<orthia::CSimplePeFile> peFile;
             bool originalFile = false;
             oui::String fullName;
+            std::vector<orthia::NameInfo> names;
         };
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
-
+        decltype(m_mappedModules)::iterator m_currentModule;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
 
@@ -40,6 +41,8 @@ namespace orthia
         bool CheckConflicts(std::shared_ptr<orthia::CSimplePeFile> peFile);
         void CheckCancel();
 
+        void LoadImports(ModuleInfo& mod);
+        void LoadExports(ModuleInfo& mod);
     public:
         CImportsLoader(std::shared_ptr<oui::BaseOperation> operation = nullptr);
         void QueryFunctionByOrdinal(const char* pDllName,

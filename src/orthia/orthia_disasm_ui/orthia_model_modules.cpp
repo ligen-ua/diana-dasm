@@ -218,6 +218,11 @@ namespace orthia
 
                 if (!forwardOffset)
                 {
+                    orthia::NameInfo nameInfo;
+                    nameInfo.flags = NameInfo::flags_Import;
+                    nameInfo.name.native = orthia::Utf8ToPlatformString(dllName + "!" + functionName);
+                    nameInfo.address = *pAddress;
+                    m_currentModule->second.names.push_back(nameInfo);
                     return;
                 }
 
@@ -233,6 +238,91 @@ namespace orthia
         CheckCancel();
     }
 
+    void CImportsLoader::LoadImports(ModuleInfo& mod)
+    {
+        struct ImportsCollector :public diana::CBasePeLinkImportsObserver
+        {
+            ModuleInfo& m_mod;
+
+            ImportsCollector(ModuleInfo& mod)
+                : m_mod(mod)
+            {
+            }
+            void QueryFunctionByOrdinal(const char* pDllName,
+                DI_UINT32 ordinal,
+                OPERAND_SIZE* pAddress)
+            {
+            }
+            void QueryFunctionByName(const char* pDllName,
+                const char* pFunctionName,
+                DI_UINT32 hint,
+                OPERAND_SIZE* pAddress)
+            {
+                if (!*pAddress)
+                {
+                    return;
+                }
+                orthia::Address_type fncAddress = m_mod.peFile->GetImageBase() + *pAddress;
+                orthia::NameInfo nameInfo;
+                nameInfo.flags = orthia::NameInfo::flags_Import;
+                nameInfo.address = fncAddress;
+                nameInfo.name = orthia::Utf8ToPlatformString(pFunctionName);
+                m_mod.names.push_back(nameInfo);
+            }
+        } collector(mod);
+        DI_CHECK_CPP(mod.peFile->QueryImports(&collector));
+    }
+    void CImportsLoader::LoadExports(ModuleInfo& mod)
+    {
+        struct ExportsCollector :public diana::CBasePeLinkImportsObserver
+        {
+            ModuleInfo& m_mod;
+
+            ExportsCollector(ModuleInfo& mod)
+                : m_mod(mod)
+            {
+            }
+            void QueryFunctionByOrdinal(const char* pDllName,
+                DI_UINT32 ordinal,
+                OPERAND_SIZE* pAddress)
+            {
+            }
+            void QueryFunctionByName(const char* pDllName,
+                const char* pFunctionName,
+                DI_UINT32 hint,
+                OPERAND_SIZE* pAddress)
+            {
+                if (!*pAddress)
+                {
+                    return;
+                }
+                orthia::Address_type fncAddress = m_mod.peFile->GetImageBase() + *pAddress;
+                orthia::NameInfo nameInfo;
+                nameInfo.flags = orthia::NameInfo::flags_Export;
+                nameInfo.address = fncAddress;
+                nameInfo.name = orthia::Utf8ToPlatformString(pFunctionName);
+                m_mod.names.push_back(nameInfo);
+            }
+        } collector(mod);
+        DI_CHECK_CPP(mod.peFile->QueryExports(&collector));
+
+        OPERAND_SIZE entryPoint = mod.peFile->GetImpl()->mappedPE.pImpl->addressOfEntryPoint;
+        if (entryPoint)
+        {
+            entryPoint += mod.peFile->GetImageBase();
+            collector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
+        }
+        // report tls callbacks
+        std::vector<OPERAND_SIZE> tlsCallbacks;
+        mod.peFile->QueryTLSCallbacks(tlsCallbacks);
+        for (int i = 0, size = (int)tlsCallbacks.size(); i < size; ++i)
+        {
+            auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
+            auto callback = tlsCallbacks[i];
+            collector.QueryFunctionByName("$", name.c_str(), 0, &callback);
+        }
+
+    }
     // CImportsLoader
     void CImportsLoader::LoadModules(const oui::String & fileName, 
         std::shared_ptr<orthia::CSimplePeFile> peFile,
@@ -252,8 +342,8 @@ namespace orthia
         info.peFile = peFile;
         info.originalFile = true;
         info.fullName = fileName;
-        m_mappedModules[NormalizeName(shortFileName).native] = info;
-    
+        auto res = m_mappedModules.insert(std::make_pair(NormalizeName(shortFileName).native, info));
+        m_currentModule = res.first;
         if (m_freeSpaceStart < peFile->GetImageEnd())
         {
             m_freeSpaceStart = peFile->GetImageEnd();
@@ -272,6 +362,16 @@ namespace orthia
             &page.front(),
             (ULONG)page.size(),
             GetParent()));
+
+        for (auto& pair: m_mappedModules)
+        {
+            LoadExports(pair.second);
+            if (pair.second.originalFile)
+            {
+                continue;
+            }
+            LoadImports(pair.second);
+        }
     }
 
     void CImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)

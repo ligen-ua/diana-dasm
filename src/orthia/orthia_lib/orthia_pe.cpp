@@ -174,4 +174,76 @@ namespace orthia
     {
         return m_mappedPeFile;
     }
+
+    int CSimplePeFile::QueryImports(diana::CBasePeLinkImportsObserver* observer)
+    {
+        if (m_mappedPeFile.empty() || !m_dianaContext.get())
+        {
+            return DI_ERROR;
+        }
+
+        std::vector<char> page(4096);
+        ::DianaMemoryStream rwStream;
+        Diana_InitMemoryStreamEx2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0);
+
+        return DianaPeFile_QueryImports(&m_dianaContext->mappedPE,
+            0,
+            &rwStream.parent,
+            page.data(),
+            (int)page.size(),
+            observer->GetParent(),
+            0,
+            DIANA_LINK_IMPORT_READ_FULL_INFO);
+    }
+    int CSimplePeFile::QueryExports(diana::CBasePeLinkImportsObserver* observer)
+    {
+        if (m_mappedPeFile.empty() || !m_dianaContext.get())
+        {
+            return DI_ERROR;
+        }
+
+        std::vector<char> page(4096);
+        ::DianaMemoryStream rwStream;
+        Diana_InitMemoryStreamEx2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0);
+
+        return DianaPeFile_QueryExports(&m_dianaContext->mappedPE,
+            &rwStream.parent.parent,
+            page.data(),
+            (int)page.size(),
+            observer->GetParent(),
+            0);
+    }
+
+    int CSimplePeFile::QueryTLSCallbacks(std::vector<OPERAND_SIZE>& callbacks)
+    {
+        callbacks.clear();
+
+        ::DianaMemoryStream stream;
+        Diana_InitMemoryStreamEx2(&stream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0);
+
+        void* pTlsCallbacks = 0;
+        int tlsCallbacksCount = 0;
+        OPERAND_SIZE addressOfTLSIndex = 0;
+        if (auto error = DianaPeFile_QueryTLSCallbacks(&GetImpl()->mappedPE,
+            GetImageBase(),
+            &stream.parent,
+            &pTlsCallbacks,
+            &tlsCallbacksCount,
+            &addressOfTLSIndex,
+            0)) 
+        {
+            return error;
+        }
+        char* pTls = (char*)pTlsCallbacks;
+        callbacks.reserve(tlsCallbacksCount);
+        for (int i = 0; i < tlsCallbacksCount; ++i)
+        {
+            OPERAND_SIZE callback = Diana_ReadValue(pTls, GetImpl()->mappedPE.pImpl->dianaMode);
+            callbacks.push_back(callback);
+            pTls += GetImpl()->mappedPE.pImpl->dianaMode;
+        }
+        DIANA_FREE(pTlsCallbacks);
+        return DI_SUCCESS;
+    }
+
 }

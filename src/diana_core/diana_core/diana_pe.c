@@ -597,9 +597,6 @@ void DianaPeFile_LinkImports_Observer_Init(DianaPeFile_LinkImports_Observer * pO
 #define DIANA_IMAGE_SNAP_BY_ORDINAL32(Ordinal) ((Ordinal & DIANA_IMAGE_ORDINAL_FLAG32) != 0)
 
 
-#define DIANA_LINK_IMPORT_FLAG_READ_ONLY  1
-
-
 int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                           DianaReadWriteRandomStream * pOutStream,
                         const char * pDllName,
@@ -636,8 +633,9 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
         {
             return DI_ERROR;
         }
+        p = (PDIANA_IMAGE_THUNK_DATA32)pPage;
         p_end = (char*)p + readBytes;
-        for(p = (PDIANA_IMAGE_THUNK_DATA32)pPage;
+        for(;
             ((char*)p_end - (char*)p) > sizeof(DIANA_IMAGE_THUNK_DATA32);
             ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA32))
         {
@@ -657,12 +655,16 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                                                         &readBytes,
                                                         streamFlags));
                 function = functionPtr;
-                DI_CHECK(pObserver->queryFunctionByName(pObserver,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        &function));
-                continue;
+
+                if (!(flags & DIANA_LINK_IMPORT_READ_FULL_INFO))
+                {
+                    DI_CHECK(pObserver->queryFunctionByName(pObserver,
+                        0,
+                        0,
+                        0,
+                        &function));
+                    continue;
+                }
             }
 
             if (DIANA_IMAGE_SNAP_BY_ORDINAL32(p->u1.Ordinal))
@@ -698,6 +700,8 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                                                         pImportByName->Hint,
                                                         &function));
             }
+
+            if (!(flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY))
             {
                 DI_UINT32 functionPtr = (DI_UINT32)function;
                 DI_CHECK(pOutStream->pRandomWrite(pOutStream,
@@ -707,9 +711,7 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                                                 &readBytes,
                                                 streamFlags));
             }
-
         }
-        return DI_ERROR;
     }
 }
 
@@ -735,7 +737,6 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
     {
         return DI_ERROR;
     }
-
     for(;;)
     {
         DI_CHECK(pOutStream->parent.pRandomRead(pOutStream,
@@ -749,8 +750,9 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
         {
             return DI_ERROR;
         }
+        p = (PDIANA_IMAGE_THUNK_DATA64)pPage;
         p_end = (char*)p + readBytes;
-        for(p = (PDIANA_IMAGE_THUNK_DATA64)pPage;
+        for(;
             ((char*)p_end - (char*)p) > sizeof(DIANA_IMAGE_THUNK_DATA64);
             ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA64))
         {
@@ -767,12 +769,16 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
                                                         sizeof(function),
                                                         &readBytes,
                                                         streamFlags));
-                DI_CHECK(pObserver->queryFunctionByName(pObserver,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        &function));
-                continue;
+
+                if (!(flags & DIANA_LINK_IMPORT_READ_FULL_INFO))
+                {
+                    DI_CHECK(pObserver->queryFunctionByName(pObserver,
+                        0,
+                        0,
+                        0,
+                        &function));
+                    continue;
+                }
             }
             if (DIANA_IMAGE_SNAP_BY_ORDINAL64(p->u1.Ordinal))
             {
@@ -807,6 +813,8 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
                                                         pImportByName->Hint,
                                                         &function));
             }
+
+            if (!(flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY))
             {
                 DI_CHECK(pOutStream->pRandomWrite(pOutStream,
                                                 currentThunkOffset,
@@ -817,7 +825,6 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
             }
 
         }
-        return DI_ERROR;
     }
 }
 
@@ -1062,7 +1069,8 @@ int DianaPeFile_QueryImports(/* in */ Diana_PeFile* pPeFile,
                             /* in */ void* pPage,
                             /* in */ int pageSize,
                             /* in */ DianaPeFile_LinkImports_Observer* pObserver,
-                            /* in */ int streamFlags)
+                            /* in */ int streamFlags,
+                            /* in */ int importFlags)
 {
     return DianaPeFile_LinkImportsEx(pPeFile,
         address,
@@ -1070,7 +1078,7 @@ int DianaPeFile_QueryImports(/* in */ Diana_PeFile* pPeFile,
         pPage,
         pageSize,
         pObserver,
-        DIANA_LINK_IMPORT_FLAG_READ_ONLY,
+        DIANA_LINK_IMPORT_FLAG_READ_ONLY| importFlags,
         streamFlags);
 }
 
@@ -1513,7 +1521,7 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
     }
     if (!pExportDirectory->VirtualAddress || !pExportDirectory->Size)
     {
-        return DI_NOT_FOUND;
+        return DI_SUCCESS;
     }
 
     pCapturedExportDirectory = DIANA_MALLOC(sizeof(DIANA_IMAGE_EXPORT_DIRECTORY));

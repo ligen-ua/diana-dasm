@@ -368,7 +368,8 @@ namespace orthia
             page.data(),
             (int)page.size(),
             importsCollector.GetParent(),
-            DIANA_ANALYZE_RANDOM_READ_ABSOLUTE);
+            DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
+            0);
 
         if (totalCount)
         {
@@ -412,6 +413,7 @@ namespace orthia
                     exportsCollector.QueryFunctionByName("$", name.c_str(), 0, &callback);
                     pTls += dianaPeFile.pImpl->dianaMode;
                 }
+                DIANA_FREE(pTlsCallbacks);
             }
 
             // report regular exports
