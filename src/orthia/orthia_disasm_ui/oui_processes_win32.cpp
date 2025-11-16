@@ -43,14 +43,20 @@ namespace oui
             {
                 return 1;
             }
-            if (memInfo.State == MEM_COMMIT &&
-                memInfo.Type == MEM_PRIVATE &&
-                (memInfo.Protect & (PAGE_READONLY | PAGE_EXECUTE_READ | PAGE_READWRITE)) != 0)
-            {
-                pRegions->push_back({ (ULONGLONG)memInfo.BaseAddress,
-                    (ULONGLONG)memInfo.RegionSize});
-            }
             offset = (ULONGLONG)memInfo.BaseAddress + (ULONGLONG)memInfo.RegionSize;
+
+            if ((ULONGLONG)memInfo.BaseAddress < address)
+            {
+                ULONGLONG diff = address - (ULONGLONG)memInfo.BaseAddress;
+                memInfo.RegionSize -= diff;
+                memInfo.BaseAddress = (PVOID)address;
+            }
+
+            if (memInfo.State == MEM_COMMIT &&
+                (memInfo.Protect & (PAGE_READONLY | PAGE_READWRITE| PAGE_EXECUTE_READ | PAGE_READWRITE)) != 0)
+            {
+                pRegions->push_back({ (ULONGLONG)memInfo.BaseAddress, (ULONGLONG)memInfo.RegionSize});
+            }
             if (size > (ULONGLONG)memInfo.RegionSize)
             {
                 size -= (ULONGLONG)memInfo.RegionSize;

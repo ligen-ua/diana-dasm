@@ -88,8 +88,11 @@ void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings&
 namespace oui
 {
 
-    orthia::Address_type CaptureAddress(const std::wstring& addressString)
+    orthia::Address_type CaptureAddress(const std::wstring& addressString_in)
     {
+        std::wstring addressString = addressString_in;
+        orthia::TrimStringAllWhiteSpace(addressString);
+        
         if (addressString.empty())
         {
             throw std::runtime_error("Invalid argument");
