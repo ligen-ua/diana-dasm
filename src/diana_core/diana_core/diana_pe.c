@@ -1511,6 +1511,11 @@ int DianaPeFile_GetProcAddressEx(Diana_PeFile * pPeFile,
         }
     }
 }
+static int compare_DI_UINT16(const void* a, const void* b)
+{
+    return (*(DI_UINT16*)a - *(DI_UINT16*)b);
+}
+
 int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
                             /* inout */ DianaMovableReadStream* pOutStream,
                             /* in */ void* pPage,
@@ -1525,6 +1530,7 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
     OPERAND_SIZE readBytes = 0;
     const DIANA_IMAGE_DATA_DIRECTORY* pExportDirectory = &pPeFile->pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_EXPORT];
     DIANA_IMAGE_EXPORT_DIRECTORY* pCapturedExportDirectory = 0;
+    DI_UINT16 * pCapturedAddresses = 0;
 
     if (pageSize < normalNameSize)
     {
@@ -1665,8 +1671,26 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
     if (pCapturedExportDirectory->NumberOfNames < pCapturedExportDirectory->NumberOfFunctions)
     {
         // deliver ordinals too
+        // capture names
+        pCapturedAddresses = DIANA_MALLOC(pCapturedExportDirectory->NumberOfNames * 2);
+        if (!pCapturedAddresses)
+        {
+            status = DI_OUT_OF_MEMORY;
+            goto cleanup;
+        }
+
+        DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+            pCapturedExportDirectory->AddressOfNameOrdinals,
+            pCapturedAddresses,
+            (pCapturedExportDirectory->NumberOfNames * 2),
+            &readBytes,
+            streamFlags));
+
+        qsort(pCapturedAddresses, pCapturedExportDirectory->NumberOfNames, sizeof(DI_UINT16), compare_DI_UINT16);
+
+        // go throug all functions
         int ordinalsToSearch = (int)pCapturedExportDirectory->NumberOfFunctions - (int)pCapturedExportDirectory->NumberOfNames;
-        for (int i = 0; i < (int)pCapturedExportDirectory->NumberOfFunctions; ++i)
+        for (DI_UINT16 i = 0; i < pCapturedExportDirectory->NumberOfFunctions; ++i)
         {
             DI_UINT32 functionValue = 0;
             OPERAND_SIZE functionPtr = pCapturedExportDirectory->AddressOfFunctions;
@@ -1685,28 +1709,10 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
                 continue;
             }
 
-            int nameFound = 0;
-            for (int u = 0; u < (int)pCapturedExportDirectory->NumberOfNames; ++u)
-            {
-                DI_UINT16 ordinalValue = 0;
-                OPERAND_SIZE ordinalPtr = pCapturedExportDirectory->AddressOfNameOrdinals;
-                Diana_SafeAdd(&ordinalPtr, u * 2);
-
-                DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
-                    ordinalPtr,
-                    &ordinalValue,
-                    (int)sizeof(ordinalValue),
-                    &readBytes,
-                    streamFlags));
-
-                if (ordinalValue == i)
-                {
-                    nameFound = 1;
-                    break;
-                }
-            }
-
-            if (nameFound)
+            DI_UINT16 * pResultValue = (DI_UINT16*)bsearch(&i, 
+                pCapturedAddresses, pCapturedExportDirectory->NumberOfNames, 
+                sizeof(DI_UINT16), compare_DI_UINT16);
+            if (pResultValue)
             {
                 continue;
             }
@@ -1728,6 +1734,10 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
     }
 
 cleanup:
+    if (pCapturedAddresses)
+    {
+        DIANA_FREE(pCapturedAddresses);
+    }
     if (pCapturedExportDirectory)
     {
         DIANA_FREE(pCapturedExportDirectory);
