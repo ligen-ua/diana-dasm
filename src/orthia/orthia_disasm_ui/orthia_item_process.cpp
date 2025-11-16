@@ -78,6 +78,8 @@ namespace orthia
             DI_UINT32 ordinal,
             OPERAND_SIZE* pAddress)
         {
+            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
+            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
         }
         void QueryFunctionByName(const char* pDllName,
             const char* pFunctionName,
@@ -172,6 +174,8 @@ namespace orthia
             DI_UINT32 ordinal,
             OPERAND_SIZE* pAddress)
         {
+            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
+            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
         }
         void QueryFunctionByName(const char* pDllName,
             const char* pFunctionName,
@@ -198,6 +202,18 @@ namespace orthia
                 info.flags = NameInfo::flags_Import;
                 info.address = *pAddress;
                 info.name = m_getName(info.address);
+
+                if (info.name.native.empty())
+                {
+                    if (pFunctionName)
+                    {
+                        info.name.native = orthia::Utf8ToPlatformString(pFunctionName);
+                    }
+                    else
+                    {
+                        info.name.native = OUI_TCSTR("<unknown>");
+                    }
+                }
                 m_names.push_back(info);
                 ++m_deliveredCount;
             }
@@ -244,6 +260,8 @@ namespace orthia
             DI_UINT32 ordinal,
             OPERAND_SIZE* pAddress)
         {
+            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
+            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
         }
         void QueryFunctionByName(const char* pDllName,
             const char* pFunctionName,
@@ -355,7 +373,7 @@ namespace orthia
                     return res;
                 }
             }
-            return oui::String(OUI_TCSTR("<unknown>"));
+            return oui::String();
 
         },
             count,

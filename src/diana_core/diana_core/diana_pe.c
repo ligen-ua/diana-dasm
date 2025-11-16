@@ -1661,6 +1661,72 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
         }
     }
 
+    // deliver ordinals
+    if (pCapturedExportDirectory->NumberOfNames < pCapturedExportDirectory->NumberOfFunctions)
+    {
+        // deliver ordinals too
+        int ordinalsToSearch = (int)pCapturedExportDirectory->NumberOfFunctions - (int)pCapturedExportDirectory->NumberOfNames;
+        for (int i = 0; i < (int)pCapturedExportDirectory->NumberOfFunctions; ++i)
+        {
+            DI_UINT32 functionValue = 0;
+            OPERAND_SIZE functionPtr = pCapturedExportDirectory->AddressOfFunctions;
+            Diana_SafeAdd(&functionPtr, i * 4);
+
+            DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                functionPtr,
+                &functionValue,
+                (int)sizeof(functionValue),
+                &readBytes,
+                streamFlags));
+
+            if (functionValue == 0 ||
+                ((functionValue >= pExportDirectory->VirtualAddress) && (functionValue < (pExportDirectory->VirtualAddress + pExportDirectory->Size))))
+            {
+                continue;
+            }
+
+            int nameFound = 0;
+            for (int u = 0; u < (int)pCapturedExportDirectory->NumberOfNames; ++u)
+            {
+                DI_UINT16 ordinalValue = 0;
+                OPERAND_SIZE ordinalPtr = pCapturedExportDirectory->AddressOfNameOrdinals;
+                Diana_SafeAdd(&ordinalPtr, u * 2);
+
+                DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                    ordinalPtr,
+                    &ordinalValue,
+                    (int)sizeof(ordinalValue),
+                    &readBytes,
+                    streamFlags));
+
+                if (ordinalValue == i)
+                {
+                    nameFound = 1;
+                    break;
+                }
+            }
+
+            if (nameFound)
+            {
+                continue;
+            }
+
+            if (pObserver->reportInfo_fnc)
+            {
+                DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionValue));
+            }
+
+            {
+                OPERAND_SIZE address = functionValue;
+                DI_CHECK_GOTO(pObserver->queryFunctionByOrdinal(pObserver, 0, i, &address));
+            }
+            if (!--ordinalsToSearch)
+            {
+                break;
+            }
+        }
+    }
+
 cleanup:
     if (pCapturedExportDirectory)
     {
