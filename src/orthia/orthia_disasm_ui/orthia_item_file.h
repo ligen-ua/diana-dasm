@@ -36,5 +36,5 @@ namespace orthia
 
     class CClassicDatabase;
     void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String & fullName);
-    void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo& info);
+    void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo& info, Address_type metaInfoAddres);
 }

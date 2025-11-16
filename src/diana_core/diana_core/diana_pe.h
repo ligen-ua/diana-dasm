@@ -100,11 +100,14 @@ typedef int (* DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc)(void * 
                                                                          const char * pFunctionName,
                                                                          DI_UINT32 hint,
                                                                          OPERAND_SIZE * pAddress);
+typedef int (* DianaPeFile_LinkImports_Observer_ReportInfo_fnc)(void * pThis, 
+                                                                   OPERAND_SIZE address);
 
 typedef struct _DianaPeFile_LinkImports_Observer
 {
     DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal;
     DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName;
+    DianaPeFile_LinkImports_Observer_ReportInfo_fnc reportInfo_fnc;
 }
 DianaPeFile_LinkImports_Observer;
 
@@ -112,6 +115,10 @@ DianaPeFile_LinkImports_Observer;
 void DianaPeFile_LinkImports_Observer_Init(DianaPeFile_LinkImports_Observer * pObserver,
                                            DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal,
                                            DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName);
+void DianaPeFile_LinkImports_Observer_Init2(DianaPeFile_LinkImports_Observer * pObserver,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName,
+                                           DianaPeFile_LinkImports_Observer_ReportInfo_fnc reportInfo);
 
 int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                             /* in */ OPERAND_SIZE address,

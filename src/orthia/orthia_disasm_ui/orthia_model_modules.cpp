@@ -222,7 +222,7 @@ namespace orthia
                     nameInfo.flags = NameInfo::flags_Import;
                     nameInfo.name.native = orthia::Utf8ToPlatformString(dllName + "!" + functionName);
                     nameInfo.address = *pAddress;
-                    m_currentModule->second.names.push_back(nameInfo);
+                    m_currentModule->second.names.insert({ GetLastAddress() , nameInfo });
                     return;
                 }
 
@@ -267,7 +267,7 @@ namespace orthia
                 nameInfo.flags = orthia::NameInfo::flags_Import;
                 nameInfo.address = fncAddress;
                 nameInfo.name = orthia::Utf8ToPlatformString(pFunctionName);
-                m_mod.names.push_back(nameInfo);
+                m_mod.names.insert({ GetLastAddress() , nameInfo });
             }
         } collector(mod);
         DI_CHECK_CPP(mod.peFile->QueryImports(&collector));
@@ -301,7 +301,7 @@ namespace orthia
                 nameInfo.flags = orthia::NameInfo::flags_Export;
                 nameInfo.address = fncAddress;
                 nameInfo.name = orthia::Utf8ToPlatformString(pFunctionName);
-                m_mod.names.push_back(nameInfo);
+                m_mod.names.insert({ GetLastAddress() , nameInfo });
             }
         } collector(mod);
         DI_CHECK_CPP(mod.peFile->QueryExports(&collector));
@@ -373,6 +373,14 @@ namespace orthia
             LoadImports(pair.second);
         }
     }
+    void CImportsLoader::InsertNames(std::shared_ptr<CModuleManager> moduleManager, const ModuleInfo& mod)
+    {
+        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        for (auto& name : mod.names)
+        {
+            InsertName(classicDatabase, mod.peFile->GetImageBase(), name.second, name.first);
+        }
+    }
 
     void CImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)
     {
@@ -384,11 +392,11 @@ namespace orthia
         {
             if (mod.second.originalFile)
             {
+                InsertNames(moduleManager, mod.second);
                 continue;
             }
             oui::String shortName;
             orthia::UnparseFileNameFromFullFileName(mod.second.fullName.native, &shortName.native);
-
 
             CAutoRollbackClassicDatabase rollback;
             classicDatabase->StartSaveModule(mod.second.peFile->GetImageBase(),
@@ -399,6 +407,8 @@ namespace orthia
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.peFile->GetImageBase(),
                 mod.second.fullName.native);
+
+            InsertNames(moduleManager, mod.second);
 
             // add metainfo
             // 1. flags

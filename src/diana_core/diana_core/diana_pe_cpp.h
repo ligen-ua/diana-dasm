@@ -48,6 +48,8 @@ int DianaPeFile_LinkImports_Observer_QueryFunctionByName_proxy(void * pThis,
                                                                          const char * pFunctionName,
                                                                          DI_UINT32 hint,
                                                                          OPERAND_SIZE * pAddress);
+int DianaPeFile_LinkImports_Observer_ReportInfo_fnc_proxy(void* pThis,  
+                                                          OPERAND_SIZE address);
 
 class CBasePeLinkImportsObserver
 {
@@ -62,20 +64,26 @@ class CBasePeLinkImportsObserver
                                                                          const char * pFunctionName,
                                                                          DI_UINT32 hint,
                                                                          OPERAND_SIZE * pAddress);
+    friend int DianaPeFile_LinkImports_Observer_ReportInfo_fnc_proxy(void* pThis, OPERAND_SIZE address);
 
     DianaPeFile_LinkImports_Observer m_parent;
+    OPERAND_SIZE m_lastAddress = 0;
 public:
     CBasePeLinkImportsObserver()
     {
-        DianaPeFile_LinkImports_Observer_Init(&m_parent, 
+        DianaPeFile_LinkImports_Observer_Init2(&m_parent, 
                                               DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_proxy,
-                                              DianaPeFile_LinkImports_Observer_QueryFunctionByName_proxy);
+                                              DianaPeFile_LinkImports_Observer_QueryFunctionByName_proxy, 
+                                              DianaPeFile_LinkImports_Observer_ReportInfo_fnc_proxy);
 
     }
     virtual ~CBasePeLinkImportsObserver()
     {
     }
-
+    OPERAND_SIZE GetLastAddress() const
+    {
+        return m_lastAddress;
+    }
     virtual void QueryFunctionByOrdinal(const char * pDllName,
                                         DI_UINT32 ordinal,
                                         OPERAND_SIZE * pAddress) = 0;
@@ -84,6 +92,8 @@ public:
                                      const char * pFunctionName,
                                      DI_UINT32 hint,
                                      OPERAND_SIZE * pAddress) = 0;
+
+    virtual void ReportInfo(OPERAND_SIZE address) { m_lastAddress = address; }
 
     DianaPeFile_LinkImports_Observer * GetParent() 
     { 
@@ -117,6 +127,12 @@ inline int DianaPeFile_LinkImports_Observer_QueryFunctionByName_proxy(void * pTh
     DI_CPP_END
 }
 
+inline int DianaPeFile_LinkImports_Observer_ReportInfo_fnc_proxy(void* pThis, OPERAND_SIZE address)
+{
+    DI_CPP_BEGIN
+        DIANA_CPP_BASE(pThis, CBasePeLinkImportsObserver, m_parent)->ReportInfo(address);
+    DI_CPP_END
+}
 
 }
 

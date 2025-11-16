@@ -587,6 +587,16 @@ void DianaPeFile_LinkImports_Observer_Init(DianaPeFile_LinkImports_Observer * pO
 {
     pObserver->queryFunctionByOrdinal = queryFunctionByOrdinal;
     pObserver->queryFunctionByName = queryFunctionByName;
+    pObserver->reportInfo_fnc = 0;
+}
+void DianaPeFile_LinkImports_Observer_Init2(DianaPeFile_LinkImports_Observer * pObserver,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName,
+                                           DianaPeFile_LinkImports_Observer_ReportInfo_fnc reportInfo)
+{
+    pObserver->queryFunctionByOrdinal = queryFunctionByOrdinal;
+    pObserver->queryFunctionByName = queryFunctionByName;
+    pObserver->reportInfo_fnc = reportInfo;
 }
 
 #define DIANA_IMAGE_ORDINAL_FLAG64 0x8000000000000000ULL
@@ -643,6 +653,11 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
             if (!p->u1.AddressOfData)
             {
                 return DI_SUCCESS;
+            }
+
+            if (pObserver->reportInfo_fnc)
+            {
+                DI_CHECK(pObserver->reportInfo_fnc(pObserver, currentThunkOffset));
             }
 
             if (flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY)
@@ -760,6 +775,11 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
             if (!p->u1.AddressOfData)
             {
                 return DI_SUCCESS;
+            }
+
+            if (pObserver->reportInfo_fnc)
+            {
+                DI_CHECK(pObserver->reportInfo_fnc(pObserver, currentThunkOffset));
             }
             if (flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY)
             {
@@ -1631,6 +1651,10 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
                 {
                     hint = functionValue;
                     address = 0;
+                }
+                if (pObserver->reportInfo_fnc)
+                {
+                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionValue));
                 }
                 DI_CHECK_GOTO(pObserver->queryFunctionByName(pObserver, 0, pPage, hint, &address));
             }

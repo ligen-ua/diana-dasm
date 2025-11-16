@@ -45,6 +45,8 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtInsertModule;
 
     CSQLStatement m_stmtSelectMetainfo_All;
+    CSQLStatement m_stmtSelectMetainfo_Module2;
+    CSQLStatement m_stmtSelectMetainfo_Module2_Count;
 
 
     void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to);
@@ -69,6 +71,8 @@ public:
 
     void InsertMetaInfo(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress = DI_MAX_OPERAND_SIZE);
     void QueryMetaInfo(int metaType, std::function<bool (Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
+    void QueryMetaInfoModule2(Address_type moduleAddress, int metaType1, int metaType2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
+    int QueryMetaInfoModule2_Count(Address_type moduleAddress, int metaType1, int metaType2);
 
     // queries
     Address_type QueryRouteStart(Address_type offset);

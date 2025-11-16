@@ -15,7 +15,7 @@ namespace orthia
             std::shared_ptr<orthia::CSimplePeFile> peFile;
             bool originalFile = false;
             oui::String fullName;
-            std::vector<orthia::NameInfo> names;
+            std::unordered_map<Address_type, orthia::NameInfo> names;
         };
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
         decltype(m_mappedModules)::iterator m_currentModule;
@@ -40,6 +40,8 @@ namespace orthia
             OPERAND_SIZE* pAddress);
         bool CheckConflicts(std::shared_ptr<orthia::CSimplePeFile> peFile);
         void CheckCancel();
+
+        void InsertNames(std::shared_ptr<CModuleManager> moduleManager, const ModuleInfo& mod);
 
         void LoadImports(ModuleInfo& mod);
         void LoadExports(ModuleInfo& mod);

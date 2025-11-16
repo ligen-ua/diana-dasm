@@ -396,13 +396,14 @@ namespace orthia
                 // load imports        
                 CImportsLoader importsLoader(completeHandler);
                 importsLoader.LoadModules(file->GetFullFileName(), info->peFile, file->GetFileSystem());
-                importsLoader.ReportModules(info->moduleManager);
 
                 info->moduleManager->ReloadModule(info->peFile->GetImageBase(),
                     &reader,
                     false,
                     info->shortName.native,
                     0);
+
+                importsLoader.ReportModules(info->moduleManager);
 
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     info->peFile->GetImageBase(),
