@@ -309,7 +309,6 @@ namespace orthia
         OPERAND_SIZE entryPoint = mod.peFile->GetImpl()->mappedPE.pImpl->addressOfEntryPoint;
         if (entryPoint)
         {
-            entryPoint += mod.peFile->GetImageBase();
             collector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
         }
         // report tls callbacks
