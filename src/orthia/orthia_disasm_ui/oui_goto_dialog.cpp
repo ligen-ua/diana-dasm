@@ -124,6 +124,14 @@ namespace oui
             console->FilterOrReplaceUnreadableSymbols(m_currentItems.back().visibleName);
         }
         std::sort(m_currentItems.begin(), m_currentItems.end());
+
+        for (auto& item : m_currentItems)
+        {
+            if (item.info.comment.native.empty())
+            {
+                item.info.comment = m_workPlace->QueryAddressName(item.info.address);
+            }
+        }
         UpdateVisibleItems();
     }
 
@@ -328,13 +336,15 @@ namespace oui
     CGotoDialog::CGotoDialog(const oui::CommonDialogStrings& dialogStrings,
         orthia::GotoCompleteHandler_type resultCallback,
         std::shared_ptr<orthia::IPeristentItemStorage> fileSystem,
+        std::shared_ptr<orthia::IWorkPlaceItem> workPlace,
         int scanFlags)
         :
             m_resultCallback(resultCallback),
             m_fileSystem(fileSystem),
             m_openingText(dialogStrings.openingText),
             m_errorText(dialogStrings.errorText),
-            m_scanFlags(scanFlags)
+            m_scanFlags(scanFlags),
+            m_workPlace(workPlace)
     {
         SetCaption(dialogStrings.caption);
 

@@ -118,6 +118,7 @@ namespace orthia
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
         virtual MarkupRangeInfo QueryMarkupRange(Address_type address) const = 0;
         virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const = 0;
+        virtual oui::String QueryAddressName(Address_type address) const = 0;
     };
 
 

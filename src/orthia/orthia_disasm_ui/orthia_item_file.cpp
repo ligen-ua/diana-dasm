@@ -268,6 +268,11 @@ namespace orthia
     {
         range.lines.clear();
     }
+    oui::String FileWorkplaceItem::QueryAddressName(Address_type address) const
+    {
+        return oui::String();
+    }
+
     // InsertModuleMetaInfo
     void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName)
     {

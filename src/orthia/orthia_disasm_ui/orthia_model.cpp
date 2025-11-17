@@ -47,7 +47,7 @@ namespace orthia
         m_fileSystem = std::make_shared<oui::CFileSystem>();
         m_processSystem = std::make_shared<oui::CProcessSystem>();
     }
-    ;
+    
     std::shared_ptr<IWorkPlaceItem> CProgramModel::GetActiveItem()
     {
         WorkplaceItem item;

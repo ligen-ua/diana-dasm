@@ -59,6 +59,8 @@ namespace oui
         int m_typesToHighlight = 0;
         bool m_readyToExit = false;
         int m_scanFlags = 0;
+        std::shared_ptr<orthia::IWorkPlaceItem> m_workPlace;
+
         void HighlightItem(int highlightItemOffset);
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
@@ -85,6 +87,7 @@ namespace oui
         CGotoDialog(const oui::CommonDialogStrings& dialogStrings,
             orthia::GotoCompleteHandler_type resultCallback,
             std::shared_ptr<orthia::IPeristentItemStorage> fileSystem,
+            std::shared_ptr<orthia::IWorkPlaceItem> workPlace, 
             int scanFlags = 0);
 
         ~CGotoDialog();

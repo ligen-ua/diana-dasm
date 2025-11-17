@@ -390,30 +390,7 @@ namespace orthia
         int importsCount = 0;
         CImportsCollector importsCollector(nameFilter, names, [this](auto address) {
          
-            {
-                auto it = m_exports.find(address);
-                if (it != m_exports.end())
-                {
-                    return it->second;
-                }
-            }
-            auto it = m_modulesIndex.lower_bound(address), it_end = m_modulesIndex.upper_bound(address);
-            if (it != m_modulesIndex.begin())
-            {
-                --it;
-            }
-            for ( ;it != it_end; ++it)
-            {
-                auto & module = m_modules[it->second];
-                if (module.IsInRange(address))
-                {
-                    oui::String res;
-                    res = module.name + OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(address - module.address));
-                    return res;
-                }
-            }
-            return oui::String();
-
+            return QueryAddressName(address);
         },
             count,
             importsCount);
@@ -499,4 +476,32 @@ namespace orthia
         }
         range.lines.push_back(it->second.native);
     }
+    oui::String CProcessWorkplaceItem::QueryAddressName(Address_type address) const
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+        {
+            auto it = m_exports.find(address);
+            if (it != m_exports.end())
+            {
+                return it->second;
+            }
+        }
+        auto it = m_modulesIndex.lower_bound(address), it_end = m_modulesIndex.upper_bound(address);
+        if (it != m_modulesIndex.begin())
+        {
+            --it;
+        }
+        for (; it != it_end; ++it)
+        {
+            auto& module = m_modules[it->second];
+            if (module.IsInRange(address))
+            {
+                oui::String res;
+                res = module.name + OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(address - module.address));
+                return res;
+            }
+        }
+        return oui::String();
+    }
+
 }

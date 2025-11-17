@@ -466,7 +466,8 @@ void CDisasmWindow::Event_Goto()
         }
         return oui::fsui::OpenResult();
     },
-        activeItem->GetPersistentStorage()));
+        activeItem->GetPersistentStorage(),
+        activeItem));
     dialog->Dock();
 }
 
