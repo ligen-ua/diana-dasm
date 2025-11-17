@@ -199,6 +199,7 @@
     <ClCompile Include="ui_disasm_memory_writer.cpp" />
     <ClCompile Include="ui_disasm_window.cpp" />
     <ClCompile Include="ui_en.cpp" />
+    <ClCompile Include="ui_help.cpp" />
     <ClCompile Include="ui_main_window.cpp" />
     <ClCompile Include="ui_menu.cpp" />
     <ClCompile Include="ui_modules_window.cpp" />
@@ -222,6 +223,7 @@
     <ClInclude Include="ui_common.h" />
     <ClInclude Include="ui_disasm_memory_writer.h" />
     <ClInclude Include="ui_disasm_window.h" />
+    <ClInclude Include="ui_help.h" />
     <ClInclude Include="ui_main_window.h" />
     <ClInclude Include="ui_modules_window.h" />
     <ClInclude Include="ui_output_window.h" />

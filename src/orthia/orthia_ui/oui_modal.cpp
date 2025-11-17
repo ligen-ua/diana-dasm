@@ -280,6 +280,9 @@ namespace oui
     {
         return m_colorProfile;
     }
+    void CModalWindow::OnPreDock(Rect & rect)
+    {
+    }
     void CModalWindow::Dock()
     {
         auto parent = GetParent();
@@ -295,6 +298,7 @@ namespace oui
         rect.position.y += yBorder;
         rect.size.width -= xBorder * 2;
         rect.size.height -= yBorder * 2;
+        OnPreDock(rect);
         this->MoveTo(rect.position);
         this->Resize(rect.size);
     }
@@ -305,7 +309,7 @@ namespace oui
             m_onDestroy(onDestroy)
     {
         auto labelProfile = std::shared_ptr<LabelColorProfile>(m_colorProfile, &m_colorProfile->label);
-        m_fileLabel = std::make_shared<CLabel>(labelProfile, getText);
+        m_textLabel = std::make_shared<CLabel>(labelProfile, getText);
     }
     void CMessageBoxWindow::OnFinishDialog()
     {
@@ -318,7 +322,7 @@ namespace oui
     }
     void CMessageBoxWindow::ConstructChilds()
     {
-        AddChild(m_fileLabel);
+        AddChild(m_textLabel);
     }
     bool CMessageBoxWindow::Resize(const Size& newSize)
     {
@@ -333,7 +337,7 @@ namespace oui
         if (clientRect.size.width < 5 || clientRect.size.height < 3)
         {
             Size zeroSize;
-            m_fileLabel->Resize(zeroSize);
+            m_textLabel->Resize(zeroSize);
             return;
         }
 
@@ -343,8 +347,8 @@ namespace oui
         fileEditRect.size.width -= 4;
         fileEditRect.size.height = 1;
 
-        m_fileLabel->MoveTo(fileEditRect.position);
-        m_fileLabel->Resize(fileEditRect.size);
+        m_textLabel->MoveTo(fileEditRect.position);
+        m_textLabel->Resize(fileEditRect.size);
         Parent_type::OnResize();
     }
 

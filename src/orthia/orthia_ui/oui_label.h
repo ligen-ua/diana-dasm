@@ -16,6 +16,7 @@ namespace oui
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         String GetText() const;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
+        void SetColorProfile(std::shared_ptr<LabelColorProfile> colorProfile);
     };
 
 }

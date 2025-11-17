@@ -1,5 +1,6 @@
 #include "ui_main_window.h"
 #include "oui_open_process_dialog.h"
+#include "ui_help.h"
 
 void CMainWindow::ToggleMenu(bool openPopup)
 {
@@ -212,6 +213,14 @@ void CMainWindow::ToggleWorkspaceView()
         m_workspaceWindow->SetFocus();
     }
 }
+void CMainWindow::ShowAbout()
+{
+    auto waitBox = AddChildAndInit_t(std::make_shared<oui::CAboutBoxWindow>());
+    waitBox->Dock();
+}
+void CMainWindow::ShowHelp()
+{
+}
 void CMainWindow::ConstuctMenu()
 {
     auto uiMenuTextNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.menu"));
@@ -284,12 +293,12 @@ void CMainWindow::ConstuctMenu()
         {
             {
                 L"&Help",
-                []() {},
+                [this]() { ShowHelp(); },
                 oui::Hotkey(oui::VirtualKey::kH)
             },
             {
                 L"&About",
-                []() {},
+                [this]() { ShowAbout();  },
                 oui::Hotkey(oui::VirtualKey::kA)
             }
         };

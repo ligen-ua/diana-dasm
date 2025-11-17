@@ -56,4 +56,8 @@ namespace oui
         Invalidate(false);
         return true;
     }
+    void CLabel::SetColorProfile(std::shared_ptr<LabelColorProfile> colorProfile)
+    {
+        m_colorProfile = colorProfile;
+    }
 }

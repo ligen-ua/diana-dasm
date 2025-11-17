@@ -52,6 +52,8 @@ namespace oui
             const Point& currentPoint,
             std::shared_ptr<CWindow> wnd,
             const Rect& initialRect);
+        virtual void OnPreDock(Rect& rect);
+
     public:
         CModalWindow();
 
@@ -69,10 +71,10 @@ namespace oui
 
     class CMessageBoxWindow :public oui::SimpleBrush<CModalWindow>
     {
+    protected:
         using Parent_type = oui::SimpleBrush<CModalWindow>;
 
-    protected:
-        std::shared_ptr<CLabel> m_fileLabel;
+        std::shared_ptr<CLabel> m_textLabel;
         std::function<void()> m_onDestroy;
 
         void OnFinishDialog() override;

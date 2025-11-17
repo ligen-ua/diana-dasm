@@ -46,6 +46,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
     void OpenExecutable();
     void OpenProcess();
+    void ShowAbout();
+    void ShowHelp();
     void ToggleWorkspaceView();
 
     oui::fsui::OpenResult HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
