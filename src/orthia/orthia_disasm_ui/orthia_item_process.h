@@ -39,6 +39,8 @@ namespace orthia
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
+        MarkupRangeInfo QueryMarkupRange(Address_type address) const override;
+        void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const override;
     };
 
 }

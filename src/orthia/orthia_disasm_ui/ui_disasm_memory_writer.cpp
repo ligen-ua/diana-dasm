@@ -37,17 +37,19 @@ namespace oui
     // MemoryPrinter
     MemoryPrinter::MemoryPrinter(DisasmWriter* pTextPrinter,
         int dianaMode,
-        orthia::Address_type startAddress,
+        const oui::LineIndex& startAddress,
         orthia::Address_type sizeInCommands,
-        DisasmWriter& writer)
+        std::shared_ptr<orthia::IWorkPlaceItem> workspaceItem)
         :
         Parent_type(pTextPrinter,
             dianaMode,
-            startAddress,
+            startAddress.GetIndex(),
             sizeInCommands),
-        m_writer(writer),
+        m_writer(*pTextPrinter),
         m_firstVirtualOffset(startAddress),
-        m_pTextPrinter(pTextPrinter)
+        m_pTextPrinter(pTextPrinter),
+        m_workspaceItem(workspaceItem),
+        m_startAddress(startAddress)
     {
         QueryDefaultColorProfile(m_colors);
         m_bytesIdent += 10;
@@ -67,6 +69,58 @@ namespace oui
     void MemoryPrinter::PrintCommand(unsigned long long address,
         const std::wstring& bytes,
         const std::wstring& command)
+    {
+        std::shared_ptr<DisasmLineContextTag> tag = std::make_shared<DisasmLineContextTag>();
+        tag->index = oui::LineIndex(address, 0);
+        PrintCommandEx(address, bytes, command, tag);
+    }
+    void MemoryPrinter::PrintCommand(const oui::LineIndex& address,
+        const std::wstring& bytes,
+        const std::wstring& command)
+    {
+        std::shared_ptr<DisasmLineContextTag> tag = std::make_shared<DisasmLineContextTag>();
+        tag->index = address;
+        PrintCommandEx(address.GetIndex(), bytes, command, tag);
+    }
+    void MemoryPrinter::PrintMetaInfo(const oui::LineIndex& address,
+        const std::wstring& text)
+    {
+        std::shared_ptr<DisasmLineContextTag> tag = std::make_shared<DisasmLineContextTag>();
+        tag->index = address;
+
+        m_currentBlock.clear();
+        // pack address
+        if (m_dianaMode < 8)
+        {
+            m_currentBlock.append(orthia::ToWideStringAsHex((unsigned int)address.GetIndex()));
+        }
+        else
+        {
+            m_currentBlock.append(orthia::Address64ToString(address.GetIndex()));
+        }
+        m_textMarkupBuilder.AddNextRange(m_currentBlock.size(), m_colors.address, g_region_id_address, oui::TextMarkup::flag_ManualHighlight);
+
+        // pack spaces
+        m_currentBlock.append(m_countOfSpacesAfterAddress, L' ');
+        m_textMarkupBuilder.AddNextRange(m_countOfSpacesAfterAddress, m_colors.spaces);
+
+        // pack spaces
+        m_currentBlock.append(L"; ");
+        m_textMarkupBuilder.AddNextRange(2, m_colors.bytes);
+
+        // pack command
+        auto oldSize = m_currentBlock.size();
+        m_currentBlock.append(text);
+        m_textMarkupBuilder.AddNextRange(m_currentBlock.size() - oldSize, m_colors.generalMeta);
+
+        m_pTextPrinter->PrintLine(m_currentBlock, m_textMarkupBuilder.Build(), tag);
+
+        m_operands.clear();
+    }
+    void MemoryPrinter::PrintCommandEx(unsigned long long address,
+        const std::wstring& bytes,
+        const std::wstring& command,
+        std::shared_ptr<DisasmLineContextTag> tag)
     {
         m_currentBlock.clear();
         // pack address
@@ -112,8 +166,7 @@ namespace oui
             m_textMarkupBuilder.AddNextRange(command.size() - lastOffset, m_colors.command);
         }
         
-        std::shared_ptr<DisasmLineContextTag> tag = std::make_shared<DisasmLineContextTag>();
-        tag->address = address;
+
         Diana_AnalyzeJumps(&m_pDianaPrintContext->result, 
             address + m_pDianaPrintContext->result.iFullCmdSize, 
             &tag->newOffset, 
@@ -127,7 +180,7 @@ namespace oui
 
             m_currentBlock.append(3, L' ');
             m_currentBlock.append(L"; ");
-            if (tag->newOffset > tag->address)
+            if (tag->newOffset > tag->index.GetIndex())
             {
                 m_currentBlock.append(1, L'\x2193');
             }
@@ -149,6 +202,148 @@ namespace oui
         m_pDataFlags = pDataFlags;
         m_routeStart = routeStart;
     }
+
+    void MemoryPrinter::OnRange(const orthia::VmMemoryRangeInfo& vmRange,
+        const char* pDataStart)
+    {
+        if (m_currentCommand >= m_sizeInCommands)
+        {
+            return;
+        }
+        bool reportNoData = false;
+        if (!vmRange.HasData())
+        {
+            if (!m_printInvalidPages)
+            {
+                PrintCommand(vmRange.address, L"??", L"???");
+                throw std::runtime_error("Memory access error");
+            }
+            reportNoData = true;
+        }
+
+        DianaPrintContext ctx;
+        m_pDianaPrintContext = &ctx;
+        ::DianaParserResult& result = ctx.result;
+        ::DianaMemoryStream& stream = ctx.stream;
+        ::DianaContext& context = ctx.context;
+
+        Diana_InitContext(&context, m_dianaMode);
+        Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
+        
+        std::wstring temp, binaryData;
+        oui::LineIndex virtualOffset = oui::LineIndex(vmRange.address, 0);
+        size_t offsetInPage = 0;
+        bool prevWasBad = false;
+        orthia::MarkupRange markupRange;
+        for (; m_currentCommand < m_sizeInCommands; )
+        {
+            if (!(virtualOffset < m_startAddress))
+            {
+                auto commandsToDeliver = m_sizeInCommands - m_currentCommand;
+                m_workspaceItem->QueryMarkupRange(virtualOffset.GetIndex(), virtualOffset.GetSubIndex(), (int)commandsToDeliver, markupRange);
+                for (auto& line : markupRange.lines)
+                {
+                    PrintMetaInfo(virtualOffset, line.native);
+                    virtualOffset.IncSubIndex();
+                    ++m_currentCommand;
+                }
+                if (m_currentCommand >= m_sizeInCommands)
+                {
+                    break;
+                }
+            }
+            int iRes = 0;
+            if (reportNoData || this->IsBadByte(virtualOffset.GetIndex()))
+            {
+                prevWasBad = true;
+                int bytesRead = 0;
+                char data = 0;
+
+                if (context.cacheSize)
+                {
+                    Diana_CacheEatOneSafe(&context);
+                    iRes = 0;
+                }
+                else
+                {
+                    iRes = stream.parent.parent.parent.pReadFnc(&stream,
+                        &data,
+                        1,
+                        &bytesRead);
+                }
+                result.iFullCmdSize = 1;
+                result.iLinkedOpCount = 0;
+                result.pInfo = Diana_GetNopInfo();
+            }
+            else
+            {
+                if (prevWasBad)
+                {
+                    Diana_ClearCache(&context);
+                }
+                prevWasBad = false;
+                iRes = Diana_ParseCmd(&context, Diana_GetRootLine(), &stream.parent.parent.parent, &result);
+            }
+            if (iRes == DI_END)
+            {
+                break;
+            }
+            bool print = true, exit = false;
+            Preprocess(iRes, context, result, virtualOffset.GetIndex(), &print, &exit);
+            if (iRes)
+            {
+                temp = orthia::ToHexString(pDataStart + offsetInPage, 1);
+                if (print)
+                {
+                    if (prevWasBad)
+                    {
+                        PrintCommand(virtualOffset, L"??", L"???");
+                    }
+                    else
+                    {
+                        std::wstring dbCommand = L"db";
+                        dbCommand.append(m_spacesCount, L' ');
+                        PrintCommand(virtualOffset, temp, dbCommand + temp);
+                    }
+                }
+                ++offsetInPage;
+                virtualOffset.IncIndex();
+                DI_CHECK_CPP(stream.parent.parent.pMoveTo(&stream.parent.parent, offsetInPage));
+                Diana_ClearCache(&context);
+
+                if (exit)
+                {
+                    break;
+                }
+                continue;
+            }
+            if (print)
+            {
+                ++m_currentCommand;
+                if (prevWasBad)
+                {
+                    PrintCommand(virtualOffset, L"??", L"???");
+                }
+                else
+                {
+                    temp = orthia::ToWideString(Parent_type::m_writer.Assign(&result, virtualOffset.GetIndex()));
+                    binaryData = orthia::ToHexString(pDataStart + offsetInPage, result.iFullCmdSize);
+
+                    PrintCommand(virtualOffset, binaryData, temp);
+                }
+            }
+            offsetInPage += result.iFullCmdSize;
+            virtualOffset.IncIndex(result.iFullCmdSize);
+
+            if (exit)
+            {
+                break;
+            }
+        }
+
+        m_pDianaPrintContext = 0;
+    }
+
     bool MemoryPrinter::IsBadByte(orthia::Address_type virtualOffset)
     {
         if (m_pDataFlags)
@@ -176,13 +371,13 @@ namespace oui
         {
             if (m_firstPrint)
             {
-                m_firstVirtualOffset = virtualOffset;
+                m_firstVirtualOffset = oui::LineIndex(virtualOffset, 0);
                 m_firstPrint = false;
             }
             m_writer.lastCmdSize = result.iFullCmdSize;
         }
     }
-    orthia::Address_type MemoryPrinter::GetRealFirstAddress() const
+    oui::LineIndex  MemoryPrinter::GetRealFirstAddress() const
     {
         return m_firstVirtualOffset;
     }

@@ -66,7 +66,8 @@ namespace orthia
     {
         const orthia::ModuleInfo* m_moduleInfo = 0;
         std::unordered_map<orthia::Address_type, oui::String> m_exports;
-    
+        bool m_fixupAddresses = false;
+
         ExportsCollector()
         {
         }
@@ -90,11 +91,45 @@ namespace orthia
             {
                 return;
             }
-            orthia::Address_type fncAddress = m_moduleInfo->address + *pAddress;
+            orthia::Address_type fncAddress =  *pAddress;
+            if (m_fixupAddresses)
+            {
+                fncAddress += m_moduleInfo->address;
+            }
             m_exports[fncAddress] = m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName);
         }
     };
-
+    template<class T, class Stream, class DianaPeFile>
+    void DeliverExtraExports(T& exportsCollector, Address_type moduleAddress, OPERAND_SIZE entryPoint, Stream& stream,
+        DianaPeFile& dianaPeFile)
+    {
+        if (entryPoint && entryPoint != moduleAddress)
+        {
+            exportsCollector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
+        }
+        // report tls callbacks
+        void* pTlsCallbacks = 0;
+        int tlsCallbacksCount = 0;
+        OPERAND_SIZE addressOfTLSIndex = 0;
+        if (!DianaPeFile_QueryTLSCallbacks(&dianaPeFile,
+            moduleAddress,
+            &stream,
+            &pTlsCallbacks,
+            &tlsCallbacksCount,
+            &addressOfTLSIndex,
+            DIANA_ANALYZE_RANDOM_READ_ABSOLUTE))
+        {
+            char* pTls = (char*)pTlsCallbacks;
+            for (int i = 0; i < tlsCallbacksCount; ++i)
+            {
+                OPERAND_SIZE callback = Diana_ReadValue(pTls, dianaPeFile.pImpl->dianaMode);
+                auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
+                exportsCollector.QueryFunctionByName("$", name.c_str(), 0, &callback);
+                pTls += dianaPeFile.pImpl->dianaMode;
+            }
+            DIANA_FREE(pTlsCallbacks);
+        }
+    }
     void CProcessWorkplaceItem::ReloadModules()
     {
         std::vector<char> page(0x4000);
@@ -105,6 +140,10 @@ namespace orthia
             [&](const orthia::ModuleInfo& moduleInfo, oui::ModuleDisasmContext& context) {
 
             exportsCollector.SetCurrentModule(&moduleInfo);
+
+            exportsCollector.m_fixupAddresses = false;
+            DeliverExtraExports(exportsCollector, moduleInfo.address, moduleInfo.entryPoint, *context.stream, *context.dianaPeFile);
+            exportsCollector.m_fixupAddresses = true;
             DianaPeFile_QueryExports(context.dianaPeFile, &context.stream->parent, page.data(), (int)page.size(), exportsCollector.GetParent(), 0);
         });
 
@@ -407,32 +446,8 @@ namespace orthia
                 moduleAddress);
 
             exportsCollector.SetFound(importsCollector.IsMarkFound());
-            if (entryPoint && entryPoint != moduleAddress)
-            {
-                exportsCollector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
-            }
-            // report tls callbacks
-            void* pTlsCallbacks = 0;
-            int tlsCallbacksCount = 0;
-            OPERAND_SIZE addressOfTLSIndex = 0;
-            if (!DianaPeFile_QueryTLSCallbacks(&dianaPeFile, 
-                moduleAddress, 
-                &stream, 
-                &pTlsCallbacks, 
-                &tlsCallbacksCount, 
-                &addressOfTLSIndex, 
-                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE))
-            {
-                char * pTls = (char* )pTlsCallbacks;
-                for (int i = 0; i < tlsCallbacksCount; ++i)
-                {
-                    OPERAND_SIZE callback = Diana_ReadValue(pTls, dianaPeFile.pImpl->dianaMode);
-                    auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
-                    exportsCollector.QueryFunctionByName("$", name.c_str(), 0, &callback);
-                    pTls += dianaPeFile.pImpl->dianaMode;
-                }
-                DIANA_FREE(pTlsCallbacks);
-            }
+
+            DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, dianaPeFile);
 
             // report regular exports
             DianaPeFile_QueryExports(&dianaPeFile,
@@ -460,5 +475,28 @@ namespace orthia
         std::vector<NameInfo> names;
         QueryNamesEx(moduleAddress, name, 0, names, &totalCount);
         return totalCount;
+    }
+
+    MarkupRangeInfo CProcessWorkplaceItem::QueryMarkupRange(Address_type address) const
+    {
+        auto it = m_exports.find(address);
+        if (it == m_exports.end())
+        {
+            return MarkupRangeInfo();
+        }
+        MarkupRangeInfo res;
+        res.sizeInLines = 1;
+        return res;
+    }
+    void CProcessWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const
+    {
+        range.lines.clear();
+
+        auto it = m_exports.find(address);
+        if (it == m_exports.end())
+        {
+            return;
+        }
+        range.lines.push_back(it->second.native);
     }
 }

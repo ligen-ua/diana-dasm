@@ -12,7 +12,8 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
         {
         }
     };
-    static const int field_peAddress = 1;
+    static const int field_peAddress_index = 1;
+    static const int field_peAddress_subIndex = 2;
 
     using Parent_type = oui::SimpleBrush<oui::CPanelWindow>;
 
@@ -20,8 +21,7 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
 
     // these vars form a content iterator
     int m_metaInfoPos = 0;
-    DI_UINT64 m_peAddress = 0;
-    DI_UINT64 m_peAddressEnd = 0;
+    oui::LineIndex m_peAddress;
 
     int m_itemUid = -1;
 

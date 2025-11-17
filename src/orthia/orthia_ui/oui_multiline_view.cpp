@@ -474,12 +474,15 @@ namespace oui
         std::vector<MultiLineViewItem> lines;
         Init(std::move(lines));
     }
-    void CMultiLineView::Init(std::vector<MultiLineViewItem>&& lines)
+    void CMultiLineView::Init(std::vector<MultiLineViewItem>&& lines, bool cancelSelection)
     {
         m_cursorOutOfText = false;
         m_firstVisibleLineIndex = 0;
         m_lines = std::move(lines);
-        CancelSelection();
+        if (cancelSelection)
+        {
+            CancelSelection();
+        }
         SetNewYCursorPosImpl(m_yCursopPos);
         Invalidate();
     }

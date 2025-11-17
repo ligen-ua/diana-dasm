@@ -32,6 +32,8 @@ namespace orthia
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
 
         int GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const;
+        MarkupRangeInfo QueryMarkupRange(Address_type address) const override;
+        void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const override;
     };
 
     class CClassicDatabase;

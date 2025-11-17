@@ -91,6 +91,15 @@ namespace orthia
         int flags = 0;
     };
 
+    struct MarkupRangeInfo
+    {
+        int sizeInLines = 0;
+    };
+
+    struct MarkupRange
+    {
+        std::vector<oui::String> lines;
+    };
 
     struct IPeristentItemStorage;
     struct IWorkPlaceItem
@@ -107,6 +116,8 @@ namespace orthia
         virtual int GetDianaMode() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo> & names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
+        virtual MarkupRangeInfo QueryMarkupRange(Address_type address) const = 0;
+        virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const = 0;
     };
 
 

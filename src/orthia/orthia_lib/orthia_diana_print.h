@@ -225,6 +225,7 @@ namespace orthia
     template<class AsmCommandWriterType>
     class CSubrangeMemoryPrinter:public CVmAsmMemoryPrinter<AsmCommandWriterType>
     {
+    protected:
         orthia::Address_type m_startAddress;
         orthia::Address_type m_sizeInCommands;
         orthia::Address_type m_reportedCommands;

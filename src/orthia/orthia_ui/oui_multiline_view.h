@@ -70,7 +70,10 @@ namespace oui
         {
             return m_index;
         }
-
+        int GetSubIndex() const
+        {
+            return m_subIndex;
+        }
         int CompareWith(const LineIndex& other) const
         {
             if (m_index < other.m_index) {
@@ -86,6 +89,15 @@ namespace oui
                 return 1;
             }
             return 0;
+        }
+        void IncIndex(int addBytes = 1)
+        {
+            m_index += addBytes;
+            m_subIndex = 0;
+        }
+        void IncSubIndex()
+        {
+            ++m_subIndex;
         }
     };
 
@@ -221,7 +233,7 @@ namespace oui
         bool PaintInProgress() const;
 
         void Clear();
-        void Init(std::vector<MultiLineViewItem>&& lines);
+        void Init(std::vector<MultiLineViewItem>&& lines, bool cancelSelection = true);
         void AddLine(MultiLineViewItem && item);
         std::pair<MultiLineViewItem, bool> GetItem(int offsetInPage);
         MultiLineViewItem GetCurrentItem() const;

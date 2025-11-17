@@ -10,6 +10,11 @@
 // [FUNCTION HEADER]
 // [INSTRUCTION HEADER]
 
+std::shared_ptr<oui::DisasmLineContextTag> GetDisasmTag(std::shared_ptr<oui::IMultilineViewTag> interfaceTag)
+{
+    return std::static_pointer_cast<oui::DisasmLineContextTag>(interfaceTag);
+}
+
 std::shared_ptr<oui::DisasmLineContextTag> GetDisasmTag(oui::MultiLineViewItem& item)
 {
     return std::static_pointer_cast<oui::DisasmLineContextTag>(item.interfaceTag);
@@ -43,7 +48,8 @@ void CDisasmWindow::PrepareParameters(UIState& state, int itemUid, DI_UINT64 ini
         address = range.entryPoint;
     }
    
-    state.addresses[field_peAddress] = address;
+    state.addresses[field_peAddress_index] = address;
+    state.addresses[field_peAddress_subIndex] = 0;
 }
 
 void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
@@ -58,7 +64,8 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     {
         return;
     }
-    auto rangeInfo = item->GetRangeInfo(m_peAddress);
+
+    auto rangeInfo = item->GetRangeInfo(m_peAddress.GetIndex());
 
     const int maxStepForwardBytes = 1024;
     const int maxStepBackwardBytes = context.scrollUp ? 256: 0;
@@ -66,14 +73,14 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     orthia::Address_type routeStart = 0;
     if (auto moduleManager = item->GetModuleManager())
     {
-        routeStart = moduleManager->QueryRouteStart(m_peAddress);
+        routeStart = moduleManager->QueryRouteStart(m_peAddress.GetIndex());
     }
-    if (!routeStart || (m_peAddress - routeStart) > (orthia::Address_type)maxStepBackwardBytes)
+    if (!routeStart || (m_peAddress.GetIndex() - routeStart) > (orthia::Address_type)maxStepBackwardBytes)
     {
         // no route or it it too far away (which is strange, whatever)
-        if (m_peAddress > maxStepBackwardBytes)
+        if (m_peAddress.GetIndex() > maxStepBackwardBytes)
         {
-            routeStart = m_peAddress - maxStepBackwardBytes;
+            routeStart = m_peAddress.GetIndex() - maxStepBackwardBytes;
         }
         else
         {
@@ -94,10 +101,10 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
         rangeInfo.dianaMode,
         m_peAddress,
         requiredLinesCount,
-        writer);
+        item);
 
     // determine final size
-    const orthia::Address_type maxSizeToUse = maxStepForwardBytes + (m_peAddress - routeStart);
+    const orthia::Address_type maxSizeToUse = maxStepForwardBytes + (m_peAddress.GetIndex() - routeStart);
 
     // query metadata
     std::vector<orthia::CommonRangeInfo> rangeInfoVec;
@@ -125,7 +132,7 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     printer.SetFlags(data.pDataFlags, routeStart);
     printer.OnRange(vmRangeInfo, data.pDataStart);
 
-    m_view->Init(std::move(writer.items));
+    m_view->Init(std::move(writer.items), false);
 
     if (context.scrollUp)
     {
@@ -221,21 +228,22 @@ void CDisasmWindow::OnPaintStart(std::shared_ptr<oui::CEditBox> editBox)
 
 oui::LineIndex CDisasmWindow::GetLineIndex(int offsetInPage) const
 {
-    OPERAND_SIZE address = 0;
+    oui::LineIndex index;
     auto pair = m_view->GetItem(offsetInPage);
     auto tag = GetDisasmTag(pair.first);
     if (tag)
     {
         if (pair.second)
         {
-            address = tag->address;
+            index = tag->index;
         }
         else
         {
-            address = tag->address + pair.first.intTag;
+            // return address of last command + size of command
+            index = oui::LineIndex(tag->index.GetIndex(), tag->index.GetSubIndex() + 1);
         }
     }
-    return oui::LineIndex(address, 0);
+    return index;
 }
 bool CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count) 
 {
@@ -251,13 +259,20 @@ bool CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
         }
         --count;
     }
-    if (m_peAddress > count)
+    if (count <= m_peAddress.GetSubIndex())
     {
-        m_peAddress -= count;
+        m_peAddress = oui::LineIndex(m_peAddress.GetIndex(), m_peAddress.GetSubIndex() - count);
     }
     else
-    {
-        m_peAddress = 0;
+    {       
+        if (m_peAddress.GetIndex() > count)
+        {
+            m_peAddress = oui::LineIndex(m_peAddress.GetIndex() - count, 0);
+        }
+        else
+        {
+            m_peAddress = oui::LineIndex(0, 0);
+        }
     }
     ReloadVisibleDataContext context;
     context.scrollUp = true;
@@ -266,6 +281,12 @@ bool CDisasmWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
 }
 bool CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count) 
 {
+    auto workplaceItem = m_model->GetItem(m_itemUid);
+    if (!workplaceItem)
+    {
+        return true;
+    }
+
     const int maxLinesCount = m_view->GetSize().height;
     int countToUse = count;
     if (count > 1)
@@ -283,13 +304,17 @@ bool CDisasmWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
         countToUse /= 2;
     }
     // count instructions here
-    int bytesCount = 0;
-    int index = 0;
+    std::shared_ptr<oui::IMultilineViewTag> interfaceTag;
+    int index = -1;
     for (auto it = m_view->VisibleItemsBegin(), it_end = m_view->VisibleItemsEnd(); it != it_end && index < countToUse; ++it, ++index)
     {
-        bytesCount += it->intTag;
+        interfaceTag = it->interfaceTag;
     }
-    m_peAddress += bytesCount;
+    auto disasm = GetDisasmTag(interfaceTag);
+    if (disasm)
+    {
+        m_peAddress = disasm->index;
+    }
     ReloadVisibleData();
     return true;
 }
@@ -313,20 +338,24 @@ void CDisasmWindow::SetFocusImpl()
 
 void CDisasmWindow::ReloadState(const UIState& state)
 {
-    {
-        auto it = state.addresses.find(field_peAddress);
-        if (it != state.addresses.end())
-        {
-            m_peAddress = it->second;
-        }
-    }
-    m_peAddressEnd = 0;
+    std::uint64_t index = 0;
+    int subIndex = 0;
+    Apply(state.addresses, field_peAddress_index,
+        [&](auto& value) { index = value; },
+        [&]() { index = 0; }
+    );
+    Apply(state.addresses, field_peAddress_subIndex,
+        [&](auto& value) { subIndex = (int)value; },
+        [&]() { subIndex = 0; }
+    );
+    m_peAddress = oui::LineIndex(index, subIndex);
     m_metaInfoPos = 0;
 }
 
 void CDisasmWindow::SaveState(UIState& state)
 {
-    state.addresses[field_peAddress] = m_peAddress;
+    state.addresses[field_peAddress_index] = m_peAddress.GetIndex();
+    state.addresses[field_peAddress_subIndex] = m_peAddress.GetSubIndex();
 }
 
 void CDisasmWindow::SetActiveWorkspaceItem(int itemId)
@@ -350,28 +379,30 @@ void CDisasmWindow::DoGoto(orthia::Address_type address, orthia::Address_type pa
             return;
         }
     }
+    std::uint64_t targetAddress = 0;
     if (hasPageAddress)
     {
-        m_peAddress = pageAddress;
+        targetAddress = pageAddress;
         auto wndHeight = m_view->GetClientRect().size.height;
         if (wndHeight)
         {
-            if (address > wndHeight && m_peAddress < (address - wndHeight))
+            if (address > wndHeight && targetAddress < (address - wndHeight))
             {
-                m_peAddress = address - wndHeight + 1;
+                targetAddress = address - wndHeight + 1;
             }
         }
     }
     else
     {
-        m_peAddress = address;
+        targetAddress = address;
     }
+    m_peAddress = oui::LineIndex(targetAddress, 0);
     m_view->Clear();
     m_view->SetCursorYPos(0);
     ReloadVisibleData();
     if (hasPageAddress && !DoGotoOnPage(address))
     {
-        m_peAddress = address;
+        m_peAddress = oui::LineIndex(address, 0);
         m_view->Clear();
         ReloadVisibleData();
     }
@@ -402,7 +433,7 @@ void CDisasmWindow::AsyncRememberCurrentPosition(oui::OperationPtr_type<orthia::
         operation,
         currentItem.GetIndex(),
         orthia::IPeristentItemStorage::goto_flags_history_mode,
-        m_peAddress);
+        m_peAddress.GetIndex());
 }
 
 void CDisasmWindow::DoGotoRequest(orthia::Address_type address)

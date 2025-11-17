@@ -260,7 +260,14 @@ namespace orthia
     {
         return peFile->GetImpl()->mappedPE.pImpl->dianaMode;
     }
-
+    MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address) const
+    {
+        return MarkupRangeInfo();
+    }
+    void FileWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const
+    {
+        range.lines.clear();
+    }
     // InsertModuleMetaInfo
     void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName)
     {

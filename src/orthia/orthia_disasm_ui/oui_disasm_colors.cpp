@@ -60,6 +60,17 @@ namespace oui
                 ColorBrightGreen(),      // text
                 ColorBlack(),          // background
             }
+        },
+        // generalMeta
+        {
+            {
+                ColorBrightYellow(),      // text
+                ColorBlack(),      // background
+            },
+            {
+                ColorBrightYellow(),      // text
+                ColorBlack(),          // background
+            }
         }
     };
     void QueryDefaultColorProfile(DisasmColorsProfile& profile)
