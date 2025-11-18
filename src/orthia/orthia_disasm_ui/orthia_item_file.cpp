@@ -300,31 +300,60 @@ namespace orthia
                 return false;
             });
 
-        CommonModuleInfo info;
-        if (classicDatabase->QueryModule(capturedModuleAddress, &info))
+        if (!range.lines.empty())
         {
-            for (auto& line : range.lines)
+            CommonModuleInfo info;
+            if (classicDatabase->QueryModule(capturedModuleAddress, &info))
             {
-                line.native = info.name + OUI_TCSTR("!") + line.native;
+                for (auto& line : range.lines)
+                {
+                    line.native = info.name + OUI_TCSTR("!") + line.native;
+                }
             }
         }
     }
     oui::String FileWorkplaceItem::QueryAddressName(Address_type address) const
     {
-        MarkupRange range;
-        QueryMarkupRange(address, 0, 1, range);
-        if (!range.lines.empty())
-        {
-            return range.lines.front();
-        }
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        Address_type capturedModuleAddress = 0;
+        Address_type capturedMetaAddress = 0;
+        std::string capturedMetaName;
+
+        classicDatabase->QueryMetaInfoByNearestAddress(g_database_type_fnc_Export,
+            address,
+            [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+        {
+            capturedModuleAddress = moduleAddress;
+            capturedMetaAddress = metaAddress;
+            Address_type target = 0;
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            parser.QueryMetadata("address", &target);
+            parser.QueryMetadata("name", &capturedMetaName);
+
+            return false;
+        });
 
         CommonModuleInfo info;
         if (classicDatabase->QueryNearestModule(address, &info))
         {
             oui::String res;
-            res = info.name + OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(address - info.address));
-            return res;
+            if (capturedMetaAddress > info.address)
+            {
+                Address_type diff = address - capturedMetaAddress;
+                res.native = info.name + OUI_TCSTR("!") + orthia::Utf8ToPlatformString(capturedMetaName);
+                if (diff)
+                {
+                    res.native += OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(diff)) + OUI_TCSTR("h");
+                }
+                return res;
+            }
+            else
+            {
+                oui::String res;
+                res = info.name + OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(address - info.address));
+                return res;
+            }
         }
         return oui::String();
     }
