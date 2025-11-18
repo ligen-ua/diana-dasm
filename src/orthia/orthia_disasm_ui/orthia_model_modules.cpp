@@ -301,7 +301,7 @@ namespace orthia
                 nameInfo.flags = orthia::NameInfo::flags_Export;
                 nameInfo.address = fncAddress;
                 nameInfo.name = orthia::Utf8ToPlatformString(pFunctionName);
-                m_mod.names.insert({ GetLastAddress() , nameInfo });
+                m_mod.names.insert({ fncAddress , nameInfo });
             }
         } collector(mod);
         DI_CHECK_CPP(mod.peFile->QueryExports(&collector));

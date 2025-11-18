@@ -43,8 +43,16 @@ void CClassicDatabase::Init()
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectReferencesTo.Get2(), NULL));
     buffer = "SELECT * FROM tbl_modules WHERE mod_address = ?1";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectModule.Get2(), NULL));
-    buffer = "SELECT * FROM tbl_modules ORDER BY mod_address";
+    
+    buffer = "SELECT mod_address, mod_size, mod_name  FROM tbl_modules ORDER BY mod_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtQueryModules.Get2(), NULL));
+    buffer = "SELECT mod_size, mod_name  FROM tbl_modules WHERE mod_address = ?1";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtQueryModuleById.Get2(), NULL));
+
+    buffer = "SELECT mod_address, mod_size, mod_name  FROM tbl_modules WHERE mod_address <= ?1";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtQueryNearestModuleById.Get2(), NULL));
+
+
     buffer = "SELECT ref_address_to, ref_address_from FROM tbl_references WHERE UINT_LESSOE(?1, ref_address_to) AND UINT_LESSOE(ref_address_to, ?2) ORDER BY ref_address_to, ref_address_from";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectReferencesToRange.Get2(), NULL));
     buffer = "SELECT ref_address_to FROM tbl_references WHERE ref_address_from = ?1 ORDER BY ref_address_to";
@@ -73,6 +81,9 @@ void CClassicDatabase::Init()
 
     buffer = "SELECT COUNT(meta_address) FROM tbl_metainfo WHERE ((meta_type == ?2) OR (?3 == -1 OR meta_type == ?3)) AND (meta_mod_id == ?1) ";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2_Count.Get2(), NULL));
+
+    buffer = "SELECT meta_mod_id, meta_type, meta_info FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address== ?2) ORDER BY meta_type, meta_address";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Address.Get2(), NULL));
 
 }
 
@@ -356,7 +367,59 @@ void CClassicDatabase::QueryReferencesFromInstructionsRange(Address_type address
         throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
 }
+bool CClassicDatabase::QueryModule(Address_type moduleAddress, CommonModuleInfo* pResult)
+{
+    orthia::CAutoCriticalSection guard(m_lock);
 
+    CSQLAutoReset autoStatement(m_stmtQueryModuleById.Get());
+    sqlite3_bind_int64(m_stmtQueryModuleById.Get(), 1, moduleAddress);
+
+    for (;;)
+    {
+        int stepResult = SQLiteStep_Wrapper(m_stmtQueryModuleById.Get());
+        if (stepResult == SQLITE_DONE)
+        {
+            break;
+        }
+        else
+            if (stepResult == SQLITE_ROW)
+            {
+                Address_type size = sqlite3_column_int64(m_stmtQueryModuleById.Get(), 0);
+                std::string name = (char*)sqlite3_column_text(m_stmtQueryModuleById.Get(), 1);
+                *pResult = CommonModuleInfo(moduleAddress, size, orthia::ToWideString(name));
+                return true;
+            }
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
+    }
+    return false;
+}
+bool CClassicDatabase::QueryNearestModule(Address_type address, CommonModuleInfo* pResult)
+{
+    orthia::CAutoCriticalSection guard(m_lock);
+
+    CSQLAutoReset autoStatement(m_stmtQueryNearestModuleById.Get());
+    sqlite3_bind_int64(m_stmtQueryNearestModuleById.Get(), 1, address);
+
+    for (;;)
+    {
+        int stepResult = SQLiteStep_Wrapper(m_stmtQueryNearestModuleById.Get());
+        if (stepResult == SQLITE_DONE)
+        {
+            break;
+        }
+        else
+            if (stepResult == SQLITE_ROW)
+            {
+                Address_type moduleAddress = sqlite3_column_int64(m_stmtQueryNearestModuleById.Get(), 0);
+                Address_type size = sqlite3_column_int64(m_stmtQueryNearestModuleById.Get(), 1);
+                std::string name = (char*)sqlite3_column_text(m_stmtQueryNearestModuleById.Get(), 2);
+                *pResult = CommonModuleInfo(moduleAddress, size, orthia::ToWideString(name));
+                return true;
+            }
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
+    }
+    return false;
+}
 void CClassicDatabase::QueryModules(std::vector<CommonModuleInfo> * pResult)
 {
     orthia::CAutoCriticalSection guard(m_lock);
@@ -466,6 +529,38 @@ void CClassicDatabase::QueryMetaInfoModule2(Address_type moduleAddress, int meta
         }
     }
 }
+
+
+void CClassicDatabase::QueryMetaInfoByAddress(int metaType, Address_type metaAddress, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler)
+{
+    orthia::CAutoCriticalSection guard(m_lock);
+
+    CSQLAutoReset autoStatement(m_stmtSelectMetainfo_Address.Get());
+    sqlite3_bind_int64(m_stmtSelectMetainfo_Address.Get(), 1, metaType);
+    sqlite3_bind_int64(m_stmtSelectMetainfo_Address.Get(), 2, metaAddress);
+    for (;;)
+    {
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_Address.Get());
+        if (stepResult == SQLITE_DONE)
+        {
+            break;
+        }
+        if (stepResult != SQLITE_ROW)
+        {
+            throw std::runtime_error("SQLiteStep_Wrapper failed");
+        }
+
+        // meta_mod_id, meta_address, meta_type, meta_info
+        Address_type moduleAddress = sqlite3_column_int64(m_stmtSelectMetainfo_Address.Get(), 0);
+        Address_type type = sqlite3_column_int64(m_stmtSelectMetainfo_Address.Get(), 1);
+        auto text = SQLReadUtf8String(m_stmtSelectMetainfo_Address.Get(), 2);
+        if (!handler(moduleAddress, (int)type, text, metaAddress))
+        {
+            break;
+        }
+    }
+}
+
 int CClassicDatabase::QueryMetaInfoModule2_Count(Address_type moduleAddress, int metaType1, int metaType2)
 {
     orthia::CAutoCriticalSection guard(m_lock);

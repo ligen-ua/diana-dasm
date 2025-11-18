@@ -468,7 +468,11 @@ namespace orthia
     void CProcessWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const
     {
         range.lines.clear();
-
+        if (index || count == 0)
+        {
+            // returning just a single line currently
+            return;
+        }
         auto it = m_exports.find(address);
         if (it == m_exports.end())
         {
