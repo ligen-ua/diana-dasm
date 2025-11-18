@@ -116,6 +116,7 @@ namespace oui
         void OnResize() override;
         void DoPaintImpl(const Rect& rect, DrawParameters& parameters);
         bool StartColumnDrag(const Point& lastMousePoint, int columnPos);
+        void OpenContextMenuItem(const Point& point, int targetColumn);
 
     public:
         CListBox(std::shared_ptr<DialogColorProfile> colorProfile, IListBoxOwner* owner);
@@ -161,10 +162,59 @@ namespace oui
         void Dock();
     };
 
-
+    void DefaultHighlightItem(std::shared_ptr<CListBox> filesBox, int highlightItemOffset, size_t containerSize);
     void DefaultShiftViewWindow(std::shared_ptr<CListBox> filesBox, int newOffset, size_t totalFilesAvailable_in);
 
-    
+    template<class Type>
+    class DefaultPredicate
+    {
+        std::function<oui::String(const Type& obj)> m_getStringHandler;
+    public:
+        template<class T>
+        DefaultPredicate(T&& value)
+            :
+            m_getStringHandler(std::forward<T>(value))
+        {
+        }
+        bool operator ()(const Type& obj, const String& symbol)
+        {
+            return StartsWith(m_getStringHandler(obj).native, symbol.native);
+        }
+    };
+    template<class OwnerType, class ContainerType, class Predicate>
+    bool DefaultShiftViewWindowToSymbol(OwnerType * owner, 
+        std::shared_ptr<CListBox> listBox,
+        const String& symbol, 
+        ContainerType& container, 
+        Predicate predicate)
+    {
+        const int totalProcessAvailable = (int)container.size();
+        const int selectionOffset = listBox->GetOffset() + listBox->GetSelectedPosition();
+
+        // scan forward till end
+        for (int i = selectionOffset + 1; i < totalProcessAvailable; ++i)
+        {
+            if (predicate(container[i], symbol.native))
+            {
+                owner->HighlightItem(i);
+                owner->UpdateVisibleItems();
+                return true;
+            }
+        }
+
+        // scan from start
+        for (int i = 0; i <= std::min((int)container.size() - 1, selectionOffset); ++i)
+        {
+            if (predicate(container[i], symbol.native))
+            {
+                owner->HighlightItem(i);
+                owner->UpdateVisibleItems();
+                return true;
+            }
+        }
+        return false;
+    }
+
     template<class OwnerType, class ContainerType, class ItemHandler>
     void DefaultUpdateVisibleItems(OwnerType owner,
         IListBoxOwner * ifaceOwner,

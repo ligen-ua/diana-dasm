@@ -3,6 +3,41 @@
 
 namespace oui
 {
+      
+     void CSelfHostedMultiLineViewOwner::CancelAllQueries()
+     {
+     }
+     bool CSelfHostedMultiLineViewOwner::SelectAll()
+     {
+         SF_GetView()->SelectAllCached();
+         return true;
+     }
+     void CSelfHostedMultiLineViewOwner::OnEnter()
+     {
+     }
+     void CSelfHostedMultiLineViewOwner::CopySelected(const oui::MultiLineSelPoint&, const oui::MultiLineSelPoint&)
+     {
+         auto selectedText = SF_GetView()->ExtractSelected();
+         auto console = SF_GetConsole();
+         if (console)
+         {
+             console->CopyTextToClipboard(selectedText);
+         }
+     }
+     oui::LineIndex CSelfHostedMultiLineViewOwner::GetLineIndex(int offsetInPage) const
+     {
+         return oui::LineIndex(offsetInPage, 0);
+     }
+     bool CSelfHostedMultiLineViewOwner::ScrollUp(oui::MultiLineViewItem* item, int count)
+     {
+         return false;
+     }
+     bool CSelfHostedMultiLineViewOwner::ScrollDown(oui::MultiLineViewItem* item, int count)
+     {
+         return false;
+     }
+
+
     void CMultiLineView::SetupHandlers()
     {
         EditBoxLowLevelHandlers handlers;

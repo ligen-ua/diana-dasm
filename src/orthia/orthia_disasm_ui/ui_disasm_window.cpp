@@ -442,7 +442,7 @@ void CDisasmWindow::DoGotoRequest(orthia::Address_type address)
     DoGoto(address, 0, false);
 }
 
-void CDisasmWindow::Event_Goto()
+void CDisasmWindow::Event_Goto(int scanFlags)
 {
     // create open dialog
     oui::CommonDialogStrings dialogStrings;
@@ -467,7 +467,8 @@ void CDisasmWindow::Event_Goto()
         return oui::fsui::OpenResult();
     },
         activeItem->GetPersistentStorage(),
-        activeItem));
+        activeItem,
+        scanFlags));
     dialog->Dock();
 }
 
@@ -509,6 +510,14 @@ bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& 
             if (!evt.keyState.HasModifiers() || evt.keyState.HasJustCtrl())
             {
                 Event_Goto();
+                handled = true;
+            }
+            break;
+
+        case oui::VirtualKey::kH:
+            if (!evt.keyState.HasModifiers() || evt.keyState.HasJustCtrl())
+            {
+                Event_Goto(orthia::IPeristentItemStorage::goto_flags_history_mode);
                 handled = true;
             }
             break;

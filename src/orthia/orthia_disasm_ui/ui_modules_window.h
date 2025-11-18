@@ -14,6 +14,7 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     std::shared_ptr<oui::DialogColorProfile> m_colorProfile;
 
     // left part
+    std::vector<orthia::ModuleInfo> m_lastModules;
     oui::ListBoxOwnerProxy m_modulesOwner;
     std::shared_ptr<oui::CListBox> m_modulesBox;
     std::shared_ptr<oui::CScrollable> m_modulesScrollable;
@@ -58,6 +59,7 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
 
     int Modules_GetTotalCount() const;
     void Modules_ShiftViewWindow(int newOffset);
+    bool Modules_ShiftViewWindowToSymbol(const oui::String& symbol);
 
     int Names_GetTotalCount() const;
     void Names_ShiftViewWindow(int newOffset);
@@ -68,6 +70,12 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     void GotoAddress(orthia::Address_type address);
     void VertScroll_OnStartDrag(const oui::Point& point);
 
+    template<class OwnerType, class ContainerType, class Predicate>
+    friend bool oui::DefaultShiftViewWindowToSymbol(OwnerType* owner,
+            std::shared_ptr<oui::CListBox> listBox,
+            const oui::String& symbol,
+            ContainerType& container,
+            Predicate predicate);
 public:
     CModulesWindow(std::function<oui::String()> getCaption, 
         std::shared_ptr<orthia::CProgramModel> model,
@@ -79,4 +87,7 @@ public:
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
     void ReloadState(const UIState& state) override;
     void SaveState(UIState& state)override;
+
+    void HighlightItem(int highlightItemOffset);
+
 };

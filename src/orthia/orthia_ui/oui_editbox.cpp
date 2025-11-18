@@ -494,6 +494,7 @@ namespace oui
         {
             ++m_selPosEnd;
         }
+        Invalidate();
     }
     bool CEditBox::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
@@ -850,6 +851,8 @@ namespace oui
     {
         m_lastMouseMovePoint = lastMouseMovePoint;
     }
+
+    bool g_test = false;
     void CEditBox::ResetSelection()
     {
         m_selPosStart = m_cursorIterator;

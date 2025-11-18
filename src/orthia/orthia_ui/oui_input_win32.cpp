@@ -185,6 +185,10 @@ namespace oui
         {
             return MouseState::DoubleClick;
         }
+        if (mouseEvent.dwEventFlags & MOUSE_MOVED)
+        {
+            return MouseState::None;
+        }
         if (mouseEvent.dwButtonState == 0)
         {
             if (mouseEvent.dwEventFlags == 0)
@@ -350,6 +354,7 @@ namespace oui
             {
                 continue;
             }
+
             if (event.keyEvent.valid &&
                 event.keyEvent.rawText.native.size() == 1)
             {

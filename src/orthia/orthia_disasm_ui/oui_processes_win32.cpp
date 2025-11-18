@@ -8,6 +8,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_log.h"
+#include "orthia_plugins_win32.h"
 
 namespace oui
 {
@@ -489,23 +490,10 @@ namespace oui
         }
     };
 
-
-    typedef HANDLE (WINAPI *OpenProcess_type)(
-            __in DWORD dwDesiredAccess,
-            __in BOOL bInheritHandle,
-            __in DWORD dwProcessId
-        );
-    typedef int(WINAPI *OrthiaInit_type)(
-        );
-    typedef void(WINAPI* OrthiaUninit_type)(
-        );
-
     class CProcessSystemImpl :public IProcessSystem
     {
-        OpenProcess_type m_openProcess;
-        orthia::CDll m_plugin;
-        OrthiaInit_type m_pluginInit;
-        OrthiaUninit_type m_pluginUninit;
+        orthia::OpenProcess_type m_openProcess = 0;
+        orthia::CWin32OpenProcessPlugin m_openProcessPlugin;
     public:
         CProcessSystemImpl()
         {
@@ -513,11 +501,6 @@ namespace oui
         }
         ~CProcessSystemImpl()
         {
-            if (m_pluginUninit)
-            {
-                m_pluginUninit();
-                m_pluginUninit = 0;
-            }
         }
         void LoadPlugins()
         {
@@ -525,53 +508,10 @@ namespace oui
             {
                 return;
             }
-            auto pluginFileName = orthia::GetCurrentModuleDir();
-            pluginFileName += L"orthia_proc_win32.dll";
-            int error = m_plugin.Reset_Silent(pluginFileName.c_str());
-            if (error)
+            if (m_openProcessPlugin.Load())
             {
-                return;
+                m_openProcess = m_openProcessPlugin.GetOpenProcess();
             }
-            std::string orthiaOpenProcessName("OrthiaOpenProcess");
-            std::string orthiaInitName("OrthiaInit");
-            std::string orthiaUninitName("OrthiaUninit");
-
-            OpenProcess_type orthiaOpenProcess = 0;
-            m_plugin.QueryFunction(orthiaOpenProcessName.c_str(), &orthiaOpenProcess, true);
-            m_plugin.QueryFunction(orthiaInitName.c_str(), &m_pluginInit, true);
-            m_plugin.QueryFunction(orthiaUninitName.c_str(), &m_pluginUninit, true);
-
-            int errorCode = 0;
-            if (m_pluginInit)
-            {
-                errorCode = m_pluginInit();
-                ORTHIA_LOG(orthia::LogSeverity::Info, "PluginLoader: Plugin loaded: ", pluginFileName);
-            }
-            if (errorCode || !orthiaOpenProcess || !m_pluginInit || !m_pluginUninit)
-            {
-                if (errorCode)
-                {
-                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Can't init plugin, code = ", orthia::ObjectToString_Ansi(errorCode));
-                }
-                if (!orthiaOpenProcess)
-                {
-                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Function not found: ", orthiaOpenProcessName);
-                }
-                if (!m_pluginInit)
-                {
-                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Function not found: ", orthiaInitName);
-                }
-                if (!m_pluginUninit)
-                {
-                    ORTHIA_LOG(orthia::LogSeverity::Error, "PluginLoader: Function not found: " + orthiaUninitName);
-                }
-                m_pluginInit = 0;
-                m_pluginUninit = 0;
-                m_plugin.Reset(0);
-                return;
-            }
-
-            m_openProcess = orthiaOpenProcess;
         }
         std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) override
         {

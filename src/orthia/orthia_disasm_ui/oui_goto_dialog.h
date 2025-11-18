@@ -35,9 +35,9 @@ namespace oui
     private:
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
 
-        std::shared_ptr<CListBox> m_filesBox;
+        std::shared_ptr<CListBox> m_listBox;
         orthia::GotoCompleteHandler_type m_resultCallback;
-        std::shared_ptr<orthia::IPeristentItemStorage> m_fileSystem;
+        std::shared_ptr<orthia::IPeristentItemStorage> m_persistentStorage;
 
         std::shared_ptr<CLabel> m_fileLabel;
         std::shared_ptr<CEditBox> m_fileEdit;
@@ -71,6 +71,13 @@ namespace oui
         void OnWaitBoxDestroyed();
         void SetOpenProcessResult(int openProcessSeq, orthia::Address_type address, int error);
         void FinishProcessOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
+
+        template<class OwnerType, class ContainerType, class Predicate>
+        friend bool DefaultShiftViewWindowToSymbol(OwnerType* owner,
+            std::shared_ptr<CListBox> listBox,
+            const String& symbol,
+            ContainerType& container,
+            Predicate predicate);
     protected:
         void OnResize() override;
         void CancelAllQueries() override;

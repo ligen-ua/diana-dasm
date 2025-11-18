@@ -20,6 +20,11 @@ int CaptureRegister(const std::wstring & regString)
     std::map<std::wstring, int>::const_iterator it = g_RegsMapping.find(regString);
     if (it == g_RegsMapping.end())
     {
+        int value = 0;
+        if (orthia::HexStringToObject_Silent(regString, &value) && value > 0)
+        {
+            return -value;
+        }
         throw std::runtime_error("Unknown register: " + orthia::Utf16ToAcp(regString));
     }
     return it->second;
@@ -140,7 +145,7 @@ int StatusCommand(int argc, wchar_t * argv[])
 }
 
 static 
-int InjectCommand(int argc, wchar_t * argv[])
+int InjectCommand(int argc, wchar_t * argv[], bool testInject)
 {
     if (argc < 4)
     {
@@ -212,7 +217,8 @@ int InjectCommand(int argc, wchar_t * argv[])
                                         addressReg_number,
                                         sizeReg_number,
                                         orthia::Utf16ToAcp(dir),
-                                        numberOfSamples);
+                                        numberOfSamples,
+                                        testInject);
     dd::info_out()<<"Control block at: "<<std::hex<<res;
     return 0;
 }
@@ -264,7 +270,12 @@ int wmain(int argc, wchar_t * argv[])
         else
         if (wcscmp(argv[1], L"inject")==0)
         {   
-            return InjectCommand(argc, argv);
+            return InjectCommand(argc, argv, false);
+        }
+        else
+        if (wcscmp(argv[1], L"test_inject") == 0)
+        {
+            return InjectCommand(argc, argv, true);
         }
         else
             throw std::runtime_error("Unknown command");

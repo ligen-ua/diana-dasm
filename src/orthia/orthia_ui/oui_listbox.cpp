@@ -1,4 +1,5 @@
 #include "oui_listbox.h"
+#include "oui_menu.h"
 
 namespace oui
 {
@@ -296,6 +297,56 @@ namespace oui
         });
         return true;
     }
+    void CListBox::OpenContextMenuItem(const Point &point, int targetColumn)
+    {
+        ListBoxItem item;
+        if (!GetSelectedItem(item))
+        {
+            return;
+        }
+        if (item.text.empty())
+        {
+            return;
+        }
+
+        oui::String text;
+        oui::String suffix;
+        if (m_columns.empty())
+        {
+            text = item.text.front();
+            suffix = OUI_TCSTR(" ");
+        }
+        else
+        {
+            if (targetColumn >= 0 && targetColumn < (int)m_columns.size())
+            {
+                suffix = OUI_TCSTR(" ") + m_columns[targetColumn].GetName().native;
+                if (targetColumn < (int)item.text.size())
+                {
+                    text = item.text[targetColumn];
+                }
+            }
+            else
+            {
+                return;
+            }
+        }
+        std::vector<oui::PopupItem> items =
+        {
+            {
+                OUI_TCSTR("&Copy") + suffix.native,
+                [this, text]() { GetConsole()->CopyTextToClipboard(text); },
+                oui::Hotkey(oui::VirtualKey::kC)
+            }
+        };
+
+        Point pointToUse{ point.x + 1, point.y + 1 };
+        auto parent = GetPool()->GetRootWindow();
+        auto popup = parent->AddChild_t(std::make_shared<CMenuPopup>(std::move(items)));
+        popup->Init(parent->GetPtr());
+        popup->Dock(pointToUse);
+        SkipNextMouseEvent();
+    }
     bool CListBox::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         {
@@ -311,10 +362,12 @@ namespace oui
                 return true;
             }
         }
-        if (evt.mouseEvent.button == MouseButton::Left && 
+        if ((evt.mouseEvent.button == MouseButton::Right) ||
+            (evt.mouseEvent.button == MouseButton::Left &&
             (evt.mouseEvent.state == MouseState::Pressed ||
-            evt.mouseEvent.state == MouseState::DoubleClick))
+            evt.mouseEvent.state == MouseState::DoubleClick)))
         {
+            int targetColumn = -1;
             auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
             int newPosition = 0;
             if (m_columnsCount)
@@ -323,7 +376,6 @@ namespace oui
                 const auto absClientRect = GetAbsoluteClientRect(this, rect);
                 int relLeftX = (0 * absClientRect.size.width) / m_columnsCount;
                 int leftX = absClientRect.position.x + relLeftX;
-                int targetColumn = -1;
                 for (int i = 0; i < m_columnsCount; ++i)
                 {
                     int relRightX = ((i + 1) * absClientRect.size.width) / m_columnsCount;
@@ -388,8 +440,11 @@ namespace oui
                         break;
                     }
                     leftX = relRightX;
+                    targetColumn = i;
                 }
             }
+
+            // logic for both modes
             if (newPosition >= (int)m_pageItems.size() && !m_pageItems.empty())
             {
                 newPosition = (int)m_pageItems.size() - 1;
@@ -401,6 +456,10 @@ namespace oui
                 if (evt.mouseEvent.state == MouseState::DoubleClick)
                 {
                     OpenSelectedItem();
+                }
+                if (evt.mouseEvent.state == MouseState::Released && evt.mouseEvent.button == MouseButton::Right)
+                {
+                    OpenContextMenuItem(evt.mouseEvent.point, targetColumn);
                 }
             }
             Invalidate();
@@ -538,8 +597,9 @@ namespace oui
                 if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
                     SelectRow();
+                    return true;
                 }
-                return true;
+                break;
 
             case VirtualKey::Enter:
                 OpenSelectedItem();
@@ -606,7 +666,7 @@ namespace oui
             auto text = evt.keyEvent.rawText;
             console->FilterOrReplaceUnreadableSymbols(text);
 
-            if (!text.native.empty())
+            if (!text.native.empty() && !evt.keyState.HasModifiers())
             {
                 if (m_owner->ShiftViewWindowToSymbol(text.native))
                 {
@@ -680,6 +740,19 @@ namespace oui
         }
         m_headerSize = 1;
     }
+
+    void CListBox::Dock()
+    {
+        int width = 0;
+        for (auto& column : m_columns)
+        {
+            width += column.GetWidth();
+        }
+        Size newSize = GetSize();
+        newSize.width = width;
+        m_dockable = true;
+        Resize(newSize);
+    }
     void DefaultShiftViewWindow(std::shared_ptr<CListBox> filesBox, int newOffset, size_t totalFilesAvailable_in)
     {
         const int visibleSize = filesBox->GetVisibleSize();
@@ -722,16 +795,30 @@ namespace oui
         filesBox->SetSelectedPosition(newSelectedPositon);
         filesBox->SetOffset(newOffset);
     }
-    void CListBox::Dock()
+
+    void DefaultHighlightItem(std::shared_ptr<CListBox> filesBox, int highlightItemOffset, size_t containerSize)
     {
-        int width = 0;
-        for (auto& column : m_columns)
+        int maxVisibleOffset = std::min(filesBox->GetVisibleSize() + filesBox->GetOffset(), (int)containerSize);
+        if (highlightItemOffset >= filesBox->GetOffset() && highlightItemOffset < maxVisibleOffset)
         {
-            width += column.GetWidth();
+            filesBox->SetSelectedPosition(highlightItemOffset - filesBox->GetOffset());
         }
-        Size newSize = GetSize();
-        newSize.width = width;
-        m_dockable = true;
-        Resize(newSize);
+        else
+        {
+            // try to reuse at least position
+            int newOffset = highlightItemOffset - filesBox->GetSelectedPosition();
+            if (newOffset < 0)
+            {
+                newOffset = 0;
+                filesBox->SetSelectedPosition(highlightItemOffset);
+            }
+            else if (newOffset >= (int)containerSize)
+            {
+                newOffset = highlightItemOffset;
+                filesBox->SetSelectedPosition(0);
+            }
+            filesBox->SetOffset(newOffset);
+        }
     }
+
 }

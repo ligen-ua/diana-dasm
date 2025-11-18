@@ -20,11 +20,14 @@ namespace oui
     protected:
         bool m_dialogFinished = false;
         std::weak_ptr<CWindow> m_prevFocus;
-        void OnInit(std::shared_ptr<CWindowsPool> pool);
-        virtual void OnFinishDialog() {}
-    public:
-        CBaseModalWindow();
+        std::shared_ptr<CWindow> m_lastModalWindow;
+        bool m_setModal = false;
 
+        void OnInit(std::shared_ptr<CWindowsPool> pool);
+        virtual void OnFinishDialog();    
+    public:
+        CBaseModalWindow(bool setModal);
+        void Destroy() override;
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void FinishDialog();
     };
@@ -34,7 +37,6 @@ namespace oui
         using Parent_type = WithBorder<CBaseModalWindow>;
         
     protected:
-        std::shared_ptr<CWindow> m_lastModalWindow;
         static String m_chunk;
         int m_lastTabY = 0;
         Range m_captionRange, m_closeRange;

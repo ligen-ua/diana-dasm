@@ -82,38 +82,7 @@ void COutputWindow::AddLine(const oui::String& line_in)
     item.text = oui::String::string_type(buffer) + line.native;
     m_view->AddLine(std::move(item));
 }
-void COutputWindow::CancelAllQueries()
-{
-}
-bool COutputWindow::SelectAll()
-{
-    m_view->SelectAllCached();
-    return true;
-}
-void COutputWindow::OnEnter()
-{
-}
-void COutputWindow::CopySelected(const oui::MultiLineSelPoint&, const oui::MultiLineSelPoint&)
-{
-    auto selectedText = m_view->ExtractSelected();
-    auto console = GetConsole();
-    if (console)
-    {
-        console->CopyTextToClipboard(selectedText);
-    }
-}
-oui::LineIndex COutputWindow::GetLineIndex(int offsetInPage) const
-{
-    return oui::LineIndex(offsetInPage, 0);
-}
-bool COutputWindow::ScrollUp(oui::MultiLineViewItem* item, int count)
-{
-    return false;
-}
-bool COutputWindow::ScrollDown(oui::MultiLineViewItem* item, int count)
-{
-    return false;
-}
+
 void COutputWindow::ConstructChilds()
 {
     AddChild(m_view);
@@ -127,6 +96,16 @@ void COutputWindow::SetFocusImpl()
 {
     m_view->SetFocus();
 }
+
+std::shared_ptr<oui::CMultiLineView> COutputWindow::SF_GetView()
+{
+    return m_view;
+}
+oui::CConsole* COutputWindow::SF_GetConsole()
+{
+    return GetConsole();
+}
+
 
 // orthia::IUILogInterface
 void COutputWindow::WriteLog(const oui::String& text)

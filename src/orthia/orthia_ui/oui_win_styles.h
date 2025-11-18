@@ -83,6 +83,7 @@ namespace oui
             :
                 Base(std::forward<Type>(obj))
         {
+            m_frontColor = ColorWhite();
         }
         void SetColors(Color frontColor, Color backgroundColor)
         {
@@ -152,18 +153,30 @@ namespace oui
     template<class Base>
     class MouseFocusable:public Base
     {
+        bool m_handleNext = true;
     public:
+        void SkipNextMouseEvent()
+        {
+            m_handleNext = false;
+        }
         void OnHandleMouseEvent(bool res, const Rect& rect, InputEvent& evt) override
         {
-            if (res)
+            if (m_handleNext)
             {
-                if (evt.mouseEvent.state == MouseState::Pressed)
+                if (res)
                 {
-                    if (!this->IsFocused())
+                    if (evt.mouseEvent.state == MouseState::Pressed)
                     {
-                        this->SetFocus();
+                        if (!this->IsFocused())
+                        {
+                            this->SetFocus();
+                        }
                     }
                 }
+            }
+            else
+            {
+                m_handleNext = true;
             }
             Base::OnHandleMouseEvent(res, rect, evt);
         }

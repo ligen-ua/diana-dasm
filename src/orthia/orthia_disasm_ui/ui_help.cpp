@@ -3,7 +3,131 @@
 
 namespace oui
 {
+    static void PrepareText(std::vector<MultiLineViewItem>& lines)
+    {
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR("Global Hotkeys:");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  F10 or ALT       - Toggle Menu");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  ALT+Letter       - Enter Menu");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  Tab              - Focus next panel group");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  CTRL+Tab         - Focus next panel");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  ESC              - Close modal window");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  CTRL+Left/Right  - Scroll ListView");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR("");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR("Disasm View Hotkeys:");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  G                - Goto Address");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  H                - Open History");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  CTRL+LMouseClick - Goto Address");
+            lines.push_back(item);
+        }
+    }
+    CHelpWindow::CHelpWindow()
+        :
+        Parent_type(
+            [=]() {
+        return OUI_TCSTR("Orthia Disassembler Help");
+    },
+            [=]() {
+    })
+    {
+        IMultiLineViewOwner* owner = this;
+        m_helpText = std::make_shared<CMultiLineView>(m_colorProfile, owner, false);
+        std::vector<MultiLineViewItem> lines;
+        PrepareText(lines);
+        m_helpText->Init(std::move(lines));
 
+        auto labelProfile = std::make_shared<LabelColorProfile>();
+        QueryDefaultColorProfile(*labelProfile);
+        labelProfile->normal.text = oui::ColorBrightYellow();
+        labelProfile->mouseHighlight.text = oui::ColorBrightYellow();
+        m_textLabel->SetColorProfile(labelProfile);
+    }
+    void CHelpWindow::ConstructChilds()
+    {
+        AddChild(m_helpText);
+        Parent_type::ConstructChilds();
+    }
+    void CHelpWindow::OnResize()
+    {
+        Parent_type::OnResize();
+        const auto clientRect = GetClientRect();
+
+        if (clientRect.size.width < 5 || clientRect.size.height < 3)
+        {
+            Size zeroSize;
+            m_helpText->Resize(zeroSize);
+            return;
+        }
+
+        Rect urlEditRect = clientRect;
+        urlEditRect.position.x += 2;
+        urlEditRect.position.y += 3;
+        urlEditRect.size.width -= 4;
+        urlEditRect.size.height -= 4;
+
+        m_helpText->MoveTo(urlEditRect.position);
+        m_helpText->Resize(urlEditRect.size);
+    }
+    bool CHelpWindow::Resize(const Size& newSize)
+    {
+        auto size = newSize;
+        return Parent_type::Parent_type::Resize(size);
+    }
+
+    std::shared_ptr<oui::CMultiLineView> CHelpWindow::SF_GetView()
+    {
+        return m_helpText;
+    }
+    oui::CConsole* CHelpWindow::SF_GetConsole()
+    {
+        return GetConsole();
+    }
+    // CAboutBoxWindow
     CAboutBoxWindow::CAboutBoxWindow()
         : 
             Parent_type(

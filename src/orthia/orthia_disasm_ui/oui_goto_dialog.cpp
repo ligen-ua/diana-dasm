@@ -26,7 +26,7 @@ namespace oui
         if (clientRect.size.width < 5 || clientRect.size.height < 5)
         {
             Size zeroSize;
-            m_filesBox->Resize(zeroSize);
+            m_listBox->Resize(zeroSize);
             m_fileEdit->Resize(zeroSize);
             m_fileLabel->Resize(zeroSize);
             return;
@@ -38,8 +38,8 @@ namespace oui
         boxRect.size.width -= 4;
         boxRect.size.height -= 4;
 
-        m_filesBox->MoveTo(boxRect.position);
-        m_filesBox->Resize(boxRect.size);
+        m_listBox->MoveTo(boxRect.position);
+        m_listBox->Resize(boxRect.size);
 
         // file edit
         Rect fileEditRect = clientRect;
@@ -95,18 +95,18 @@ namespace oui
         }
         if (m_firstResult)
         {
-            m_filesBox->Clear();
+            m_listBox->Clear();
 
             m_currentFilter = filter;
             m_currentItems.clear();
             m_currentItems.reserve(data.size() + 1);
             m_firstResult = false;
 
-            m_parentOffset = m_filesBox->GetOffset();
-            m_parentPosition = m_filesBox->GetSelectedPosition();
+            m_parentOffset = m_listBox->GetOffset();
+            m_parentPosition = m_listBox->GetSelectedPosition();
 
-            m_filesBox->SetOffset(0);
-            m_filesBox->SetSelectedPosition(0);
+            m_listBox->SetOffset(0);
+            m_listBox->SetSelectedPosition(0);
 
             m_fileEdit->ScrollRight();
             m_fileEdit->SetFocus();
@@ -137,11 +137,12 @@ namespace oui
 
     void CGotoDialog::UpdateVisibleItems()
     {
-        DefaultUpdateVisibleItems(this, this, m_filesBox, m_currentItems,
+        DefaultUpdateVisibleItems(this, this, m_listBox, m_currentItems,
             [&](auto it, auto vit)
         {
             vit->text.clear();
             vit->text.push_back(orthia::ToWideStringAsHex(it->info.address));
+            vit->text.push_back(it->info.comment);
 
             // open file here
             vit->openHandler = [=, info = it->info]() {
@@ -205,7 +206,7 @@ namespace oui
             m_currentOperation = operation;
             m_firstResult = true;
 
-            m_fileSystem->AsyncUpdateGotoInfo(this->GetThread(),
+            m_persistentStorage->AsyncUpdateGotoInfo(this->GetThread(),
                 operation,
                 address,
                 0,
@@ -232,10 +233,10 @@ namespace oui
             m_currentOperation = operation;
             m_firstResult = true;
 
-            m_fileSystem->AsyncQueryGotoInfo(this->GetThread(),
+            m_persistentStorage->AsyncQueryGotoInfo(this->GetThread(),
                 m_currentFilter,
                 operation,
-                0
+                m_scanFlags
             );
         }
     }
@@ -340,7 +341,7 @@ namespace oui
         int scanFlags)
         :
             m_resultCallback(resultCallback),
-            m_fileSystem(fileSystem),
+            m_persistentStorage(fileSystem),
             m_openingText(dialogStrings.openingText),
             m_errorText(dialogStrings.errorText),
             m_scanFlags(scanFlags),
@@ -349,10 +350,10 @@ namespace oui
         SetCaption(dialogStrings.caption);
 
         IListBoxOwner* owner = this;
-        m_filesBox = std::make_shared<CListBox>(m_colorProfile, owner);
+        m_listBox = std::make_shared<CListBox>(m_colorProfile, owner);
 
         auto columnsNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.goto.columns"));
-        m_filesBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }),
+        m_listBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }),
             oui::ColumnParam([=] { return columnsNode->QueryValue(L"comment");  })
         );
         m_fileEdit = std::make_shared<CEditBox>(m_colorProfile);
@@ -383,7 +384,7 @@ namespace oui
         m_fileLabel = std::make_shared<CLabel>(labelProfile, [] { return String(OUI_STR(">"));  });
 
         this->RegisterSwitch(m_fileEdit);
-        this->RegisterSwitch(m_filesBox);
+        this->RegisterSwitch(m_listBox);
     }
     CGotoDialog::~CGotoDialog()
     {
@@ -396,7 +397,7 @@ namespace oui
     }
     void CGotoDialog::ConstructChilds()
     {
-        AddChild(m_filesBox);
+        AddChild(m_listBox);
         AddChild(m_fileEdit);
         AddChild(m_fileLabel);
     }
@@ -412,7 +413,7 @@ namespace oui
     void CGotoDialog::OnVisibleItemChanged()
     {
         ListBoxItem item;
-        if (!m_filesBox->GetSelectedItem(item))
+        if (!m_listBox->GetSelectedItem(item))
         {
             return;
         }
@@ -433,60 +434,21 @@ namespace oui
     }
     void CGotoDialog::HighlightItem(int highlightItemOffset)
     {
-        int maxVisibleOffset = std::min(m_filesBox->GetVisibleSize() + m_filesBox->GetOffset(), (int)m_currentItems.size());
-        if (highlightItemOffset >= m_filesBox->GetOffset() && highlightItemOffset < maxVisibleOffset)
-        {
-            m_filesBox->SetSelectedPosition(highlightItemOffset - m_filesBox->GetOffset());
-        }
-        else
-        {
-            // try to reuse at least position
-            int newOffset = highlightItemOffset - m_filesBox->GetSelectedPosition();
-            if (newOffset < 0)
-            {
-                newOffset = 0;
-                m_filesBox->SetSelectedPosition(highlightItemOffset);
-            }
-            else if (newOffset >= (int)m_currentItems.size())
-            {
-                newOffset = highlightItemOffset;
-                m_filesBox->SetSelectedPosition(0);
-            }
-            m_filesBox->SetOffset(newOffset);
-        }
+        DefaultHighlightItem(m_listBox, highlightItemOffset, m_currentItems.size());
     }
     bool CGotoDialog::ShiftViewWindowToSymbol(const String& symbol) 
     {
-        const int totalProcessAvailable = (int)m_currentItems.size();
-        const int selectionOffset = m_filesBox->GetOffset() + m_filesBox->GetSelectedPosition();
-
-        // scan forward till end
-        for (int i = selectionOffset + 1; i < totalProcessAvailable; ++i)
-        {
-            if (StartsWith(orthia::ObjectToString(m_currentItems[i].info.address), symbol.native))
-            {
-                HighlightItem(i);
-                UpdateVisibleItems();
-                return true;
-            }
-        }
-
-        // scan from start
-        for (int i = 0; i <= std::min((int)m_currentItems.size() - 1, selectionOffset); ++i)
-        {
-            if (StartsWith(orthia::ObjectToString(m_currentItems[i].info.address), symbol.native))
-            {
-                HighlightItem(i);
-                UpdateVisibleItems();
-                return true;
-            }
-        }
-        return false;
+        return DefaultShiftViewWindowToSymbol(this, m_listBox, symbol, m_currentItems,
+            [](const GotoDialogInfo& info, const String& symbol) 
+                { 
+                  return StartsWith(orthia::ObjectToString(info.info.address), symbol.native) ||
+                      StartsWith(info.info.comment.native, symbol.native);
+        });
     }
 
     void CGotoDialog::ShiftViewWindow(int newOffset)
     {
-        DefaultShiftViewWindow(m_filesBox, newOffset, m_currentItems.size());
+        DefaultShiftViewWindow(m_listBox, newOffset, m_currentItems.size());
         UpdateVisibleItems();
     }
     int CGotoDialog::GetTotalCount() const
@@ -502,12 +464,12 @@ namespace oui
             {
                 if (m_fileEdit->IsFocused())
                 {
-                    m_filesBox->SetFocus();
+                    m_listBox->SetFocus();
                     return true;
                 }
             }
             
-            if (m_filesBox->IsFocused())
+            if (m_listBox->IsFocused())
             {
                 if (!evt.keyEvent.rawText.native.empty())
                 {

@@ -39,8 +39,7 @@ void HookAgent(FormatType * pData,
    
     // analyse input parameteres
     const void * pUserData = ppInputRegisters[pData->addressReg_number];
-    const DWORD userDataSize = (DWORD)(size_t)ppInputRegisters[pData->sizeReg_number];
-
+    const DWORD userDataSize = (pData->sizeReg_number >= 0) ? (DWORD)(size_t)ppInputRegisters[pData->sizeReg_number] : -pData->sizeReg_number;
     // allocate data
     const DWORD fullDataSize = userDataSize + sizeof(ListNode);
     ListNode * pNode = (ListNode *)pData->fnc_HeapAlloc(pData->heap, 0, fullDataSize);
@@ -365,10 +364,15 @@ ULONGLONG HookProcess(const ProcessInfo & process,
                  int addressReg_number,
                  int sizeReg_number,
                  const std::string & outPath,
-                 ULONG samplesCount)
+                 ULONG samplesCount,
+                 bool testHook)
 {    
     dd::debug_out()<<"Patch address: "<<std::hex<<patchAddress;
 
+    if (testHook)
+    {
+        dd::debug_out() << "Test hook mode";
+    }
     RegionInfo region;
     region.InitOutDir(outPath, samplesCount);
 
@@ -403,6 +407,7 @@ ULONGLONG HookProcess(const ProcessInfo & process,
                             hookSaverSize);
 
     DWORD tid = 0;
+    bool waitThread = false;
     HANDLE hThread = CreateRemoteThread(process.GetHandle(), 
         0, 
         0, 
@@ -412,25 +417,37 @@ ULONGLONG HookProcess(const ProcessInfo & process,
         &tid); 
     if (!hThread)
     {
-        ORTHIA_THROW_WIN32("Can't create remote thread");
+        if (testHook)
+        {
+            dd::debug_out() << "Can't create remote thread: " << GetLastError();
+
+        }
+        else
+        {
+            ORTHIA_THROW_WIN32("Can't create remote thread");
+        }
     }
+
     dd::debug_out()<<"Thread ID: "<<tid;
     diana::Guard<diana::Win32Handle> threadGuard(hThread);
 
-    for(;;)
+    if (waitThread)
     {
-        LoadPageFromProcess(process, region);
-        
-        if (region.parts.saverIsReady)
+        for (;;)
         {
-            break;
+            LoadPageFromProcess(process, region);
+
+            if (region.parts.saverIsReady)
+            {
+                break;
+            }
+            if (WaitForSingleObject(hThread, 300) == WAIT_OBJECT_0)
+            {
+                throw std::runtime_error("Thread has exited");
+            }
         }
-        if (WaitForSingleObject(hThread, 300) == WAIT_OBJECT_0)
-        {
-            throw std::runtime_error("Thread has exited");
-        }
+        dd::debug_out() << "Thread is OK";
     }
-    dd::debug_out()<<"Thread is OK";
     try
     {
         // deploy the hook body
@@ -499,7 +516,7 @@ ULONGLONG HookProcess(const ProcessInfo & process,
             region.parts.exitCommand = 1;
             SaveControlFieldToProcess(process, region, (const char*)&region.parts.exitCommand, sizeof(region.parts.exitCommand));
 
-            if (WaitForSingleObject(hThread, 5000) == WAIT_OBJECT_0)
+            if (hThread == 0 || WaitForSingleObject(hThread, 5000) == WAIT_OBJECT_0)
             {   
                 dd::debug_out()<<"Thread stopped";
 
@@ -536,7 +553,8 @@ static void SelfTest2()
                 7,
                 6,
                 ".",
-                2);
+                2,
+        false);
     SelfTest2_FunctionToHook("hello", 5);
     SelfTest2_FunctionToHook("world", 5);
 

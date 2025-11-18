@@ -127,8 +127,21 @@ namespace oui
     // CMenuPopup
     CMenuPopup::CMenuPopup(std::shared_ptr<CMenuWindow> menuWindow)
         :
+        Parent_type(false),
         m_menuWindow(menuWindow)
     {
+    }
+    CMenuPopup::CMenuPopup(std::vector<PopupItem>&& items, std::shared_ptr<MenuColorProfile> menuColorProfile)
+        :
+        Parent_type(true),
+        m_items(std::move(items)),
+        m_menuColorProfile(menuColorProfile)
+    {
+        if (!menuColorProfile)
+        {
+            m_menuColorProfile = std::make_shared<MenuColorProfile>();
+            QueryDefaultColorProfile(*m_menuColorProfile);
+        }
     }
     void CMenuPopup::Detach()
     {
@@ -151,17 +164,7 @@ namespace oui
     }
     bool CMenuPopup::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
-        auto menu = m_menuWindow.lock();
-        if (!menu)
-        {
-            return false;
-        }
-        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
-        if (!selectedButton)
-        {
-            return false;
-        }
-        auto popupItems = selectedButton->GetPopupItems();
+        auto popupItems = GetPopupItems();
         if (!popupItems)
         {
             return false;
@@ -240,17 +243,7 @@ namespace oui
     }
     void CMenuPopup::FireEvent()
     {
-        auto menu = m_menuWindow.lock();
-        if (!menu)
-        {
-            return;
-        }
-        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
-        if (!selectedButton)
-        {
-            return;
-        }
-        auto popupItems = selectedButton->GetPopupItems();
+        auto popupItems = GetPopupItems();
         if (!popupItems)
         {
             return;
@@ -271,45 +264,56 @@ namespace oui
     bool CMenuPopup::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
     {
         auto parentMenu = m_menuWindow.lock();
-        if (parentMenu)
+
+        if (m_hotkeys.ProcessEvent(evt))
         {
-            if (m_hotkeys.ProcessEvent(evt))
+            return true;
+        }
+        if (evt.keyEvent.valid)
+        {
+            switch (evt.keyEvent.virtualKey)
             {
-                return true;
-            }
-            if (evt.keyEvent.valid)
-            {
-                switch (evt.keyEvent.virtualKey)
+            case oui::VirtualKey::Left:
+                if (parentMenu)
                 {
-                case oui::VirtualKey::Left:
                     parentMenu->ShiftSelectedButtonIndex(-1);
                     Dock();
                     return true;
-                case oui::VirtualKey::Right:
+                }
+                break;
+            case oui::VirtualKey::Right:
+                if (parentMenu)
+                {
                     parentMenu->ShiftSelectedButtonIndex(1);
                     Dock();
                     return true;
-                case oui::VirtualKey::Down:
-                    ShiftIndex(1);
-                    Invalidate();
-                    return true;
-                case oui::VirtualKey::Up:
-                    ShiftIndex(-1);
-                    Invalidate();
-                    return true;
-                case oui::VirtualKey::Enter:
-                    FireEvent();
-                    return true;
-
-                case oui::VirtualKey::Escape:
-                    if (auto menu = m_menuWindow.lock())
-                    {
-                        menu->Deactivate();
-                    }
-                    return true;
                 }
+                break;
+            case oui::VirtualKey::Down:
+                ShiftIndex(1);
+                Invalidate();
+                return true;
+            case oui::VirtualKey::Up:
+                ShiftIndex(-1);
+                Invalidate();
+                return true;
+            case oui::VirtualKey::Enter:
+                FireEvent();
+                return true;
+
+            case oui::VirtualKey::Escape:
+                if (auto menu = m_menuWindow.lock())
+                {
+                    menu->Deactivate();
+                }
+                else
+                {
+                    Destroy();
+                }
+                return true;
             }
         }
+
         return Parent_type::ProcessEvent(evt, evtContext);
     }
     static int ToString(CConsole * console, const PopupItem& item, int fixedWidth, String& result)
@@ -353,6 +357,47 @@ namespace oui
 
         return symCount;
     }
+    std::shared_ptr<MenuColorProfile> CMenuPopup::GetColorProfile()
+    {
+        if (m_menuColorProfile)
+        {
+            return m_menuColorProfile;
+        }
+        auto menu = m_menuWindow.lock();
+        if (!menu)
+        {
+            return nullptr;
+        }
+        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
+        if (!selectedButton)
+        {
+            return nullptr;
+        }
+        auto popupItems = selectedButton->GetPopupItems();
+        if (!popupItems)
+        {
+            return nullptr;
+        }
+        return menu->GetColorProfile();
+    }
+    std::shared_ptr<const std::vector<PopupItem>> CMenuPopup::GetPopupItems()
+    {
+        auto menu = m_menuWindow.lock();
+        if (menu)
+        {
+            std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
+            if (selectedButton)
+            {
+                return selectedButton->GetPopupItems();
+            }
+        }
+        auto me = this->GetPtr();
+        if (!me)
+        {
+            return nullptr;
+        }
+        return std::shared_ptr< const std::vector<PopupItem>>(me, &m_items);
+    }
     void CMenuPopup::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
         auto console = GetConsole();
@@ -360,29 +405,23 @@ namespace oui
         {
             return;
         }
-        // paint border
+
+        // paint rect
+        auto colorProfile = GetColorProfile();
+        if (!colorProfile)
+        {
+            return;
+        }
+        Parent_type::SetColors(colorProfile->popup.borderColor, colorProfile->popup.borderBackgroundColor);
         Parent_type::DoPaint(rect, parameters);
 
+
         // paint body
-        auto menu = m_menuWindow.lock();
-        if (!menu)
-        {
-            return;
-        }
-        std::shared_ptr<CMenuButtonWindow> selectedButton = menu->GetSelectedButton();
-        if (!selectedButton)
-        {
-            return;
-        }
-        auto popupItems = selectedButton->GetPopupItems();
+        auto popupItems = GetPopupItems();
         if (!popupItems)
         {
             return;
         }
-        auto colorProfile = menu->GetColorProfile();
-
-        Parent_type::SetColors(colorProfile->popup.borderColor, colorProfile->popup.borderBackgroundColor);
-
         const auto clientRect = GetClientRect();
         Point pos = clientRect.position + rect.position;
         String tmp;
@@ -430,6 +469,10 @@ namespace oui
         {
             menu->DontSetFocusOnDeactivate();
         }
+        if (IsDestroyed() || m_destroyed || m_dialogFinished)
+        {
+            return;
+        }
         Parent_type::OnFocusLost();
     }
     void CMenuPopup::UpdateHotkeys(std::shared_ptr<CWindow> menu,
@@ -448,14 +491,41 @@ namespace oui
             }
         }
     }
-    void CMenuPopup::Dock()
+    void CMenuPopup::DockImpl(const std::vector<PopupItem>& items, const Point & popupPosition)
     {
         auto console = GetConsole();
         if (!console)
         {
             return;
         }
+        int maxWidth = 0;
+        String tmp;
+        for (auto popup : items)
+        {
+            int symbolsCount = ToString(console, popup, 0, tmp);
+            if (symbolsCount > maxWidth)
+            {
+                maxWidth = symbolsCount;
+            }
+        }
+
+        // Yep, I know this is a hardcode, but what are you gonna do
+        auto borderSize = Size{ 2, 2 };
+        if (GetBorderStyle() == BorderStyle::None)
+        {
+            borderSize = Size{ 0, 0 };
+        }
+
+        const Size size = { maxWidth + borderSize.width, (int)items.size() + borderSize.height };
+
+        MoveTo(popupPosition);
+        Resize(size);
+        Invalidate();
+    }
+    void CMenuPopup::Dock()
+    {
         m_selectedPosition = 0;
+
         auto menu = m_menuWindow.lock();
         if (!menu)
         {
@@ -473,34 +543,19 @@ namespace oui
             menu->SetFocus();
             return;
         }
-        UpdateHotkeys(menu, *popupItems);
-
-        int maxWidth = 0;
-        String tmp;
-        for (auto popup: *popupItems)
-        {
-            int symbolsCount = ToString(console, popup, 0, tmp);
-            if (symbolsCount > maxWidth)
-            {
-                maxWidth = symbolsCount;
-            }
-        }
-
-        // Yep, I know this is a hardcode, but what are you gonna do
-        auto borderSize = Size { 2, 2 };
-        if (GetBorderStyle() == BorderStyle::None)
-        {
-            borderSize = Size { 0, 0 };
-        }
         auto menuPosition = menu->GetPosition();
         auto buttonPosition = selectedButton->GetPosition();
-        const Size size = { maxWidth + borderSize.width, (int)popupItems->size() + borderSize.height};
+
+        UpdateHotkeys(menu, *popupItems);
 
         const Point popupPosition = { buttonPosition.x, menuPosition.y + 1 };
-        MoveTo(popupPosition);
-        Resize(size);
-        Invalidate();
+        DockImpl(*popupItems, popupPosition);
     }
+    void CMenuPopup::Dock(const Point& popupPosition)
+    {
+        DockImpl(m_items, popupPosition);
+    }
+
     std::shared_ptr<CWindow> CMenuPopup::GetPopupPrevFocusTarget()
     {
         auto menu = m_menuWindow.lock();

@@ -38,7 +38,7 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void SetFocusImpl() override;
     void SetActiveItemImpl(int itemUid);
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
-    void Event_Goto();
+    void Event_Goto(int scanFlags = 0);
     void DoGoto(orthia::Address_type address, orthia::Address_type pageAddress, bool hasPageAddress);
     void CopySelected(const oui::MultiLineSelPoint& p1, const oui::MultiLineSelPoint& p2) override;
     bool SelectAll() override;

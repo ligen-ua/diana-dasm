@@ -77,9 +77,10 @@ namespace oui
             return;
         }
         auto oldFocused = m_focused;
-
+        bool wasUpdate = false;
         if (m_focused != window)
         {
+            wasUpdate = true;
             m_focused = window;
         }
         if (invalidate)
@@ -93,7 +94,8 @@ namespace oui
                 oldFocused->Invalidate();
             }
         }
-        if (oldFocused)
+        if (wasUpdate && 
+            oldFocused)
         {
             oldFocused->OnFocusLost();
         }

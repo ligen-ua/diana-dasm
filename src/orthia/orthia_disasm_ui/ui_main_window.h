@@ -49,6 +49,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     void ShowAbout();
     void ShowHelp();
     void ToggleWorkspaceView();
+    void OpenHistoryModal();
 
     oui::fsui::OpenResult HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
         std::shared_ptr<oui::IFile2> file,

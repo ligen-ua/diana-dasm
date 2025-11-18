@@ -75,6 +75,14 @@ namespace oui
         void OnWaitBoxDestroyed();
         void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName);
         void FinishFileOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
+
+        template<class OwnerType, class ContainerType, class Predicate>
+        friend bool DefaultShiftViewWindowToSymbol(OwnerType* owner,
+            std::shared_ptr<CListBox> listBox,
+            const String& symbol,
+            ContainerType& container,
+            Predicate predicate);
+
     protected:
         void OnResize() override;
         void CancelAllQueries() override;

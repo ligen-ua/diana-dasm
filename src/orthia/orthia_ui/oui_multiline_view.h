@@ -148,8 +148,21 @@ namespace oui
         virtual void OnEnter() = 0;
         virtual void OnPaintStart(std::shared_ptr<CEditBox> ) {}
     };
+    class CMultiLineView;
+    class CSelfHostedMultiLineViewOwner:public IMultiLineViewOwner
+    {
+    public:
+        void CancelAllQueries() override;
+        bool ScrollUp(MultiLineViewItem* item, int count) override;
+        bool ScrollDown(MultiLineViewItem* item, int count) override;
+        LineIndex GetLineIndex(int offsetInPage) const override;
+        void CopySelected(const MultiLineSelPoint& selPosStart, const MultiLineSelPoint& selPosEnd) override;
+        bool SelectAll() override;
+        void OnEnter() override;
 
-
+        virtual std::shared_ptr<oui::CMultiLineView> SF_GetView() = 0;
+        virtual CConsole* SF_GetConsole() = 0;
+    };
     class CMultiLineView:public SimpleBrush<MouseFocusable<CWindow>>
     {
     public:

@@ -48,13 +48,23 @@ namespace oui
 
         int m_selectedPosition = 0;
         bool m_destroyed = false;
+
+        std::vector<PopupItem> m_items;
+
         void ShiftIndex(int difference);
         void FireEvent();
         void UpdateHotkeys(std::shared_ptr<CWindow> menu, const std::vector<PopupItem>& items);
+        void DockImpl(const std::vector<PopupItem>& items, const Point& popupPosition);
+        std::shared_ptr<MenuColorProfile> GetColorProfile();
+        std::shared_ptr<const std::vector<PopupItem>> GetPopupItems();
+
     public:
         CMenuPopup(std::shared_ptr<CMenuWindow> menuWindow);
+        CMenuPopup(std::vector<PopupItem> && items, std::shared_ptr<MenuColorProfile> m_menuColorProfile = nullptr);
         bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
         void Dock();
+        void Dock(const Point& popupPosition);
+
         void DoPaint(const Rect& rect, DrawParameters& parameters) override;
         bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
         void Destroy() override;

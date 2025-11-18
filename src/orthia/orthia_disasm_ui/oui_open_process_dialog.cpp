@@ -401,57 +401,26 @@ namespace oui
     }
     void COpenProcessDialog::HighlightItem(int highlightItemOffset)
     {
-        int maxVisibleOffset = std::min(m_filesBox->GetVisibleSize() + m_filesBox->GetOffset(), (int)m_currentProcess.size());
-        if (highlightItemOffset >= m_filesBox->GetOffset() && highlightItemOffset < maxVisibleOffset)
-        {
-            m_filesBox->SetSelectedPosition(highlightItemOffset - m_filesBox->GetOffset());
-        }
-        else
-        {
-            // try to reuse at least position
-            int newOffset = highlightItemOffset - m_filesBox->GetSelectedPosition();
-            if (newOffset < 0)
-            {
-                newOffset = 0;
-                m_filesBox->SetSelectedPosition(highlightItemOffset);
-            }
-            else if (newOffset >= (int)m_currentProcess.size())
-            {
-                newOffset = highlightItemOffset;
-                m_filesBox->SetSelectedPosition(0);
-            }
-            m_filesBox->SetOffset(newOffset);
-        }
+        DefaultHighlightItem(m_filesBox, highlightItemOffset, m_currentProcess.size());
     }
     bool COpenProcessDialog::ShiftViewWindowToSymbol(const String& symbol) 
     {
-        const int totalProcessAvailable = (int)m_currentProcess.size();
-        const int selectionOffset = m_filesBox->GetOffset() + m_filesBox->GetSelectedPosition();
-
-        // scan forward till end
-        for (int i = selectionOffset + 1; i < totalProcessAvailable; ++i)
+        std::vector<orthia::PlatformString_type> parts;
+        return DefaultShiftViewWindowToSymbol(this, m_filesBox, symbol, m_currentProcess,
+            [&](const ProcessDialogInfo& info, const String& symbol)
         {
-            if (StartsWith(m_currentProcess[i].info.processName.native, symbol.native))
-            {
-                HighlightItem(i);
-                UpdateVisibleItems();
-                return true;
-            }
-        }
+            orthia::SplitStringWithoutWhitespace(info.info.processName.native, OUI_TCSTR(" "), &parts);
 
-        // scan from start
-        for (int i = 0; i <= std::min((int)m_currentProcess.size() - 1, selectionOffset); ++i)
-        {
-            if (StartsWith(m_currentProcess[i].info.processName.native, symbol.native))
+            for (auto part : parts)
             {
-                HighlightItem(i);
-                UpdateVisibleItems();
-                return true;
+                if (StartsWith(part, symbol.native))
+                {
+                    return true;
+                }
             }
-        }
-        return false;
+            return false;
+        });
     }
-
     void COpenProcessDialog::ShiftViewWindow(int newOffset)
     {
         DefaultShiftViewWindow(m_filesBox, newOffset, m_currentProcess.size());

@@ -2,6 +2,7 @@
 #include "psapi.h"
 #include "orthia_utils.h"
 #include "orthia_allocators.h"
+#include "orthia_plugins_win32.h"
 
 namespace dd
 {
@@ -58,15 +59,22 @@ void RegionInfo::VerifyMagic(ULONG pid) const
         throw std::runtime_error("Magic/PID doesn't match");
     }
 }
-
+static orthia::CWin32OpenProcessPlugin g_plugin;
 void OpenProcess(ULONG pid, bool writeMode, ProcessInfo * pProcess)
 {
+    decltype(&::OpenProcess) openProcess = &::OpenProcess;
+    g_plugin.Load();
+    if (g_plugin.GetOpenProcess())
+    {
+        openProcess = g_plugin.GetOpenProcess();
+    }
+
     DWORD desiredAccess = PROCESS_QUERY_INFORMATION|STANDARD_RIGHTS_REQUIRED|SYNCHRONIZE|PROCESS_VM_OPERATION|PROCESS_VM_READ;
     if (writeMode)
     {
         desiredAccess |= PROCESS_VM_WRITE|PROCESS_SUSPEND_RESUME;
     }
-    HANDLE hProcess = ::OpenProcess(desiredAccess, 
+    HANDLE hProcess = openProcess(desiredAccess,
         FALSE, 
         pid);
     if (!hProcess)

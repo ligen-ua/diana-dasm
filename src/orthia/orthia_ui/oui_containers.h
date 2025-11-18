@@ -202,6 +202,7 @@ namespace oui
         int GetGroupsCount() const { return m_groupsCount; }
 
         std::shared_ptr<CPanelGroupWindow> CreateDefaultGroup();
+        std::shared_ptr<CPanelGroupWindow> GetDefaultGroup() { return m_defaultGroup;  }
 
         std::shared_ptr<CPanelCommonContext> GetCommonContext() { return m_panelCommonContext;  }
 

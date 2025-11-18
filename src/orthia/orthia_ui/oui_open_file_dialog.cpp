@@ -554,31 +554,8 @@ namespace oui
      
     bool COpenFileDialog::ShiftViewWindowToSymbol(const String& symbol) 
     {
-        const int totalFilesAvailable = (int)m_currentFiles.size();
-        const int selectionOffset = m_filesBox->GetOffset() + m_filesBox->GetSelectedPosition();
-
-        // scan forward till end
-        for (int i = selectionOffset + 1; i < totalFilesAvailable; ++i)
-        {
-            if (StartsWith(m_currentFiles[i].info.fileName.native, symbol.native))
-            {
-                HighlightItem(i);
-                UpdateVisibleItems();
-                return true;
-            }
-        }
-
-        // scan from start
-        for (int i = 0; i <= std::min((int)m_currentFiles.size() - 1, selectionOffset); ++i)
-        {
-            if (StartsWith(m_currentFiles[i].info.fileName.native, symbol.native))
-            {
-                HighlightItem(i);
-                UpdateVisibleItems();
-                return true;
-            }
-        }
-        return false;
+        return DefaultShiftViewWindowToSymbol(this, m_filesBox, symbol, m_currentFiles, 
+            DefaultPredicate< FileDialogInfo>([](const FileDialogInfo& info) { return info.info.fileName; }));
     }
 
     void COpenFileDialog::ShiftViewWindow(int newOffset)

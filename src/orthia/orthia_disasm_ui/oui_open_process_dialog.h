@@ -68,6 +68,13 @@ namespace oui
         void OnWaitBoxDestroyed();
         void SetOpenProcessResult(int openProcessSeq, std::shared_ptr<IProcess> file, int error);
         void FinishProcessOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
+
+        template<class OwnerType, class ContainerType, class Predicate>
+        friend bool DefaultShiftViewWindowToSymbol(OwnerType* owner,
+                std::shared_ptr<CListBox> listBox,
+                const String& symbol,
+                ContainerType& container,
+                Predicate predicate);
     protected:
         void OnResize() override;
         void CancelAllQueries() override;

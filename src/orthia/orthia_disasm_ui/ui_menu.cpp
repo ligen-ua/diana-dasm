@@ -1,6 +1,7 @@
 #include "ui_main_window.h"
 #include "oui_open_process_dialog.h"
 #include "ui_help.h"
+#include "oui_goto_dialog.h"
 
 void CMainWindow::ToggleMenu(bool openPopup)
 {
@@ -220,6 +221,38 @@ void CMainWindow::ShowAbout()
 }
 void CMainWindow::ShowHelp()
 {
+    auto waitBox = AddChildAndInit_t(std::make_shared<oui::CHelpWindow>());
+    waitBox->Dock();
+}
+void CMainWindow::OpenHistoryModal()
+{
+    // create open dialog
+    oui::CommonDialogStrings dialogStrings;
+    GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.goto"), dialogStrings);
+
+    auto activeItem = m_model->GetActiveItem();
+    if (!activeItem)
+    {
+        return;
+    }
+    if (!activeItem->GetPersistentStorage())
+    {
+        return;
+    }
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::CGotoDialog>(dialogStrings,
+        [=](orthia::Address_type address, int error) {
+
+        if (!error)
+        {
+            m_panelContainerWindow->GetDefaultGroup()->SwitchPanel(m_disasmWindow);
+            m_disasmWindow->DoGotoRequest(address);
+        }
+        return oui::fsui::OpenResult();
+    },
+        activeItem->GetPersistentStorage(),
+        activeItem,
+        orthia::IPeristentItemStorage::goto_flags_history_mode));
+    dialog->Dock();
 }
 void CMainWindow::ConstuctMenu()
 {
@@ -230,6 +263,9 @@ void CMainWindow::ConstuctMenu()
     m_menu = AddChild_t(std::make_shared<oui::CMenuWindow>());
     m_menu->SetBackgroundColor(oui::ColorBlack());
 
+
+    m_hotkeys.Register(oui::Hotkey(oui::KeyState(),
+        oui::VirtualKey::kF1), [=]() { ShowHelp();  });
     m_hotkeys.Register(oui::Hotkey(oui::KeyState(),
         oui::VirtualKey::kF10), [=]() { ToggleMenu(true);  });
 
@@ -279,14 +315,19 @@ void CMainWindow::ConstuctMenu()
                 uiMenuTextNodeView->QueryValue(ORTHIA_TCSTR("workspace")),
                 [this]() { ToggleWorkspaceView(); },
                 oui::Hotkey(oui::VirtualKey::kW)
+            },
+            {
+                uiMenuTextNodeView->QueryValue(ORTHIA_TCSTR("history")),
+                [this]() { OpenHistoryModal(); },
+                oui::Hotkey(oui::VirtualKey::kH)
             }
         };
         auto button = m_menu->AddButton(uiMenuTextNode->QueryValue(ORTHIA_TCSTR("view")),
             std::move(view)
-        );        
+        );
+
         m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
             oui::VirtualKey::kV), [=]() { m_menu->SelectAndOpenPopup(button, false);  });
-
     }
     {
         std::vector<oui::PopupItem> help =

@@ -3,12 +3,19 @@
 namespace oui
 {
 
-    CBaseModalWindow::CBaseModalWindow()
+    CBaseModalWindow::CBaseModalWindow(bool setModal)
+        :
+            m_setModal(setModal)
     {
     }
 
     void CBaseModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
+        if (m_setModal)
+        {
+            m_lastModalWindow = pool->GetModalWindow();
+            pool->SetModalWindow(GetPtr());
+        }
         m_prevFocus = pool->GetFocus();
         if (auto prevFocus = m_prevFocus.lock())
         {
@@ -18,6 +25,32 @@ namespace oui
             }
         }
         Activate();
+        if (m_setModal)
+        {
+            pool->SetFocus(GetPtr());
+        }
+    }
+    void CBaseModalWindow::Destroy()
+    {
+        if (IsDestroyed())
+        {
+            return;
+        }
+        FinishDialog();
+        CWindow::Destroy();
+    }
+    void CBaseModalWindow::OnFinishDialog()
+    {
+        auto pool = GetPool();
+        if (!pool)
+        {
+            return;
+        }
+        if (m_setModal && m_lastModalWindow)
+        {
+            pool->SetModalWindow(m_lastModalWindow);
+            m_lastModalWindow = nullptr;
+        }
     }
     void CBaseModalWindow::FinishDialog()
     {
@@ -62,6 +95,8 @@ namespace oui
 
     // CModalWindow
     CModalWindow::CModalWindow()
+        :
+        Parent_type(true)
     {
         // colors for header
         m_panelColorProfile = std::make_shared<PanelColorProfile>();
@@ -222,7 +257,7 @@ namespace oui
         {
             if (evt.mouseEvent.state == MouseState::Released)
             {
-                if (IsInside(m_closeRange, evt.mouseEvent.point.x))
+                if (evt.mouseEvent.point.y == rect.position.y && IsInside(m_closeRange, evt.mouseEvent.point.x))
                 {
                     this->FinishDialog();
                     return true;
@@ -253,20 +288,11 @@ namespace oui
     }
     void CModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
-        m_lastModalWindow = pool->GetModalWindow();
-        pool->SetModalWindow(GetPtr());
         Parent_type::OnInit(pool);
-        pool->SetFocus(GetPtr());
     }
     void CModalWindow::OnFinishDialog() 
     {
-        auto pool = GetPool();
-        if (!pool)
-        {
-            return;
-        }
-        pool->SetModalWindow(m_lastModalWindow);
-        m_lastModalWindow = nullptr;
+        Parent_type::OnFinishDialog();
     }
     void CModalWindow::SetCaption(const String& caption)
     {

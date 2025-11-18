@@ -17,6 +17,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.menu.view"))
         << textManager->RegisterValue(ORTHIA_TCSTR("workspace"), ORTHIA_TCSTR("&Workspace"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("history"), ORTHIA_TCSTR("&History"))
         ;
 
     // modal

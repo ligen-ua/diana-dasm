@@ -37,6 +37,7 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
 
     m_modulesOwner.getTotalCount = [this]() { return Modules_GetTotalCount(); };
     m_modulesOwner.shiftViewWindow = [this](int newOffset) { return Modules_ShiftViewWindow(newOffset); };
+    m_modulesOwner.shiftViewWindowToSymbol = [this](const oui::String& symbol) { return Modules_ShiftViewWindowToSymbol(symbol); };
 
     m_modulesBox = std::make_shared<oui::CListBox>(m_colorProfile, &m_modulesOwner);
     m_modulesBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  }, 25),
@@ -173,10 +174,9 @@ int CModulesWindow::Names_GetTotalCount() const
 void CModulesWindow::UpdateVisibleItems()
 {
     auto activeItem = m_model->GetActiveItem();
-    std::vector<orthia::ModuleInfo> modules;
     if (activeItem)
     {
-        activeItem->GetModules(modules);
+        activeItem->GetModules(m_lastModules);
     }
     auto firstRunAfterReload = m_needUpdateModulesBox;
     if (firstRunAfterReload)
@@ -189,7 +189,7 @@ void CModulesWindow::UpdateVisibleItems()
         m_requiredModulesBoxPosition = 0;
     }
 
-    DefaultUpdateVisibleItems(this, &m_modulesOwner, m_modulesBox, modules,
+    DefaultUpdateVisibleItems(this, &m_modulesOwner, m_modulesBox, m_lastModules,
         [&](auto it, auto vit)
     {
         vit->text.clear();
@@ -254,20 +254,33 @@ void CModulesWindow::UpdateVisibleItems()
         vit->colorsHandler = [=]() { return oui::LabelColorState{ m_colorProfile->listBoxFolders, oui::Color() }; };
     });
 }
+
 void CModulesWindow::GotoAddress(orthia::Address_type address)
 {
     m_onGotoAddress(address);
 }
+void CModulesWindow::HighlightItem(int highlightItemOffset)
+{
+    DefaultHighlightItem(m_modulesBox, highlightItemOffset, m_lastModules.size());
+}
+bool CModulesWindow::Modules_ShiftViewWindowToSymbol(const oui::String& symbol)
+{
+    return DefaultShiftViewWindowToSymbol(this, m_modulesBox, symbol, m_lastModules,
+        [](const orthia::ModuleInfo& info, const oui::String& symbol)
+    {
+        return oui::StartsWith(orthia::ObjectToString(info.address), symbol.native) ||
+            oui::StartsWith(info.name, symbol.native);
+    });
+}
 void CModulesWindow::Modules_ShiftViewWindow(int newOffset)
 {
     auto activeItem = m_model->GetActiveItem();
-    std::vector<orthia::ModuleInfo> items;
     if (activeItem)
     {
-        activeItem->GetModules(items);
+        activeItem->GetModules(m_lastModules);
     }
  
-    DefaultShiftViewWindow(m_modulesBox, newOffset, items.size());
+    DefaultShiftViewWindow(m_modulesBox, newOffset, m_lastModules.size());
     UpdateVisibleItems();
 }
 void CModulesWindow::Names_ShiftViewWindow(int newOffset)
