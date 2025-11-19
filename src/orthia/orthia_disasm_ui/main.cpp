@@ -17,7 +17,9 @@ int RunTests();
 static void PrintUsage()
 {
     std::cout << "Usage: [--run-tests] <filename>\n";
+    std::cout << "       --pid <pid-to-open>\n";
 }
+
 int wmain(int argc, const wchar_t* argv[])
 {
     orthia::intrusive_ptr<orthia::ILowLevelLog> lowLevelLog(new orthia::CDebugOutputLog());
