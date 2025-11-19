@@ -8,6 +8,8 @@ namespace orthia
         oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
         int flags)
     {
+        orthia::CAutoCriticalSection guard(m_lock);
+
         auto filterLowercase = orthia::Downcase(filter.native);
         std::wstring text;
 
@@ -47,6 +49,8 @@ namespace orthia
         int flags,
         orthia::Address_type pageAddress)
     {
+        orthia::CAutoCriticalSection guard(m_lock);
+
         auto pair = m_dataItems.insert(std::make_pair(address, GotoItem(address, flags)));
         if (!pair.second)
         {
@@ -77,6 +81,8 @@ namespace orthia
     void ÑPersistentItemStorage::AsyncFetchPrevHistory(ThreadPtr_type targetThread,
         oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler)
     {
+        orthia::CAutoCriticalSection guard(m_lock);
+
         orthia::Address_type address = 0;
         orthia::Address_type pageAddress = 0;
         int error = DI_NOT_FOUND;
@@ -90,5 +96,58 @@ namespace orthia
         gotoHandler->ReplyWithRetain(gotoHandler, address, error, pageAddress);
     }
 
+    oui::String ÑPersistentItemStorage::SyncReadComment(orthia::Address_type address)
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
 
+        auto it = m_comments.find(address);
+        if (it == m_comments.end())
+        {
+            return oui::String();
+        }
+        return it->second.text;
+    }
+    oui::fsui::OpenResult ÑPersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+
+        m_comments[address].text = comment;
+        return oui::fsui::OpenResult();
+    }
+
+    oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address)
+    {
+        Address_type diff = address - nameAddress;
+        if (!diff)
+        {
+            return name;
+        }
+        oui::String addressStr;
+        if (diff > std::numeric_limits<uint32_t>::max())
+        {
+            orthia::ToStringAsHex(diff, &addressStr.native);
+        }
+        else if (diff > std::numeric_limits<uint16_t>::max())
+        {
+            orthia::ToStringAsHex((uint32_t)diff, &addressStr.native);
+        }
+        else if (diff > std::numeric_limits<uint8_t>::max())
+        {
+            orthia::ToStringAsHex((uint16_t)diff, &addressStr.native);
+        }
+        else
+        { 
+            orthia::ToStringAsHex((uint8_t)diff, &addressStr.native);
+        }
+    
+        oui::String result;
+        result.native = name.native + OUI_TCSTR("+");
+        if (addressStr.native.front() >= OUI_TCSTR('a') && addressStr.native.front() <= OUI_TCSTR('z'))
+        {
+            result.native += OUI_TCSTR("0");
+        }
+        result.native += addressStr.native;
+        result.native += OUI_TCSTR("h");
+        return result;
+    }
 }

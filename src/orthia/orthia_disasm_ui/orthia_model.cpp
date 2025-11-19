@@ -344,7 +344,7 @@ namespace orthia
             }
 
             // fill the model data
-            auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
+            auto persistentItemStorage = std::make_shared<ÑFilePersistentItemStorage>();
             auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
 
             info->fullName = file->GetFullFileName();
@@ -356,6 +356,7 @@ namespace orthia
             }
             info->moduleManager = std::make_shared<CModuleManager>();
             info->moduleManager->Reinit(dbFileName, false);
+            persistentItemStorage->Init(info->moduleManager->QueryDatabaseManager());
 
             if (info->shortName.native == m_config->GetBinFileName())
             {

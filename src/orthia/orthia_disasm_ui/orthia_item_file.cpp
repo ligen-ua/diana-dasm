@@ -6,7 +6,36 @@
 
 namespace orthia
 {
+    ÑFilePersistentItemStorage::ÑFilePersistentItemStorage()
+    {
+    }
+    void ÑFilePersistentItemStorage::Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager)
+    {
+        m_databaseManager = databaseManager;
+        m_databaseManager->GetClassicDatabase()->QueryAllComments([=](Address_type address, const std::string& text) {
+            ÑPersistentItemStorage::SyncWriteComment(address, orthia::Utf8ToPlatformString(text));
+            return true;
+        });
+    }
+    oui::fsui::OpenResult ÑFilePersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
+    {
+        oui::fsui::OpenResult result;
+        try
+        {
+            ÑPersistentItemStorage::SyncWriteComment(address, comment);
+            m_databaseManager->GetClassicDatabase()->InsertComment(address, orthia::PlatformStringToUtf8(comment.native));
+        }
+        catch (std::exception& e)
+        {
+            result.error = orthia::Utf8ToPlatformString(e.what());
+        }
+        return result;
+    }
 
+    FileWorkplaceItem::FileWorkplaceItem(std::shared_ptr<ÑFilePersistentItemStorage> peristentItemStorage_in)
+        : persistentItemStorage(peristentItemStorage_in)
+    {
+    }
     // FileWorkplaceItem
     WorkAddressData FileWorkplaceItem::ReadData(Address_type address, Address_type size)
     {
@@ -314,6 +343,15 @@ namespace orthia
     }
     oui::String FileWorkplaceItem::QueryAddressName(Address_type address) const
     {
+        if (persistentItemStorage)
+        {
+            auto comment = persistentItemStorage->SyncReadComment(address);
+            if (!comment.native.empty())
+            {
+                return comment;
+            }
+        }
+
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         Address_type capturedModuleAddress = 0;
         Address_type capturedMetaAddress = 0;
@@ -344,18 +382,44 @@ namespace orthia
                 res.native = info.name + OUI_TCSTR("!") + orthia::Utf8ToPlatformString(capturedMetaName);
                 if (diff)
                 {
-                    res.native += OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(diff)) + OUI_TCSTR("h");
+                    res = ComposeName(res, capturedMetaAddress, address);
                 }
                 return res;
             }
             else
             {
-                oui::String res;
-                res = info.name + OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(address - info.address));
-                return res;
+                return ComposeName(info.name, info.address, address);
             }
         }
         return oui::String();
+    }
+    std::shared_ptr<::DianaMovableReadStream> FileWorkplaceItem::CreateDisasmStream(Address_type addressStart)
+    {
+        struct DianaReadStreamAdapter
+        {
+            std::shared_ptr<orthia::CSimplePeFile> peFile;
+            ::DianaMemoryStream stream;
+
+            DianaReadStreamAdapter(std::shared_ptr<orthia::CSimplePeFile> peFile_in)
+                :
+                peFile(peFile_in)
+            {
+
+            }
+        };
+
+        if (addressStart < peFile->GetImageBase() || addressStart >= peFile->GetImageEnd())
+        {
+            return nullptr;
+        }
+
+        auto streamAdapter = std::make_shared<DianaReadStreamAdapter>(peFile);
+        auto diff = addressStart - peFile->GetImageBase();
+
+        auto& data = peFile->GetMappedPeFile();
+        Diana_InitMemoryStreamEx2(&streamAdapter->stream, (char*)data.data()+diff, data.size()-diff, 0, 0);
+
+        return std::shared_ptr<::DianaMovableReadStream>(streamAdapter, &streamAdapter->stream.parent.parent);
     }
 
     // InsertModuleMetaInfo

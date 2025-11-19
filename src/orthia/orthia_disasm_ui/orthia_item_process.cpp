@@ -65,7 +65,7 @@ namespace orthia
     struct ExportsCollector:public diana::CBasePeLinkImportsObserver
     {
         const orthia::ModuleInfo* m_moduleInfo = 0;
-        std::unordered_map<orthia::Address_type, oui::String> m_exports;
+        orthia::flat_map<orthia::Address_type, oui::String> m_exports;
         bool m_fixupAddresses = false;
 
         ExportsCollector()
@@ -96,7 +96,7 @@ namespace orthia
             {
                 fncAddress += m_moduleInfo->address;
             }
-            m_exports[fncAddress] = m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName);
+            m_exports.insert(fncAddress, m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName));
         }
     };
     template<class T, class Stream, class DianaPeFile>
@@ -480,17 +480,11 @@ namespace orthia
         }
         range.lines.push_back(it->second.native);
     }
-    oui::String CProcessWorkplaceItem::QueryAddressName(Address_type address) const
+    bool CProcessWorkplaceItem::QueryAddressModule(Address_type address, orthia::ModuleInfo & result) const
     {
         orthia::CAutoCriticalSection guard(m_lock);
-        {
-            auto it = m_exports.find(address);
-            if (it != m_exports.end())
-            {
-                return it->second;
-            }
-        }
-        auto it = m_modulesIndex.lower_bound(address), it_end = m_modulesIndex.upper_bound(address);
+
+        auto it = m_modulesIndex.lower_bound(address), it_end = m_modulesIndex.end();
         if (it != m_modulesIndex.begin())
         {
             --it;
@@ -498,12 +492,85 @@ namespace orthia
         for (; it != it_end; ++it)
         {
             auto& module = m_modules[it->second];
+            if (module.address > address)
+            {
+                break;
+            }
             if (module.IsInRange(address))
             {
-                oui::String res;
-                res = module.name + OUI_TCSTR("+") + orthia::ToWideStringAsHex((DI_UINT32)(address - module.address));
-                return res;
+                result = module;
+                return true;
             }
+        }
+        return false;
+    }
+    std::shared_ptr<::DianaMovableReadStream> CProcessWorkplaceItem::CreateDisasmStream(Address_type addressStart)
+    {
+        struct DianaReadStreamAdapter
+        {
+            std::shared_ptr<oui::IProcess> proc;
+            orthia::ProcessReaderAdapter memReader;
+            orthia::DianaMemoryStream stream;
+
+            DianaReadStreamAdapter(std::shared_ptr<oui::IProcess> proc_in, Address_type addressStart)
+                :
+                proc(proc_in),
+                memReader(proc_in.get()),
+                stream(addressStart, &memReader, 0)
+            {
+            }
+        };
+
+        auto streamAdapter = std::make_shared<DianaReadStreamAdapter>(m_proc, addressStart);
+        return std::shared_ptr<::DianaMovableReadStream>(streamAdapter, &streamAdapter->stream.parent);
+    }
+    oui::String CProcessWorkplaceItem::QueryAddressName(Address_type address) const
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+        if (m_persistentStorage)
+        {
+            auto comment = m_persistentStorage->SyncReadComment(address);
+            if (!comment.native.empty())
+            {
+                return comment;
+            }
+        }
+        orthia::Address_type capturedAddress = 0;
+        oui::String capturedName;
+        {
+            auto it = m_exports.upper_bound(address);
+            auto it_end = m_exports.end();
+            if (it != it_end && it != m_exports.begin())
+            {
+                --it;
+            }
+            for(;it != it_end; ++it)
+            {
+                if (address >= it->first)
+                {
+                    capturedAddress = it->first;
+                    capturedName = it->second;
+                    break;
+                }
+            }
+        }
+        if (address == capturedAddress)
+        {
+            return capturedName;
+        }
+        orthia::ModuleInfo moduleInfo;
+        if (QueryAddressModule(address, moduleInfo))
+        {
+            if (moduleInfo.address > capturedAddress)
+            {
+                // export function is not found or there is module with a closest address
+                return ComposeName(moduleInfo.name, moduleInfo.address, address);
+            }
+        }
+        // use found function
+        if (!capturedName.native.empty())
+        {
+            return ComposeName(capturedName, capturedAddress, address);
         }
         return oui::String();
     }

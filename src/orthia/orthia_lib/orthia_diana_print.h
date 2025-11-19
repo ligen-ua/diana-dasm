@@ -8,13 +8,14 @@ namespace orthia
     template<class AsmCommandWriterType>
     class CVmAsmMemoryPrinter:public orthia::IVmMemoryRangesTarget
     {
-    protected:
+    public:
         struct DianaPrintContext
         {
             ::DianaParserResult result;
-            ::DianaMemoryStream stream;
+            ::DianaMovableReadStream* pStream = 0;
             ::DianaContext context;
         };
+    protected:
 
         orthia::ITextPrinter* m_pTextPrinter;
         int m_dianaMode;
@@ -116,10 +117,13 @@ namespace orthia
             }
 
             DianaPrintContext ctx;
+            ::DianaMemoryStream stream;
+            ctx.pStream = &stream.parent.parent;
+
+            ::DianaParserResult& result = ctx.result;
+            ::DianaContext& context = ctx.context;
+
             m_pDianaPrintContext = &ctx;
-            ::DianaParserResult & result = ctx.result;
-            ::DianaMemoryStream & stream = ctx.stream;
-            ::DianaContext & context = ctx.context;
 
             Diana_InitContext(&context, m_dianaMode);
             Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);

@@ -75,6 +75,9 @@ void CDatabase::DoUpdate_1_2()
 {
     ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "CREATE TABLE IF NOT EXISTS tbl_metainfo(meta_mod_id INTEGER, meta_address INTEGER, meta_type INTEGER, meta_info TEXT, FOREIGN KEY(meta_mod_id) REFERENCES tbl_modules(mod_address) ON DELETE CASCADE)"),
         "Can't create database");
+
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "CREATE TABLE IF NOT EXISTS tbl_comments(com_address INTEGER PRIMARY KEY, com_text TEXT)"),
+        "Can't create database");
 }
 void CDatabase::DoVersionScripts()
 {

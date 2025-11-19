@@ -58,6 +58,11 @@ namespace oui
         SetSpacesCount(3);
         Parent_type::m_writer.SetOnOpCallback(DianaStringOutputOnOpCallback, this);
     }
+    void MemoryPrinter::SetEndAddress(const oui::LineIndex& endAddress)
+    {
+        m_endAddress = endAddress;
+        m_haveEndAddress = true;
+    }
     void MemoryPrinter::AddOperandPointer(OPERAND_SIZE operand, size_t offset, int size)
     {
         MemoryPrinterOperandInfo info;
@@ -117,6 +122,20 @@ namespace oui
 
         m_operands.clear();
     }
+
+    Diana_LinkedAdditionalGroupInfo* MemoryPrinter::GetLinkedInfo()
+    {
+        auto pInfo = m_pDianaPrintContext->result.pInfo;
+        if (!pInfo)
+        {
+            return 0;
+        }
+        return pInfo->m_pGroupInfo->m_pLinkedInfo;
+    }
+    void MemoryPrinter::PackCommand(const std::wstring& command, std::shared_ptr<DisasmLineContextTag> tag)
+    {
+        m_currentBlock.append(command);
+    }
     void MemoryPrinter::PrintCommandEx(unsigned long long address,
         const std::wstring& bytes,
         const std::wstring& command,
@@ -153,7 +172,13 @@ namespace oui
         m_textMarkupBuilder.AddNextRange(m_currentBlock.size() - oldSize, m_colors.spaces);
 
         // pack command
-        m_currentBlock.append(command);
+        Diana_AnalyzeJumps(&m_pDianaPrintContext->result,
+            address + m_pDianaPrintContext->result.iFullCmdSize,
+            &tag->newOffset,
+            &tag->absoluteAddress,
+            &tag->linksToData);
+
+        PackCommand(command, tag);
         size_t lastOffset = 0;
         for (auto& op : m_operands)
         {
@@ -165,21 +190,63 @@ namespace oui
         {
             m_textMarkupBuilder.AddNextRange(command.size() - lastOffset, m_colors.command);
         }
-        
 
-        Diana_AnalyzeJumps(&m_pDianaPrintContext->result, 
-            address + m_pDianaPrintContext->result.iFullCmdSize, 
-            &tag->newOffset, 
-            &tag->absoluteAddress, 
-            &tag->linksToData);
-
-        if (tag->newOffset && !tag->linksToData && 
-            (m_pDianaPrintContext->result.pInfo->m_pGroupInfo->m_pLinkedInfo->flags & DIANA_GT_IS_JUMP))
+        // build comment section
+        oldSize = m_currentBlock.size();
+        auto addCommentSeparator = [&]()
         {
-            oldSize = m_currentBlock.size();
+            if (m_currentBlock.size() == oldSize)
+            {
+                m_currentBlock.append(3, L' ');
+                m_currentBlock.append(L"; ");
+            }
+            else
+            {
+                m_currentBlock.append(1, L' ');
+            }
+        };
 
-            m_currentBlock.append(3, L' ');
-            m_currentBlock.append(L"; ");
+        auto linkedInfo = GetLinkedInfo();
+
+        // read comment
+        oui::String comment;
+        if (auto storage = m_workspaceItem->GetPersistentStorage())
+        {
+            comment = storage->SyncReadComment(address);
+        }
+        
+        if (!comment.native.empty())
+        {
+            addCommentSeparator();
+            m_currentBlock.append(comment.native);
+        }
+        else
+        if (tag->newOffset)
+        {
+            auto gotoAddress = tag->newOffset;
+            if (tag->linksToData)
+            {
+                // dereference
+                auto data = m_workspaceItem->ReadData(tag->newOffset, m_workspaceItem->GetDianaMode());
+                if (data.pDataStart && data.dataSize == m_workspaceItem->GetDianaMode())
+                {
+                    gotoAddress = Diana_ReadValue(data.pDataStart, m_workspaceItem->GetDianaMode());
+                }
+            }
+
+            auto name = m_workspaceItem->QueryAddressName(gotoAddress);
+            if (!name.native.empty())
+            {
+                addCommentSeparator();
+                m_currentBlock.append(name.native);
+            }
+        }
+
+        // put arrows
+        if (tag->newOffset && !tag->linksToData && 
+            (linkedInfo && linkedInfo->flags & DIANA_GT_IS_JUMP))
+        {
+            addCommentSeparator();
             if (tag->newOffset > tag->index.GetIndex())
             {
                 m_currentBlock.append(1, L'\x2193');
@@ -188,9 +255,27 @@ namespace oui
             {
                 m_currentBlock.append(1, L'\x2191');
             }
-            m_textMarkupBuilder.AddNextRange(bytes.size(), m_colors.bytes);
+        }
+
+        // dump operands if no any analysis done
+        if (m_currentBlock.size() == oldSize)
+        {
+            for (auto& op : m_operands)
+            {
+                auto name = m_workspaceItem->QueryAddressName(op.operand);
+                if (!name.native.empty())
+                {
+                    addCommentSeparator();
+                    m_currentBlock.append(name.native);
+                }
+            }
+        }
+
+        if (m_currentBlock.size() > oldSize)
+        {
             m_textMarkupBuilder.AddNextRange(m_currentBlock.size() - oldSize, m_colors.bytes);
         }
+        // done comments section
 
         m_pTextPrinter->PrintLine(m_currentBlock, m_textMarkupBuilder.Build(), tag);
 
@@ -206,6 +291,13 @@ namespace oui
     void MemoryPrinter::OnRange(const orthia::VmMemoryRangeInfo& vmRange,
         const char* pDataStart)
     {
+        DianaMemoryStream stream;
+        DianaPrintContext ctx;
+        m_pDianaPrintContext = &ctx;
+        ::DianaParserResult& result = ctx.result;
+        ::DianaContext& context = ctx.context;
+        ctx.pStream = &stream.parent.parent;
+
         if (m_currentCommand >= m_sizeInCommands)
         {
             return;
@@ -221,22 +313,29 @@ namespace oui
             reportNoData = true;
         }
 
-        DianaPrintContext ctx;
-        m_pDianaPrintContext = &ctx;
-        ::DianaParserResult& result = ctx.result;
-        ::DianaMemoryStream& stream = ctx.stream;
-        ::DianaContext& context = ctx.context;
-
         Diana_InitContext(&context, m_dianaMode);
         Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
-        
-        std::wstring temp, binaryData;
+
         oui::LineIndex virtualOffset = oui::LineIndex(vmRange.address, 0);
+        OnStream(&ctx, virtualOffset, reportNoData);
+    }
+    void MemoryPrinter::OnStream(DianaPrintContext* pDianaPrintContext, oui::LineIndex virtualOffset, bool reportNoData)
+    {
+        m_pDianaPrintContext = pDianaPrintContext;
+        ::DianaParserResult& result = m_pDianaPrintContext->result;
+        auto & stream = *m_pDianaPrintContext->pStream;
+        ::DianaContext& context = m_pDianaPrintContext->context;
+
+        std::wstring temp, binaryData;
         size_t offsetInPage = 0;
         bool prevWasBad = false;
         orthia::MarkupRange markupRange;
         for (; m_currentCommand < m_sizeInCommands; )
         {
+            if (m_haveEndAddress && m_endAddress < virtualOffset) 
+            {
+                break;
+            }
             if (!(virtualOffset < m_startAddress))
             {
                 auto commandsToDeliver = m_sizeInCommands - m_currentCommand;
@@ -266,7 +365,7 @@ namespace oui
                 }
                 else
                 {
-                    iRes = stream.parent.parent.parent.pReadFnc(&stream,
+                    iRes = stream.parent.pReadFnc(&stream,
                         &data,
                         1,
                         &bytesRead);
@@ -282,7 +381,7 @@ namespace oui
                     Diana_ClearCache(&context);
                 }
                 prevWasBad = false;
-                iRes = Diana_ParseCmd(&context, Diana_GetRootLine(), &stream.parent.parent.parent, &result);
+                iRes = Diana_ParseCmd(&context, Diana_GetRootLine(), &stream.parent, &result);
             }
             if (iRes == DI_END)
             {
@@ -292,7 +391,7 @@ namespace oui
             Preprocess(iRes, context, result, virtualOffset.GetIndex(), &print, &exit);
             if (iRes)
             {
-                temp = orthia::ToHexString(pDataStart + offsetInPage, 1);
+                temp = orthia::ToHexString(result.bytes, result.bytesCount);
                 if (print)
                 {
                     if (prevWasBad)
@@ -308,7 +407,7 @@ namespace oui
                 }
                 ++offsetInPage;
                 virtualOffset.IncIndex();
-                DI_CHECK_CPP(stream.parent.parent.pMoveTo(&stream.parent.parent, offsetInPage));
+                DI_CHECK_CPP(stream.pMoveTo(&stream, offsetInPage));
                 Diana_ClearCache(&context);
 
                 if (exit)
@@ -327,7 +426,7 @@ namespace oui
                 else
                 {
                     temp = orthia::ToWideString(Parent_type::m_writer.Assign(&result, virtualOffset.GetIndex()));
-                    binaryData = orthia::ToHexString(pDataStart + offsetInPage, result.iFullCmdSize);
+                    binaryData = orthia::ToHexString(result.bytes, result.bytesCount);
 
                     PrintCommand(virtualOffset, binaryData, temp);
                 }

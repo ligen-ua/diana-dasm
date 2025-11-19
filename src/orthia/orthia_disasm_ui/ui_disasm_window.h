@@ -47,6 +47,7 @@ class CDisasmWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::IMultiLineV
     void OnPaintStart(std::shared_ptr<oui::CEditBox> editBox) override;
     void AsyncRememberCurrentPosition(oui::OperationPtr_type<orthia::GotoCompleteHandler_type> operation = nullptr);
     bool DoGotoOnPage(orthia::Address_type address);
+    void MakeComment();
 
 public:
     CDisasmWindow(std::function<oui::String()> getCaption,

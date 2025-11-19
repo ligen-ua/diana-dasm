@@ -103,6 +103,7 @@ typedef enum
 
 #define DI_MAX_INSTRUCTION_SIZE 15
 #define DI_MAX_PREFIXES_COUNT DI_MAX_INSTRUCTION_SIZE-1
+#define DI_MAX_INSTRUCTION_SIZE_ALIGNED  16
 
 #define DI_CONST64(x)  (x##LL)
 // common
@@ -279,8 +280,12 @@ typedef struct _dianaParserResult
     int iPrefix;
     DI_CHAR iRexPrefix;
     int iFullCmdSize;
+    unsigned char bytes[DI_MAX_INSTRUCTION_SIZE_ALIGNED];
+    int bytesCount;
+
 }DianaParserResult;
 
+void DianaResult_AddByte(DianaParserResult * result, DI_CHAR ch);
 // Callback
 #define DI_END                      ((int)1)
 #define DI_ERROR                    ((int)-1)

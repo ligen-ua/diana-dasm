@@ -144,9 +144,63 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
 void CDisasmWindow::CancelAllQueries()
 {
 }
-void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1, const oui::MultiLineSelPoint& p2)
+void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1_in, const oui::MultiLineSelPoint& p2_in)
 {
+    auto console = GetConsole();
+    if (!console)
+    {
+        return;        
+    }
+
+    auto item = m_model->GetItem(m_itemUid);
+    if (!item)
+    {
+        return;
+    }
+
+    oui::MultiLineSelPoint p1 = p1_in; 
+    oui::MultiLineSelPoint p2 = p2_in;
+    if (p1.y.GetIndex() > p2.y.GetIndex())
+    {
+        std::swap(p1, p2);
+    }
+    orthia::Address_type maxSizeInBytes = p2.y.GetIndex() - p1.y.GetIndex() + 16;
+
+    auto stream = item->CreateDisasmStream(p1.y.GetIndex());
+    if (!stream) 
+    {
+        return;
+    }
+    struct DisasmCopier:oui::DisasmWriter
+    {
+        std::wstring text;
+        void PrintLine(const std::wstring& line) override
+        {
+            text.append(line + L"\n");
+        }
+        void PrintLine(const std::wstring& line, const oui::TextMarkup& markup, std::shared_ptr<oui::IMultilineViewTag> tag)
+        {
+            text.append(line + L"\n");
+        }
+    }
+    writer;
+    oui::MemoryPrinter printer(&writer,
+        item->GetDianaMode(),
+        p1.y,
+        DI_MAX_OPERAND_SIZE,
+        item);
+
+    printer.SetEndAddress(p2.y);
+
+    oui::MemoryPrinter::DianaPrintContext context;
+    Diana_InitContext(&context.context, item->GetDianaMode());
+
+    context.pStream = stream.get();
+    printer.OnStream(&context, p1.y, false);
+    
+    console->CopyTextToClipboard(writer.text);
 }
+
 void CDisasmWindow::OnEnter()
 {
     auto item = m_model->GetItem(m_itemUid);
@@ -471,7 +525,45 @@ void CDisasmWindow::Event_Goto(int scanFlags)
         scanFlags));
     dialog->Dock();
 }
+void CDisasmWindow::MakeComment()
+{
+    auto activeItem = m_model->GetActiveItem();
+    if (!activeItem)
+    {
+        return;
+    }
+    auto persistentStorage = activeItem->GetPersistentStorage();
+    if (!persistentStorage)
+    {
+        return;
+    }
+    auto lineItem = m_view->GetCurrentItem();
+    if (!lineItem.interfaceTag)
+    {
+        return;
+    }
+    auto tag = GetDisasmTag(lineItem);
+    if (!tag)
+    {
+        return;
+    }
+    auto comment = persistentStorage->SyncReadComment(tag->index.GetIndex());
 
+    auto editcommentNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.editcomment"));
+    
+    auto editBox = AddChildAndInit_t(std::make_shared<oui::CEditBoxWindow>(
+        [=]() 
+        {
+            return editcommentNode->QueryValue(ORTHIA_TCSTR("label"));
+        },
+        [=](const oui::String& newValue)
+        {
+            persistentStorage->SyncWriteComment(tag->index.GetIndex(), newValue);
+            ReloadVisibleData();
+        },
+        comment));
+    editBox->Dock();
+}
 bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
 {
     oui::CConsole* console = GetConsole();
@@ -524,6 +616,14 @@ bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& 
 
         default:
             break;
+        }
+        if (!evt.keyEvent.rawText.native.empty() && evt.keyEvent.rawText.native[0] == OUI_TCHAR(';'))
+        {
+            if (!evt.keyState.HasModifiers() || evt.keyState.HasJustCtrl())
+            {
+                MakeComment();
+                handled = true;
+            }
         }
         if (handled)
         {

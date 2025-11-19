@@ -216,6 +216,7 @@
     <ClInclude Include="orthia_model_interfaces.h" />
     <ClInclude Include="orthia_model_modules.h" />
     <ClInclude Include="orthia_process_adapter.h" />
+    <ClInclude Include="orthia_version.h" />
     <ClInclude Include="oui_disasm_colors.h" />
     <ClInclude Include="oui_goto_dialog.h" />
     <ClInclude Include="oui_open_process_dialog.h" />

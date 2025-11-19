@@ -87,6 +87,10 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("comment"), ORTHIA_TCSTR("Comment"))
         ;
 
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.editcomment"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("label"), ORTHIA_TCSTR("New comment:"))
+        ;
+
     // main
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.main"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Orthia Disassembler"))

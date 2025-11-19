@@ -157,5 +157,8 @@
     <ClInclude Include="ui_help.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="orthia_version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

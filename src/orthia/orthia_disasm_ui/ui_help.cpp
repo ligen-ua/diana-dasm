@@ -1,5 +1,5 @@
 #include "ui_help.h"
-
+#include "orthia_version.h"
 
 namespace oui
 {
@@ -58,6 +58,16 @@ namespace oui
         {
             MultiLineViewItem item;
             item.text = OUI_TCSTR(" -  H                - Open History");
+            lines.push_back(item);
+        } 
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  ;                - Write a Comment");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  BACKSPACE        - Return to the previous location");
             lines.push_back(item);
         }
         {
@@ -128,11 +138,16 @@ namespace oui
         return GetConsole();
     }
     // CAboutBoxWindow
+#ifdef _DEBUG
+#define RELEASE_DEBUG_MODE "(Debug)"
+#else
+#define RELEASE_DEBUG_MODE "(Release)"
+#endif
     CAboutBoxWindow::CAboutBoxWindow()
         : 
             Parent_type(
                                 [=]() {
-                            return OUI_TCSTR("Orthia Disassembler");
+                            return OUI_TCSTR("Orthia Disassembler v" ORTHIA_UI_VERSION " " RELEASE_DEBUG_MODE);
                         },
                                 [=]() {
                         })

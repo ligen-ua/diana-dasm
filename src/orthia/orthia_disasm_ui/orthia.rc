@@ -8,6 +8,7 @@
 // Generated from the TEXTINCLUDE 2 resource.
 //
 #include "afxres.h"
+#include "orthia_version.h"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -26,13 +27,10 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 // Version
 //
 
-#define ORTHIA_REVISION       1
-#define ORTHIA_REVISION_STR   "1"
-
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,ORTHIA_REVISION
- PRODUCTVERSION 1,0,0,ORTHIA_REVISION
+ FILEVERSION ORTHIA_UI_VER_MAJOR, ORTHIA_UI_VER_MINOR, ORTHIA_UI_VER_PATCH, ORTHIA_UI_VER_REVISION
+ PRODUCTVERSION ORTHIA_UI_VER_MAJOR, ORTHIA_UI_VER_MINOR, ORTHIA_UI_VER_PATCH, ORTHIA_UI_VER_REVISION
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -49,12 +47,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "https://github.com/ligen-ua/diana-dasm"
             VALUE "FileDescription", "Orthia Disassembler" 
-            VALUE "FileVersion", "1, 0, 0, " ORTHIA_REVISION_STR
+            VALUE "FileVersion", ORTHIA_UI_VER_MAJOR_STR ", " ORTHIA_UI_VER_MINOR_STR ", " ORTHIA_UI_VER_PATCH_STR ", " ORTHIA_UI_VER_REVISION_STR
             VALUE "InternalName", "orthia_disasm"
             VALUE "LegalCopyright", "Copyright (c) 2013-2023, https://github.com/ligen-ua/diana-dasm"
             VALUE "OriginalFilename", "orthia_disasm.exe"
             VALUE "ProductName", "Orthia Disassembler"
-            VALUE "ProductVersion", "1, 0, 0, " ORTHIA_REVISION_STR
+            VALUE "ProductVersion", ORTHIA_UI_VER_MAJOR_STR ", " ORTHIA_UI_VER_MINOR_STR ", " ORTHIA_UI_VER_PATCH_STR ", " ORTHIA_UI_VER_REVISION_STR
         END
     END
     BLOCK "VarFileInfo"

@@ -119,6 +119,7 @@ namespace orthia
         virtual MarkupRangeInfo QueryMarkupRange(Address_type address) const = 0;
         virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const = 0;
         virtual oui::String QueryAddressName(Address_type address) const = 0;
+        virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
     };
 
 
@@ -147,6 +148,7 @@ namespace orthia
         int error)>;
     using GotoCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error)>;
     using FetchCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error, orthia::Address_type pageAddress)>;
+    using AsyncCommentCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error, const oui::String & comment)>;
 
     struct IPeristentItemStorage
     {
@@ -166,11 +168,16 @@ namespace orthia
 
         virtual void AsyncFetchPrevHistory(ThreadPtr_type targetThread,
             oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler) = 0;
+
+        virtual oui::String SyncReadComment(orthia::Address_type address) = 0;
+        virtual oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String & comment) = 0;
     };
 
 
     class ÑPersistentItemStorage :public IPeristentItemStorage
     {
+        orthia::CCriticalSection m_lock;
+
         std::map<orthia::Address_type, GotoItem> m_dataItems;
 
         struct HistoryGotoItem :public GotoItem
@@ -184,6 +191,12 @@ namespace orthia
         };
         std::vector<HistoryGotoItem> m_history;
         int m_historyIndex = -1;
+
+        struct CommentInfo
+        {
+            oui::String text;
+        };
+        std::unordered_map<orthia::Address_type, CommentInfo> m_comments;
     public:
         void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
             const oui::String& filter,
@@ -198,6 +211,10 @@ namespace orthia
 
         void AsyncFetchPrevHistory(ThreadPtr_type targetThread,
             oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler);
+
+
+        oui::String SyncReadComment(orthia::Address_type address);
+        oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment);
     };
 
 
@@ -206,4 +223,5 @@ namespace orthia
     const static int g_database_type_fnc_Import = 2;
     const static int g_database_type_fnc_Export = 3;
 
+    oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
 }

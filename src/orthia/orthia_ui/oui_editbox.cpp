@@ -121,13 +121,13 @@ namespace oui
         {
             // analyze xToDraw
             int rangeEnd = rangePos + (int)rangeIt->sizeInTChars;
-            if (xToDraw >= rangeEnd)
+            if ((xToDraw + chunkStartOffset) >= rangeEnd)
             {
                 rangePos = rangeEnd;
                 ++rangeIt;
                 continue;
             }
-            int xEnd = std::min(rangeEnd, endPos);
+            int xEnd = std::min(rangeEnd - chunkStartOffset, endPos);
             m_chunk2.native.assign(stringToRender->native.begin() + xToDraw,
                 stringToRender->native.begin() + xEnd);
 

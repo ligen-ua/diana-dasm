@@ -3,6 +3,7 @@
 #include "oui_window.h"
 #include "oui_win_styles.h"
 #include "oui_label.h"
+#include "oui_editbox.h"
 
 namespace oui
 {
@@ -85,7 +86,22 @@ namespace oui
         void ConstructChilds() override;
         void OnResize() override;
         bool Resize(const Size& newSize) override;
-
     };
 
+    class CEditBoxWindow :public CMessageBoxWindow
+    {
+        using Parent_type = CMessageBoxWindow;
+
+    protected:
+        std::shared_ptr<CEditBox> m_urlEdit;
+
+        void OnPreDock(Rect& rect) override;
+        void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
+
+    public:
+        CEditBoxWindow(std::function<String()> getLabelText, std::function<void (const String& )> handler, const String& editBoxText);
+        void ConstructChilds() override;
+        void OnResize() override;
+        bool Resize(const Size& newSize) override;
+    };
 }

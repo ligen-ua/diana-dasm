@@ -543,7 +543,7 @@ int Diana_ParseCmdEx(DianaParseParams * pParseParams)    // OUT
     int iOriginalCacheSize = 0;
     int nopFlags = 0;
     pParseParams->pContext->prefixesCount = 0;
-    
+
     Diana_ResetPrefixes(pParseParams->pContext);
     DIANA_MEMSET(pParseParams->pResult, 0, sizeof(DianaParserResult));
 
@@ -559,7 +559,6 @@ int Diana_ParseCmdEx(DianaParseParams * pParseParams)    // OUT
             return iResult;
 
         data = Diana_CacheEatOne(pParseParams->pContext);
-
         if (!iBytesCounter || !nopFlags)
         {
             // check nop
@@ -650,8 +649,9 @@ int Diana_ParseCmdEx(DianaParseParams * pParseParams)    // OUT
     if (iResult && !dataValid)
     {
         if (pParseParams->pContext->cacheSize)
+        {
             Diana_CacheEatOne(pParseParams->pContext);
+        }
     }
-
     return iResult;
 }

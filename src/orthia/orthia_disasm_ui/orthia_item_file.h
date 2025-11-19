@@ -4,19 +4,25 @@
 
 namespace orthia
 {
+    class CDatabaseManager;
+    class ÑFilePersistentItemStorage :public ÑPersistentItemStorage
+    {
+        orthia::intrusive_ptr<CDatabaseManager> m_databaseManager;
+    public:
+        ÑFilePersistentItemStorage();
+        void Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager);
+        oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment);
+    };
+
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, IWorkPlaceItem
     {
-
         std::shared_ptr<orthia::CSimplePeFile> peFile;
         oui::String fullName, shortName;
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;
-        std::shared_ptr<IPeristentItemStorage> persistentItemStorage;
+        std::shared_ptr<ÑFilePersistentItemStorage> persistentItemStorage;
 
-        FileWorkplaceItem(std::shared_ptr<IPeristentItemStorage> peristentItemStorage_in) 
-            : persistentItemStorage(peristentItemStorage_in)
-        {
-        }
+        FileWorkplaceItem(std::shared_ptr<ÑFilePersistentItemStorage> peristentItemStorage_in);
 
         // public interface
         WorkAddressData ReadData(Address_type address, Address_type size) override;
@@ -35,6 +41,7 @@ namespace orthia
         MarkupRangeInfo QueryMarkupRange(Address_type address) const override;
         void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const override;
         oui::String QueryAddressName(Address_type address) const override;
+        std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) override;
     };
 
     class CClassicDatabase;

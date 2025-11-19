@@ -11,12 +11,12 @@ namespace oui
 
     void CBaseModalWindow::OnInit(std::shared_ptr<CWindowsPool> pool)
     {
+        m_prevFocus = pool->GetFocus();
         if (m_setModal)
         {
             m_lastModalWindow = pool->GetModalWindow();
             pool->SetModalWindow(GetPtr());
         }
-        m_prevFocus = pool->GetFocus();
         if (auto prevFocus = m_prevFocus.lock())
         {
             if (auto target = prevFocus->GetPopupPrevFocusTarget())
@@ -378,5 +378,69 @@ namespace oui
         Parent_type::OnResize();
     }
 
+    // CEditBoxWindow
+    CEditBoxWindow::CEditBoxWindow(std::function<String()> getLabelText, std::function<void(const String&)> handler, const String& editBoxText)
+        :
+        Parent_type(
+            getLabelText,
+            [=]() {
+            })
+    {
+        m_urlEdit = std::make_shared<CEditBox>(m_colorProfile);
+        m_urlEdit->SetText(editBoxText);
+        m_urlEdit->SetEnterHandler([=](const oui::String& text) { handler(text); FinishDialog(); });
 
+        auto labelProfile = std::make_shared<LabelColorProfile>();
+        QueryDefaultColorProfile(*labelProfile);
+        labelProfile->normal.text = oui::ColorBrightYellow();
+        labelProfile->mouseHighlight.text = oui::ColorBrightYellow();
+        m_textLabel->SetColorProfile(labelProfile);
+    }
+    void CEditBoxWindow::ConstructChilds()
+    {
+        AddChild(m_urlEdit);
+        Parent_type::ConstructChilds();
+    }
+    void CEditBoxWindow::OnResize()
+    {
+        Parent_type::OnResize();
+        const auto clientRect = GetClientRect();
+
+        if (clientRect.size.width < 5 || clientRect.size.height < 3)
+        {
+            Size zeroSize;
+            m_urlEdit->Resize(zeroSize);
+            return;
+        }
+
+        Rect urlEditRect = clientRect;
+        urlEditRect.position.x += 2;
+        urlEditRect.position.y += 3;
+        urlEditRect.size.width -= 4;
+        urlEditRect.size.height = 1;
+
+        m_urlEdit->MoveTo(urlEditRect.position);
+        m_urlEdit->Resize(urlEditRect.size);
+    }
+    bool CEditBoxWindow::Resize(const Size& newSize)
+    {
+        auto size = newSize;
+        size.height = 7;
+        return Parent_type::Parent_type::Resize(size);
+    }
+    void CEditBoxWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
+    {
+        m_urlEdit->SetFocus();
+    }
+    void CEditBoxWindow::OnPreDock(Rect& rect)
+    {
+        const int minWidth = 50;
+        if (rect.size.width > minWidth)
+        {
+            return;
+        }
+        int diff = minWidth - rect.size.width;
+        rect.position.x += diff / 2;
+        rect.size.width = minWidth;
+    }
 }

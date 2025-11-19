@@ -52,6 +52,9 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtSelectMetainfo_Address;
     CSQLStatement m_stmtSelectMetainfo_NearestAddress;
 
+    CSQLStatement m_stmtSelectAllComments;
+    CSQLStatement m_stmtWriteComment;
+
     void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to);
     void InsertModule(Address_type baseAddress, Address_type size, const std::wstring & moduleName);
 
@@ -94,6 +97,10 @@ public:
     bool QueryNearestModule(Address_type address, CommonModuleInfo* pResult);
 
     void RollbackTransactionSilent();
+    
+    // comments
+    void InsertComment(Address_type address, const std::string& text);
+    void QueryAllComments(std::function<bool(Address_type address, const std::string& text)> handler);
 };
 
 class CClassicDatabaseModuleCleaner
