@@ -138,6 +138,49 @@ static void parse_pe_test()
 }
 
 
+struct ExportsCollector :public diana::CBasePeLinkImportsObserver
+{
+    const char* m_pModuleAddress;
+    const char* m_pModuleAddressEnd;
+    Diana_PeFile& m_dianaPeFile;
+
+    ExportsCollector(const char * pModuleAddress, const char* pModuleAddressEnd, Diana_PeFile& dianaPeFile)
+        : m_pModuleAddress(pModuleAddress), m_pModuleAddressEnd(pModuleAddressEnd), m_dianaPeFile(dianaPeFile)
+    {
+    }
+    void QueryFunctionByOrdinal(const char* pDllName,
+        DI_UINT32 ordinal,
+        OPERAND_SIZE* pAddress)
+    {
+    }
+    void QueryFunctionByName(const char* pDllName,
+        const char* pFunctionName,
+        DI_UINT32 hint,
+        OPERAND_SIZE* pAddress)
+    {
+        if (!*pAddress)
+        {
+            return;
+        }
+        OPERAND_SIZE offset2 = 0;
+        OPERAND_SIZE forwardOffset2 = 0;
+        DI_CHECK_CPP(DianaPeFile_GetProcAddress(&m_dianaPeFile,
+            m_pModuleAddress,
+            m_pModuleAddressEnd,
+            pFunctionName,
+            &offset2,
+            &forwardOffset2));
+
+        if (forwardOffset2)
+        {
+            return;
+        }
+
+        DIANA_TEST_ASSERT(offset2);
+        auto target = m_pModuleAddress + offset2;
+        DIANA_TEST_ASSERT(offset2 == *pAddress);
+    }
+};
 static void parse_pe_test2()
 {
     HMODULE hNtdllModule = GetModuleHandleW(L"ntdll.dll");
@@ -188,6 +231,19 @@ static void parse_pe_test2()
                                             "EnterCriticalSection",
                                             &offset2,
                                             &forwardOffset2));
+    DIANA_TEST_ASSERT(!offset2);
+    DIANA_TEST_ASSERT(forwardOffset2);
+
+    std::vector<char> page(0x4000);
+    ExportsCollector collector((const char*)hkernel32Module,
+        (const char*)hkernel32Module + kernel32ModuleInfo.SizeOfImage,
+        dianaPeFile_kernel32);
+    DI_CHECK_CPP(DianaPeFile_QueryExports(&dianaPeFile_kernel32,
+        &peFileStream_kernel32.stream,
+        page.data(),
+        (int)page.size(),
+        collector.GetParent(),
+        0));
 
 }
 void test_pe()

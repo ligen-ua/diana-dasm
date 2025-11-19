@@ -135,6 +135,20 @@ public:
     ~CMasmString()
     {
     }
+    void SetOnOpCallback(DianaStringOutputOnOpCallback_type pOnOpCallback, void* pUserContext)
+    {
+        m_context.pOnOpCallback = pOnOpCallback;
+        m_context.onOpCallbackContext = pUserContext;
+    }
+    void SetSpacesCount(int spacesCount)
+    {
+        DianaStringOutputContext_Init(&m_context,
+            DianaTextOutput_String,
+            DianaOpOutput_String,
+            spacesCount,
+            &m_buffer.front(),
+            m_buffer.size());
+    }
     const char * Assign(DianaParserResult * pResult, 
                         OPERAND_SIZE instructionRIP)
     {

@@ -22,7 +22,7 @@ public:
 inline 
 void SQLExecute(sqlite3_stmt * statement)
 {
-    int stepResult = sqlite3_step(statement);
+    int stepResult = SQLiteStep_Wrapper(statement);
     if (stepResult != SQLITE_DONE)
     {
         throw std::runtime_error("Can't execute");
@@ -31,7 +31,7 @@ void SQLExecute(sqlite3_stmt * statement)
 inline 
 bool SQLStep(sqlite3_stmt * statement)
 {
-    int stepResult = sqlite3_step(statement);
+    int stepResult = SQLiteStep_Wrapper(statement);
     if (stepResult == SQLITE_DONE)
     {
         return false;
@@ -287,7 +287,7 @@ struct SQLResult_1_Double
 };
 inline bool SQLite_IsExists(sqlite3_stmt * statement)
 {
-    int stepResult = sqlite3_step(statement);
+    int stepResult = SQLiteStep_Wrapper(statement);
     return (stepResult == SQLITE_ROW);
 }
 template<class RowRecipientType>
@@ -301,7 +301,7 @@ bool SQLite_ReadCustom(sqlite3_stmt * statement,
     bool bResult = false;
     for(;;)
     {
-        int stepResult = sqlite3_step(statement);
+        int stepResult = SQLiteStep_Wrapper(statement);
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -311,13 +311,13 @@ bool SQLite_ReadCustom(sqlite3_stmt * statement,
         {
             if (bResult && !bAllowMultiply)
             {
-                throw std::runtime_error("sqlite3_step failed: only one row expected");
+                throw std::runtime_error("SQLiteStep_Wrapper failed: only one row expected");
             }
             pResult->Deserialize(statement);
             bResult = true;
             continue;
         }
-        throw std::runtime_error("sqlite3_step failed");
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
     }
     if (!bResult)
     {
@@ -327,7 +327,7 @@ bool SQLite_ReadCustom(sqlite3_stmt * statement,
         }
         if (!bAllowNoResults)
         {
-            throw std::runtime_error("sqlite3_step failed: value not found");
+            throw std::runtime_error("SQLiteStep_Wrapper failed: value not found");
         }
     }
     return bResult;

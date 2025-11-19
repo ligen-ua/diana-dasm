@@ -1,0 +1,107 @@
+#pragma once
+
+#include "oui_window.h"
+#include "oui_win_styles.h"
+#include "oui_label.h"
+#include "oui_editbox.h"
+
+namespace oui
+{
+    struct CommonDialogStrings
+    {
+        String caption;
+        String openingText;
+        String errorText;
+        String okText;
+        String cancelText;
+    };
+
+    class CBaseModalWindow:public CWindow
+    {
+    protected:
+        bool m_dialogFinished = false;
+        std::weak_ptr<CWindow> m_prevFocus;
+        std::shared_ptr<CWindow> m_lastModalWindow;
+        bool m_setModal = false;
+
+        void OnInit(std::shared_ptr<CWindowsPool> pool);
+        virtual void OnFinishDialog();    
+    public:
+        CBaseModalWindow(bool setModal);
+        void Destroy() override;
+        bool ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext) override;
+        void FinishDialog();
+    };
+
+    class CModalWindow:public WithBorder<CBaseModalWindow>
+    {
+        using Parent_type = WithBorder<CBaseModalWindow>;
+        
+    protected:
+        static String m_chunk;
+        int m_lastTabY = 0;
+        Range m_captionRange, m_closeRange;
+
+        String m_caption;
+        Point m_lastMouseMovePoint;
+        std::shared_ptr<PanelColorProfile> m_panelColorProfile;
+        std::shared_ptr<DialogColorProfile> m_colorProfile;
+
+        void OnInit(std::shared_ptr<CWindowsPool> pool) override;
+        void OnFinishDialog() override;
+        void PaintTitle(const Rect& rect, DrawParameters& parameters);
+        bool Drag_MoveHandler(DragEvent event,
+            const Point& initialPoint,
+            const Point& currentPoint,
+            std::shared_ptr<CWindow> wnd,
+            const Rect& initialRect);
+        virtual void OnPreDock(Rect& rect);
+
+    public:
+        CModalWindow();
+
+        std::shared_ptr<DialogColorProfile> GetColorProfile();
+
+        void Dock();
+
+        bool IsPopup() const override { return false; }
+        void SetCaption(const String& caption);
+        String GetCaption() const;
+        void DoPaint(const Rect& rect, DrawParameters& parameters) override;
+        bool HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext) override;
+    };
+
+
+    class CMessageBoxWindow :public oui::SimpleBrush<CModalWindow>
+    {
+    protected:
+        using Parent_type = oui::SimpleBrush<CModalWindow>;
+
+        std::shared_ptr<CLabel> m_textLabel;
+        std::function<void()> m_onDestroy;
+
+        void OnFinishDialog() override;
+    public:
+        CMessageBoxWindow(std::function<String()> getText, std::function<void()> onDestroy);
+        void ConstructChilds() override;
+        void OnResize() override;
+        bool Resize(const Size& newSize) override;
+    };
+
+    class CEditBoxWindow :public CMessageBoxWindow
+    {
+        using Parent_type = CMessageBoxWindow;
+
+    protected:
+        std::shared_ptr<CEditBox> m_urlEdit;
+
+        void OnPreDock(Rect& rect) override;
+        void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
+
+    public:
+        CEditBoxWindow(std::function<String()> getLabelText, std::function<void (const String& )> handler, const String& editBoxText);
+        void ConstructChilds() override;
+        void OnResize() override;
+        bool Resize(const Size& newSize) override;
+    };
+}

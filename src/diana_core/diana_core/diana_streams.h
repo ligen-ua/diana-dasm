@@ -9,16 +9,23 @@ typedef struct _dianaMemoryStream
     void * pBuffer;
     DIANA_SIZE_T bufferSize;
     DIANA_SIZE_T curSize;
+    OPERAND_SIZE addressDifference;
 }DianaMemoryStream;
 
 void Diana_InitMemoryStream(DianaMemoryStream * pStream,
                             void * pBuffer,
-                            DIANA_SIZE_T bufferSize);  // this
+                            DIANA_SIZE_T bufferSize); // constructor
 
 void Diana_InitMemoryStreamEx(DianaMemoryStream * pStream,
                               void * pBuffer,
                               DIANA_SIZE_T bufferSize,
-                              int bWritable);  // this
+                              int bWritable);  // constructor
+
+void Diana_InitMemoryStreamEx2(DianaMemoryStream* pStream,
+                               void* pBuffer,
+                               DIANA_SIZE_T bufferSize,
+                               int bWritable,
+                               OPERAND_SIZE addressDifference);  // constructor
 
 int Diana_ParseCmdOnBuffer(int iMode,
                            void * pBuffer,

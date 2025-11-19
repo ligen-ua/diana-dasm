@@ -17,13 +17,26 @@ static Diana_LinkedAdditionalGroupInfo g_infoForLoops = {DIANA_GT_CAN_CHANGE_RIP
 static Diana_LinkedAdditionalGroupInfo g_infoForJecxz = {DIANA_GT_CAN_CHANGE_RIP|DIANA_GT_IS_JUMP|DIANA_GT_CAN_GO_TO_THE_NEXT_INSTRUCTION, 1};
 static Diana_LinkedAdditionalGroupInfo g_infoForJcc =   {DIANA_GT_CAN_CHANGE_RIP|DIANA_GT_IS_JUMP|DIANA_GT_CAN_GO_TO_THE_NEXT_INSTRUCTION, 0};
 
-
+#define DI_PROXY_BYTES_SIZE  DI_MAX_INSTRUCTION_SIZE_ALIGNED*2
 typedef struct _dianaProxyReadStream
 {
     DianaReadStream m_parent;
     DianaReadStream * m_pOriginalStream;
     int m_iReadSize;
+    char m_lastBytes[DI_PROXY_BYTES_SIZE];
+    int m_bytesCount;
 }DianaProxyReadStream;
+
+void DianaProxyReadStream_AddBytes(DianaProxyReadStream* stream, void *pBuffer, int iSize)
+{
+    if ((stream->m_bytesCount + iSize) >= DI_PROXY_BYTES_SIZE)
+    {
+        Diana_FatalBreak();
+        return;
+    }
+    memcpy(stream->m_lastBytes + stream->m_bytesCount, pBuffer, iSize);
+    stream->m_bytesCount += iSize;
+}
 
 static int ProxyDianaReadFnc(void * pThisIn, void * pBuffer, int iBufferSize, int * readBytes)
 {
@@ -33,6 +46,7 @@ static int ProxyDianaReadFnc(void * pThisIn, void * pBuffer, int iBufferSize, in
         int iRes = pThis->m_pOriginalStream->pReadFnc(pThis->m_pOriginalStream, pBuffer, iBufferSize, readBytes);
         if (!iRes)
         {
+            DianaProxyReadStream_AddBytes(pThis, pBuffer, *readBytes);
             pThis->m_iReadSize += *readBytes;
         }
         return iRes;
@@ -48,6 +62,17 @@ int DianaExactRead(DianaReadStream * pThis,
     if (read != iBufferSize)
         return DI_END_OF_STREAM;
     return DI_SUCCESS;
+}
+
+void DianaResult_AddByte(DianaParserResult* result, DI_CHAR ch)
+{
+    if (result->bytesCount >= DI_MAX_INSTRUCTION_SIZE)
+    {
+        Diana_FatalBreak();
+        return;
+    }
+    result->bytes[ch] = ch;
+    ++result->bytesCount;
 }
 
 void DianaMovableReadStream_Init(DianaMovableReadStream * pStream,
@@ -82,10 +107,15 @@ int Diana_ParseCmd(DianaContext * pContext, //IN
     int iPreviousCacheSize = pContext->cacheSize;
     DianaProxyReadStream proxy;
     DianaParseParams parseParams;
+    unsigned char prevCache[DI_CACHE_SIZE];
+    int prevCacheIt = pContext->cacheIt;
+
+    memcpy(prevCache, pContext->cache, sizeof(pContext->cache));
 
     proxy.m_iReadSize = 0;
     proxy.m_pOriginalStream = readStream;
     proxy.m_parent.pReadFnc = ProxyDianaReadFnc;
+    proxy.m_bytesCount = 0;
 
     parseParams.pContext = pContext;
     parseParams.pInitialLine = pInitialLine;
@@ -97,6 +127,7 @@ int Diana_ParseCmd(DianaContext * pContext, //IN
     pResult->iPrefix = 0;
     pResult->iRexPrefix = 0;
     pResult->iFullCmdSize = 0;
+    pResult->bytesCount = 0;
 
     iRes = Diana_ParseCmdEx(&parseParams);
 
@@ -104,10 +135,31 @@ int Diana_ParseCmd(DianaContext * pContext, //IN
     pResult->iRexPrefix = pContext->iRexPrefix;
 
     pResult->iFullCmdSize = iPreviousCacheSize + proxy.m_iReadSize - pContext->cacheSize;
-
     if( pResult->iFullCmdSize > DI_MAX_INSTRUCTION_SIZE )
         return DI_ERROR;
 
+    // copy bytes
+    if (pResult->iFullCmdSize <= iPreviousCacheSize)
+    {
+        memcpy(pResult->bytes, prevCache + prevCacheIt, pResult->iFullCmdSize);
+        pResult->bytesCount = pResult->iFullCmdSize;
+    }
+    else
+    {
+        int processedBytes = proxy.m_iReadSize - pContext->cacheSize;
+
+        // all prev cache went to cmd, so move it
+        memcpy(pResult->bytes, prevCache + prevCacheIt, iPreviousCacheSize);
+        pResult->bytesCount = iPreviousCacheSize;
+
+        memcpy(pResult->bytes + pResult->bytesCount, proxy.m_lastBytes, processedBytes);
+        pResult->bytesCount += processedBytes;
+    }
+
+    if (pResult->bytesCount != pResult->iFullCmdSize)
+    {
+        Diana_FatalBreak();
+    }
     return iRes;
 }
 
@@ -478,5 +530,24 @@ const char * Diana_QueryErrorText_Silent(int value)
     }
 
 #undef DI_ERR_DEF_CASE
+    return 0;
+}
+
+
+OPERAND_SIZE Diana_ReadValue(const void* buffer,
+    int size)
+{
+    switch (size)
+    {
+    case 1:
+        return *(unsigned char*)buffer;
+    case 2:
+        return *(unsigned short*)buffer;
+    case 4:
+        return *(unsigned int*)buffer;
+    case 8:
+        return *(OPERAND_SIZE*)buffer;
+    }
+    Diana_FatalBreak();
     return 0;
 }

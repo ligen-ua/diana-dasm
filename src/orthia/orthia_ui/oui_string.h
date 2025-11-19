@@ -1,0 +1,106 @@
+#pragma once
+
+#include "oui_base.h"
+
+namespace oui
+{
+    struct String
+    {
+#ifdef OUI_SYS_WINDOWS
+        std::wstring native;
+        typedef std::wstringstream StringStream_type;
+#define OUI_TCSTR(X) L##X
+#define OUI_TCHAR(X) L##X
+#define OUI_STR(X) std::wstring(OUI_TCSTR(X))
+#define OUI_TO_STR(X) std::to_wstring(X)
+#define OUI_SCANF swscanf
+#define OUI_STRNCMP(X1, X2, X3)  wcsncmp(X1, X2, X3)
+#define OUI_SPRINTF swprintf
+
+#else
+        std::string native;
+        typedef std::stringstream StringStream_type;
+#define OUI_TCSTR(X) X
+#define OUI_TCHAR(X) X
+#define OUI_STR(X) std::string(X)
+#define OUI_TO_STR(X) std::to_string(X)
+#define OUI_SCANF sscanf
+#define OUI_STRNCMP(X1, X2, X3)  strncmp(X1, X2, X3)
+#define OUI_SPRINTF sprintf
+
+#endif
+        typedef typename decltype(native)::value_type char_type;
+        typedef decltype(native) string_type;
+        const static char_type symSpace = (char_type)' ';
+
+        String()
+        {
+        }
+        String(const string_type& str)
+            :
+            native(str)
+        {
+        }
+        String(const char_type * p)
+            :
+            native(p)
+        {
+        }
+    };
+
+    oui::String PassParameter1(const oui::String& text,
+        const oui::String& param1);
+
+    oui::String PassParameter2(const oui::String& text,
+        const oui::String& param1,
+        const oui::String& param2);
+
+    oui::String PassParameter3(const oui::String& text,
+        const oui::String& param1,
+        const oui::String& param2,
+        const oui::String& param3);
+
+    // symbols
+    struct SymbolInfo
+    {
+        int charOffset = 0;
+        int visibleOffset = 0;
+        int16_t sizeInTChars = 0;
+        int16_t visibleSize = 0;
+    };
+
+    struct VisibleStringInfo
+    {
+        int visibleSize = 0;
+        int symbolsCount = 0;
+
+        VisibleStringInfo(int visibleSize_in,
+            int symbolsCount_in)
+            :
+                visibleSize(visibleSize_in),
+                symbolsCount(symbolsCount_in)
+        {
+        }
+    };
+    struct ISymbolsAnalyzer
+    {
+        virtual ~ISymbolsAnalyzer() {}
+        
+        virtual VisibleStringInfo CutVisibleString(String::string_type& str,
+            int visibleSymCount) = 0;
+        
+        virtual int CalculateSymbolsCount(const String::char_type* pStart, 
+            size_t sizeInWchars, 
+            const String::char_type exceptSym_in) = 0;
+        
+        virtual int CalculateSymbolsCount(const String::char_type* pStart,
+            size_t sizeInWchars,
+            std::vector<SymbolInfo>& symbols) = 0;
+
+        template<class Type, class CharType>
+        int CalculateSymbolsCount(const Type& str, const CharType exceptSym_in)
+        {
+            return this->CalculateSymbolsCount(str.c_str(), str.size(), exceptSym_in);
+        }
+    };
+}

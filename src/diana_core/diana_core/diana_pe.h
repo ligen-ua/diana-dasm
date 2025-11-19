@@ -67,6 +67,23 @@ int DianaPeFile_Map(/* in */ Diana_PeFile * pPeFile,
                     /* inout */ DianaReadWriteRandomStream * pOutStream,
                     /* in */ void * pPage,
                     /* in */ int pageSize);
+
+
+#define DIANA_PE_MAP_DO_NOT_RELOCATE       1
+
+int DianaPeFile_MapEx(/* in */ Diana_PeFile* pPeFile,
+    /* in */ DianaMovableReadStream* pStream,
+    /* in */ OPERAND_SIZE address,
+    /* inout */ DianaReadWriteRandomStream* pOutStream,
+    /* in */ void* pPage,
+    /* in */ int pageSize,
+    /* in */ int flags);
+
+
+int DianaPeFile_Relocate(/* in */ Diana_PeFile* pPeFile,
+                         /* in */ OPERAND_SIZE address,
+                         /* inout */ DianaReadWriteRandomStream* pOutStream);
+
 DIANA_IMAGE_SECTION_HEADER * DianaPeFile_FindSection(Diana_PeFile * pPeFile,
                                                      const char * pSectionName,
                                                      int nameSize);
@@ -83,11 +100,14 @@ typedef int (* DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc)(void * 
                                                                          const char * pFunctionName,
                                                                          DI_UINT32 hint,
                                                                          OPERAND_SIZE * pAddress);
+typedef int (* DianaPeFile_LinkImports_Observer_ReportInfo_fnc)(void * pThis, 
+                                                                   OPERAND_SIZE address);
 
 typedef struct _DianaPeFile_LinkImports_Observer
 {
     DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal;
     DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName;
+    DianaPeFile_LinkImports_Observer_ReportInfo_fnc reportInfo_fnc;
 }
 DianaPeFile_LinkImports_Observer;
 
@@ -95,6 +115,10 @@ DianaPeFile_LinkImports_Observer;
 void DianaPeFile_LinkImports_Observer_Init(DianaPeFile_LinkImports_Observer * pObserver,
                                            DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal,
                                            DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName);
+void DianaPeFile_LinkImports_Observer_Init2(DianaPeFile_LinkImports_Observer * pObserver,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName,
+                                           DianaPeFile_LinkImports_Observer_ReportInfo_fnc reportInfo);
 
 int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                             /* in */ OPERAND_SIZE address,
@@ -103,6 +127,30 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                             /* in */ int pageSize,
                             /* in */ DianaPeFile_LinkImports_Observer * pObserver
                             );
+
+
+
+#define DIANA_LINK_IMPORT_FLAG_READ_ONLY  1
+#define DIANA_LINK_IMPORT_READ_FULL_INFO  2
+
+
+int DianaPeFile_QueryImports(/* in */ Diana_PeFile* pPeFile,
+                            /* in */ OPERAND_SIZE address,
+                            /* inout */ DianaReadWriteRandomStream* pOutStream,
+                            /* in */ void* pPage,
+                            /* in */ int pageSize,
+                            /* in */ DianaPeFile_LinkImports_Observer* pObserver,
+                            /* in */ int streamFlags,
+                            /* in */ int importFlags);
+
+
+int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
+                            /* inout */ DianaMovableReadStream* pOutStream,
+                            /* in */ void* pPage,
+                            /* in */ int pageSize,
+                            /* in */ DianaPeFile_LinkImports_Observer* pObserver,
+                            /* in */ int streamFlags);
+
 int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
                           /* inout */ DianaMovableReadStream* pOutStream,
                           /* in */ OPERAND_SIZE address,
@@ -112,7 +160,8 @@ int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                 /* inout */ DianaReadWriteRandomStream * pOutStream,
                                 /* in */ OPERAND_SIZE virtualAddress,
                                 /* in */ OPERAND_SIZE sizeToRead,
-                                /* out */ void ** ppSection
+                                /* out */ void ** ppSection,
+                                /* in */ int streamFlags
                                );
 
 int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
@@ -120,8 +169,10 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                             /* inout */ DianaReadWriteRandomStream * pOutStream,
                             /* out */ void ** ppTlsCallbacks,
                             /* out */ int * callbacksCount,
-                            /* out */ OPERAND_SIZE * pAddressOfTLSIndex
-                            );
+                            /* out */ OPERAND_SIZE * pAddressOfTLSIndex,
+                            /* in */ int streamFlags);
+
+#define DIANA_PE_INVALID_ORDINAL_VALUE    ((DI_UINT16)(-1))
 int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
                                 const char * pCapturedDataStart,
                                 const char * pCapturedDataEnd,
@@ -129,6 +180,14 @@ int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
                                 OPERAND_SIZE * pFunctionOffset,
                                 OPERAND_SIZE * pForwardInformationOffset);
 
+
+int DianaPeFile_GetProcAddressEx(Diana_PeFile * pPeFile,
+                                const char * pCapturedDataStart,
+                                const char * pCapturedDataEnd,
+                                const char * pFunctionName,
+                                OPERAND_SIZE * pFunctionOffset,
+                                OPERAND_SIZE * pForwardInformationOffset,
+                                DI_UINT16 ordinal);
 
 #define DIANA_IMAGE_DEBUG_TYPE_UNKNOWN      0
 #define DIANA_IMAGE_DEBUG_TYPE_COFF         1

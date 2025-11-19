@@ -10,7 +10,8 @@ ULONGLONG HookProcess(const ProcessInfo & process,
                  int addressReg_number,
                  int sizeReg_number,
                  const std::string & outPath,
-                 ULONG samplesCount);
+                 ULONG samplesCount,
+                 bool testHook);
 
 void SelfTest();
 }

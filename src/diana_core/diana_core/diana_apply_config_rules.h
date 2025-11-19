@@ -75,8 +75,13 @@
 #endif
 
 
-#if __cplusplus < 201103L 
+#if _MSC_VER < 1910 && __cplusplus < 201703L
 #define DIANA_AUTO_PTR std::auto_ptr
 #else
 #define DIANA_AUTO_PTR std::unique_ptr
+
+#ifndef DIANA_HAS_CPP11
+#define DIANA_HAS_CPP11
+#endif
+
 #endif

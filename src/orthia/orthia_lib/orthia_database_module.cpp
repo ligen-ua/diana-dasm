@@ -63,26 +63,34 @@ void CDatabase::Init()
 
 void CDatabase::DoUpdate_0_1()
 {
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_vm_vms (vms_id INTEGER PRIMARY KEY, vms_name TEXT, vms_creation_time DATETIME DEFAULT CURRENT_TIMESTAMP, vms_last_write_time DATETIME DEFAULT CURRENT_TIMESTAMP)",
-                        0,0,0), "Can't update the database");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_vm_vms (vms_id INTEGER PRIMARY KEY, vms_name TEXT, vms_creation_time DATETIME DEFAULT CURRENT_TIMESTAMP, vms_last_write_time DATETIME DEFAULT CURRENT_TIMESTAMP)"), 
+        "Can't update the database");
 
     // vmods_flags: executable, file, disabled, exec-results
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_vm_modules(vmods_vm_id INTEGER, vmods_flags INTEGER DEFAULT 0, vmods_pos_in_vm INTEGER, vmods_info_xml TEXT, vmods_raw_data BLOB, FOREIGN KEY(vmods_vm_id) REFERENCES tbl_vm_vms(vms_id))",
-                        0,0,0), "Can't update the database");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_vm_modules(vmods_vm_id INTEGER, vmods_flags INTEGER DEFAULT 0, vmods_pos_in_vm INTEGER, vmods_info_xml TEXT, vmods_raw_data BLOB, FOREIGN KEY(vmods_vm_id) REFERENCES tbl_vm_vms(vms_id))"), 
+        "Can't update the database");
 
+}
+void CDatabase::DoUpdate_1_2()
+{
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "CREATE TABLE IF NOT EXISTS tbl_metainfo(meta_mod_id INTEGER, meta_address INTEGER, meta_type INTEGER, meta_info TEXT, FOREIGN KEY(meta_mod_id) REFERENCES tbl_modules(mod_address) ON DELETE CASCADE)"),
+        "Can't create database");
+
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "CREATE TABLE IF NOT EXISTS tbl_comments(com_address INTEGER PRIMARY KEY, com_text TEXT)"),
+        "Can't create database");
 }
 void CDatabase::DoVersionScripts()
 {
     CSQLTransaction transaction(m_pDatabase->Get());
 
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_version (ver_database_version INTEGER PRIMARY KEY, ver_action_time DATETIME DEFAULT CURRENT_TIMESTAMP)",
-                        0,0,0), "Can't create database");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_version (ver_database_version INTEGER PRIMARY KEY, ver_action_time DATETIME DEFAULT CURRENT_TIMESTAMP)"), 
+        "Can't create database");
 
     m_dbVersion.Init(m_pDatabase->Get());
 
     int version = m_dbVersion.GetDBVersion();
 
-#define ORTHIA_CURRENT_DB_VERSION_INT       1
+#define ORTHIA_CURRENT_DB_VERSION_INT       2
     if (version != ORTHIA_CURRENT_DB_VERSION_INT)
     {
         switch(version)
@@ -91,6 +99,9 @@ void CDatabase::DoVersionScripts()
         case 0:
             DoUpdate_0_1();
             m_dbVersion.AddDBVersion(1);
+        case 1:
+            DoUpdate_1_2();
+            m_dbVersion.AddDBVersion(2);
         case ORTHIA_CURRENT_DB_VERSION_INT:
             ;
         }
@@ -120,11 +131,15 @@ void CDatabase::CreateNew(const std::wstring & fullFileName)
     ORTHIA_CHECK_SQLITE(sqlite3_open16(fullFileName.c_str(), database.Get2()), "Can't create the database: "<<orthia::ToAnsiString_Silent(fullFileName));
     m_pDatabase = new CSQLDatabase2(database);
 
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_references (ref_address_from INTEGER, ref_address_to INTEGER)",
-                        0,0,0), "Can't create database");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "PRAGMA encoding = \"UTF-8\""), "Can't create database");
 
-    ORTHIA_CHECK_SQLITE(sqlite3_exec(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_modules (mod_address INTEGER, mod_size INTEGER, mod_name TEXT)",
-                        0,0,0), "Can't create database");
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "PRAGMA foreign_keys=ON"), "Can't create database");
+
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_references (ref_address_from INTEGER, ref_address_to INTEGER)"), 
+        "Can't create database");
+
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_modules (mod_address INTEGER PRIMARY KEY, mod_size INTEGER, mod_name TEXT)"), 
+        "Can't create database");
 
     Init();
 }

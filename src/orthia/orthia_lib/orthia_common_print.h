@@ -189,9 +189,19 @@ public:
         {
             return false;
         }
-        VmDeserializeMemory(varSize, 
-                            m_addressBuffer,
-                            &m_addressBufferUnparsed);
+        try
+        {
+            VmDeserializeMemory(varSize,
+                m_addressBuffer,
+                &m_addressBufferUnparsed);
+        }
+        catch (std::exception&e)
+        {
+            // it's io, just reaction on some weird windbg error
+            // don't pass an error, do our best
+            &e;
+            return false;
+        }
         if (m_addressBufferUnparsed.size() != varSize)
         {
             throw std::runtime_error("Internal error");

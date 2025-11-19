@@ -132,5 +132,23 @@ int DianaOpOutput_String(struct _DianaTextOutputContext * pContextIn,
        pBuffer[0] = '0';
     }
     pContext->curSize += written;
+
+    if (size != 1 || operand > 10)
+    {
+        if (pContext->curSize >= pContext->maxBufferSize)
+            return DI_ERROR;
+        pContext->pBuffer[pContext->curSize] = 'h';
+        ++pContext->curSize;
+
+        if (pContext->curSize >= pContext->maxBufferSize)
+            return DI_ERROR;
+        pContext->pBuffer[pContext->curSize] = 0;
+        ++written;
+    }
+
+    if (pContext->pOnOpCallback) 
+    {
+        pContext->pOnOpCallback(pContext, pContext->onOpCallbackContext, pBuffer, written, operand, size);
+    }
     return DI_SUCCESS;
 }

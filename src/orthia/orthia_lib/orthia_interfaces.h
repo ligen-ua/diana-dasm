@@ -121,6 +121,9 @@ struct CommonModuleInfo
     std::wstring name;
     Address_type size;
     CommonModuleInfo()
+        :
+        address(0),
+        size(0)
     {
     }
     CommonModuleInfo(Address_type address_in,

@@ -90,6 +90,9 @@ typedef enum
 #define DI_OPERAND_SIZE         unsigned long long
 #define DI_OPERAND_SIZE_SIGNED  long long
 
+#define DI_MAX_OPERAND_SIZE         ((unsigned long long)(-1))
+
+
 #define DI_FULL_CHAR           unsigned int
 #define DI_FULL_CHAR_NULL      ((unsigned int)(-1))
 #define DI_MAX_OPERANDS_COUNT  (4)
@@ -100,6 +103,7 @@ typedef enum
 
 #define DI_MAX_INSTRUCTION_SIZE 15
 #define DI_MAX_PREFIXES_COUNT DI_MAX_INSTRUCTION_SIZE-1
+#define DI_MAX_INSTRUCTION_SIZE_ALIGNED  16
 
 #define DI_CONST64(x)  (x##LL)
 // common
@@ -276,8 +280,12 @@ typedef struct _dianaParserResult
     int iPrefix;
     DI_CHAR iRexPrefix;
     int iFullCmdSize;
+    unsigned char bytes[DI_MAX_INSTRUCTION_SIZE_ALIGNED];
+    int bytesCount;
+
 }DianaParserResult;
 
+void DianaResult_AddByte(DianaParserResult * result, DI_CHAR ch);
 // Callback
 #define DI_END                      ((int)1)
 #define DI_ERROR                    ((int)-1)
@@ -505,5 +513,7 @@ int Diana_SafeAdd(OPERAND_SIZE * pResult, OPERAND_SIZE arg);
 // returns 0 if code is unknown
 const char * Diana_QueryErrorText_Silent(int value);
 
+OPERAND_SIZE Diana_ReadValue(const void* buffer,
+    int size);
 
 #endif

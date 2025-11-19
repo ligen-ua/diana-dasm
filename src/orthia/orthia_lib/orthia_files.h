@@ -23,6 +23,12 @@ inline long long GetSizeOfFile(HANDLE hFile)
 const ULONG g_share_all = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
 const ULONG g_share_read = FILE_SHARE_READ;
 
+const ULONG g_desired_read = GENERIC_READ;
+const ULONG g_desired_write = GENERIC_WRITE;
+
+const ULONG g_open_existing = OPEN_EXISTING;
+const ULONG g_create_always = CREATE_ALWAYS;
+
 class CFile
 {
     HANDLE m_handle;
@@ -194,7 +200,19 @@ public:
             throw std::runtime_error("Can't read file: partial read");
         }
     }
-
+    int ExactRead_Silent(void* pData, ULONG dwSize)
+    {
+        DWORD read = 0;
+        if (!ReadFile(m_handle, pData, dwSize, &read, 0))
+        {
+            return GetLastError();
+        }
+        if (read != dwSize)
+        {
+            return ERROR_INVALID_DATA;
+        }
+        return 0;
+    }
     void FlushBuffers()
     {
         if (!FlushFileBuffers(m_handle))
@@ -229,6 +247,36 @@ void LoadFileToVector(const std::wstring& fileName,
 
     char * pData = &data[0];
     file.ExactRead(pData, (ULONG)fileSize);
+}
+
+inline
+int LoadFileToVector_Silent(const std::wstring& fileName,
+    std::vector<char>& data)
+{
+    data.clear();
+    CFile file;
+    int error = file.Open_Silent(fileName,
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        OPEN_EXISTING);
+    if (error)
+    {
+        return error;
+    }
+
+    long long fileSize = file.GetSize();
+
+    if (fileSize > (long long)(1024 * 1024 * 1024))
+    {
+        return ERROR_INVALID_DATA;
+    }
+    data.resize((size_t)fileSize);
+
+    if (!fileSize)
+        return 0;
+
+    char* pData = &data[0];
+    return file.ExactRead_Silent(pData, (ULONG)fileSize);
 }
 
 inline bool IsFileExists(const std::wstring& fileName)

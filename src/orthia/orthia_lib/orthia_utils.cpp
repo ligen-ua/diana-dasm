@@ -2,7 +2,60 @@
 #pragma warning(disable:4996)
 namespace orthia
 {
+
+
+static int GetWinFolder_Silent(int csidl, PlatformString_type& result)
+{
+    CDll shell;
+    int error = shell.Reset_Silent(L"shell32.dll");
+    if (error)
+    {
+        return error;
+    }
+    std::vector<wchar_t> dataPath(MAX_PATH + 1);
+    dataPath[0] = 0;
+    HRESULT (STDAPICALLTYPE* pSHGetFolderPath)(HWND hwnd,
+        int csidl, 
+        HANDLE hToken, 
+        int dwFlags, 
+        LPWSTR pszPath) = 0;
+    shell.QueryFunction("SHGetFolderPathW", &pSHGetFolderPath, true);
+    if (!pSHGetFolderPath)
+    {
+        return ERROR_INVALID_FUNCTION;
+    }
+    if (pSHGetFolderPath(NULL,
+        csidl,
+        0,
+        0,
+        &dataPath[0]) != S_OK)
+    {
+        return ERROR_INVALID_FUNCTION;
+    }
+    result.clear();
+    result.append(&dataPath[0]);
+    AddSlash(result);
+    return 0;
+}
+
+int GetAppDataFolderWithSlash_Silent(PlatformString_type& result)
+{
+    const int cs_CSIDL_APPDATA = 0x001a;
+    return GetWinFolder_Silent(cs_CSIDL_APPDATA, result);
+}
+
 // systemtime
+long long GetCurrentUTCTime()
+{
+    FILETIME fileTime = { 0, };
+    GetSystemTimeAsFileTime(&fileTime);
+
+    LARGE_INTEGER result;
+    result.HighPart = fileTime.dwHighDateTime;
+    result.LowPart = fileTime.dwLowDateTime;
+    return result.QuadPart;
+}
+
 long long ConvertSystemTimeToFileTime(const SYSTEMTIME * pTime)
 {
     FILETIME fileTime = {0,0};
@@ -365,7 +418,11 @@ void CreateAllDirectoriesForFile(const std::wstring & fullFileName)
     }
 }
 
-
+CDll::CDll()
+    :
+    m_hLib(0)
+{
+}
 CDll::CDll(const std::wstring & name)
     :
         m_hLib(0)
@@ -400,6 +457,24 @@ void CDll::Reset(const wchar_t * pName)
     {
         ORTHIA_THROW_WIN32("Can't load: "<<orthia::ToAnsiString_Silent(pName)<<", code: "<<orthia____code);
     }
+}
+int CDll::Reset_Silent(const wchar_t* pName)
+{
+    if (m_hLib)
+    {
+        FreeLibrary(m_hLib);
+        m_hLib = 0;
+    }
+    if (!pName)
+    {
+        return 0;
+    }
+    m_hLib = LoadLibraryW(pName);
+    if (!m_hLib)
+    {
+        return GetLastError();
+    }
+    return 0;
 }
 FARPROC CDll::QueryFunctionRaw(const char * pFunctionName, 
                               bool bSilent)
@@ -468,7 +543,6 @@ unsigned int orthia_pcg32_random_r(orthia_pcg32_random * rng)
     unsigned int rot = (unsigned int)(oldstate >> 59u);
     return (xorshifted >> rot) | (xorshifted << ((0-rot) & 31));
 }
-
 
 static
 BOOL VerParseTranslationID(LPVOID lpData, UINT unBlockSize, WORD wLangId, DWORD* pdwId, BOOL bPrimaryEnough/*= FALSE*/)
@@ -599,6 +673,160 @@ cleanup:
         FreeLibrary(hVersionDll);
     }
     return pResult;
+}
+
+// whitespace
+bool IsSpace(ORTHIA_TCHAR symbol)
+{
+    return symbol == L' ';
+}
+bool IsWhiteSpace(ORTHIA_TCHAR symbol)
+{
+    switch (symbol)
+    {
+    case L' ':
+    case 9:
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+bool IsWhiteSpace_Ansi(char symbol)
+{
+    switch (symbol)
+    {
+    case ' ':
+    case 9:
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+bool IsFileNameSeparator(ORTHIA_TCHAR ch)
+{
+    return (ch == L'\\' || ch == L'/');
+}
+bool IsEOL(ORTHIA_TCHAR symbol)
+{
+    switch (symbol)
+    {
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+bool IsEOL_Ansi(char symbol)
+{
+    switch (symbol)
+    {
+    case 10:
+    case 13:
+        return true;
+    }
+    return false;
+}
+
+void AddSlash(PlatformString_type& str)
+{
+    EraseLastSlash(str);
+    str.append(1, ORTHIA_SYM_PLATFORM_SLASH);
+}
+PlatformString_type AddSlash2(const PlatformString_type& str)
+{
+    PlatformString_type copy(str);
+    AddSlash(copy);
+    return copy;
+}
+
+void EraseLastSlash(PlatformString_type& str)
+{
+    for (;;)
+    {
+        if (str.empty())
+            return;
+
+        if (!IsFileNameSeparator(*str.rbegin()))
+            break;
+
+        str.resize(str.size() - 1);
+    }
+}
+
+void TrimString(std::wstring& str)
+{
+    TrimStringIf(str, IsSpace);
+}
+void TrimString(std::string& str)
+{
+    TrimStringIf(str, IsSpace);
+}
+std::wstring TrimString2(const std::wstring& str)
+{
+    std::wstring str2(str);
+    TrimString(str2);
+    return str2;
+}
+std::string TrimString2(const std::string& str)
+{
+    std::string str2(str);
+    TrimString(str2);
+    return str2;
+}
+int TrimStringAllWhiteSpace(std::wstring& str)
+{
+    return TrimStringIf(str, IsWhiteSpace);
+}
+int TrimStringAllWhiteSpace(std::string& str)
+{
+    return TrimStringIf(str, IsWhiteSpace_Ansi);
+}
+
+void SplitStringWithoutWhitespace(const StringInfo& str,
+    const StringInfo& separator,
+    std::set<orthia::PlatformString_type>* pInfo)
+{
+    std::vector<StringInfo> info;
+    SplitString(str,
+        separator,
+        &info);
+
+    for (std::vector<StringInfo>::iterator it = info.begin(), it_end = info.end();
+        it != it_end;
+        ++it)
+    {
+        orthia::PlatformString_type tmp = it->ToString();
+        orthia::TrimStringAllWhiteSpace(tmp);
+        if (tmp.empty())
+            continue;
+        pInfo->insert(tmp);
+    }
+}
+
+void SplitStringWithoutWhitespace(const StringInfo& str_in,
+    const StringInfo& separator,
+    std::vector<orthia::PlatformString_type>* pInfo)
+{
+    orthia::PlatformString_type str(str_in.ToString());
+    orthia::TrimStringAllWhiteSpace(str);
+    std::vector<StringInfo> info;
+    SplitString(str,
+        separator,
+        &info);
+
+    for (std::vector<StringInfo>::iterator it = info.begin(), it_end = info.end();
+        it != it_end;
+        ++it)
+    {
+        orthia::PlatformString_type tmp = it->ToString();
+        orthia::TrimStringAllWhiteSpace(tmp);
+        if (tmp.empty())
+            continue;
+        pInfo->push_back(tmp);
+    }
+
 }
 
 }

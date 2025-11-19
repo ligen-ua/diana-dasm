@@ -120,4 +120,13 @@ int Diana_AnalyzeCodeEx(Diana_InstructionsOwner * pOwner,
                         OPERAND_SIZE maxOffset,
                         Diana_Stack * pStack,
                         int flags);
+
+
+int Diana_AnalyzeJumps(DianaParserResult* pResult,
+    OPERAND_SIZE offset,
+    OPERAND_SIZE* pNewOffset,
+    int* pAbsoluteAddress,
+    int* pLinksToData);
+
+
 #endif

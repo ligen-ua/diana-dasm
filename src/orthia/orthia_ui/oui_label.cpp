@@ -1,0 +1,63 @@
+#include "oui_label.h"
+#include "oui_input.h"
+
+namespace oui
+{
+    String CLabel::m_chunk;
+
+    CLabel::CLabel(std::shared_ptr<LabelColorProfile> colorProfile, std::function<String()> getText)
+        :
+        m_colorProfile(colorProfile),
+        m_getText(getText)
+    {
+    }
+    void CLabel::DoPaint(const Rect& rect, DrawParameters& parameters) 
+    {
+        auto console = GetConsole();
+        if (!console)
+        {
+            return;
+        }
+        const auto absClientRect = GetAbsoluteClientRect(this, rect);
+        Point target = absClientRect.position;
+
+        {
+            auto text = GetText();
+            m_chunk = text;
+        }
+        int symbolsLeft = absClientRect.size.width;
+        console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, symbolsLeft);
+
+        bool mouseInside = IsMouseOn();
+        auto state = &m_colorProfile->normal;
+        if (mouseInside)
+        {
+            state = &m_colorProfile->mouseHighlight;
+        }
+        parameters.console.PaintText(target,
+            state->text,
+            state->background,
+            m_chunk.native);
+
+    }
+    String CLabel::GetText() const
+    {
+        auto console = GetConsole();
+
+        String text = m_getText();
+        if (console)
+        {
+            console->FilterOrReplaceUnreadableSymbols(text);
+        }
+        return text;
+    }
+    bool CLabel::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
+    {
+        Invalidate(false);
+        return true;
+    }
+    void CLabel::SetColorProfile(std::shared_ptr<LabelColorProfile> colorProfile)
+    {
+        m_colorProfile = colorProfile;
+    }
+}

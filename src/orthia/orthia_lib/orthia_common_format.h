@@ -31,6 +31,12 @@ public:
     void AddMetadata(const std::string & name, const std::string & value);
     void AddMetadata(const std::wstring & name, const std::wstring & value);
     void AddMetadata(const std::string & name, long long value);
+    void AddMetadata(const std::wstring& name, long long value);
+    void AddMetadata(const std::string& name, unsigned long long value);
+    void AddMetadata(const std::wstring& name, unsigned long long value);
+    void AddMetadata(const std::string& name, int value);
+    void AddMetadata(const std::wstring& name, int value);
+
     void DeleteMetadata(const std::string & utf8name);
     void DeleteMetadata(const std::wstring & name);
 

@@ -94,11 +94,7 @@ static int DianaOpOutput(DianaTextOutputContext * pContext,
                          int size)
 {
     DI_CHECK((*pContext->pOpOutputFnc)(pContext, operand, size));
-    if (size == 1 && operand < 10)
-    {
-        return DI_SUCCESS;
-    }
-    return DianaTextOutput(pContext, "h");
+    return DI_SUCCESS;
 }
 static int PrintRegister(DianaTextOutputContext * pContext, DianaUnifiedRegister recognizedRegister)
 {
@@ -128,6 +124,19 @@ static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pL
     DI_CHECK(PrintRegister(pContext, pLinkedOp->value.rmIndex.seg_reg));
     DI_CHECK(DianaTextOutput(pContext, ":["));
     
+    // calculate RIP's
+    if (pLinkedOp->value.rmIndex.reg == reg_RIP &&
+        (pLinkedOp->value.rmIndex.indexed_reg == reg_none ||
+        pLinkedOp->value.rmIndex.index == 0))
+    {
+        OPERAND_SIZE result = pContext->instructionRIP;
+        result += pContext->pResult->iFullCmdSize;
+        result += pLinkedOp->value.rmIndex.dispValue;
+        DI_CHECK(DianaOpOutput(pContext, result, pLinkedOp->usedAddressSize));
+        DI_CHECK(DianaTextOutput(pContext, "]"));
+        return DI_SUCCESS;
+    }
+
     if (pLinkedOp->value.rmIndex.reg != reg_none)
     {
         bWasSomething = 1;
@@ -144,7 +153,7 @@ static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pL
         DI_CHECK(DianaTextOutput(pContext, "*"));
         DI_CHECK(DianaOpOutput(pContext, pLinkedOp->value.rmIndex.index, 1));
     }
-    if (pLinkedOp->value.rmIndex.dispSize)
+    if ((pLinkedOp->value.rmIndex.dispSize && pLinkedOp->value.rmIndex.dispValue) || !bWasSomething)
     {
         int positive = 1;
         int wasConvert = 0;
@@ -259,6 +268,11 @@ static int diana_cmd_output_generic(DianaTextOutputContext * pContext)
     return PrintOperands(pContext);
 }
 
+static int diana_cmd_output_hint_nop(DianaTextOutputContext* pContext)
+{
+    DI_CHECK(DianaTextOutput(pContext, "nop"));
+    return PrintOperands(pContext);
+}
 static DianaTextOutputCmd_fnc g_functions[] = 
 {
     0,
@@ -590,7 +604,7 @@ static DianaTextOutputCmd_fnc g_functions[] =
     diana_cmd_output_generic,     //   diana_cmd_output_emms,
     diana_cmd_output_generic,     //   diana_cmd_output_femms,
     diana_cmd_output_generic,     //   diana_cmd_output_mfence,
-    diana_cmd_output_generic,     //   diana_cmd_output_hint_nop,
+    diana_cmd_output_hint_nop,
     diana_cmd_output_generic,     //   diana_cmd_output_aaa,
     diana_cmd_output_generic,     //   diana_cmd_output_aad,
     diana_cmd_output_generic,     //   diana_cmd_output_aam,
@@ -783,6 +797,8 @@ void DianaStringOutputContext_Init(DianaStringOutputContext * pContext,
     pContext->parent.pReset = DianaTextReset;
     pContext->pBuffer = pBuffer;
     pContext->maxBufferSize = maxBufferSize;
+    pContext->pOnOpCallback = 0;
+    pContext->onOpCallbackContext = 0;
 }
 int DianaTextOutputContext_TextOut(DianaTextOutputContext * pContext,
                                    DianaParserResult * pResult, 

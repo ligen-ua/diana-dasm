@@ -406,6 +406,23 @@ int DianaPeFile_Map(/* in */ Diana_PeFile * pPeFile,
                     /* in */ void * pPage,
                     /* in */ int pageSize)
 {
+    return DianaPeFile_MapEx(pPeFile,
+        pStream,
+        address,
+        pOutStream,
+        pPage,
+        pageSize,
+        0);
+}
+
+int DianaPeFile_MapEx(/* in */ Diana_PeFile * pPeFile,
+                    /* in */ DianaMovableReadStream * pStream,
+                    /* in */ OPERAND_SIZE address,
+                    /* inout */ DianaReadWriteRandomStream * pOutStream,
+                    /* in */ void * pPage,
+                    /* in */ int pageSize,
+                    /* in */ int flags)
+{
     int i = 0;
     OPERAND_SIZE lastSectionOffset = 0;
     OPERAND_SIZE sizeOfHeaders = pPeFile->pImpl->sizeOfHeaders;
@@ -491,7 +508,19 @@ int DianaPeFile_Map(/* in */ Diana_PeFile * pPeFile,
 
         }
     }
+    if (flags & DIANA_PE_MAP_DO_NOT_RELOCATE)
+    {
+        return DI_SUCCESS;
+    }
+    return DianaPeFile_Relocate(pPeFile,
+        address,
+        pOutStream);
+}
 
+int DianaPeFile_Relocate(/* in */ Diana_PeFile* pPeFile,
+    /* in */ OPERAND_SIZE address,
+    /* inout */ DianaReadWriteRandomStream* pOutStream)
+{
     DI_CHECK(DianaPeFile_FixRelocs(pPeFile,
                                    address,
                                    pOutStream));
@@ -534,11 +563,16 @@ DIANA_IMAGE_SECTION_HEADER * DianaPeFile_FindSection(Diana_PeFile * pPeFile,
                                                      int nameSize)
 {
     int i;
+    int maxSize = nameSize;
+    if (maxSize > DIANA_IMAGE_SIZEOF_SHORT_NAME)
+    {
+        maxSize = DIANA_IMAGE_SIZEOF_SHORT_NAME;
+    }
     for(i = 0; i < pPeFile->pImpl->capturedSectionCount; ++i)
     {
         DIANA_IMAGE_SECTION_HEADER * pSectionHeader = &pPeFile->pImpl->pCapturedSections[i];
         
-        if (strncmp((char*)pSectionHeader->Name, pSectionName, nameSize) == 0)
+        if (strncmp((char*)pSectionHeader->Name, pSectionName, maxSize) == 0)
         {
             return pSectionHeader;
         }
@@ -553,6 +587,16 @@ void DianaPeFile_LinkImports_Observer_Init(DianaPeFile_LinkImports_Observer * pO
 {
     pObserver->queryFunctionByOrdinal = queryFunctionByOrdinal;
     pObserver->queryFunctionByName = queryFunctionByName;
+    pObserver->reportInfo_fnc = 0;
+}
+void DianaPeFile_LinkImports_Observer_Init2(DianaPeFile_LinkImports_Observer * pObserver,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_fnc queryFunctionByOrdinal,
+                                           DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc queryFunctionByName,
+                                           DianaPeFile_LinkImports_Observer_ReportInfo_fnc reportInfo)
+{
+    pObserver->queryFunctionByOrdinal = queryFunctionByOrdinal;
+    pObserver->queryFunctionByName = queryFunctionByName;
+    pObserver->reportInfo_fnc = reportInfo;
 }
 
 #define DIANA_IMAGE_ORDINAL_FLAG64 0x8000000000000000ULL
@@ -562,6 +606,7 @@ void DianaPeFile_LinkImports_Observer_Init(DianaPeFile_LinkImports_Observer * pO
 #define DIANA_IMAGE_SNAP_BY_ORDINAL64(Ordinal) ((Ordinal & DIANA_IMAGE_ORDINAL_FLAG64) != 0)
 #define DIANA_IMAGE_SNAP_BY_ORDINAL32(Ordinal) ((Ordinal & DIANA_IMAGE_ORDINAL_FLAG32) != 0)
 
+
 int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                           DianaReadWriteRandomStream * pOutStream,
                         const char * pDllName,
@@ -570,7 +615,9 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                         int pageSize,
                         void * pImageImportBuffer,
                         int imageImportBufferSize,
-                        DianaPeFile_LinkImports_Observer * pObserver)
+                        DianaPeFile_LinkImports_Observer * pObserver,
+                        int flags,
+                        int streamFlags)
 {
     PDIANA_IMAGE_THUNK_DATA32 p = 0;
     char * p_end = 0;
@@ -590,14 +637,15 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                                                 pPage,
                                                 usedPageSize,
                                                 &readBytes,
-                                                0));
+                                                streamFlags));
 
         if (readBytes < sizeof(DIANA_IMAGE_THUNK_DATA32))
         {
             return DI_ERROR;
         }
+        p = (PDIANA_IMAGE_THUNK_DATA32)pPage;
         p_end = (char*)p + readBytes;
-        for(p = (PDIANA_IMAGE_THUNK_DATA32)pPage;
+        for(;
             ((char*)p_end - (char*)p) > sizeof(DIANA_IMAGE_THUNK_DATA32);
             ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA32))
         {
@@ -606,6 +654,34 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
             {
                 return DI_SUCCESS;
             }
+
+            if (pObserver->reportInfo_fnc)
+            {
+                DI_CHECK(pObserver->reportInfo_fnc(pObserver, currentThunkOffset));
+            }
+
+            if (flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY)
+            {
+                DI_UINT32 functionPtr = (DI_UINT32)function;
+                DI_CHECK(pOutStream->parent.pRandomRead(pOutStream,
+                                                        currentThunkOffset,
+                                                        &functionPtr,
+                                                        sizeof(functionPtr),
+                                                        &readBytes,
+                                                        streamFlags));
+                function = functionPtr;
+
+                if (!(flags & DIANA_LINK_IMPORT_READ_FULL_INFO))
+                {
+                    DI_CHECK(pObserver->queryFunctionByName(pObserver,
+                        0,
+                        0,
+                        0,
+                        &function));
+                    continue;
+                }
+            }
+
             if (DIANA_IMAGE_SNAP_BY_ORDINAL32(p->u1.Ordinal))
             {
                 DI_CHECK(pObserver->queryFunctionByOrdinal(pObserver,
@@ -624,7 +700,7 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                                                         pImageImportBuffer,
                                                         imageImportBufferSize,
                                                         &readBytes,
-                                                        0));
+                                                        streamFlags));
                 
                 if (readBytes < sizeof(DIANA_IMAGE_IMPORT_BY_NAME))
                 {
@@ -639,6 +715,8 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                                                         pImportByName->Hint,
                                                         &function));
             }
+
+            if (!(flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY))
             {
                 DI_UINT32 functionPtr = (DI_UINT32)function;
                 DI_CHECK(pOutStream->pRandomWrite(pOutStream,
@@ -646,11 +724,9 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                                                 &functionPtr,
                                                 sizeof(functionPtr),
                                                 &readBytes,
-                                                0));
+                                                streamFlags));
             }
-
         }
-        return DI_ERROR;
     }
 }
 
@@ -662,7 +738,9 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
                         int pageSize,
                         void * pImageImportBuffer,
                         int imageImportBufferSize,
-                        DianaPeFile_LinkImports_Observer * pObserver)
+                        DianaPeFile_LinkImports_Observer * pObserver,
+                        int flags,
+                        int streamFlags)
 {
     PDIANA_IMAGE_THUNK_DATA64 p = 0;
     char * p_end = 0;
@@ -674,7 +752,6 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
     {
         return DI_ERROR;
     }
-
     for(;;)
     {
         DI_CHECK(pOutStream->parent.pRandomRead(pOutStream,
@@ -682,14 +759,15 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
                                                 pPage,
                                                 usedPageSize,
                                                 &readBytes,
-                                                0));
+                                                streamFlags));
 
         if (readBytes < sizeof(DIANA_IMAGE_THUNK_DATA64))
         {
             return DI_ERROR;
         }
+        p = (PDIANA_IMAGE_THUNK_DATA64)pPage;
         p_end = (char*)p + readBytes;
-        for(p = (PDIANA_IMAGE_THUNK_DATA64)pPage;
+        for(;
             ((char*)p_end - (char*)p) > sizeof(DIANA_IMAGE_THUNK_DATA64);
             ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA64))
         {
@@ -697,6 +775,30 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
             if (!p->u1.AddressOfData)
             {
                 return DI_SUCCESS;
+            }
+
+            if (pObserver->reportInfo_fnc)
+            {
+                DI_CHECK(pObserver->reportInfo_fnc(pObserver, currentThunkOffset));
+            }
+            if (flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY)
+            {
+                DI_CHECK(pOutStream->parent.pRandomRead(pOutStream,
+                                                        currentThunkOffset,
+                                                        &function,
+                                                        sizeof(function),
+                                                        &readBytes,
+                                                        streamFlags));
+
+                if (!(flags & DIANA_LINK_IMPORT_READ_FULL_INFO))
+                {
+                    DI_CHECK(pObserver->queryFunctionByName(pObserver,
+                        0,
+                        0,
+                        0,
+                        &function));
+                    continue;
+                }
             }
             if (DIANA_IMAGE_SNAP_BY_ORDINAL64(p->u1.Ordinal))
             {
@@ -716,7 +818,7 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
                                                         pImageImportBuffer,
                                                         imageImportBufferSize,
                                                         &readBytes,
-                                                        0));
+                                                        streamFlags));
                 
                 if (readBytes < sizeof(DIANA_IMAGE_IMPORT_BY_NAME))
                 {
@@ -731,17 +833,18 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
                                                         pImportByName->Hint,
                                                         &function));
             }
+
+            if (!(flags & DIANA_LINK_IMPORT_FLAG_READ_ONLY))
             {
                 DI_CHECK(pOutStream->pRandomWrite(pOutStream,
                                                 currentThunkOffset,
                                                 &function,
                                                 sizeof(function),
                                                 &readBytes,
-                                                0));
+                                                streamFlags));
             }
 
         }
-        return DI_ERROR;
     }
 }
 
@@ -835,13 +938,15 @@ cleanup:
     return status;
 }
 
-int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
+static
+int DianaPeFile_LinkImportsEx(/* in */ Diana_PeFile * pPeFile,
                             /* in */ OPERAND_SIZE address,
                             /* inout */ DianaReadWriteRandomStream * pOutStream,
                             /* in */ void * pPage,
                             /* in */ int pageSize,
-                            /* in */ DianaPeFile_LinkImports_Observer * pObserver
-                            )
+                            /* in */ DianaPeFile_LinkImports_Observer * pObserver,
+                            /* in */ int flags,
+                            /* in */ int streamFlags)
 {
     char * pDllNameBuffer = 0;
     char * pImageImportBuffer = 0;
@@ -852,7 +957,7 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
     long long debugCounter = 0;
     OPERAND_SIZE readBytes = 0;
     PDIANA_IMAGE_IMPORT_DESCRIPTOR pImportDescriptor = 0;
-    if (!pImportDescriptor)
+    if (!pImportDirectory)
     {
         return DI_SUCCESS;
     }
@@ -884,7 +989,7 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                                            pCapturedImports,
                                            pImportDirectory->Size,
                                            &readBytes,
-                                           0));
+                                           streamFlags));
     DI_CHECK_CONDITION_GOTO(readBytes == pImportDirectory->Size, DI_ERROR);
 
     pCapturedImports_end = (char*)pCapturedImports + pImportDirectory->Size - sizeof(DIANA_IMAGE_IMPORT_DESCRIPTOR) + 1;
@@ -906,7 +1011,7 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                                                      pDllNameBuffer,
                                                      MAX_DLL_NAME,
                                                      &readBytes,
-                                                     0));
+                                                     streamFlags));
         DI_CHECK_CONDITION_GOTO(readBytes, DI_ERROR);
         pDllNameBuffer[MAX_DLL_NAME-1] = 0;
 
@@ -923,7 +1028,9 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                                           pageSize,
                                           pImageImportBuffer,
                                           MAX_IMAGE_IMPORT_BUFFER_SIZE,
-                                          pObserver));
+                                          pObserver,
+                                          flags,
+                                          streamFlags));
              break;
         case DIANA_MODE64:
              DI_CHECK_GOTO(DianaPeFile_LinkDll64(address,
@@ -934,7 +1041,9 @@ int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
                                           pageSize,
                                           pImageImportBuffer,
                                           MAX_IMAGE_IMPORT_BUFFER_SIZE,
-                                          pObserver));
+                                          pObserver,
+                                          flags,
+                                          streamFlags));
              break;
         default:
             DI_CHECK_GOTO(DI_ERROR);
@@ -954,22 +1063,57 @@ cleanup:
         DIANA_FREE(pCapturedImports);
     }
     return status;
+}
 
+int DianaPeFile_LinkImports(/* in */ Diana_PeFile * pPeFile,
+                            /* in */ OPERAND_SIZE address,
+                            /* inout */ DianaReadWriteRandomStream * pOutStream,
+                            /* in */ void * pPage,
+                            /* in */ int pageSize,
+                            /* in */ DianaPeFile_LinkImports_Observer * pObserver
+                            )
+{
+    return DianaPeFile_LinkImportsEx(pPeFile,
+        address,
+        pOutStream,
+        pPage,
+        pageSize,
+        pObserver,
+        0,
+        0);
+}
+
+int DianaPeFile_QueryImports(/* in */ Diana_PeFile* pPeFile,
+                            /* in */ OPERAND_SIZE address,
+                            /* inout */ DianaReadWriteRandomStream* pOutStream,
+                            /* in */ void* pPage,
+                            /* in */ int pageSize,
+                            /* in */ DianaPeFile_LinkImports_Observer* pObserver,
+                            /* in */ int streamFlags,
+                            /* in */ int importFlags)
+{
+    return DianaPeFile_LinkImportsEx(pPeFile,
+        address,
+        pOutStream,
+        pPage,
+        pageSize,
+        pObserver,
+        DIANA_LINK_IMPORT_FLAG_READ_ONLY| importFlags,
+        streamFlags);
 }
 
 int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                 /* inout */ DianaReadWriteRandomStream * pOutStream,
                                 /* in */ OPERAND_SIZE virtualAddress,
                                 /* in */ OPERAND_SIZE sizeToRead,
-                                /* out */ void ** ppSection
+                                /* out */ void ** ppSection,
+                                /* in */ int streamFlags
                                )
 {
     int status = 0;
     void * pResult = 0;
     OPERAND_SIZE startOfRegion = 0;
     OPERAND_SIZE readBytes = 0;
-    if (virtualAddress < peStartAddress)
-        return DI_ERROR;
     
     *ppSection = 0;
     startOfRegion = peStartAddress;
@@ -987,7 +1131,7 @@ int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                                  pResult,
                                                  (int)sizeToRead,
                                                  &readBytes,
-                                                 0));
+                                                 streamFlags));
     if (readBytes != sizeToRead)
     {
         status = DI_ERROR;
@@ -1009,7 +1153,8 @@ static
 int DianaPeFile_ReadTLSCallbacks32(OPERAND_SIZE addressOfCallbacks,
                                    DianaReadWriteRandomStream * pOutStream,
                                    void ** ppTlsCallbacks,
-                                   int * pCallbacksCount)
+                                   int * pCallbacksCount,
+                                   int streamFlags)
 {
     int status = 0, i = 0;
     OPERAND_SIZE readBytes = 0;
@@ -1026,7 +1171,7 @@ int DianaPeFile_ReadTLSCallbacks32(OPERAND_SIZE addressOfCallbacks,
                                                  *ppTlsCallbacks,
                                                  MAX_CALLBACKS_COUNT_SUPPORTED*sizeof(DI_UINT32),
                                                  &readBytes,
-                                                 0));
+                                                 streamFlags));
 
     pCallbacksArray = *ppTlsCallbacks;
     for(i = 0; i < MAX_CALLBACKS_COUNT_SUPPORTED; ++i, ++*pCallbacksCount)
@@ -1049,7 +1194,8 @@ static
 int DianaPeFile_ReadTLSCallbacks64(OPERAND_SIZE addressOfCallbacks,
                                    DianaReadWriteRandomStream * pOutStream,
                                    void ** ppTlsCallbacks,
-                                   int * pCallbacksCount)
+                                   int * pCallbacksCount,
+                                   int streamFlags)
 {
     int status = 0, i = 0;
     OPERAND_SIZE readBytes = 0;
@@ -1066,7 +1212,7 @@ int DianaPeFile_ReadTLSCallbacks64(OPERAND_SIZE addressOfCallbacks,
                                                  *ppTlsCallbacks,
                                                  MAX_CALLBACKS_COUNT_SUPPORTED*sizeof(DI_UINT64),
                                                  &readBytes,
-                                                 0));
+                                                 streamFlags));
 
     pCallbacksArray = *ppTlsCallbacks;
     for(i = 0; i < MAX_CALLBACKS_COUNT_SUPPORTED; ++i, ++*pCallbacksCount)
@@ -1091,7 +1237,8 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                                   /* inout */ DianaReadWriteRandomStream * pOutStream,
                                   /* out */ void ** ppTlsCallbacks,
                                   /* out */ int * pCallbacksCount,
-                                  /* out */ OPERAND_SIZE * pAddressOfTLSIndex)
+                                  /* out */ OPERAND_SIZE * pAddressOfTLSIndex,
+                                  /* in */ int streamFlags)
 {
     OPERAND_SIZE callbacksAddress = 0;
     int status = 0;
@@ -1110,7 +1257,8 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                                         pOutStream, 
                                         pTLSDirectory->VirtualAddress, 
                                         pTLSDirectory->Size,
-                                        &pSection));
+                                        &pSection,
+                                        streamFlags));
 
 
     switch(pPeFile->pImpl->dianaMode)
@@ -1120,25 +1268,27 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
             {
                 DI_CHECK_GOTO(DI_ERROR);
             }
-            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY32*)pTLSDirectory)->AddressOfCallBacks;
-            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY32*)pTLSDirectory)->AddressOfIndex;
+            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY32*)pSection)->AddressOfCallBacks;
+            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY32*)pSection)->AddressOfIndex;
 
             DI_CHECK_GOTO(DianaPeFile_ReadTLSCallbacks32(callbacksAddress,
                                                          pOutStream,
                                                          ppTlsCallbacks,
-                                                         pCallbacksCount));
+                                                         pCallbacksCount,
+                                                         streamFlags));
             break;
         case DIANA_MODE64:
             if (pTLSDirectory->Size < sizeof(DIANA_IMAGE_TLS_DIRECTORY64))
             {
                 DI_CHECK_GOTO(DI_ERROR);
             }
-            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY64*)pTLSDirectory)->AddressOfCallBacks;
-            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY64*)pTLSDirectory)->AddressOfIndex;
+            callbacksAddress = ((DIANA_IMAGE_TLS_DIRECTORY64*)pSection)->AddressOfCallBacks;
+            *pAddressOfTLSIndex = ((DIANA_IMAGE_TLS_DIRECTORY64*)pSection)->AddressOfIndex;
             DI_CHECK_GOTO(DianaPeFile_ReadTLSCallbacks64(callbacksAddress,
                                                          pOutStream,
                                                          ppTlsCallbacks,
-                                                         pCallbacksCount));
+                                                         pCallbacksCount,
+                                                         streamFlags));
             break;
         default:
             DI_CHECK_GOTO(DI_ERROR);
@@ -1220,12 +1370,30 @@ int CaptureValue16(const char * pTable,
     return DI_SUCCESS;
 }
 
-int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
+
+int DianaPeFile_GetProcAddress(Diana_PeFile* pPeFile,
+    const char* pCapturedDataStart,
+    const char* pCapturedDataEnd,
+    const char* pFunctionName,
+    OPERAND_SIZE* pFunctionOffset,
+    OPERAND_SIZE* pForwardInformationOffset)
+{
+    return DianaPeFile_GetProcAddressEx(pPeFile,
+        pCapturedDataStart,
+        pCapturedDataEnd,
+        pFunctionName,
+        pFunctionOffset,
+        pForwardInformationOffset,
+        DIANA_PE_INVALID_ORDINAL_VALUE);
+}
+
+int DianaPeFile_GetProcAddressEx(Diana_PeFile * pPeFile,
                                 const char * pCapturedDataStart,
                                 const char * pCapturedDataEnd,
                                 const char * pFunctionName,
                                 OPERAND_SIZE * pFunctionOffset,
-                                OPERAND_SIZE * pForwardInformationOffset)
+                                OPERAND_SIZE * pForwardInformationOffset,
+                                DI_UINT16 ordinalIn)
 {
     OPERAND_SIZE moduleSize = pCapturedDataEnd - pCapturedDataStart;
     const DIANA_IMAGE_DATA_DIRECTORY * pExportDirectory = &pPeFile->pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_EXPORT];
@@ -1257,89 +1425,322 @@ int DianaPeFile_GetProcAddress(Diana_PeFile * pPeFile,
     }
     
     pCapturedExportDirectory = (const DIANA_IMAGE_EXPORT_DIRECTORY * )(pCapturedDataStart + pExportDirectory->VirtualAddress);
-    if (!pCapturedExportDirectory->NumberOfNames)
+    DI_UINT32 ordinal = ordinalIn;
     {
-        return DI_ERROR;
-    }
+        const char* pNameTable = 0;
+        const char* pNameOrdinalTable = 0;
+        const char* pFunctionsTable = 0;
 
-    {
-    const char * pNameTable = 0;
-    const char * pNameOrdinalTable = 0;
-    const char * pFunctionsTable = 0;
+        DI_UINT32 low = 0;
+        DI_UINT32 middle = 0;
+        DI_UINT32 high = pCapturedExportDirectory->NumberOfNames - 1;
 
-    DI_UINT32 low = 0;
-    DI_UINT32 middle = 0;
-    DI_UINT32 high = pCapturedExportDirectory->NumberOfNames - 1;
+        // get the tables
+        DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfFunctions,
+            pCapturedDataStart,
+            pCapturedDataEnd,
+            &pFunctionsTable));
 
-    // get the tables
-    DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNames,
-                                    pCapturedDataStart,
-                                    pCapturedDataEnd,
-                                    &pNameTable));
-    DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNameOrdinals,
-                                    pCapturedDataStart,
-                                    pCapturedDataEnd,
-                                    &pNameOrdinalTable));
-    DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfFunctions,
-                                    pCapturedDataStart,
-                                    pCapturedDataEnd,
-                                    &pFunctionsTable));
-
-
-    while (high >= low && (DI_INT32)high >= 0) 
-    {
-        int compareResult = 0;
-        DI_UINT32 functionNameOffset = 0;
-        const char * pFunctionPointer = 0;
-        middle = (low + high) >> 1;
-
-        DI_CHECK(CaptureValue32(pNameTable, pCapturedDataEnd, middle, &functionNameOffset));
-
-        DI_CHECK(ValidateVirtualAddress(functionNameOffset,
-                                        pCapturedDataStart,
-                                        pCapturedDataEnd,
-                                        &pFunctionPointer));
-
-        compareResult = DIANA_STRNICMP(pFunctionName, pFunctionPointer, pCapturedDataEnd-pFunctionPointer);
-        if (!compareResult)
+        if (ordinalIn == DIANA_PE_INVALID_ORDINAL_VALUE)
         {
-            break;
-        }
-        if (compareResult > 0)
-        {
-            low = middle + 1;
-            continue;
-        }
-        high = middle - 1;
-    }
+            DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNames,
+                pCapturedDataStart,
+                pCapturedDataEnd,
+                &pNameTable));
+            DI_CHECK(ValidateVirtualAddress(pCapturedExportDirectory->AddressOfNameOrdinals,
+                pCapturedDataStart,
+                pCapturedDataEnd,
+                &pNameOrdinalTable));
 
-    if ((DI_INT32)high < (DI_INT32)low)
-    {
-        return DI_NOT_FOUND;
-    }
-
-
-    {
-        DI_UINT32 ordinal = 0;
-        DI_UINT32 functionOffset = 0;
-        DI_CHECK(CaptureValue16(pNameOrdinalTable, pCapturedDataEnd, middle, &ordinal));
-        DI_CHECK(CaptureValue32(pFunctionsTable, pCapturedDataEnd, ordinal, &functionOffset));
-
-        if ((functionOffset >= pExportDirectory->VirtualAddress) && (functionOffset < (pExportDirectory->VirtualAddress + pExportDirectory->Size)))
-        {
-            const char * p = pCapturedDataStart;
-            for(; p < pCapturedDataEnd; ++p)
+            if (!pCapturedExportDirectory->NumberOfNames)
             {
-                if (!*p)
+                return DI_ERROR;
+            }
+
+            while (high >= low && (DI_INT32)high >= 0)
+            {
+                int compareResult = 0;
+                DI_UINT32 functionNameOffset = 0;
+                const char* pFunctionPointer = 0;
+                middle = (low + high) >> 1;
+
+                DI_CHECK(CaptureValue32(pNameTable, pCapturedDataEnd, middle, &functionNameOffset));
+
+                DI_CHECK(ValidateVirtualAddress(functionNameOffset,
+                    pCapturedDataStart,
+                    pCapturedDataEnd,
+                    &pFunctionPointer));
+
+                compareResult = DIANA_STRNCMP(pFunctionName, pFunctionPointer, pCapturedDataEnd - pFunctionPointer);
+                if (!compareResult)
+                {
+                    break;
+                }
+                if (compareResult > 0)
+                {
+                    low = middle + 1;
+                    continue;
+                }
+                high = middle - 1;
+            }
+
+            if ((DI_INT32)high < (DI_INT32)low)
+            {
+                return DI_NOT_FOUND;
+            }
+
+            // capture ordinal
+            DI_CHECK(CaptureValue16(pNameOrdinalTable, pCapturedDataEnd, middle, &ordinal));
+        }
+
+        {
+            DI_UINT32 functionOffset = 0;
+            DI_CHECK(CaptureValue32(pFunctionsTable, pCapturedDataEnd, ordinal, &functionOffset));
+
+            if ((functionOffset >= pExportDirectory->VirtualAddress) && (functionOffset < (pExportDirectory->VirtualAddress + pExportDirectory->Size)))
+            {
+                if (pForwardInformationOffset)
                 {
                     *pForwardInformationOffset = functionOffset;
                     return DI_SUCCESS;
                 }
+                return DI_ERROR;
             }
-            return DI_ERROR;
+            *pFunctionOffset = functionOffset;
+            return DI_SUCCESS;
         }
-        *pFunctionOffset = functionOffset;
+    }
+}
+static int compare_DI_UINT16(const void* a, const void* b)
+{
+    return (*(DI_UINT16*)a - *(DI_UINT16*)b);
+}
+
+int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
+                            /* inout */ DianaMovableReadStream* pOutStream,
+                            /* in */ void* pPage,
+                            /* in */ int pageSize,
+                            /* in */ DianaPeFile_LinkImports_Observer* pObserver,
+                            /* in */ int streamFlags)
+{
+    int status = 0;
+    int maxNameSize = 2047;
+    int normalNameSize = 128;
+
+    OPERAND_SIZE readBytes = 0;
+    const DIANA_IMAGE_DATA_DIRECTORY* pExportDirectory = &pPeFile->pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_EXPORT];
+    DIANA_IMAGE_EXPORT_DIRECTORY* pCapturedExportDirectory = 0;
+    DI_UINT16 * pCapturedAddresses = 0;
+
+    if (pageSize < normalNameSize)
+    {
+        return DI_INVALID_CONFIGURATION;
+    }
+    if (pageSize < maxNameSize)
+    {
+        maxNameSize = pageSize;
+    }
+    if (pPeFile->flags & DIANA_PE_FILE_FLAGS_FILE_MODE)
+    {
+        // map it somewhere first
+        return DI_INVALID_INPUT;
+    }
+    if (!pExportDirectory->VirtualAddress || !pExportDirectory->Size)
+    {
         return DI_SUCCESS;
     }
+
+    pCapturedExportDirectory = DIANA_MALLOC(sizeof(DIANA_IMAGE_EXPORT_DIRECTORY));
+    if (!pCapturedExportDirectory)
+    {
+        return DI_OUT_OF_MEMORY;
     }
+
+    DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+        pExportDirectory->VirtualAddress,
+        pCapturedExportDirectory,
+        (int)sizeof(DIANA_IMAGE_EXPORT_DIRECTORY),
+        &readBytes,
+        streamFlags));
+    if (readBytes != sizeof(DIANA_IMAGE_EXPORT_DIRECTORY)) 
+    {
+        status = DI_ERROR;
+        goto cleanup;
+    }
+    if (pCapturedExportDirectory->NumberOfNames)
+    {
+        DI_UINT64 nameAddress = pCapturedExportDirectory->AddressOfNames;
+        for (DI_UINT32 i = 0; i < pCapturedExportDirectory->NumberOfNames - 1; ++i)
+        {
+            DI_UINT32 functionNameOffset = 0;
+            DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                nameAddress,
+                &functionNameOffset,
+                (int)sizeof(functionNameOffset),
+                &readBytes,
+                streamFlags));
+            if (readBytes != sizeof(functionNameOffset))
+            {
+                status = DI_ERROR;
+                goto cleanup;
+            }
+            Diana_SafeAdd(&nameAddress, 4);
+
+            int endFound = 0;
+            int sizeToUse = normalNameSize;
+            for (int u = 0; u < 2; ++u)
+            {
+                DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                    functionNameOffset,
+                    pPage,
+                    normalNameSize,
+                    &readBytes,
+                    streamFlags));
+
+                if (!readBytes)
+                {
+                    break;
+                }
+                for (int k = 0; k < readBytes; ++k)
+                {
+                    if (!((char*)pPage)[k])
+                    {
+                        endFound = 1;
+                        break;
+                    }
+                }
+                if (endFound)
+                {
+                    break;
+                }
+                sizeToUse = maxNameSize;
+            }
+            if (readBytes)
+            {
+                DI_UINT16 ordinalValue = 0;
+                DI_UINT64 ordinalPtr = 0;
+                DI_UINT32 functionValue = 0;
+                DI_UINT64 functionPtr = 0;
+                DI_UINT64 address = 0;
+                DI_UINT32 hint = 0;
+
+                // put last zero to name
+                if (!endFound)
+                {
+                    ((char*)pPage)[readBytes - 1] = 0;
+                }
+                // name is in page, read ordinal
+                ordinalPtr = pCapturedExportDirectory->AddressOfNameOrdinals;
+                Diana_SafeAdd(&ordinalPtr, i * 2);
+
+                DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                    ordinalPtr,
+                    &ordinalValue,
+                    (int)sizeof(ordinalValue),
+                    &readBytes,
+                    streamFlags));
+
+                functionPtr = pCapturedExportDirectory->AddressOfFunctions;
+                Diana_SafeAdd(&functionPtr, ordinalValue * 4);
+
+                DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                    functionPtr,
+                    &functionValue,
+                    (int)sizeof(functionValue),
+                    &readBytes,
+                    streamFlags));
+
+                address = functionValue;
+
+                // check forwarding
+                if ((functionValue >= pExportDirectory->VirtualAddress) && (functionValue < (pExportDirectory->VirtualAddress + pExportDirectory->Size)))
+                {
+                    hint = functionValue;
+                    address = 0;
+                }
+                if (pObserver->reportInfo_fnc)
+                {
+                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionValue));
+                }
+                DI_CHECK_GOTO(pObserver->queryFunctionByName(pObserver, 0, pPage, hint, &address));
+            }
+        }
+    }
+
+    // deliver ordinals
+    if (pCapturedExportDirectory->NumberOfNames < pCapturedExportDirectory->NumberOfFunctions)
+    {
+        // deliver ordinals too
+        // capture names
+        pCapturedAddresses = DIANA_MALLOC(pCapturedExportDirectory->NumberOfNames * 2);
+        if (!pCapturedAddresses)
+        {
+            status = DI_OUT_OF_MEMORY;
+            goto cleanup;
+        }
+
+        DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+            pCapturedExportDirectory->AddressOfNameOrdinals,
+            pCapturedAddresses,
+            (pCapturedExportDirectory->NumberOfNames * 2),
+            &readBytes,
+            streamFlags));
+
+        qsort(pCapturedAddresses, pCapturedExportDirectory->NumberOfNames, sizeof(DI_UINT16), compare_DI_UINT16);
+
+        // go throug all functions
+        int ordinalsToSearch = (int)pCapturedExportDirectory->NumberOfFunctions - (int)pCapturedExportDirectory->NumberOfNames;
+        for (DI_UINT16 i = 0; i < pCapturedExportDirectory->NumberOfFunctions; ++i)
+        {
+            DI_UINT32 functionValue = 0;
+            OPERAND_SIZE functionPtr = pCapturedExportDirectory->AddressOfFunctions;
+            Diana_SafeAdd(&functionPtr, i * 4);
+
+            DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                functionPtr,
+                &functionValue,
+                (int)sizeof(functionValue),
+                &readBytes,
+                streamFlags));
+
+            if (functionValue == 0 ||
+                ((functionValue >= pExportDirectory->VirtualAddress) && (functionValue < (pExportDirectory->VirtualAddress + pExportDirectory->Size))))
+            {
+                continue;
+            }
+
+            DI_UINT16 * pResultValue = (DI_UINT16*)bsearch(&i, 
+                pCapturedAddresses, pCapturedExportDirectory->NumberOfNames, 
+                sizeof(DI_UINT16), compare_DI_UINT16);
+            if (pResultValue)
+            {
+                continue;
+            }
+
+            if (pObserver->reportInfo_fnc)
+            {
+                DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionValue));
+            }
+
+            {
+                OPERAND_SIZE address = functionValue;
+                DI_CHECK_GOTO(pObserver->queryFunctionByOrdinal(pObserver, 0, i, &address));
+            }
+            if (!--ordinalsToSearch)
+            {
+                break;
+            }
+        }
+    }
+
+cleanup:
+    if (pCapturedAddresses)
+    {
+        DIANA_FREE(pCapturedAddresses);
+    }
+    if (pCapturedExportDirectory)
+    {
+        DIANA_FREE(pCapturedExportDirectory);
+    }
+    return status;
 }
