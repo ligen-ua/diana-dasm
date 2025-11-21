@@ -207,7 +207,9 @@ namespace oui
     }
 
     // CWindow
+    std::atomic<bool> CWindow::m_rootDrawInProgress(false);
     CConsole* CWindow::g_defConsole = 0;
+
     void CWindow::InitDefConsole(CConsole* defConsole)
     {
         g_defConsole = defConsole;
@@ -672,9 +674,13 @@ namespace oui
         m_valid = valid;
         if (!valid)
         {
-            if (auto thread = GetThread())
+            if (!IsDrawInProgress())
             {
-                thread->WakeUpUI();
+                // if the draw is in progress do not make UI to awake endlessly
+                if (auto thread = GetThread())
+                {
+                    thread->WakeUpUI();
+                }
             }
         }
     }

@@ -17,7 +17,7 @@ namespace oui
     public:
         CEvent(EventType type)
         {
-            m_hEvent = ::CreateEventW(NULL, type == EventType::Manual ? TRUE : FALSE, FALSE, NULL);
+            m_hEvent = ::CreateEventW(NULL, (type == EventType::Manual) ? TRUE : FALSE, FALSE, NULL);
             if (m_hEvent == NULL)
                 throw std::runtime_error("Can't create event.");
         }

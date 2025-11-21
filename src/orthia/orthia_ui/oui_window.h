@@ -128,7 +128,12 @@ namespace oui
             int endY);
 
         static CConsole* g_defConsole;
+        static std::atomic<bool> m_rootDrawInProgress;
+
     public:
+        static void SetDrawProgress(bool inProgress) { m_rootDrawInProgress = inProgress; }
+        static bool IsDrawInProgress() { return m_rootDrawInProgress; }
+
         CConsole* GetConsole() const;
  
         template<class Type>

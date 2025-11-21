@@ -79,16 +79,25 @@ namespace oui
         rootWindow->ProcessEvent(initialEvent, evtContext);
         
         DrawParameters parameters;
-        bool forceRedrewNext = true;
+        bool forceRedrawNext = true;
         for (; !m_pool->IsExitRequested(); )
         {
             Rect rect;
             rect.size = mainConsole.GetSize();
             parameters.console.StartDraw(rect.size, &mainConsole);
 
-            rootWindow->DrawTo(rect, parameters, forceRedrewNext);
+            CWindow::SetDrawProgress(true);
+            try
+            {
+                rootWindow->DrawTo(rect, parameters, forceRedrawNext);
+            }
+            catch(std::exception& e)
+            {
+                oui::LogOutput(LogFlags::Error, e.what());
+            }
             parameters.console.FinishDraw();
-            forceRedrewNext = false;
+            CWindow::SetDrawProgress(false);
+            forceRedrawNext = false;
 
             if (!reader.Read(data))
             {
@@ -149,7 +158,7 @@ namespace oui
                 {
                     if (evt.focusEvent.focusSet)
                     {
-                        forceRedrewNext = true;
+                        forceRedrawNext = true;
                     }
                     else
                     {
