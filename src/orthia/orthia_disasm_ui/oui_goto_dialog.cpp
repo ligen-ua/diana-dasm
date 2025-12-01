@@ -361,7 +361,7 @@ namespace oui
 
             try
             {
-                orthia::Address_type address = oui::CaptureAddress(text.native);
+                orthia::Address_type address = oui::CaptureAddressExp(text.native, m_workPlace);
                 TryOpenAddress(address);
             }
             catch (std::exception& e)

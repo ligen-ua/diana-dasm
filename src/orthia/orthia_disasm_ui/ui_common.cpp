@@ -1,5 +1,6 @@
 #include "ui_common.h"
 #include "oui_modal.h"
+#include "orthia_expressions.h"
 
 void CUIStateManager::Register(std::shared_ptr<IUIStatefulWindow> window)
 {
@@ -88,37 +89,37 @@ void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings&
 namespace oui
 {
 
-    orthia::Address_type CaptureAddress(const std::wstring& addressString_in)
+    orthia::Address_type CaptureAddress(orthia::PlatformString_type& addressString_in)
     {
-        std::wstring addressString = addressString_in;
+        orthia::PlatformString_type addressString = addressString_in;
         orthia::TrimStringAllWhiteSpace(addressString);
-        
+
         if (addressString.empty())
         {
             throw std::runtime_error("Invalid argument");
         }
         ULONGLONG address = 0;
-        if (addressString.size() > 2 && addressString[0] == '0' && addressString[1] == 'x')
+        if (addressString.size() > 2 && addressString[0] == OUI_TCHAR('0') && addressString[1] == OUI_TCHAR('x'))
         {
-            orthia::HexStringToObject(std::wstring(addressString.begin() + 2, addressString.end()), &address);
+            orthia::HexStringToObject(orthia::PlatformString_type(addressString.begin() + 2, addressString.end()), &address);
             return address;
         }
-        if (addressString.size() > 2 && addressString[0] == '0' && addressString[1] == 'n')
+        if (addressString.size() > 2 && addressString[0] == OUI_TCHAR('0') && addressString[1] == OUI_TCHAR('n'))
         {
-            orthia::StringToObject(std::wstring(addressString.begin() + 2, addressString.end()), &address);
+            orthia::StringToObject(orthia::PlatformString_type(addressString.begin() + 2, addressString.end()), &address);
             return address;
         }
-        if (addressString.back() == 'h') 
-        {  
+        if (addressString.back() == OUI_TCHAR('h'))
+        {
             // asm format
-            orthia::HexStringToObject(std::wstring(addressString.begin(), addressString.end()-1), &address);
+            orthia::HexStringToObject(orthia::PlatformString_type(addressString.begin(), addressString.end() - 1), &address);
             return address;
         }
-        if (addressString.find('`') != addressString.npos)
+        if (addressString.find(OUI_TCHAR('`')) != addressString.npos)
         {
             // windbg format
             auto copy = addressString;
-            copy.erase(std::remove(copy.begin(), copy.end(), '`'), copy.end());
+            copy.erase(std::remove(copy.begin(), copy.end(), OUI_TCHAR('`')), copy.end());
             orthia::HexStringToObject(copy, &address);
             return address;
         }
@@ -126,5 +127,31 @@ namespace oui
         return address;
     }
 
-
+    struct MapNameResolver:orthia::INameResolver
+    {
+        std::shared_ptr<orthia::IWorkPlaceItem> item;
+        MapNameResolver(std::shared_ptr<orthia::IWorkPlaceItem> item_in)
+            :
+                item(item_in)
+        {
+        }
+        virtual orthia::Address_type QueryAddress(const orthia::PlatformString_type& name)
+        {
+            auto address = item->QueryAddressByName(name, 0);
+            if (!address)
+            {
+                address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
+                if (address == DI_MAX_OPERAND_SIZE)
+                {
+                    throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
+                }
+            }
+            return address;
+        }
+    };
+    orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, std::shared_ptr<orthia::IWorkPlaceItem> item)
+    {
+        auto resolver = std::make_shared< MapNameResolver>(item);
+        return orthia::CaptureAddressExp(expression, resolver);
+    }
 }

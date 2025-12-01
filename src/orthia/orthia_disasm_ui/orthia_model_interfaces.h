@@ -120,6 +120,7 @@ namespace orthia
         virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const = 0;
         virtual oui::String QueryAddressName(Address_type address) const = 0;
         virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
+        virtual Address_type QueryAddressByName(const oui::String & text, Address_type defValue) const = 0;
     };
 
 

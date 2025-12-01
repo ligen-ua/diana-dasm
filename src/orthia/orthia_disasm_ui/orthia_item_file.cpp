@@ -149,7 +149,7 @@ namespace orthia
     {
         return shortName;
     }
-    void FileWorkplaceItem::ReloadModules() 
+    void FileWorkplaceItem::ReloadModules()
     {
         // do nothing
     }
@@ -164,7 +164,7 @@ namespace orthia
         names.reserve(1024);
 
         bool pageFound = false;
-        classicDatabase->QueryMetaInfoModule2(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export, 
+        classicDatabase->QueryMetaInfoModule2(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
             std::string name;
@@ -223,7 +223,7 @@ namespace orthia
         {
             return (int)dbModules.size();
         }
-        for (auto& dbm:dbModules)
+        for (auto& dbm : dbModules)
         {
             orthia::ModuleInfo info;
             info.name = dbm.name;
@@ -276,7 +276,7 @@ namespace orthia
     {
         GetModulesEx(false, modules);
     }
-    int FileWorkplaceItem::GetModulesCount() const 
+    int FileWorkplaceItem::GetModulesCount() const
     {
         std::vector<orthia::ModuleInfo> modules;
         return GetModulesEx(true, modules);
@@ -312,22 +312,22 @@ namespace orthia
         range.lines.clear();
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         Address_type capturedModuleAddress = 0;
-        classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export, 
+        classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export,
             address,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
-             {
-                capturedModuleAddress = moduleAddress;
+        {
+            capturedModuleAddress = moduleAddress;
 
-                std::string name;
-                Address_type target = 0;
-                CCommonFormatParser parser;
-                parser.Parse(text);
-                parser.QueryMetadata("address", &target);
-                parser.QueryMetadata("name", &name);
+            std::string name;
+            Address_type target = 0;
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            parser.QueryMetadata("address", &target);
+            parser.QueryMetadata("name", &name);
 
-                range.lines.push_back(orthia::Utf8ToPlatformString(name));
-                return false;
-            });
+            range.lines.push_back(orthia::Utf8ToPlatformString(name));
+            return false;
+        });
 
         if (!range.lines.empty())
         {
@@ -392,6 +392,48 @@ namespace orthia
             }
         }
         return oui::String();
+    }
+    Address_type FileWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const
+    {
+        Address_type target = 0;
+        bool found = false;
+        auto downcased = orthia::Downcase(text.native);
+        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        classicDatabase->QueryMetaInfo(g_database_type_fnc_Export, [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+        {
+  
+            orthia::PlatformString_type name;
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            parser.QueryMetadata("address", &target);
+            parser.QueryMetadata(OUI_TCSTR("name"), &name);
+
+            auto downcased2 = orthia::Downcase(name);
+            found = downcased2 == downcased;
+            return !found;
+        });
+        if (found)
+        {
+            return target;
+        }
+        std::vector<CommonModuleInfo> dbModules;
+        classicDatabase->QueryModules(&dbModules);
+        for (auto& dbm : dbModules)
+        {
+            auto downcased2 = orthia::Downcase(dbm.name);
+            found = downcased2 == downcased;
+
+            if (found)
+            {
+                target = dbm.address; 
+                break;
+            }
+        }
+        if (found)
+        {
+            return target;
+        }
+        return defValue;
     }
     std::shared_ptr<::DianaMovableReadStream> FileWorkplaceItem::CreateDisasmStream(Address_type addressStart)
     {

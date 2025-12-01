@@ -55,5 +55,7 @@ void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings&
 
 namespace oui
 {
-    orthia::Address_type CaptureAddress(const std::wstring& addressString);
+    orthia::Address_type CaptureAddress(const orthia::PlatformString_type& addressString);
+    orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, std::shared_ptr<orthia::IWorkPlaceItem> item);
+
 }

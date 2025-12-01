@@ -49,6 +49,8 @@ struct Token
 
 bool operator == (const Token & token1, const Token & token2);
 
+orthia::PlatformString_type ReadString(const Token& token);
+
 struct ITokenFileSource
 {
     virtual ~ITokenFileSource(){}
@@ -104,6 +106,7 @@ class CTokenizer
     std::string m_tempStorageStr;
 
     bool m_inComment;
+    bool m_windbgStyle;
     Token BuildNewToken(Token::TokenType_type type);
     char ReadOneOrDie(const std::string & error = std::string());
     char HasOneMore() const;
@@ -123,6 +126,8 @@ class CTokenizer
 
     void RaiseError(const std::string & type);
     void RaiseWarning(const std::string & type);
+    bool IsOtherNameSymbol(char ch);
+
 public:
     CTokenizer(CBinaryTokenStorage * pBinaryTokenStorage, 
                CReservedWordsStorage * pReservedWordsStorage,
@@ -131,6 +136,7 @@ public:
     void Clear();
     void ResetSource(ITokenFileSource * pTokenFileSource);
     void TestPopulateAllCaches();
+    void SetWindbgStyle(bool val) { m_windbgStyle = val; }
 };
 
 

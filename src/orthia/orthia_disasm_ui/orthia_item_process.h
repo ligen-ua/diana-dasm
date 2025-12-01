@@ -44,6 +44,7 @@ namespace orthia
         bool QueryAddressModule(Address_type address, orthia::ModuleInfo& result) const;
         oui::String QueryAddressName(Address_type address) const;
         std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart);
+        Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;
     };
 
 }

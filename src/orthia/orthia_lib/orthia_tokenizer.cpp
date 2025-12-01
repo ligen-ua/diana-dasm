@@ -3,7 +3,17 @@
 #include <stdlib.h>
 namespace orthia
 {
-
+orthia::PlatformString_type ReadString(const Token& token)
+{
+    orthia::PlatformString_type res;
+    if (!token.pBinaryTokenStorage)
+    {
+        return res;
+    }
+    auto buffer = (char*)token.pBinaryTokenStorage->QueryData(token.tokenOffset, token.tokenSize);
+    std::string utf8(buffer, buffer + token.tokenSize);
+    return Utf8ToPlatformString(utf8);
+}
 bool operator == (const Token & token1, const Token & token2)
 {
     bool commonPropsAreEqual = 
@@ -227,7 +237,8 @@ CTokenizer::CTokenizer(CBinaryTokenStorage * pBinaryTokenStorage,
         m_eofReached(false),
         m_lineNumber(-1),
         m_columnPos(0),
-        m_inComment(false)
+        m_inComment(false),
+        m_windbgStyle(false)
 {
     m_line.resize(1024);
     m_tempStorage.reserve(1024);
@@ -509,16 +520,29 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
     // analyze and process first symbol
     IntType_type type = itDec;
     int radix = 10;
+    if (m_windbgStyle)
+    {
+        type = itHex;
+        radix = 16;
+    }
     m_tempStorage.clear();
     if (m_line[m_columnPos] == '0')
     {
-        type = itOctal;
-        radix = 8;
+        if (!m_windbgStyle)
+        {
+            type = itOctal;
+            radix = 8;
+        }
         // can be octal, binary or hex
         char secondChar = HasOneMore();
         switch(secondChar)
         {
-        case 'x': 
+        case 'n':
+            m_columnPos += 2;
+            type = itDec;
+            radix = 10;
+            break;
+        case 'x':
         case 'X':
             m_columnPos += 2;
             type = itHex;
@@ -629,6 +653,15 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
         char firstSuffixChar = HasCurrent();
         switch (firstSuffixChar)
         {
+
+        case 'h':
+            if (m_windbgStyle)
+            {
+                ++m_columnPos;
+                break;
+            }
+            break;
+
         case 'u':
         case 'U':
             if (wasU)
@@ -659,9 +692,9 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
 
         ++m_columnPos;
     }
-    if (wasLL)
+    if (wasLL || m_windbgStyle)
     {
-        if (wasU)
+        if (wasU || m_windbgStyle)
         {
             RegisterTokenData(pToken, &value, sizeof(value));
         }
@@ -703,6 +736,26 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
     }
     return true;
 }
+
+static
+bool IsHexChar(char ch)
+{
+    if ((ch >= '0' && ch <= '9') ||
+        (ch >= 'a' && ch <= 'f') ||
+        (ch >= 'A' && ch <= 'F'))
+    {
+        return true;
+    }
+    return false;
+}
+bool CTokenizer::IsOtherNameSymbol(char ch)
+{
+    if (m_windbgStyle)
+    {
+        return ch == '@' || ch == '$' || ch == '.' || ch == '#' || ch == '!' || ch == '?';
+    }
+    return false;
+}
 bool CTokenizer::CaptureName(Token * pToken)
 {
     if (m_line[m_columnPos] == 'L')
@@ -720,25 +773,58 @@ bool CTokenizer::CaptureName(Token * pToken)
         }
     }
 
+    auto originalColumnPos = m_columnPos;
     // this is name
     *pToken = BuildNewToken(Token::ttName);
+
+    bool isHexInt = IsHexChar(m_line[m_columnPos]);
+    bool hFound = false;
 
     m_tempStorageStr.clear();
     m_tempStorageStr.push_back(m_line[m_columnPos++]);
     while(m_columnPos < m_lineSize)
     {
         char ch = m_line[m_columnPos];
-        if ((ch>='0' && ch<='9') ||
+        bool hexChar = false;
+        if (isHexInt)
+        {
+            hexChar = IsHexChar(ch);
+        }
+        if ((ch >= '0' && ch <= '9') ||
             (ch>='a' && ch<='z') || 
             (ch>='A' && ch<='Z') ||
-            (ch == '_'))
+            (ch == '_') ||
+            IsOtherNameSymbol(ch))
         {
+            if (isHexInt && !hexChar)
+            {
+                if (ch == 'h')
+                {
+                    if (hFound)
+                    {
+                        isHexInt = false;
+                    }
+                    hFound = true;
+                }   
+                else
+                {
+                    isHexInt = false;
+                }
+            }
             m_tempStorageStr.push_back(m_line[m_columnPos++]);
             continue;
         }
         break;
     }
 
+    if (m_windbgStyle)
+    {
+        if (isHexInt)
+        {
+            m_columnPos = originalColumnPos;
+            return CaptureDigitLiteral(pToken);
+        }
+    }
     pToken->reservedWordId = m_pReservedWordsStorage->GetReservedWord_Silent(m_tempStorageStr);
     if (pToken->reservedWordId)
     {
@@ -874,6 +960,8 @@ bool CTokenizer::GetNextToken(Token * pToken)
             case ']':
             case '{':
             case '}':
+            case '@':
+            case '$':
                 break;
 
             case '\'':

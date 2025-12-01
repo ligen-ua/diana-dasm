@@ -128,6 +128,17 @@ void CMainWindow::ConstructChilds()
         defaultGroup->AddPanel(m_modulesWindow);
         m_stateManager.Register(m_modulesWindow);
     }
+#if 0
+    {
+        // commands window
+        auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.commands"));
+        m_commandWindow = std::make_shared<CCommandWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  },
+            m_model,
+            defaultGroup);
+        defaultGroup->AddPanel(m_commandWindow);
+        m_stateManager.Register(m_commandWindow);
+    }
+#endif
     {
         // output window
         auto bottomPanel = m_panelContainerWindow->AttachNewGroup(defaultGroup, oui::GroupLocation::Bottom, oui::GroupAttachMode::Sibling);
@@ -261,6 +272,22 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
             if (m_menu->IsActive())
             {
                 ToggleMenu(false);
+            }
+        }
+
+        // check linux style terminal switch
+        if (evt.keyState.HasJustAlt())
+        {
+            if (evt.keyEvent.virtualKey == oui::VirtualKey::k0)
+            {
+                m_outputWindow->SetFocus();
+            }
+            else
+            if (evt.keyEvent.virtualKey >= oui::VirtualKey::k1 && evt.keyEvent.virtualKey <= oui::VirtualKey::k9)
+            {
+                auto tabId = (int)evt.keyEvent.virtualKey - (int)oui::VirtualKey::k1;
+                auto defGroup = m_panelContainerWindow->GetDefaultGroup();
+                defGroup->SwitchPanel(tabId);
             }
         }
     }

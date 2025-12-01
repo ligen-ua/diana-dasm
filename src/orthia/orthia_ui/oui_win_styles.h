@@ -228,9 +228,13 @@ namespace oui
         {
             if (auto poolPtr = this->GetPool())
             {
-
                 auto focused = poolPtr->GetFocus();
                 auto it = std::find(m_childs.begin(), m_childs.end(), focused);
+                if (it == m_childs.end())
+                {
+                    focused = focused->GetParent();
+                    it = std::find(m_childs.begin(), m_childs.end(), focused);
+                }
                 if (it == m_childs.end())
                 {
                     m_childs[0]->SetFocus();

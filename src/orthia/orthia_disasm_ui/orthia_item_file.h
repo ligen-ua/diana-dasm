@@ -42,6 +42,7 @@ namespace orthia
         void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const override;
         oui::String QueryAddressName(Address_type address) const override;
         std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) override;
+        Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;
     };
 
     class CClassicDatabase;

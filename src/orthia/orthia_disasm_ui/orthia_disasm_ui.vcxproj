@@ -195,6 +195,7 @@
     <ClCompile Include="oui_open_process_dialog.cpp" />
     <ClCompile Include="oui_processes.cpp" />
     <ClCompile Include="oui_processes_win32.cpp" />
+    <ClCompile Include="ui_command_window.cpp" />
     <ClCompile Include="ui_common.cpp" />
     <ClCompile Include="ui_disasm_memory_writer.cpp" />
     <ClCompile Include="ui_disasm_window.cpp" />
@@ -221,6 +222,7 @@
     <ClInclude Include="oui_goto_dialog.h" />
     <ClInclude Include="oui_open_process_dialog.h" />
     <ClInclude Include="oui_processes.h" />
+    <ClInclude Include="ui_command_window.h" />
     <ClInclude Include="ui_common.h" />
     <ClInclude Include="ui_disasm_memory_writer.h" />
     <ClInclude Include="ui_disasm_window.h" />

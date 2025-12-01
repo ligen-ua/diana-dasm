@@ -11,6 +11,7 @@
 #include "oui_open_process_dialog.h"
 #include "ui_workspace_window.h"
 #include "ui_modules_window.h"
+#include "ui_command_window.h"
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -33,6 +34,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     std::shared_ptr<COutputWindow> m_outputWindow;
     std::shared_ptr<CWorkspaceWindow> m_workspaceWindow;
     std::shared_ptr<CModulesWindow> m_modulesWindow;
+    std::shared_ptr<CCommandWindow> m_commandWindow;
 
     oui::CHotkeyStorage m_hotkeys;
     std::vector<InitialOpenFileInfo> m_fileToOpen;

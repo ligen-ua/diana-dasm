@@ -504,6 +504,28 @@ namespace orthia
         }
         return false;
     }
+    Address_type CProcessWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const
+    {
+        auto downcased = orthia::Downcase(text.native);
+        orthia::CAutoCriticalSection guard(m_lock);
+        {
+            auto it = std::find_if(m_exports.begin(), m_exports.end(), [&](const auto& pair) { return orthia::Downcase(pair.second.native) == downcased;  });
+            if (it != m_exports.end())
+            {
+                return it->first;
+            }
+        }
+
+        {
+            auto it = std::find_if(m_modules.begin(), m_modules.end(), [&](const auto& mod) { return orthia::Downcase(mod.name) == downcased;  });
+            if (it != m_modules.end())
+            {
+                return it->address;
+            }
+        }
+        return defValue;
+    }
+
     std::shared_ptr<::DianaMovableReadStream> CProcessWorkplaceItem::CreateDisasmStream(Address_type addressStart)
     {
         struct DianaReadStreamAdapter

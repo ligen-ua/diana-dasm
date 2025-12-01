@@ -539,6 +539,8 @@ namespace oui
     {
         if (m_activePanelIndex == index)
         {
+            auto panel = m_panels[index];
+            panel->SetFocus();
             return true;
         }
         if (index < 0 || index >= (int)m_panels.size())

@@ -57,6 +57,9 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.output"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Output"))
         ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.commands"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Commands"))
+        ;
 
     // workspace
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.workspace"))

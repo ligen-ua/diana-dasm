@@ -95,6 +95,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -112,6 +113,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -126,6 +128,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -143,6 +146,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -158,6 +162,7 @@
     <ClCompile Include="orthia_diana_module.cpp" />
     <ClCompile Include="orthia_diana_print.cpp" />
     <ClCompile Include="orthia_exec.cpp" />
+    <ClCompile Include="orthia_expressions.cpp" />
     <ClCompile Include="orthia_files.cpp" />
     <ClCompile Include="orthia_log.cpp" />
     <ClCompile Include="orthia_memory_cache.cpp" />
@@ -195,6 +200,7 @@
     <ClInclude Include="orthia_diana_module.h" />
     <ClInclude Include="orthia_diana_print.h" />
     <ClInclude Include="orthia_exec.h" />
+    <ClInclude Include="orthia_expressions.h" />
     <ClInclude Include="orthia_files.h" />
     <ClInclude Include="orthia_interfaces.h" />
     <ClInclude Include="orthia_interfaces_vm.h" />

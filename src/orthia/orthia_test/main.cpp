@@ -76,6 +76,7 @@ void test_pe();
 void test_vm_shuttle();
 void test_shuttle_utils();
 void test_tokenizer();
+void test_expressions();
 
 int main(int argc, char * argv[])
 {
@@ -91,6 +92,7 @@ int main(int argc, char * argv[])
     {
         test_vm_shuttle();
     }
+    test_expressions();
     test_tokenizer();
     test_shuttle_utils();
     test_pe();
