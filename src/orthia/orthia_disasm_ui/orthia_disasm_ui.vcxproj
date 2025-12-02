@@ -182,6 +182,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="orthia_commands.cpp" />
     <ClCompile Include="orthia_config.cpp" />
     <ClCompile Include="orthia_helpers.cpp" />
     <ClCompile Include="orthia_item_file.cpp" />
@@ -209,6 +210,7 @@
     <ClCompile Include="ui_workspace_window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="orthia_commands.h" />
     <ClInclude Include="orthia_config.h" />
     <ClInclude Include="orthia_helpers.h" />
     <ClInclude Include="orthia_item_file.h" />

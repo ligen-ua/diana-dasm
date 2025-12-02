@@ -156,6 +156,12 @@ struct MapNameResolver:orthia::INameResolver
         return it->second;
     }
 };
-orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, std::shared_ptr<orthia::INameResolver> resolver);
+orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, 
+    std::shared_ptr<orthia::INameResolver> resolver);
+
+orthia::Address_type CaptureAddressExp(std::shared_ptr<ICalcNode> rootNode, 
+    std::shared_ptr<ICalcNode> currentNode,
+    const orthia::Token& token,
+    std::shared_ptr<orthia::INameResolver> resolver);
 
 }

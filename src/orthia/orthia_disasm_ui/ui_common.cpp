@@ -89,7 +89,7 @@ void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings&
 namespace oui
 {
 
-    orthia::Address_type CaptureAddress(orthia::PlatformString_type& addressString_in)
+    orthia::Address_type CaptureAddress(const orthia::PlatformString_type& addressString_in)
     {
         orthia::PlatformString_type addressString = addressString_in;
         orthia::TrimStringAllWhiteSpace(addressString);
@@ -127,31 +127,9 @@ namespace oui
         return address;
     }
 
-    struct MapNameResolver:orthia::INameResolver
-    {
-        std::shared_ptr<orthia::IWorkPlaceItem> item;
-        MapNameResolver(std::shared_ptr<orthia::IWorkPlaceItem> item_in)
-            :
-                item(item_in)
-        {
-        }
-        virtual orthia::Address_type QueryAddress(const orthia::PlatformString_type& name)
-        {
-            auto address = item->QueryAddressByName(name, 0);
-            if (!address)
-            {
-                address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
-                if (address == DI_MAX_OPERAND_SIZE)
-                {
-                    throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
-                }
-            }
-            return address;
-        }
-    };
     orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, std::shared_ptr<orthia::IWorkPlaceItem> item)
     {
-        auto resolver = std::make_shared< MapNameResolver>(item);
+        auto resolver = std::make_shared< NameResolverOverWorkplaceItem>(item);
         return orthia::CaptureAddressExp(expression, resolver);
     }
 }

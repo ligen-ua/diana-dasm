@@ -7,6 +7,7 @@
 #include "orthia_module_manager.h"
 #include "oui_processes.h"
 #include <optional>
+#include "orthia_commands.h"
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -39,6 +40,7 @@ namespace orthia
     {
         std::shared_ptr<oui::CFileSystem> m_fileSystem;
         std::shared_ptr<oui::CProcessSystem> m_processSystem;
+        std::shared_ptr<orthia::CCommandProcessor> m_commandProcessor;
 
         mutable std::mutex m_lock;
         std::map<int, std::shared_ptr<IWorkPlaceItem>> m_items;
@@ -61,7 +63,9 @@ namespace orthia
 
         std::shared_ptr<oui::CFileSystem> GetFileSystem();
         std::shared_ptr<oui::CProcessSystem> GetProcessSystem();
+        std::shared_ptr<orthia::CCommandProcessor> GetCommandProcessor();
 
+        int GetActiveItemId() const { return m_activeId; }
         bool QueryWorkspaceItem(int id, WorkplaceItem& item) const;
         bool SetActiveItem(int uid);
         int QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const;

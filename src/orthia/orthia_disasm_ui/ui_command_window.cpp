@@ -19,6 +19,41 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
     // edit
     m_commandEdit = std::make_shared<oui::CEditBox>(m_colorProfile);
     m_commandEdit->SetEnterHandler([=](const oui::String& text) { 
+
+
+        auto itemId = model->GetActiveItemId();
+
+        auto item = model->GetActiveItem();
+        if (!item)
+        {
+            AddLine(oui::String(OUI_TCSTR("No active workspace")));
+            return;
+        }
+       
+        if (m_currentOperation)
+        {
+            return;
+        }
+        auto operation = std::make_shared<oui::Operation<orthia::CCommandProcessor::ExecuteProgressHandler_type>>(GetThread(), 
+            [=](std::shared_ptr<oui::BaseOperation> operation,
+                const oui::String& text,
+                bool finalText)
+                {
+                    WriteLog(text);
+                    if (finalText)
+                    {
+                        AddLine(oui::String());
+                        m_currentOperation = nullptr;
+                    }
+                }
+            );
+        orthia::PlatformString_type itemStr;
+        orthia::ObjectToString_t(itemId, itemStr);
+
+        WriteLog(itemStr + OUI_TCSTR("> ") + text.native);
+        m_commandEdit->Clear();
+        m_currentOperation = operation;
+        model->GetCommandProcessor()->AsyncExecute(GetThread(), operation, text.native, item);
     });
 
     // label

@@ -20,6 +20,11 @@ namespace oui
             AddThread();
         }
     }
+    int CThreadPool::GetTasksCount() const
+    {
+        std::lock_guard<std::mutex> lock(m_tasksLock);
+        return (int)m_tasks.size() + m_activeTasksCount;
+    }
     void CThreadPool::AddThread()
     {
         std::lock_guard<std::mutex> guard(m_threadsLock);
@@ -48,6 +53,7 @@ namespace oui
                 }
                 task = std::move(m_tasks.front());
                 m_tasks.pop_front();
+                ++m_activeTasksCount;
             }
 
             try
@@ -58,6 +64,7 @@ namespace oui
             {
                 oui::LogOutput(LogFlags::Error, e.what());
             }
+            --m_activeTasksCount;
         }
     }
 

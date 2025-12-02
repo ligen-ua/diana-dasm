@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_model.h"
+#include "orthia_expressions.h"
 
 struct UIState
 {
@@ -55,6 +56,30 @@ void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings&
 
 namespace oui
 {
+
+    struct NameResolverOverWorkplaceItem :orthia::INameResolver
+    {
+        std::shared_ptr<orthia::IWorkPlaceItem> item;
+        NameResolverOverWorkplaceItem(std::shared_ptr<orthia::IWorkPlaceItem> item_in)
+            :
+            item(item_in)
+        {
+        }
+        virtual orthia::Address_type QueryAddress(const orthia::PlatformString_type& name)
+        {
+            auto address = item->QueryAddressByName(name, 0);
+            if (!address)
+            {
+                address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
+                if (address == DI_MAX_OPERAND_SIZE)
+                {
+                    throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
+                }
+            }
+            return address;
+        }
+    };
+
     orthia::Address_type CaptureAddress(const orthia::PlatformString_type& addressString);
     orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, std::shared_ptr<orthia::IWorkPlaceItem> item);
 

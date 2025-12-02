@@ -98,6 +98,9 @@
     <ClCompile Include="ui_command_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_commands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h">
@@ -164,6 +167,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_command_window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_commands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

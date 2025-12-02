@@ -13,9 +13,10 @@ namespace oui
 
         // task management
         std::condition_variable m_tasksCondition;
-        std::mutex m_tasksLock;
+        mutable std::mutex m_tasksLock;
         std::list<std::function<void()>> m_tasks;
-        
+        std::atomic_int m_activeTasksCount = 0; 
+
         void MainLoop();
         void NotifyStop();
         void JoinAll();
@@ -26,6 +27,7 @@ namespace oui
         void Start(size_t threadCount);
         void AddThread();
         void AddTask(std::function<void()> task);
+        int GetTasksCount() const;
     };
 }
 

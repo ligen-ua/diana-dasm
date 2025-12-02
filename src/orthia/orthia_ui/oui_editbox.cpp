@@ -798,7 +798,11 @@ namespace oui
     }
     void CEditBox::Clear()
     {
+        m_cursorIterator = 0;
+        m_windowRightIterator = 0;
+        ResetSelection();
         m_text.native.clear();
+        Invalidate();
     }
     String CEditBox::GetText() const
     {

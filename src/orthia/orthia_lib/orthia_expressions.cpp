@@ -496,6 +496,15 @@ orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expres
             currentNode = result.newNode;
         }
     }
+
+    return CaptureAddressExp(rootNode, currentNode, token, resolver);
+}
+
+orthia::Address_type CaptureAddressExp(std::shared_ptr<ICalcNode> rootNode, 
+    std::shared_ptr<ICalcNode> currentNode,
+    const orthia::Token & token,
+    std::shared_ptr<orthia::INameResolver> resolver)
+{
     if (!rootNode)
     {
         throw std::runtime_error("Empty expression");

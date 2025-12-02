@@ -128,7 +128,7 @@ void CMainWindow::ConstructChilds()
         defaultGroup->AddPanel(m_modulesWindow);
         m_stateManager.Register(m_modulesWindow);
     }
-#if 0
+#if 1
     {
         // commands window
         auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.commands"));

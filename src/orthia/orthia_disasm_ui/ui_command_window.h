@@ -15,6 +15,7 @@ class CCommandWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     std::shared_ptr<oui::DialogColorProfile> m_colorProfile;
     std::shared_ptr<oui::CEditBox> m_commandEdit;
     std::shared_ptr<oui::CLabel> m_textLabel;
+    std::shared_ptr<oui::BaseOperation> m_currentOperation;
 
     void ConstructChilds() override;
     void OnResize() override;

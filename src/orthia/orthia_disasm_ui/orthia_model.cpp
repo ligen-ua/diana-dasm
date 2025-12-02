@@ -46,6 +46,7 @@ namespace orthia
     {
         m_fileSystem = std::make_shared<oui::CFileSystem>();
         m_processSystem = std::make_shared<oui::CProcessSystem>();
+        m_commandProcessor = std::make_shared<orthia::CCommandProcessor>();
     }
     
     std::shared_ptr<IWorkPlaceItem> CProgramModel::GetActiveItem()
@@ -78,6 +79,10 @@ namespace orthia
     std::shared_ptr<oui::CProcessSystem> CProgramModel::GetProcessSystem()
     {
         return m_processSystem;
+    }
+    std::shared_ptr<orthia::CCommandProcessor> CProgramModel::GetCommandProcessor()
+    {
+        return m_commandProcessor;
     }
     bool CProgramModel::QueryWorkspaceItem(int id, WorkplaceItem& item) const
     {
