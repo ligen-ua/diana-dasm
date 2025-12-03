@@ -17,6 +17,9 @@ class CCommandWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     std::shared_ptr<oui::CLabel> m_textLabel;
     std::shared_ptr<oui::BaseOperation> m_currentOperation;
 
+    std::vector<oui::String> m_cmdHistory;
+    int m_cmdHistoryPointer = 0;
+
     void ConstructChilds() override;
     void OnResize() override;
     void SetFocusImpl() override;
@@ -27,6 +30,7 @@ class CCommandWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     void AddLine(const oui::String& line); 
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
 
+    void PushHistory(const oui::String& cmd);
 public:
     CCommandWindow(std::function<oui::String()> getCaption,
                    std::shared_ptr<orthia::CProgramModel> model,

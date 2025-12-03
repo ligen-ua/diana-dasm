@@ -396,15 +396,17 @@ namespace orthia
             importsCount);
 
         std::vector<char> page(4096);
-        DianaPeFile_QueryImports(&dianaPeFile,
-            moduleAddress,
-            &stream,
-            page.data(),
-            (int)page.size(),
-            importsCollector.GetParent(),
-            DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
-            0);
-
+        if (!nameFilter.excludeImports)
+        {
+            DianaPeFile_QueryImports(&dianaPeFile,
+                moduleAddress,
+                &stream,
+                page.data(),
+                (int)page.size(),
+                importsCollector.GetParent(),
+                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
+                0);
+        }
         if (totalCount)
         {
             *totalCount = importsCount;

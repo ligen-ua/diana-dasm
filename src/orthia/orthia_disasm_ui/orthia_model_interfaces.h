@@ -89,6 +89,7 @@ namespace orthia
         Address_type address;
         oui::String name;
         int flags = 0;
+        bool excludeImports = false;
     };
 
     struct MarkupRangeInfo

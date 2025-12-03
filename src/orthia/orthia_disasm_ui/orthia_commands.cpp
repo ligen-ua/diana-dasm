@@ -2,6 +2,8 @@
 #include "orthia_expressions.h"
 #include "ui_common.h"
 #include "ui_disasm_memory_writer.h"
+#include "orthia_match.h"
+
 namespace orthia
 {
     CCommandProcessor::CCommandProcessor()
@@ -111,6 +113,86 @@ namespace orthia
         printer.OnStream(&context, oui::LineIndex(targetAddress, 0), false);
     }
 
+    void CCommandProcessor::Handle_x(CommandArguments& args)
+    {
+        auto mask = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
+        orthia::TrimStringAllWhiteSpace(mask);
+
+        auto maskDowncase = orthia::Downcase(orthia::Utf8ToPlatformString(mask));
+
+        std::vector<StringInfo> parts;
+        orthia::SplitString(maskDowncase, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
+        
+        if (parts.size() != 2)
+        {
+            return;
+        }
+
+        std::vector<orthia::ModuleInfo> modules;
+        std::vector<orthia::NameInfo> names;
+        args.item->GetModules(modules);
+
+        orthia::PlatformString_type text;
+        auto dianaMode = args.item->GetDianaMode();
+        for (auto& mod : modules)
+        {
+            auto modDowncased = orthia::Downcase(mod.name);
+            bool match = utils::match(parts[0].ToString(), modDowncased);
+            if (!match)
+            {
+                orthia::PlatformString_type extension;
+                orthia::GetExtensionOfFile(modDowncased, &extension);
+                if (!extension.empty())
+                {
+                    modDowncased.erase(modDowncased.size() - extension.size() - 1);
+                    match = utils::match(parts[0].ToString(), modDowncased);
+                }
+            }
+            if (match)
+            {
+                const int c_pageSize = 1000;
+                orthia::NameSelectionKey key;
+                key.excludeImports = true;
+
+                for (;;)
+                {
+                    args.item->QueryNames(mod.address, key, c_pageSize, names);
+                    if (names.empty())
+                    {
+                        break;
+                    }
+
+                    for (auto& name : names)
+                    {
+                        auto nameDowncased = orthia::Downcase(name.name.native);
+                        if (utils::match(parts[1].ToString(), nameDowncased))
+                        {
+                            text.clear();
+                            if (dianaMode < 8)
+                            {
+                                text.append(orthia::ToWideStringAsHex((unsigned int)name.address));
+                            }
+                            else
+                            {
+                                text.append(orthia::Address64ToString(name.address));
+                            }
+                            text.append(ORTHIA_TCSTR("  "));
+                            text.append(mod.name);
+                            text.append(ORTHIA_TCSTR("!"));
+                            text.append(name.name.native);
+                            if (!args.progressHandler->Reply(args.progressHandler, text, false))
+                            {
+                                throw std::runtime_error("Request canceled");
+                            }
+                        }
+                    }
+                    key.flags |= key.flags_ContinueFrom;
+                    key.address = names.back().address;
+                }
+            }
+        }
+    }
+
     void CCommandProcessor::ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
         const orthia::PlatformString_type& text,
@@ -125,6 +207,7 @@ namespace orthia
         {
             parser.SetEmptyHandler([&]() {});
             parser.SetHandler(OUI_TCSTR("u"), [=](CCommandParser& parser) mutable { Handle_u(args);  });
+            parser.SetHandler(OUI_TCSTR("x"), [=](CCommandParser& parser) mutable { Handle_x(args);  });
             parser.Parse(text);
         }
         catch (std::exception& e)

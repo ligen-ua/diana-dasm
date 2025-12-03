@@ -206,6 +206,7 @@
     <ClInclude Include="orthia_interfaces_vm.h" />
     <ClInclude Include="orthia_json.h" />
     <ClInclude Include="orthia_log.h" />
+    <ClInclude Include="orthia_match.h" />
     <ClInclude Include="orthia_memory_cache.h" />
     <ClInclude Include="orthia_module_manager.h" />
     <ClInclude Include="orthia_parser.h" />

@@ -31,6 +31,7 @@ protected:
 
     void ReportStop(CommandArguments& args);
     void Handle_u(CommandArguments& args);
+    void Handle_x(CommandArguments& args);
 
 public:
 

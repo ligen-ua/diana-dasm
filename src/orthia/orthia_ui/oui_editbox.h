@@ -35,7 +35,7 @@ namespace oui
         int m_selPosEnd = 0;
 
         static String m_chunk, m_chunk2;
-        void InsertText(const String& text);
+        bool InsertText(const String& text);
 
 
         int m_windowSymStart = 0;

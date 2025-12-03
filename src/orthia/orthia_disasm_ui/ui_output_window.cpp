@@ -81,6 +81,7 @@ void COutputWindow::AddLine(const oui::String& line_in)
     oui::MultiLineViewItem item;
     item.text = oui::String::string_type(buffer) + line.native;
     m_view->AddLine(std::move(item));
+    m_view->GoToLastLine();
 }
 
 void COutputWindow::ConstructChilds()

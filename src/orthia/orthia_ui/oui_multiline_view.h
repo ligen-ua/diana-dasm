@@ -259,6 +259,7 @@ namespace oui
         void SetCursorYPos(int newPos);
         bool SetCursorYPos(const oui::LineIndex& index);
         String ExtractSelected();
+        void GoToLastLine();
     };
 
 }

@@ -164,8 +164,7 @@ namespace orthia
         names.reserve(1024);
 
         bool pageFound = false;
-        classicDatabase->QueryMetaInfoModule2(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export,
-            [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+        auto handler = [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
             std::string name;
             Address_type target = 0;
@@ -203,7 +202,20 @@ namespace orthia
                 return false;
             }
             return true;
-        });
+        };
+
+        if (nameFilter.excludeImports)
+        {
+            classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                g_database_type_fnc_Export, -1,
+                handler);
+        }
+        else
+        {
+            classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                g_database_type_fnc_Import, g_database_type_fnc_Export,
+                handler);
+        }
     }
     int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {

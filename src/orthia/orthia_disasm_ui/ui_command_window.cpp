@@ -53,6 +53,7 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
         WriteLog(itemStr + OUI_TCSTR("> ") + text.native);
         m_commandEdit->Clear();
         m_currentOperation = operation;
+        PushHistory(text);
         model->GetCommandProcessor()->AsyncExecute(GetThread(), operation, text.native, item);
     });
 
@@ -67,6 +68,12 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
     RegisterSwitchParent(parentTabSwitcher);
 }
 
+void CCommandWindow::PushHistory(const oui::String& cmd)
+{
+    m_cmdHistory.push_back(cmd);
+    m_cmdHistoryPointer = (int)m_cmdHistory.size();
+}
+
 bool CCommandWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
 {
     if (evt.keyState.state & evt.keyState.AnyCtrl)
@@ -76,6 +83,71 @@ bool CCommandWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
             if (auto parent = ChildSwitcher_GetParent())
             {
                 return parent->SwitchNextPanel();
+            }
+        }
+    }
+    if (evt.keyEvent.valid)
+    {
+        bool handled = false;
+        switch (evt.keyEvent.virtualKey)
+        {
+        case oui::VirtualKey::Up:
+            --m_cmdHistoryPointer;
+            if (m_cmdHistoryPointer < 0)
+            {
+                m_cmdHistoryPointer = 0;
+            }
+            if (m_cmdHistoryPointer >= (int)m_cmdHistory.size())
+            {
+                m_cmdHistoryPointer = (int)m_cmdHistory.size();
+                m_commandEdit->SetText(oui::String());
+            }
+            else
+            {
+                m_commandEdit->SetText(m_cmdHistory[m_cmdHistoryPointer]);
+            }
+            handled = true;
+            break;
+
+        case oui::VirtualKey::Down:
+            if (!m_cmdHistory.empty())
+            {
+                int oldPtr = m_cmdHistoryPointer;
+                ++m_cmdHistoryPointer;
+                if (m_cmdHistoryPointer >= (int)m_cmdHistory.size())
+                {
+                    m_cmdHistoryPointer = (int)m_cmdHistory.size();
+                    if (oldPtr != m_cmdHistoryPointer)
+                    {
+                        m_commandEdit->SetText(oui::String());
+                    }
+                }
+                else
+                {
+                    m_commandEdit->SetText(m_cmdHistory[m_cmdHistoryPointer]);
+                }
+            }
+            handled = true;
+            break;
+        }
+
+        if (handled)
+        {
+            Invalidate();
+            return true;
+        }
+        else
+        {
+            oui::CConsole* console = GetConsole();
+            if (console)
+            {
+                oui::String text = evt.keyEvent.rawText.native;
+                console->FilterOrReplaceUnreadableSymbols(text);
+                if (!text.native.empty() && !m_commandEdit->IsFocused())
+                {
+                    m_commandEdit->SetFocus();
+                    m_commandEdit->ProcessEvent(evt, evtContext);
+                }
             }
         }
     }
@@ -90,6 +162,7 @@ void CCommandWindow::AddLine(const oui::String& line_in)
     oui::MultiLineViewItem item;
     item.text = line.native;
     m_view->AddLine(std::move(item));
+    m_view->GoToLastLine();
 }
 
 void CCommandWindow::ConstructChilds()

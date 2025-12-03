@@ -133,6 +133,8 @@ public:
                CReservedWordsStorage * pReservedWordsStorage,
                ITokenFileSource * pTokenFileSource = 0);
     bool GetNextToken(Token * pToken);
+    std::string GetNextRawString();
+
     void Clear();
     void ResetSource(ITokenFileSource * pTokenFileSource);
     void TestPopulateAllCaches();

@@ -843,7 +843,7 @@ namespace oui
                 }
             }
             auto group = *it;
-            if (group->HasPanels())
+            if (group->HasPanels() && group->IsVisible())
             {
                 group->Activate();
                 return;

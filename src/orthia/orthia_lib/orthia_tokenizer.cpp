@@ -862,7 +862,31 @@ void CTokenizer::Clear()
     m_tempStorageStr.clear();
     m_inComment = false;
 }
-
+std::string CTokenizer::GetNextRawString()
+{
+    if (m_eofReached)
+    {
+        return 0;
+    }
+    if (!m_pTokenFileSource)
+    {
+        return 0;
+    }
+    std::string res;
+    for (;;)
+    {
+        while (!m_lineSize || m_columnPos >= m_lineSize)
+        {
+            if (!m_pTokenFileSource->GetNextLine(&m_line, &m_lineSize))
+            {
+                return res;
+            }
+            m_columnPos = 0;
+        }
+        res.append(m_line.begin() + m_columnPos, m_line.begin() + m_lineSize);
+        m_columnPos = (int)m_lineSize;
+    }
+}
 bool CTokenizer::GetNextToken(Token * pToken)
 {
     if (m_eofReached)

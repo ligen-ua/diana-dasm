@@ -785,6 +785,12 @@ namespace oui
         m_selectionIsActive = true;
         Invalidate();
     }
+    void CMultiLineView::GoToLastLine()
+    {
+        auto offsetInPage = m_yCursopPos + m_firstVisibleLineIndex;
+        ScrollDown((int)m_lines.size() - offsetInPage);
+        Invalidate();
+    }
 
     String CMultiLineView::ExtractSelected()
     {

@@ -530,24 +530,24 @@ namespace oui
         }
         return false;
     }
-    void CEditBox::InsertText(const String& text_in)
+    bool CEditBox::InsertText(const String& text_in)
     {
         if (IsReadOnly())
         {
-            return;
+            return false;
         }
 
         CConsole* console = GetConsole();
         if (!console)
         {
-            return;
+            return false;
         }
 
         String text = text_in;
         console->FilterOrReplaceUnreadableSymbols(text);
         if (text.native.empty())
         {
-            return;
+            return false;
         }
 
         if (SelectionIsActive())
@@ -569,6 +569,7 @@ namespace oui
             SetTextImpl(m_text.native + text.native);
         }
         m_cursorIterator += symbolsToInsert;
+        return true;
     }
     void CEditBox::MoveToNextWordRight()
     {
@@ -789,15 +790,19 @@ namespace oui
             }
             if (!handled && !evt.keyEvent.rawText.native.empty())
             {
-                InsertText(evt.keyEvent.rawText);
-                handled = true;
+                handled = InsertText(evt.keyEvent.rawText);
             }
             Invalidate();
+            if (handled)
+            {
+                return true;
+            }
         }
         return Parent_type::ProcessEvent(evt, evtContext);
     }
     void CEditBox::Clear()
     {
+        m_symbols.clear();
         m_cursorIterator = 0;
         m_windowRightIterator = 0;
         ResetSelection();
