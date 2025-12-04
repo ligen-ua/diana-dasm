@@ -52,7 +52,8 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize)
         auto range = args.item->ReadData(curAddress, sizeToRead);
         if (!range.dataSize)
         {
-            throw std::runtime_error("Can't read memory");
+            range.rangeFlags |= orthia::WorkAddressData::flags_FullInvalid;
+            range.dataSize = sizeToRead;
         }
         VmMemoryRangeInfo info;
         bool partialRead = true;
