@@ -64,14 +64,7 @@ namespace orthia
             const std::wstring& command)
         {
             m_currentBlock.clear();
-            if (m_dianaMode < 8)
-            {
-                m_currentBlock.append(orthia::ToWideStringAsHex((unsigned int)address));
-            }
-            else
-            {
-                m_currentBlock.append(orthia::Address64ToString(address));
-            }
+            m_currentBlock.append(orthia::AddressToString(address, m_dianaMode));
             m_currentBlock.append(m_countOfSpacesAfterAddress, L' ');
             m_currentBlock.append(bytes);
 

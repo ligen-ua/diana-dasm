@@ -105,6 +105,11 @@ bool CCommandWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
             else
             {
                 m_commandEdit->SetText(m_cmdHistory[m_cmdHistoryPointer]);
+
+                oui::InputEvent evt;
+                evt.keyEvent.valid = true;
+                evt.keyEvent.virtualKey = oui::VirtualKey::End;
+                m_commandEdit->ProcessEvent(evt, evtContext);
             }
             handled = true;
             break;
@@ -127,6 +132,11 @@ bool CCommandWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
                     m_commandEdit->SetText(m_cmdHistory[m_cmdHistoryPointer]);
                 }
             }
+            handled = true;
+            break;
+
+        case oui::VirtualKey::Escape:
+            m_commandEdit->SetFocus();
             handled = true;
             break;
         }

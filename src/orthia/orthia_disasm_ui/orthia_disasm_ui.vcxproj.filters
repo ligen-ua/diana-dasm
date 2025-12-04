@@ -101,6 +101,9 @@
     <ClCompile Include="orthia_commands.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_commands_display.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h">

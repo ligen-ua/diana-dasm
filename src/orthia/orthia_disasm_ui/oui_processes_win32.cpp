@@ -139,8 +139,6 @@ namespace oui
                 pOutBuffer += holeSize;
                 outAddress += holeSize;
                 sizeToGo -= holeSize;
-
-                continue;
             }
             // So here reg.baseAddress <= outAddress
             // check API result for sanity
@@ -168,6 +166,11 @@ namespace oui
             sizeToGo -= sizeToRead;
         }
 
+        if (sizeToGo)
+        {
+            memset(pOutBuffer, 0, (size_t)sizeToGo);
+            AddRange(noAccessRegions, lpBuffer, pOutBuffer, sizeToGo);
+        }
         if (fail)
         {
             // no access

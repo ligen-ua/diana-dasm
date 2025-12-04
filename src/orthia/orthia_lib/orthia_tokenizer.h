@@ -88,6 +88,9 @@ typedef bool (*SymbolMatcherFnc_type)(int index,
 
 class CTokenizer
 {
+public:
+    static const int flags_ForceGetName = 1;
+protected:
     ITokenFileSource * m_pTokenFileSource;
     CBinaryTokenStorage * m_pBinaryTokenStorage;
     CReservedWordsStorage * m_pReservedWordsStorage;
@@ -121,7 +124,7 @@ class CTokenizer
                               Token * pToken, 
                               int columnPos = -1);
     bool CaptureDigitLiteral(Token * pToken);
-    bool CaptureName(Token * pToken);
+    bool CaptureName(Token * pToken, int flags);
     wchar_t CaptureEscapedChar(bool wide);
 
     void RaiseError(const std::string & type);
@@ -132,7 +135,7 @@ public:
     CTokenizer(CBinaryTokenStorage * pBinaryTokenStorage, 
                CReservedWordsStorage * pReservedWordsStorage,
                ITokenFileSource * pTokenFileSource = 0);
-    bool GetNextToken(Token * pToken);
+    bool GetNextToken(Token * pToken, int flags = 0);
     std::string GetNextRawString();
 
     void Clear();
@@ -185,7 +188,7 @@ class CTokenizerEnv
     CTokenizer m_tokenizer;
 public:
     CTokenizerEnv();
-    bool GetNextToken(Token * pToken);
+    bool GetNextToken(Token * pToken, int flags = 0);
     void Clear();
     void ResetSource(ITokenFileSource * pTokenFileSource);
 

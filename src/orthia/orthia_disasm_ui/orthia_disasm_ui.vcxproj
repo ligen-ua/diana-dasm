@@ -183,6 +183,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="orthia_commands.cpp" />
+    <ClCompile Include="orthia_commands_display.cpp" />
     <ClCompile Include="orthia_config.cpp" />
     <ClCompile Include="orthia_helpers.cpp" />
     <ClCompile Include="orthia_item_file.cpp" />

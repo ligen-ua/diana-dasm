@@ -10,6 +10,10 @@ orthia::PlatformString_type ReadString(const Token& token)
     {
         return res;
     }
+    if (token.type != Token::ttName)
+    {
+        return res;
+    }
     auto buffer = (char*)token.pBinaryTokenStorage->QueryData(token.tokenOffset, token.tokenSize);
     std::string utf8(buffer, buffer + token.tokenSize);
     return Utf8ToPlatformString(utf8);
@@ -756,7 +760,7 @@ bool CTokenizer::IsOtherNameSymbol(char ch)
     }
     return false;
 }
-bool CTokenizer::CaptureName(Token * pToken)
+bool CTokenizer::CaptureName(Token * pToken, int flags)
 {
     if (m_line[m_columnPos] == 'L')
     {
@@ -819,10 +823,13 @@ bool CTokenizer::CaptureName(Token * pToken)
 
     if (m_windbgStyle)
     {
-        if (isHexInt)
+        if (!(flags & flags_ForceGetName))
         {
-            m_columnPos = originalColumnPos;
-            return CaptureDigitLiteral(pToken);
+            if (isHexInt)
+            {
+                m_columnPos = originalColumnPos;
+                return CaptureDigitLiteral(pToken);
+            }
         }
     }
     pToken->reservedWordId = m_pReservedWordsStorage->GetReservedWord_Silent(m_tempStorageStr);
@@ -887,7 +894,7 @@ std::string CTokenizer::GetNextRawString()
         m_columnPos = (int)m_lineSize;
     }
 }
-bool CTokenizer::GetNextToken(Token * pToken)
+bool CTokenizer::GetNextToken(Token * pToken, int flags)
 {
     if (m_eofReached)
     {
@@ -1010,7 +1017,7 @@ bool CTokenizer::GetNextToken(Token * pToken)
                 {
                     RaiseError("Invalid characters");
                 }
-                return CaptureName(pToken);
+                return CaptureName(pToken, flags);
         }
         // capture sign
         bool res = CaptureSign(pToken, symbolMatcher);
@@ -1034,9 +1041,9 @@ CTokenizerEnv::CTokenizerEnv()
         m_tokenizer(&m_binaryStorage, &m_reservedWordsStorage)
 {
 }
-bool CTokenizerEnv::GetNextToken(Token * pToken)
+bool CTokenizerEnv::GetNextToken(Token * pToken, int flags)
 {
-    return m_tokenizer.GetNextToken(pToken);
+    return m_tokenizer.GetNextToken(pToken, flags);
 }
 void CTokenizerEnv::Clear()
 {

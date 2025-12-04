@@ -27,7 +27,7 @@ void CCommandParser::Parse(const orthia::PlatformString_type& text)
     m_tokenizer.GetTokenizer().SetWindbgStyle(true);
 
     orthia::Token token;
-    m_tokenizer.GetNextToken(&token);
+    m_tokenizer.GetNextToken(&token, CTokenizer::flags_ForceGetName);
     if (token.type == Token::ttEOF)
     {
         if (m_emptyHandler)

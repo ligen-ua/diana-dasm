@@ -95,14 +95,7 @@ namespace oui
 
         m_currentBlock.clear();
         // pack address
-        if (m_dianaMode < 8)
-        {
-            m_currentBlock.append(orthia::ToWideStringAsHex((unsigned int)address.GetIndex()));
-        }
-        else
-        {
-            m_currentBlock.append(orthia::Address64ToString(address.GetIndex()));
-        }
+        m_currentBlock.append(orthia::AddressToString(address.GetIndex(), m_dianaMode));
         m_textMarkupBuilder.AddNextRange(m_currentBlock.size(), m_colors.address, g_region_id_address, oui::TextMarkup::flag_ManualHighlight);
 
         // pack spaces
@@ -143,14 +136,7 @@ namespace oui
     {
         m_currentBlock.clear();
         // pack address
-        if (m_dianaMode < 8)
-        {
-            m_currentBlock.append(orthia::ToWideStringAsHex((unsigned int)address));
-        }
-        else
-        {
-            m_currentBlock.append(orthia::Address64ToString(address));
-        }
+        m_currentBlock.append(orthia::AddressToString(address, m_dianaMode));
         m_textMarkupBuilder.AddNextRange(m_currentBlock.size(), m_colors.address,   g_region_id_address, oui::TextMarkup::flag_ManualHighlight);
 
         // pack spaces

@@ -25,6 +25,7 @@ class CVmBinaryMemoryPrinter:public IVmMemoryRangesTarget
     Address_type m_startAddress;
     int m_currentItemInRow;
     bool m_firstRange;
+    Address_type m_extraEatenBytes;
 
     void ReportBlock();
     void ReportText(Address_type address, 
@@ -37,6 +38,8 @@ public:
                            int itemsInRow);
     virtual void OnRange(const VmMemoryRangeInfo & vmRange,
                          const char * pDataStart);
+
+    Address_type GetExtraEatenBytes() const { return m_extraEatenBytes; }
 
     void Finish();
 
@@ -56,6 +59,7 @@ struct PrintStringWriter:public orthia::ITextPrinter
 
 char AsciiEscapeSymbol(char symbol);
 std::wstring Address64ToString(Address_type address);
+std::wstring AddressToString(Address_type address, int dianaMode);
 void VmDeserializeMemory(int varSize, 
                          const std::wstring & text,
                          std::vector<char> * pBuffer);

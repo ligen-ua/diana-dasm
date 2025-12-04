@@ -10,6 +10,19 @@ static const wchar_t * g_no_data_patterns[] =
     L"????????",
     L"????????`????????"
 };
+std::wstring AddressToString(Address_type address, int dianaMode)
+{
+    switch (dianaMode)
+    {
+    case 8:
+        return Address64ToString(address);
+    case 2:
+        return orthia::ToWideStringAsHex((DI_UINT16)address);
+
+    default:
+        return orthia::ToWideStringAsHex((DI_UINT32)address);
+    }
+}
 std::wstring Address64ToString(Address_type address)
 {
     ULARGE_INTEGER largeInt;
@@ -47,7 +60,8 @@ CVmBinaryMemoryPrinter::CVmBinaryMemoryPrinter(ITextPrinter * pTextPrinter,
         m_itemsInRow(itemsInRow),
         m_currentItemInRow(0),
         m_startAddress(0),
-        m_firstRange(true)
+        m_firstRange(true),
+        m_extraEatenBytes(0)
 {
     int defItemsInRow = 0;
     switch(varSize)
@@ -80,14 +94,16 @@ CVmBinaryMemoryPrinter::CVmBinaryMemoryPrinter(ITextPrinter * pTextPrinter,
         m_itemsInRow = defItemsInRow;
     }
 }
-void CVmBinaryMemoryPrinter::OnRange(const VmMemoryRangeInfo & vmRange,
+void CVmBinaryMemoryPrinter::OnRange(const VmMemoryRangeInfo & vmRange_in,
                                      const char * pDataStart)
 {
+    VmMemoryRangeInfo vmRange = vmRange_in;
     if (m_firstRange)
     {
         m_startAddress = vmRange.address;
         m_firstRange = false;
     }
+
     // reports from aligned start to unaligned end
     Address_type startOffsetInRange = 0;
     int rangeModulus = (int)(vmRange.address % m_varSize);
@@ -122,6 +138,10 @@ void CVmBinaryMemoryPrinter::OnRange(const VmMemoryRangeInfo & vmRange,
             }
             else
             {
+                if (lastOfRange < (offsetInRange + m_varSize - 1))
+                {
+                    m_extraEatenBytes = (offsetInRange + m_varSize - 1) - lastOfRange;
+                }
                 currentText = m_noDataPattern;
             }
 

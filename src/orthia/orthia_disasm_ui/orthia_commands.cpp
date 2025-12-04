@@ -6,6 +6,15 @@
 
 namespace orthia
 {
+
+    void CCommandProcessor::CommandArguments::ReplyLine(const oui::String& text)
+    {
+        if (!progressHandler->Reply(progressHandler, text, false))
+        {
+            throw std::runtime_error("Request canceled");
+        }
+    }
+
     CCommandProcessor::CCommandProcessor()
         :
             m_pool(1)
@@ -15,12 +24,8 @@ namespace orthia
     {
         args.progressHandler->Reply(args.progressHandler, oui::String(), true);
     }
-    void CCommandProcessor::Handle_u(CommandArguments& args)
+    int CCommandProcessor::PrepareTokens(CommandArguments& args, std::vector<Token> & tokens, const Address_type maxCountOfItems, Address_type & countOfItems)
     {
-        std::shared_ptr<ICalcNode> rootNode = std::make_shared<SummNode>(false);
-        auto currentNode = rootNode;
-
-        std::vector<Token> tokens;
         Token token;
         int indexOfLength = -1;
         for (; args.parser.GetTokenizer().GetNextToken(&token);)
@@ -35,37 +40,50 @@ namespace orthia
             }
             tokens.push_back(token);
         }
-
-        for (int i = 0, size = (int)tokens.size(); i < size; ++i)
+        if (tokens.empty())
         {
-            token = tokens[i];
-            if (indexOfLength == i)
-            {
-                break;
-            }
-            auto result = currentNode->Append(token);
-            if (result.newNode)
-            {
-                currentNode = result.newNode;
-            }
+            throw orthia::NoTokenError();
         }
-        const Address_type maxCountOfLines = 1000;
-        Address_type countOfLines = 10;
-        orthia::PlatformString_type lengthString;
+
 
         if (indexOfLength != -1)
         {
-            lengthString = orthia::ReadString(tokens[indexOfLength]);
-            countOfLines = oui::CaptureAddress(orthia::PlatformString_type(lengthString.begin() + 1, lengthString.end()));
+            orthia::PlatformString_type lengthString = orthia::ReadString(tokens[indexOfLength]);
+            countOfItems = oui::CaptureAddress(orthia::PlatformString_type(lengthString.begin() + 1, lengthString.end()));
         }
-        if (countOfLines > maxCountOfLines)
+        if (countOfItems > maxCountOfItems)
         {
             throw std::runtime_error("Length is too big");
         }
-
-        // calc address
+        return indexOfLength;
+    }
+    std::shared_ptr<ICalcNode> CCommandProcessor::BuildNodes(CommandArguments& args, std::vector<Token>& tokens, int indexOfLength, std::shared_ptr<ICalcNode> currentNode)
+    {        
+         // calc address
+         for (int i = 0, size = (int)tokens.size(); i < size; ++i)
+         {
+             if (indexOfLength == i)
+             {
+                 break;
+             }
+             auto result = currentNode->Append(tokens[i]);
+             if (result.newNode)
+             {
+                 currentNode = result.newNode;
+             }
+         }
+         return currentNode;
+    }
+    void CCommandProcessor::Handle_u(CommandArguments& args)
+    {
+        std::shared_ptr<ICalcNode> rootNode = std::make_shared<SummNode>(false);
+        std::vector<Token> tokens;
+        const Address_type maxCountOfLines = 1000;
+        Address_type countOfLines = 10;
+        int indexOfLength = PrepareTokens(args, tokens, maxCountOfLines, countOfLines);
+        auto currentNode = BuildNodes(args, tokens, indexOfLength, rootNode);
         auto resolver = std::make_shared< oui::NameResolverOverWorkplaceItem>(args.item);
-        auto targetAddress = orthia::CaptureAddressExp(rootNode, currentNode, token, resolver);
+        auto targetAddress = orthia::CaptureAddressExp(rootNode, currentNode, tokens.back(), resolver);
 
         auto stream = args.item->CreateDisasmStream(targetAddress);
         if (!stream)
@@ -75,10 +93,7 @@ namespace orthia
 
         auto AddTextHandler = [&](const oui::String& text) {
 
-            if (!args.progressHandler->Reply(args.progressHandler, text, false))
-            {
-                throw std::runtime_error("Request canceled");
-            }
+            args.ReplyLine(text);
         };
 
         struct DisasmSender :oui::DisasmWriter
@@ -168,22 +183,12 @@ namespace orthia
                         if (utils::match(parts[1].ToString(), nameDowncased))
                         {
                             text.clear();
-                            if (dianaMode < 8)
-                            {
-                                text.append(orthia::ToWideStringAsHex((unsigned int)name.address));
-                            }
-                            else
-                            {
-                                text.append(orthia::Address64ToString(name.address));
-                            }
+                            text.append(orthia::AddressToString(name.address, dianaMode));
                             text.append(ORTHIA_TCSTR("  "));
                             text.append(mod.name);
                             text.append(ORTHIA_TCSTR("!"));
                             text.append(name.name.native);
-                            if (!args.progressHandler->Reply(args.progressHandler, text, false))
-                            {
-                                throw std::runtime_error("Request canceled");
-                            }
+                            args.ReplyLine(text);
                         }
                     }
                     key.flags |= key.flags_ContinueFrom;
@@ -206,8 +211,14 @@ namespace orthia
         try
         {
             parser.SetEmptyHandler([&]() {});
-            parser.SetHandler(OUI_TCSTR("u"), [=](CCommandParser& parser) mutable { Handle_u(args);  });
-            parser.SetHandler(OUI_TCSTR("x"), [=](CCommandParser& parser) mutable { Handle_x(args);  });
+            parser.SetHandler(OUI_TCSTR("u"), [&](CCommandParser& parser) mutable { Handle_u(args);  });
+            parser.SetHandler(OUI_TCSTR("x"), [&](CCommandParser& parser) mutable { Handle_x(args);  });
+            parser.SetHandler(OUI_TCSTR("db"), [&](CCommandParser& parser) mutable { Handle_d(args, 1);  });
+            parser.SetHandler(OUI_TCSTR("dw"), [&](CCommandParser& parser) mutable { Handle_d(args, 2);  });
+            parser.SetHandler(OUI_TCSTR("dd"), [&](CCommandParser& parser) mutable { Handle_d(args, 4);  });
+            parser.SetHandler(OUI_TCSTR("dq"), [&](CCommandParser& parser) mutable { Handle_d(args, 8);  });
+            parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode());  });
+
             parser.Parse(text);
         }
         catch (std::exception& e)

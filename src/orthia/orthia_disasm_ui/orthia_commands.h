@@ -5,7 +5,7 @@
 
 namespace orthia
 {
-
+struct ICalcNode;
 class CCommandProcessor
 {
 public:
@@ -13,6 +13,14 @@ public:
         const oui::String& text,
         bool finalText)>;
 
+    struct CommandArguments
+    {
+        oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler;
+        CCommandParser& parser;
+        std::shared_ptr<IWorkPlaceItem> item;
+
+        void ReplyLine(const oui::String& text);
+    };
 protected:
 
     oui::CThreadPool m_pool;
@@ -22,16 +30,14 @@ protected:
         const orthia::PlatformString_type& text,
         std::shared_ptr<IWorkPlaceItem> item);
     
-    struct CommandArguments
-    {
-        oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler;
-        CCommandParser& parser;
-        std::shared_ptr<IWorkPlaceItem> item;
-    };
+
 
     void ReportStop(CommandArguments& args);
     void Handle_u(CommandArguments& args);
     void Handle_x(CommandArguments& args);
+    void Handle_d(CommandArguments& args, int itemSize);
+    int PrepareTokens(CommandArguments& args, std::vector<Token>& tokens, const Address_type maxCountOfItems, Address_type& countOfItems);
+    std::shared_ptr<ICalcNode> BuildNodes(CommandArguments& args, std::vector<Token>& tokens, int indexOfLength, std::shared_ptr<ICalcNode> currentNode);
 
 public:
 
