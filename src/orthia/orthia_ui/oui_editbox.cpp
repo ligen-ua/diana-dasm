@@ -788,7 +788,8 @@ namespace oui
                     ResetSelection();
                 }
             }
-            if (!handled && !evt.keyEvent.rawText.native.empty())
+            if (!handled && !evt.keyEvent.rawText.native.empty() && 
+                (!(evt.keyState.state & (evt.keyState.AnyCtrl | evt.keyState.AnyAlt))))
             {
                 handled = InsertText(evt.keyEvent.rawText);
             }

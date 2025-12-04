@@ -72,7 +72,7 @@ namespace oui
 
     void CWindowsPool::SetFocus(std::shared_ptr<CWindow> window, bool invalidate)
     {
-        if (window && window->IsDestroyed())
+        if (window && (window->IsDestroyed() || !window->IsVisible()))
         {
             return;
         }
