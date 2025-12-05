@@ -33,19 +33,19 @@ std::wstring Address64ToString(Address_type address)
     result.append(orthia::ToWideStringAsHex((unsigned int)largeInt.LowPart));
     return result;
 }
-static void ConvertToText1(const char * pBinary, std::wstring * pText)
+static void ConvertToText1(void *, const char * pBinary, std::wstring * pText)
 {
     *pText = orthia::ToHexString(pBinary, 1);
 }
-static void ConvertToText2(const char * pBinary, std::wstring * pText)
+static void ConvertToText2(void*, const char * pBinary, std::wstring * pText)
 {
     *pText = orthia::ToWideStringAsHex(*(unsigned short*)pBinary);
 }
-static void ConvertToText4(const char * pBinary, std::wstring * pText)
+static void ConvertToText4(void*, const char * pBinary, std::wstring * pText)
 {
     *pText = orthia::ToWideStringAsHex(*(unsigned int*)pBinary);
 }
-static void ConvertToText8(const char * pBinary, std::wstring * pText)
+static void ConvertToText8(void*, const char * pBinary, std::wstring * pText)
 {
     *pText = Address64ToString(*(unsigned long long*)pBinary);
 }
@@ -61,7 +61,8 @@ CVmBinaryMemoryPrinter::CVmBinaryMemoryPrinter(ITextPrinter * pTextPrinter,
         m_currentItemInRow(0),
         m_startAddress(0),
         m_firstRange(true),
-        m_extraEatenBytes(0)
+        m_extraEatenBytes(0),
+        m_pConvertContext(0)
 {
     int defItemsInRow = 0;
     switch(varSize)
@@ -93,6 +94,11 @@ CVmBinaryMemoryPrinter::CVmBinaryMemoryPrinter(ITextPrinter * pTextPrinter,
     {
         m_itemsInRow = defItemsInRow;
     }
+}
+void CVmBinaryMemoryPrinter::SetConvertToText(void* pConvertContext, ConvertToTextPtr_type pConvertToTextFnc)
+{
+    m_pConvertContext = pConvertContext;
+    m_pConvertToTextFnc = pConvertToTextFnc;
 }
 void CVmBinaryMemoryPrinter::OnRange(const VmMemoryRangeInfo & vmRange_in,
                                      const char * pDataStart)
@@ -133,7 +139,7 @@ void CVmBinaryMemoryPrinter::OnRange(const VmMemoryRangeInfo & vmRange_in,
             char charHint = '?';
             if  (vmRange.HasData() && dataFits)
             {
-                (*m_pConvertToTextFnc)(pDataStart + offsetInRange, &currentText);
+                (*m_pConvertToTextFnc)(m_pConvertContext, pDataStart + offsetInRange, &currentText);
                 charHint = pDataStart[offsetInRange];
             }
             else

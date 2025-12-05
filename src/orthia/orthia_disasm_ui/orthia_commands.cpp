@@ -66,17 +66,13 @@ namespace orthia
              {
                  break;
              }
-             auto result = currentNode->Append(tokens[i]);
-             if (result.newNode)
-             {
-                 currentNode = result.newNode;
-             }
+             currentNode = AppendToken(currentNode, tokens[i]);
          }
          return currentNode;
     }
     void CCommandProcessor::Handle_u(CommandArguments& args)
     {
-        std::shared_ptr<ICalcNode> rootNode = std::make_shared<SummNode>(false);
+        std::shared_ptr<ICalcNode> rootNode = CreateRootNode(&args.parser.GetTokenizer());
         std::vector<Token> tokens;
         const Address_type maxCountOfLines = 1000;
         Address_type countOfLines = 10;
@@ -218,6 +214,7 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("dd"), [&](CCommandParser& parser) mutable { Handle_d(args, 4);  });
             parser.SetHandler(OUI_TCSTR("dq"), [&](CCommandParser& parser) mutable { Handle_d(args, 8);  });
             parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode());  });
+            parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode(), true);  });
 
             parser.Parse(text);
         }

@@ -1,7 +1,41 @@
 #include "ui_common.h"
 #include "oui_modal.h"
 #include "orthia_expressions.h"
+#include "orthia_common_print.h"
 
+namespace oui
+{
+
+NameResolverOverWorkplaceItem::NameResolverOverWorkplaceItem(std::shared_ptr<orthia::IWorkPlaceItem> item_in)
+    :
+    item(item_in)
+{
+}
+orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::PlatformString_type& name) 
+{
+    auto address = item->QueryAddressByName(name, 0);
+    if (!address)
+    {
+        address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
+        if (address == DI_MAX_OPERAND_SIZE)
+        {
+            throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
+        }
+    }
+    return address;
+}
+orthia::Address_type NameResolverOverWorkplaceItem::Dereference(orthia::Address_type address) 
+{
+    auto res = item->ReadData(address, item->GetDianaMode());
+    if (res.rangeFlags & res.flags_FullValid)
+    {
+        return Diana_ReadValue(res.pDataStart, item->GetDianaMode());
+    }
+    throw std::runtime_error("Can't dereference: " + orthia::PlatformStringToUtf8(orthia::AddressToString(address, item->GetDianaMode())));
+}
+
+}
+// CUIStateManager
 void CUIStateManager::Register(std::shared_ptr<IUIStatefulWindow> window)
 {
     m_windows.insert(window);

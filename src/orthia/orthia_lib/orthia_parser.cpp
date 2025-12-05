@@ -1,5 +1,4 @@
 #include "orthia_parser.h"
-
 namespace orthia
 {
 
@@ -24,7 +23,7 @@ void CCommandParser::Parse(const orthia::PlatformString_type& text)
     orthia::CStreamTokenFileSource source;
     source.GetStream() << utf8String;
     m_tokenizer.ResetSource(&source);
-    m_tokenizer.GetTokenizer().SetWindbgStyle(true);
+    orthia::InitTokenizer(m_tokenizer);
 
     orthia::Token token;
     m_tokenizer.GetNextToken(&token, CTokenizer::flags_ForceGetName);

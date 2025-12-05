@@ -9,10 +9,22 @@ namespace orthia
 static void WriteFullInvalidRow(CCommandProcessor::CommandArguments& args, Address_type sizeInBytes, int itemSize)
 {
 }
-
-void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize)
+static void ConvertToTextDPS(void* args_in, const char* pBinary, orthia::PlatformString_type* pText)
 {
-    std::shared_ptr<ICalcNode> rootNode = std::make_shared<SummNode>(false);
+    CCommandProcessor::CommandArguments& args = *(CCommandProcessor::CommandArguments *)args_in;
+    auto address = *(orthia::Address_type*)pBinary;
+    *pText = Address64ToString(address);
+
+    auto name = args.item->QueryAddressName(address);
+    if (!name.native.empty())
+    {
+        pText->append(2, ORTHIA_TCHAR(' '));
+        pText->append(name.native);
+    }
+}
+void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize, bool dps)
+{
+    std::shared_ptr<ICalcNode> rootNode = CreateRootNode(&args.parser.GetTokenizer());
     std::vector<Token> tokens;
     const Address_type maxCountOfItems = 100000;
     Address_type countOfItems = 16*8/itemSize;
@@ -21,7 +33,7 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize)
     auto resolver = std::make_shared< oui::NameResolverOverWorkplaceItem>(args.item);
     auto targetAddress = orthia::CaptureAddressExp(rootNode, currentNode, tokens.back(), resolver);
 
-        const int columnsCount = 16/itemSize;
+    const int columnsCount = dps?1:(16/itemSize);
     std::vector<char> page(columnsCount * 1024);
     Address_type bytesLeft = countOfItems * itemSize;
     auto curAddress = targetAddress;
@@ -29,7 +41,7 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize)
 
         args.ReplyLine(text);
     };
-
+    
     struct TextPrinter:ITextPrinter
     {
         decltype(AddTextHandler) m_handler;
@@ -46,6 +58,10 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize)
         }
     }textPrinter(AddTextHandler);
     orthia::CVmBinaryMemoryPrinter vmPrinter(&textPrinter, itemSize, args.item->GetDianaMode(), columnsCount);
+    if (dps)
+    {
+        vmPrinter.SetConvertToText(&args, ConvertToTextDPS);
+    }
     for (; bytesLeft;)
     {
         auto sizeToRead = std::min<Address_type>(page.size(), bytesLeft);

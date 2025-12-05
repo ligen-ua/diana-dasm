@@ -60,24 +60,9 @@ namespace oui
     struct NameResolverOverWorkplaceItem :orthia::INameResolver
     {
         std::shared_ptr<orthia::IWorkPlaceItem> item;
-        NameResolverOverWorkplaceItem(std::shared_ptr<orthia::IWorkPlaceItem> item_in)
-            :
-            item(item_in)
-        {
-        }
-        virtual orthia::Address_type QueryAddress(const orthia::PlatformString_type& name)
-        {
-            auto address = item->QueryAddressByName(name, 0);
-            if (!address)
-            {
-                address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
-                if (address == DI_MAX_OPERAND_SIZE)
-                {
-                    throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
-                }
-            }
-            return address;
-        }
+        NameResolverOverWorkplaceItem(std::shared_ptr<orthia::IWorkPlaceItem> item_in);
+        orthia::Address_type QueryAddress(const orthia::PlatformString_type& name) override;
+        orthia::Address_type Dereference(orthia::Address_type address) override;
     };
 
     orthia::Address_type CaptureAddress(const orthia::PlatformString_type& addressString);

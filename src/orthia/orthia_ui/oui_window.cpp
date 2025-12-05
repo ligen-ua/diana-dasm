@@ -80,6 +80,26 @@ namespace oui
         bool wasUpdate = false;
         if (m_focused != window)
         {
+            // check if we are trying to set focus on different modal window
+            auto modal = GetModalWindow();
+            if (modal)
+            {
+                auto ptr = window;
+                do
+                {
+                    if (ptr == modal)
+                    {
+                        break;
+                    }
+                    ptr = ptr->GetParent();
+                }
+                while(ptr);
+
+                if (ptr != modal)
+                {
+                    return;
+                }
+            }
             wasUpdate = true;
             m_focused = window;
         }

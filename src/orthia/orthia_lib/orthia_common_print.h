@@ -10,7 +10,7 @@ struct ITextPrinter
     virtual void PrintLine(const std::wstring & line) = 0;
 };
 
-typedef void (*ConvertToTextPtr_type)(const char * pBinary, std::wstring * text);
+typedef void (*ConvertToTextPtr_type)(void * context, const char * pBinary, orthia::PlatformString_type * text);
 class CVmBinaryMemoryPrinter:public IVmMemoryRangesTarget
 {
     ITextPrinter * m_pTextPrinter;
@@ -26,7 +26,7 @@ class CVmBinaryMemoryPrinter:public IVmMemoryRangesTarget
     int m_currentItemInRow;
     bool m_firstRange;
     Address_type m_extraEatenBytes;
-
+    void* m_pConvertContext;
     void ReportBlock();
     void ReportText(Address_type address, 
                     const std::wstring & text,
@@ -39,6 +39,7 @@ public:
     virtual void OnRange(const VmMemoryRangeInfo & vmRange,
                          const char * pDataStart);
 
+    void SetConvertToText(void * pConvertContext, ConvertToTextPtr_type pConvertToTextFnc);
     Address_type GetExtraEatenBytes() const { return m_extraEatenBytes; }
 
     void Finish();

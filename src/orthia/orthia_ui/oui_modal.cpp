@@ -46,7 +46,7 @@ namespace oui
         {
             return;
         }
-        if (m_setModal && m_lastModalWindow)
+        if (m_setModal)
         {
             pool->SetModalWindow(m_lastModalWindow);
             m_lastModalWindow = nullptr;

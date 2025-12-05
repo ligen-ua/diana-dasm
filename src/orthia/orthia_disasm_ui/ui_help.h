@@ -20,6 +20,7 @@ namespace oui
         void ConstructChilds() override;
         void OnResize() override;
         bool Resize(const Size& newSize) override;
+        void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
     };
 
     class CAboutBoxWindow :public CMessageBoxWindow
@@ -36,5 +37,6 @@ namespace oui
         void ConstructChilds() override;
         void OnResize() override;
         bool Resize(const Size& newSize) override;
+        void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
     };
 }

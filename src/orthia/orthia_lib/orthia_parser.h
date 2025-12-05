@@ -1,6 +1,6 @@
 #pragma once
 
-#include "orthia_tokenizer.h"
+#include "orthia_expressions.h"
 #include <functional>
 
 namespace orthia
@@ -23,7 +23,7 @@ struct CmdNameNotFoundException :public std::runtime_error
 };
 class CCommandParser
 {
-    CTokenizerEnv m_tokenizer;
+    CExpressionTokenizerEnv m_tokenizer;
 
 public:
     using CmdHandler_type = std::function<void(CCommandParser& parser)>;
@@ -33,7 +33,7 @@ protected:
 public:
     
     CCommandParser();
-    CTokenizerEnv& GetTokenizer() { return m_tokenizer; }
+    CExpressionTokenizerEnv& GetTokenizer() { return m_tokenizer; }
     void SetEmptyHandler(std::function<void()> && emptyCmdHandler);
     void SetHandler(const orthia::PlatformString_type& cmdName, CmdHandler_type&& handler);
     void Parse(const orthia::PlatformString_type& text);

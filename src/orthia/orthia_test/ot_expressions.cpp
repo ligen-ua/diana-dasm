@@ -18,7 +18,10 @@ static void test_expressions_address()
         auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR(" + + + fffff806`b1458a9eh"), resolver);
         DIANA_TEST_ASSERT(address == 0xfffff806b1458a9eULL);
     }
-
+    {
+        auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR("+++fffff806`b1458a9eh"), resolver);
+        DIANA_TEST_ASSERT(address == 0xfffff806b1458a9eULL);
+    }
     {
         auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR(" -  1"), resolver);
         DIANA_TEST_ASSERT(address == 0xffffffffffffffffULL);
@@ -32,7 +35,10 @@ static void test_expressions_address()
         auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR(" - - 0xfffffffffffffffffh"), resolver);
         DIANA_TEST_ASSERT(address == 0xffffffffffffffffULL);
     }
-
+    {
+        auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR("--0xfffffffffffffffffh"), resolver);
+        DIANA_TEST_ASSERT(address == 0xffffffffffffffffULL);
+    }
     {
         auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR(" + - + - 0"), resolver);
         DIANA_TEST_ASSERT(address == 0);
@@ -262,12 +268,68 @@ static void test_expressions_invalid()
     {
         DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("(1))"), resolver), orthia::TokenError);
     }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("DS:[7FF769486040h]]"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("DS::[7FF769486040h]"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("FS::[7FF769486040h]"), resolver), orthia::TokenError);
+    }
+}
+static void test_expressions_segment_prefix()
+{
+    auto resolver = std::make_shared< orthia::MapNameResolver>();
+    {
+        auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR("DS:[7FF769486040h]"), resolver);
+        DIANA_TEST_ASSERT(address == 0x7FF769486040);
+    }
+}
+
+static void test_expressions_poi()
+{
+    auto resolver = std::make_shared< orthia::MapNameResolver>();
+    resolver->addresses[0x7FF769486040] = 0xfffff806b1458a9e;
+    resolver->addresses[0x7FF769486040*2] = 0x42;
+
+    {
+        auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h)"), resolver);
+        DIANA_TEST_ASSERT(address == 0xfffff806b1458a9e);
+    }
+    {
+        auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR("poi((0x7FF769486040))"), resolver);
+        DIANA_TEST_ASSERT(address == 0xfffff806b1458a9e);
+    }
+    {
+        auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(2*(0x7FF769486040))"), resolver);
+        DIANA_TEST_ASSERT(address == 0x42);
+    }
+    {
+        auto address = orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(DS:[7FF769486040h])"), resolver);
+        DIANA_TEST_ASSERT(address == 0xfffff806b1458a9e);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi 7FF769486040h)"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h"), resolver), orthia::NoTokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h, )"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h, 1)"), resolver), std::exception);
+    }
+
 }
 
 void test_expressions()
-{
-    DIANA_TEST(test_expressions_names2());
+{   
+    DIANA_TEST(test_expressions_poi());
+    DIANA_TEST(test_expressions_segment_prefix());
     DIANA_TEST(test_expressions_names());
+    DIANA_TEST(test_expressions_names2());
     DIANA_TEST(test_expressions_mult());
     DIANA_TEST(test_expressions_address());
     DIANA_TEST(test_expressions_summ());

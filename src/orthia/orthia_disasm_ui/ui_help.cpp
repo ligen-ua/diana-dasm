@@ -137,6 +137,11 @@ namespace oui
     {
         return GetConsole();
     }
+    void CHelpWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
+    {
+        m_helpText->SetFocus();
+    }
+
     // CAboutBoxWindow
 #ifdef _DEBUG
 #define RELEASE_DEBUG_MODE "(Debug)"
@@ -204,5 +209,9 @@ namespace oui
         int diff = rect.size.width - maxWidth;
         rect.position.x += diff / 2;
         rect.size.width = maxWidth;
+    }
+    void CAboutBoxWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
+    {
+        m_urlEdit->SetFocus();
     }
 }

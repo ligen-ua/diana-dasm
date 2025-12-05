@@ -958,13 +958,20 @@ bool CTokenizer::GetNextToken(Token * pToken, int flags)
                 break;
 
             case '+':
+                if (m_windbgStyle)
+                {
+                    break;
+                }
             case '&':
             case '|':
                 symbolMatcher = DuplicationOrWithEqualMatcher;
                 break;
 
             case '-':
-                symbolMatcher = MinusMatcher;
+                if (!m_windbgStyle)
+                {
+                    symbolMatcher = MinusMatcher;
+                }
                 break;
 
             case '/':
