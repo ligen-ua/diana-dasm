@@ -74,6 +74,36 @@ namespace oui
             MultiLineViewItem item;
             item.text = OUI_TCSTR(" -  CTRL+LMouseClick - Goto Address");
             lines.push_back(item);
+        } 
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR("");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR("Supported Commands:");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  x <mask>                - Examine symbols");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  u <address> [L<length>] - Unassemble address");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  lm                      - List loaded modules");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  d[b,w,d,q,p,ps]         - Display memory");
+            lines.push_back(item);
         }
     }
     CHelpWindow::CHelpWindow()
