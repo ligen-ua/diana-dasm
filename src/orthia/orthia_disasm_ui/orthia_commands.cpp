@@ -215,6 +215,7 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("dq"), [&](CCommandParser& parser) mutable { Handle_d(args, 8);  });
             parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode());  });
             parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode(), true);  });
+            parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { Handle_lm(args);  });
 
             parser.Parse(text);
         }

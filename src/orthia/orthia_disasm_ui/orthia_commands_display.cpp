@@ -22,6 +22,56 @@ static void ConvertToTextDPS(void* args_in, const char* pBinary, orthia::Platfor
         pText->append(name.native);
     }
 }
+
+void CCommandProcessor::Handle_lm(CommandArguments& args)
+{
+    auto rawArgs = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
+    orthia::TrimStringAllWhiteSpace(rawArgs);
+
+    if (!rawArgs.empty())
+    {
+        throw std::runtime_error("Argument not supported: " + rawArgs);
+    }
+        
+    std::vector<orthia::ModuleInfo> modules;
+    args.item->GetModules(modules);
+
+    orthia::PlatformString_type line;
+    int dianaMode = args.item->GetDianaMode();
+
+    // print header
+    int addressTextSize = (int)orthia::AddressToString(0, dianaMode).size();
+
+    orthia::PlatformString_type columnStart(ORTHIA_TCSTR("start"));
+    orthia::PlatformString_type columnEnd(ORTHIA_TCSTR("end"));
+    orthia::PlatformString_type columnName(ORTHIA_TCSTR("module name")); 
+    
+    orthia::PlatformString_type column;
+    column = columnStart;
+    column.resize(addressTextSize + 2, ORTHIA_TCHAR(' '));
+    line = column;
+
+    column = columnEnd;
+    column.resize(addressTextSize + 3, ORTHIA_TCHAR(' '));
+    line += column;
+
+    column = columnName;
+    line += column;
+    args.ReplyLine(line);
+ 
+    for (auto& mod : modules)
+    {
+        line = orthia::AddressToString(mod.address, dianaMode);
+        line.append(2, ORTHIA_TCHAR(' '));
+        line += orthia::AddressToString(mod.address + mod.size, dianaMode);
+        line.append(3, ORTHIA_TCHAR(' '));
+        line += mod.name;
+
+        args.ReplyLine(line);
+        line.clear();
+    }
+}
+
 void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize, bool dps)
 {
     std::shared_ptr<ICalcNode> rootNode = CreateRootNode(&args.parser.GetTokenizer());
