@@ -73,18 +73,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)..\bin\$(Configuration)\amd64\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\amd64\</IntDir>
+    <TargetName>orthia</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)..\bin\$(Configuration)\amd64\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\amd64\</IntDir>
+    <TargetName>orthia</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)..\bin\$(Configuration)\i386\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\i386\</IntDir>
+    <TargetName>orthia</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)..\bin\$(Configuration)\i386\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\i386\</IntDir>
+    <TargetName>orthia</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
