@@ -506,6 +506,10 @@ namespace orthia
         }
         return false;
     }
+    std::shared_ptr<oui::IProcess> CProcessWorkplaceItem::GetAssociatedProcess()
+    {
+        return m_proc;
+    }
     Address_type CProcessWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const
     {
         auto downcased = orthia::Downcase(text.native);

@@ -3,12 +3,14 @@
 #include "oui_base_win32.h"
 #include <Psapi.h>
 #include <tlhelp32.h>
+#include <winternl.h>
 #include "orthia_utils.h"
 #include "orthia_process_adapter.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_log.h"
 #include "orthia_plugins_win32.h"
+
 
 namespace oui
 {
@@ -248,26 +250,71 @@ namespace oui
         }
         return 0;
     }
-    class CProcess :public IProcess, Noncopyable
+    class CWin32Thread;
+    struct IThreadOpener
+    {
+        virtual ~IThreadOpener() {}
+        virtual std::tuple<int, std::shared_ptr<CWin32Thread>> OpenNextThread(HANDLE hProcess, HANDLE hThread) = 0;
+    };
+    class CWin32Thread:public IThread
+    {
+        mutable orthia::CHandleGuard m_handleGuard;
+    public:
+        CWin32Thread(orthia::CHandleGuard & handleGuard)
+        {
+            m_handleGuard.Reset(handleGuard.Release());
+        }
+        int GetInfo(ThreadInfo& info) const override
+        {
+            info.tid = GetThreadId(m_handleGuard.Get());
+            return 0;
+        }
+        HANDLE GetHandle()
+        {
+            return m_handleGuard.Get();
+        }
+    };
+    class CProcess;
+    class CWin32ThreadEnumerator :public IThreadEnumerator, Noncopyable
+    {
+        std::shared_ptr<CProcess> m_process;
+        std::shared_ptr<IThreadOpener> m_opener;
+        std::shared_ptr<CWin32Thread> m_thread;
+    public:
+        CWin32ThreadEnumerator(std::shared_ptr<IThreadOpener> opener, std::shared_ptr<CProcess> process)
+            :
+            m_opener(opener), m_process(process)
+        {
+        }
+        std::tuple<int, std::shared_ptr<IThread>> GetNextThread() override;
+    };
+
+    class CProcess :public IProcess, Noncopyable, public std::enable_shared_from_this<CProcess>
     {
         String m_name;
         HANDLE m_hProc;
         bool m_is32bit;
         LARGE_INTEGER m_distance;
         ULONG m_processID;
+        std::weak_ptr<IThreadOpener> m_opener;
     public:
-        CProcess(const String& name, HANDLE hProc, bool is32bit, ULONG processID)
+        CProcess(const String& name, HANDLE hProc, bool is32bit, ULONG processID, std::shared_ptr<IThreadOpener> opener)
             :
             m_name(name),
             m_hProc(hProc),
             m_is32bit(is32bit),
-            m_processID(processID)
+            m_processID(processID), 
+            m_opener(opener)
         {
             m_distance.QuadPart = 0;
         }
         ~CProcess()
         {
             Reset(String(), 0);
+        }
+        HANDLE GetProcessHandle()
+        {
+            return m_hProc;
         }
         void Reset(const String& name, HANDLE hProc)
         {
@@ -408,6 +455,16 @@ namespace oui
             DWORD readBytes = 0;
             return SafeReadProcess(noAccessRegions, m_hProc, offset, pBuffer, (DWORD)size, &readBytes);
         }
+        std::tuple<int, std::shared_ptr<IThreadEnumerator>> CreateThreadEnumerator() override
+        {
+            auto opener = m_opener.lock();
+            if (!opener)
+            {
+                return { ERROR_FILE_NOT_FOUND, nullptr };
+            }
+            std::shared_ptr<IThreadEnumerator> res(std::make_shared<CWin32ThreadEnumerator>(opener, shared_from_this()));
+            return { 0, res };
+        }
 
         orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) override
         {
@@ -493,18 +550,61 @@ namespace oui
         }
     };
 
-    class CProcessSystemImpl :public IProcessSystem
+
+    std::tuple<int, std::shared_ptr<IThread>> CWin32ThreadEnumerator::GetNextThread()
+    {
+        HANDLE hProc = m_process->GetProcessHandle();
+
+        HANDLE hThread = 0;
+        if (m_thread)
+        {
+            hThread = m_thread->GetHandle();
+        }
+        auto [error, thread] = m_opener->OpenNextThread(hProc, hThread);
+        if (error || !thread)
+        {
+            if (error == ERROR_NO_MORE_ITEMS)
+            {
+                error = 0;
+            }
+            return { error, thread };
+        }
+        m_thread = thread;
+        return { 0, m_thread };
+    }
+
+    class CProcessSystemImpl :public IProcessSystem, public std::enable_shared_from_this<CProcessSystemImpl>, public IThreadOpener
     {
         orthia::OpenProcess_type m_openProcess = 0;
+        orthia::NtGetNextThread_type m_getNextThread = 0;
         orthia::CWin32OpenProcessPlugin m_openProcessPlugin;
+        orthia::CDll m_ntdll;
+        decltype(RtlNtStatusToDosError)* m_RtlNtStatusToDosError = 0;
     public:
         CProcessSystemImpl()
         {
             m_openProcess = &::OpenProcess;
+            m_ntdll.Reset(ORTHIA_TCSTR("ntdll.dll"));
+            m_ntdll.QueryFunction("NtGetNextThread", &m_getNextThread, false);
+            m_ntdll.QueryFunction("RtlNtStatusToDosError", &m_RtlNtStatusToDosError, false);
         }
         ~CProcessSystemImpl()
         {
         }
+        std::tuple<int, std::shared_ptr<CWin32Thread>> OpenNextThread(HANDLE hProcess, HANDLE hThread) override
+        {
+            HANDLE hNewThread = 0;
+            auto status = m_getNextThread(hProcess, hThread, THREAD_QUERY_INFORMATION, 0, 0, &hNewThread);
+
+            if (!NT_SUCCESS(status))
+            {
+                return { m_RtlNtStatusToDosError(status), nullptr };
+            }
+            orthia::CHandleGuard guard(hNewThread);
+            auto res = std::make_shared<CWin32Thread>(guard);
+            return { 0, res };
+        }
+
         void LoadPlugins()
         {
             if (m_openProcess != &::OpenProcess)
@@ -514,6 +614,11 @@ namespace oui
             if (m_openProcessPlugin.Load())
             {
                 m_openProcess = m_openProcessPlugin.GetOpenProcess();
+
+                if (auto getNextThread = m_openProcessPlugin.GetGetNextThread())
+                {
+                    m_getNextThread = getNextThread;
+                }
             }
         }
         std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) override
@@ -542,7 +647,7 @@ namespace oui
                     oui::String::StringStream_type res;
                     res << OUI_TCSTR("[") << procId.pid << OUI_TCSTR("] ") << shortName.native;
 
-                    proc = std::make_shared<CProcess>(res.str(), hProc, is32bit, (DWORD)procId.pid);
+                    proc = std::make_shared<CProcess>(res.str(), hProc, is32bit, (DWORD)procId.pid, shared_from_this());
                     handlerGuard.Release();
                 }
             }

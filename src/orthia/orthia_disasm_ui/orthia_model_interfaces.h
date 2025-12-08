@@ -6,6 +6,10 @@
 #include "oui_filesystem.h"
 #include "orthia_common_time.h"
 
+namespace oui
+{
+    struct IProcess;
+}
 namespace orthia
 {
     class CSimplePeFile;
@@ -122,6 +126,7 @@ namespace orthia
         virtual oui::String QueryAddressName(Address_type address) const = 0;
         virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
         virtual Address_type QueryAddressByName(const oui::String & text, Address_type defValue) const = 0;
+        virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr;  }
     };
 
 

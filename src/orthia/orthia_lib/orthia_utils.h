@@ -54,6 +54,12 @@ public:
     {
         return m_hFile;
     }
+    HANDLE Release()
+    {
+        HANDLE hFile = m_hFile;
+        m_hFile = 0;
+        return hFile;
+    }
     void Reset(HANDLE hFile)
     {
         if (m_hFile && m_hFile != INVALID_HANDLE_VALUE)

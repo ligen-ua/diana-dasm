@@ -207,6 +207,7 @@ namespace orthia
         try
         {
             parser.SetEmptyHandler([&]() {});
+            parser.SetHandler(OUI_TCSTR("threads"), [&](CCommandParser& parser) mutable { Handle_threads(args);  });
             parser.SetHandler(OUI_TCSTR("u"), [&](CCommandParser& parser) mutable { Handle_u(args);  });
             parser.SetHandler(OUI_TCSTR("x"), [&](CCommandParser& parser) mutable { Handle_x(args);  });
             parser.SetHandler(OUI_TCSTR("db"), [&](CCommandParser& parser) mutable { Handle_d(args, 1);  });

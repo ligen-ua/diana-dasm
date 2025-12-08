@@ -23,6 +23,59 @@ static void ConvertToTextDPS(void* args_in, const char* pBinary, orthia::Platfor
     }
 }
 
+
+void CCommandProcessor::Handle_threads(CommandArguments& args)
+{
+    auto rawArgs = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
+    orthia::TrimStringAllWhiteSpace(rawArgs);
+
+    if (!rawArgs.empty())
+    {
+        throw std::runtime_error("Argument not supported: " + rawArgs);
+    }
+
+    auto proc = args.item->GetAssociatedProcess();
+    if (!proc)
+    {
+        throw std::runtime_error("No process - no threads");
+    }
+
+    int dianaMode = args.item->GetDianaMode();
+
+    // print header
+    int addressTextSize = (int)orthia::AddressToString(0, dianaMode).size();
+
+    auto [error, enumerator] = proc->CreateThreadEnumerator();
+    if (error)
+    {
+        throw orthia::CWin32Exception("Can't enum threads", error);
+    }
+    if (!enumerator)
+    {
+        throw std::runtime_error("Can't enum threads");
+    }
+
+    orthia::PlatformString_type line;
+    for (;;)
+    {
+        auto [error, thread] = enumerator->GetNextThread();
+        if (error)
+        {
+            throw orthia::CWin32Exception("Can't enum threads", error);
+        }
+        if (!thread)
+        {
+            break;
+        }
+        oui::ThreadInfo info;
+        thread->GetInfo(info);
+
+        line = ORTHIA_TCSTR("THREAD ") + orthia::AddressToString(info.tid, dianaMode);
+        args.ReplyLine(line);
+        line.clear();
+    }
+}
+
 void CCommandProcessor::Handle_lm(CommandArguments& args)
 {
     auto rawArgs = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();

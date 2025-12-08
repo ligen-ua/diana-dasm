@@ -37,6 +37,7 @@ protected:
     void Handle_x(CommandArguments& args);
     void Handle_d(CommandArguments& args, int itemSize, bool dps = false);
     void Handle_lm(CommandArguments& args);
+    void Handle_threads(CommandArguments& args);
 
     int PrepareTokens(CommandArguments& args, std::vector<Token>& tokens, const Address_type maxCountOfItems, Address_type& countOfItems);
     std::shared_ptr<ICalcNode> BuildNodes(CommandArguments& args, std::vector<Token>& tokens, int indexOfLength, std::shared_ptr<ICalcNode> currentNode);

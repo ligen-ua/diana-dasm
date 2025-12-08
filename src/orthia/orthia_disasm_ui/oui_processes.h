@@ -14,12 +14,29 @@ namespace oui
         orthia::DianaMemoryStream * stream = nullptr;
         Diana_PeFile * dianaPeFile = nullptr;
     };
+
+    struct ThreadInfo
+    {
+        unsigned long long tid = 0;
+    };
+    struct IThread
+    {
+        virtual ~IThread() {};
+        virtual int GetInfo(ThreadInfo & info) const = 0;
+    };
+    struct IThreadEnumerator
+    {
+        virtual ~IThreadEnumerator() {}
+        virtual std::tuple<int, std::shared_ptr<IThread>> GetNextThread() = 0;
+    };
     struct IProcess:IFile
     {
         virtual orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) = 0;
         virtual int ReadExactEx2(unsigned long long offset, void* pBuffer, size_t size) = 0;
         virtual int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset, 
             std::function<void (const orthia::ModuleInfo& info, ModuleDisasmContext&)> contextCallback) = 0;
+    
+        virtual std::tuple<int, std::shared_ptr<IThreadEnumerator>> CreateThreadEnumerator() = 0;
     };
 
     struct ProcessUnifiedId

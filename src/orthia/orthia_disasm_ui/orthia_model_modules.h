@@ -33,6 +33,7 @@ namespace orthia
         oui::String LocateFile(const oui::String& dllName);
         ModuleIterator LoadModule(const std::string& dllName);
         void RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile);
+        OPERAND_SIZE GetLastPossibleAddress();
 
         void QueryFunctionImpl(const char* pDllName,
             const char* pFunctionName,

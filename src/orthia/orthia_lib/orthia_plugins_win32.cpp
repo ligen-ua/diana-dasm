@@ -18,6 +18,10 @@ namespace orthia
     {
         return m_openProcess;
     }
+    NtGetNextThread_type CWin32OpenProcessPlugin::GetGetNextThread()
+    {
+        return m_getNextThread;
+    }
     bool CWin32OpenProcessPlugin::Load()
     {
         if (m_openProcess)
@@ -34,11 +38,13 @@ namespace orthia
         std::string orthiaOpenProcessName("OrthiaOpenProcess");
         std::string orthiaInitName("OrthiaInit");
         std::string orthiaUninitName("OrthiaUninit");
+        std::string orthiaGetNextThreadName("OrthiaGetNextThread");
 
         OpenProcess_type orthiaOpenProcess = 0;
         m_plugin.QueryFunction(orthiaOpenProcessName.c_str(), &orthiaOpenProcess, true);
         m_plugin.QueryFunction(orthiaInitName.c_str(), &m_pluginInit, true);
         m_plugin.QueryFunction(orthiaUninitName.c_str(), &m_pluginUninit, true);
+        m_plugin.QueryFunction(orthiaGetNextThreadName.c_str(), &m_getNextThread, true);
 
         int errorCode = 0;
         if (m_pluginInit)
@@ -67,6 +73,7 @@ namespace orthia
             m_pluginInit = 0;
             m_pluginUninit = 0;
             m_plugin.Reset(0);
+            m_getNextThread = 0;
             return false;
         }
 

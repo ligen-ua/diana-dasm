@@ -256,15 +256,15 @@ namespace orthia
     {
         // non-ui thread
         oui::fsui::OpenResult result;
+        oui::ScopedGuard handlerGuard([&]() {
+            completeHandler->Reply(completeHandler, file, result);
+        });
         try
         {
             // prepare the message on unknown error
             auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
             auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
             result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
-            oui::ScopedGuard handlerGuard([&]() {
-                completeHandler->Reply(completeHandler, file, result);
-            });
 
             // opening
             WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opening")),

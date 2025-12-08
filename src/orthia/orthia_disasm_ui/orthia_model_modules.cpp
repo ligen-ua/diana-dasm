@@ -96,9 +96,8 @@ namespace orthia
         return newAddress + alignment;
     }
 
-    void CImportsLoader::RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile)
+    OPERAND_SIZE CImportsLoader::GetLastPossibleAddress()
     {
-        // check 
         OPERAND_SIZE lastPossibleAddress = DI_MAX_OPERAND_SIZE;
         switch (m_dianaMode)
         {
@@ -109,7 +108,12 @@ namespace orthia
             lastPossibleAddress = std::numeric_limits<uint16_t>::max();
             break;
         }
-
+        return lastPossibleAddress;
+    }
+    void CImportsLoader::RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile)
+    {
+        // check 
+        OPERAND_SIZE lastPossibleAddress = GetLastPossibleAddress();
         if (m_freeSpaceStart > lastPossibleAddress)
         {
             throw std::runtime_error("Can't load module");
@@ -155,6 +159,10 @@ namespace orthia
         params.mapFlags = DIANA_PE_MAP_DO_NOT_RELOCATE;
         mappedPE->MapFile(binPeFile, params);
 
+        if (mappedPE->GetImpl()->mappedPE.pImpl->dianaMode != m_dianaMode)
+        {
+            throw std::runtime_error("Can't load file: " + orthia::PlatformStringToUtf8(fullName.native));
+        }
         if (CheckConflicts(mappedPE))
         {
             RelocateModule(mappedPE);
@@ -170,6 +178,12 @@ namespace orthia
         {
             m_freeSpaceStart = mappedPE->GetImageEnd();
         }
+        OPERAND_SIZE lastPossibleAddress = GetLastPossibleAddress();
+        if (m_freeSpaceStart > lastPossibleAddress)
+        {
+            throw std::runtime_error("Can't load module");
+        }
+
         return m_mappedModules.insert({ name.native, info }).first;
     }
 
@@ -202,32 +216,43 @@ namespace orthia
             std::string functionName(pFunctionName);
             OPERAND_SIZE ordinal = ordinalIn;
 
-            const int maxTryCount = 3;
-            for (int i = 0; i < maxTryCount; ++i)
+            int maxTryCount = 3;
+            bool tryKernelbase = false;
+            for (int u = 0; u < 2; ++u)
             {
-                ModuleIterator it = LoadModule(dllName);
-
-                auto ordinalToPass = ordinal;
-                if (ordinalToPass == DI_MAX_OPERAND_SIZE)
+                if (u)
                 {
-                    ordinalToPass = DIANA_PE_INVALID_ORDINAL_VALUE;
+                    dllName = "kernelbase.dll";
+                    maxTryCount = 1;
+                }
+                for (int i = 0; i < maxTryCount; ++i)
+                {
+                    
+                    ModuleIterator it = LoadModule(dllName);
+
+                    auto ordinalToPass = ordinal;
+                    if (ordinalToPass == DI_MAX_OPERAND_SIZE)
+                    {
+                        ordinalToPass = DIANA_PE_INVALID_ORDINAL_VALUE;
+                    }
+
+                    OPERAND_SIZE forwardOffset = 0;
+                    *pAddress = it->second.peFile->DiGetProcAddress(functionName.c_str(), &forwardOffset, (DI_UINT16)ordinalToPass);
+
+                    if (!forwardOffset)
+                    {
+                        orthia::NameInfo nameInfo;
+                        nameInfo.flags = NameInfo::flags_Import;
+                        nameInfo.name.native = orthia::Utf8ToPlatformString(dllName + "!" + functionName);
+                        nameInfo.address = *pAddress;
+                        m_currentModule->second.names.insert({ GetLastAddress() , nameInfo });
+                        return;
+                    }
+
+                    auto fwString = it->second.peFile->DiReadForwardingString(forwardOffset);
+                    DI_CHECK_CPP(diana::ParseForwarderString(fwString, dllName, functionName, ordinal));
                 }
 
-                OPERAND_SIZE forwardOffset = 0;
-                *pAddress = it->second.peFile->DiGetProcAddress(functionName.c_str(), &forwardOffset, (DI_UINT16)ordinalToPass);
-
-                if (!forwardOffset)
-                {
-                    orthia::NameInfo nameInfo;
-                    nameInfo.flags = NameInfo::flags_Import;
-                    nameInfo.name.native = orthia::Utf8ToPlatformString(dllName + "!" + functionName);
-                    nameInfo.address = *pAddress;
-                    m_currentModule->second.names.insert({ GetLastAddress() , nameInfo });
-                    return;
-                }
-
-                auto fwString = it->second.peFile->DiReadForwardingString(forwardOffset);
-                DI_CHECK_CPP(diana::ParseForwarderString(fwString, dllName, functionName, ordinal));
             }
             throw std::runtime_error("Can't process forwarding");
         }
