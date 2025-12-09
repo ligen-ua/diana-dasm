@@ -150,3 +150,9 @@ namespace oui
         using FileCompleteHandler_type = std::function<void(std::shared_ptr<BaseOperation>, std::shared_ptr<IFile2>, const OpenResult&)>;
     }
 }
+
+#if defined(_M_AMD64)
+
+#include "oui_filesystem_win32.h"
+
+#endif

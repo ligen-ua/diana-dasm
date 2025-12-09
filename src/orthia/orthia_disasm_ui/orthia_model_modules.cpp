@@ -5,6 +5,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_database_saver.h"
 #include "orthia_item_file.h"
+#include "orthia_log.h"
 
 namespace orthia
 {
@@ -128,6 +129,24 @@ namespace orthia
         peFile->Relocate(possibleAddress);
     }
     CImportsLoader::ModuleIterator CImportsLoader::LoadModule(const std::string& dllName)
+    {
+        try
+        {
+            return LoadModuleImpl(dllName);
+        }
+        catch (std::exception& e)
+        {
+            ORTHIA_LOG(orthia::LogSeverity::Error, "Can't load ", dllName, " Error: ", e.what());
+
+            auto name = NormalizeName(dllName);
+
+            ModuleInfo info;
+            info.fullName = orthia::Utf8ToPlatformString(dllName);
+            info.peFile = std::make_shared <orthia::CSimplePeFile> ();
+            return m_mappedModules.insert({ name.native, info }).first;
+        }
+    }
+    CImportsLoader::ModuleIterator CImportsLoader::LoadModuleImpl(const std::string& dllName)
     {
         auto name = NormalizeName(dllName);
         {
@@ -265,6 +284,10 @@ namespace orthia
 
     void CImportsLoader::LoadImports(ModuleInfo& mod)
     {
+        if (!mod.peFile->GetImpl())
+        {
+            return;
+        }
         struct ImportsCollector :public diana::CBasePeLinkImportsObserver
         {
             ModuleInfo& m_mod;
@@ -299,6 +322,10 @@ namespace orthia
     }
     void CImportsLoader::LoadExports(ModuleInfo& mod)
     {
+        if (!mod.peFile->GetImpl())
+        {
+            return;
+        }
         struct ExportsCollector :public diana::CBasePeLinkImportsObserver
         {
             ModuleInfo& m_mod;
@@ -389,12 +416,26 @@ namespace orthia
 
         for (auto& pair: m_mappedModules)
         {
-            LoadExports(pair.second);
+            try
+            {
+                LoadExports(pair.second);
+            }
+            catch (std::exception& e)
+            {
+                ORTHIA_LOG(orthia::LogSeverity::Error, "Can't load exports for ", pair.first, " Error: ", e.what());
+            }
             if (pair.second.originalFile)
             {
                 continue;
             }
-            LoadImports(pair.second);
+            try
+            {
+                LoadImports(pair.second);
+            }
+            catch (std::exception& e)
+            {
+                ORTHIA_LOG(orthia::LogSeverity::Error, "Can't load imports for ", pair.first, " Error: ", e.what());
+            }
         }
     }
     void CImportsLoader::InsertNames(std::shared_ptr<CModuleManager> moduleManager, const ModuleInfo& mod)

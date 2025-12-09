@@ -65,7 +65,7 @@ namespace orthia
             }
             else
             {
-                if ((m_historyIndex + 1) < m_history.size())
+                if ((m_historyIndex + 1) < (int)m_history.size())
                 {
                     m_history.erase(m_history.begin() + m_historyIndex + 1, m_history.end());
                 }
@@ -86,7 +86,7 @@ namespace orthia
         orthia::Address_type address = 0;
         orthia::Address_type pageAddress = 0;
         int error = DI_NOT_FOUND;
-        if (m_historyIndex != -1 && m_historyIndex < m_history.size())
+        if (m_historyIndex != -1 && m_historyIndex < (int)m_history.size())
         {
             address = m_history[m_historyIndex].address;
             pageAddress = m_history[m_historyIndex].pageAddress;

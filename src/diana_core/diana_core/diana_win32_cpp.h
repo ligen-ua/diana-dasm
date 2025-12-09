@@ -22,6 +22,8 @@ public:
             m_errorCode(errorCode)
     {
     }
+    ULONG GetErrorCode() const { return m_errorCode; }
+
 };
 
 struct Win32Handle

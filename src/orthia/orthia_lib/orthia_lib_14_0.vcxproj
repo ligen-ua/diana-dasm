@@ -171,6 +171,8 @@
     <ClCompile Include="orthia_pe.cpp" />
     <ClCompile Include="orthia_plugins_win32.cpp" />
     <ClCompile Include="orthia_plugin_interfaces.cpp" />
+    <ClCompile Include="orthia_process.cpp" />
+    <ClCompile Include="orthia_processes_ex.cpp" />
     <ClCompile Include="orthia_sha1.c" />
     <ClCompile Include="orthia_sqlite.cpp" />
     <ClCompile Include="orthia_stack_analyzer.cpp" />
@@ -214,6 +216,9 @@
     <ClInclude Include="orthia_plugins_win32.h" />
     <ClInclude Include="orthia_plugin_interfaces.h" />
     <ClInclude Include="orthia_pointers.h" />
+    <ClInclude Include="orthia_process.h" />
+    <ClInclude Include="orthia_processes_ex.h" />
+    <ClInclude Include="orthia_resources.h" />
     <ClInclude Include="orthia_sha1.h" />
     <ClInclude Include="orthia_shuttle_interface.h" />
     <ClInclude Include="orthia_sqlite.h" />

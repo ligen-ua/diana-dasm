@@ -227,7 +227,7 @@ void CModulesWindow::UpdateVisibleItems()
         auto offset = m_namesBox->GetOffset();
         auto visibleSize = m_namesBox->GetVisibleSize();
         auto itemsHandled = offset + visibleSize;
-        if (itemsHandled > m_cachedNamesPage.size() && itemsHandled < m_lastTotalNamesCount)
+        if (itemsHandled > (int)m_cachedNamesPage.size() && itemsHandled < m_lastTotalNamesCount)
         {
             // reload more data
             orthia::NameSelectionKey key;

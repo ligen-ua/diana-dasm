@@ -9,6 +9,10 @@ extern "C"
 #include "diana_processor/diana_processor_core.h"
 #include "diana_win32.h"
 }
+#include "orthia_resources.h"
+#include "resource.h"
+#include "orthia_files.h"
+#include "orthia_processes_ex.h"
 
 orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
@@ -19,6 +23,82 @@ static void PrintUsage()
     std::cout << "Usage: [--run-tests] <filename>\n";
     std::cout << "       --pid <pid-to-open>\n";
 }
+
+
+#if defined(_M_AMD64)
+
+void UpdateHostFile(const std::wstring& targetExe)
+{
+    orthia::CResource resource;
+    resource.Load(orthia::GetCurrentModule(), ORTHIA_WIN32_HOST, L"BINARY");
+
+    orthia::CFile file;
+    file.Open(targetExe, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS);
+    file.WriteToFile(resource.data(), resource.size());
+    file.FlushBuffers();
+}
+
+void SetupWin32FSHandlers(std::shared_ptr<orthia::CConfigOptionsStorage> config)
+{
+    const std::wstring hostFile(L"orthia_win32_host.exe");
+
+    auto bin = config->GetBinFolder();
+    orthia::EraseLastSlash(bin);
+    auto targetExe = bin + L"\\" + hostFile;
+
+    try
+    {
+        UpdateHostFile(targetExe);
+    }
+    catch (std::exception& e)
+    {
+        ORTHIA_DEV_LOG(orthia::LogSeverity::Error, e.what());
+    }
+    
+    oui::SetupWin32DllLookupHandler([=](const oui::String& name) -> std::tuple<int, oui::String> {
+
+        try
+        {
+            if (!orthia::IsFileExists(targetExe))
+            {
+                UpdateHostFile(targetExe);
+            }
+
+            orthia::CProcessParams params(targetExe, true); 
+            params << L"search";
+            params << name.native;
+            oui::String result;
+            orthia::intrusive_ptr<orthia::CConsoleProcess> process = StartConsoleProcess(params,
+                nullptr,
+                true,
+                64*1024,
+                nullptr,
+                nullptr);
+            process->PerformAll([&](const std::wstring& line) { 
+
+                result.native.append(line);
+            });
+            process->Join();
+            auto code = process->GetExitCode();
+            if (code == 0 && result.native.empty())
+            {
+                code = ERROR_INTERNAL_ERROR;
+            }
+            return { (int)code, result };
+        }
+        catch (orthia::CWin32Exception& e)
+        {
+            return { e.GetErrorCode(), oui::String()};
+        }
+        catch (std::exception& e)
+        {
+            &e;
+            return { ERROR_FILE_NOT_FOUND, oui::String() };
+        }
+    });
+}
+#endif //  M_AMD64
+
 
 int wmain(int argc, const wchar_t* argv[])
 {
@@ -73,6 +153,10 @@ int wmain(int argc, const wchar_t* argv[])
         Diana_Init();
         DianaProcessor_GlobalInit();
         DianaWin32_Init();
+
+#if defined(_M_AMD64)
+        SetupWin32FSHandlers(config);
+#endif //  M_AMD64
 
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
         oui::CConsoleApp app;

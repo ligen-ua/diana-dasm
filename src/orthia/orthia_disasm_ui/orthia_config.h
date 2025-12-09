@@ -8,6 +8,7 @@ namespace orthia
     {
         PlatformString_type m_appDir;
         PlatformString_type m_dbDir;
+        PlatformString_type m_binDir;
 
     public:
         void Init();
@@ -15,6 +16,8 @@ namespace orthia
         PlatformString_type GetDBFileName() const;
         PlatformString_type GetDBFolder() const;
         PlatformString_type GetReadmeFileName() const;
+        PlatformString_type GetBinFolder() const;
+
 
     };
 }

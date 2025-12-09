@@ -720,7 +720,7 @@ namespace oui
         {
             return std::make_pair(MultiLineViewItem(), false);
         }
-        if (offsetInPage >= m_lines.size())
+        if (offsetInPage >= (int)m_lines.size())
         {
             return std::make_pair(m_lines[m_lines.size() - 1], false);
         }
@@ -746,7 +746,7 @@ namespace oui
     }
     std::vector<MultiLineViewItem>::iterator CMultiLineView::VisibleItemsBegin()
     {
-        if (m_firstVisibleLineIndex > m_lines.size())
+        if (m_firstVisibleLineIndex > (int)m_lines.size())
         {
             return m_lines.end();
         }
@@ -754,7 +754,7 @@ namespace oui
     }
     std::vector<MultiLineViewItem>::iterator CMultiLineView::VisibleItemsEnd()
     {
-        if (m_firstVisibleLineIndex > m_lines.size())
+        if (m_firstVisibleLineIndex > (int)m_lines.size())
         {
             return m_lines.end();
         }

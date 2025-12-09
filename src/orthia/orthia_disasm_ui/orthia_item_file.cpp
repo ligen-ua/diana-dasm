@@ -197,7 +197,7 @@ namespace orthia
                 }
             }
             names.push_back(info);
-            if (names.size() >= count)
+            if ((int)names.size() >= count)
             {
                 return false;
             }

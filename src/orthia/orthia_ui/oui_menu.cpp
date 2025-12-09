@@ -171,7 +171,7 @@ namespace oui
         }
 
         auto relativePoint = GetClientMousePoint(mouseEventContext, this, rect, evt.mouseEvent.point);
-        if (relativePoint.x < 0 || relativePoint.y < 0 || relativePoint.y >= popupItems->size())
+        if (relativePoint.x < 0 || relativePoint.y < 0 || relativePoint.y >= (int)popupItems->size())
         {
             return true;
         }
@@ -629,7 +629,7 @@ namespace oui
 
     std::shared_ptr<CMenuButtonWindow> CMenuWindow::GetSelectedButton()
     {
-        if (m_selectedButtonIndex < 0 || m_selectedButtonIndex >= m_buttons.size())
+        if (m_selectedButtonIndex < 0 || m_selectedButtonIndex >= (int)m_buttons.size())
         {
             return 0;
         }

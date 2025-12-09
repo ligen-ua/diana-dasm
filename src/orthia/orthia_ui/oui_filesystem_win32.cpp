@@ -1,9 +1,12 @@
 #include "oui_filesystem.h"
 #include "oui_window_thread.h"
 #include "oui_base_win32.h"
+#include "oui_filesystem_win32.h"
 
 namespace oui
 {
+
+    std::function<std::tuple<int, oui::String>(const oui::String& name)> g_dllLookupHandler;
 
     template<class ContainerStr>
     void GetExtensionOfFile(const ContainerStr& fullName, ContainerStr* pExtension)
@@ -299,6 +302,15 @@ namespace oui
 
         std::tuple<int, String> SyncLocateFile(const String& fileName, int dianaMode)
         {
+#if defined(_M_AMD64)
+            if (dianaMode == 4)
+            {
+                if (g_dllLookupHandler)
+                {
+                    return g_dllLookupHandler(fileName);
+                }
+            }
+#endif
             String result;
             std::wstring name;
             name.resize(MAX_PATH);
@@ -559,5 +571,10 @@ namespace oui
     {
         // TODO: add shell32 here if available
         return std::make_shared<CFileSystemImpl>();
+    }
+
+    void SetupWin32DllLookupHandler(std::function<std::tuple<int, oui::String>(const oui::String& name)> dllLookupHandler)
+    {
+        g_dllLookupHandler = dllLookupHandler;
     }
 }

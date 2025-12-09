@@ -107,6 +107,9 @@
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\i386\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>VS_CONFIG=$(Configuration);VS_PLATFORM=i386;_USING_V110_SDK71_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -129,6 +132,9 @@
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\i386\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>VS_CONFIG=$(Configuration);VS_PLATFORM=i386;_USING_V110_SDK71_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -147,6 +153,9 @@
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\amd64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>VS_CONFIG=$(Configuration);VS_PLATFORM=amd64;_USING_V110_SDK71_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -169,6 +178,9 @@
       <AdditionalLibraryDirectories>$(FTXUI_DIR)\lib\$(Configuration)\amd64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>VS_CONFIG=$(Configuration);VS_PLATFORM=amd64;_USING_V110_SDK71_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\diana_core\diana_core\diana_core_14_0.vcxproj">
@@ -229,6 +241,7 @@
     <ClInclude Include="oui_goto_dialog.h" />
     <ClInclude Include="oui_open_process_dialog.h" />
     <ClInclude Include="oui_processes.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="ui_command_window.h" />
     <ClInclude Include="ui_common.h" />
     <ClInclude Include="ui_disasm_memory_writer.h" />

@@ -202,6 +202,7 @@
     <ClInclude Include="oui_containers.h" />
     <ClInclude Include="oui_editbox.h" />
     <ClInclude Include="oui_filesystem.h" />
+    <ClInclude Include="oui_filesystem_win32.h" />
     <ClInclude Include="oui_hotkey.h" />
     <ClInclude Include="oui_input.h" />
     <ClInclude Include="oui_input_win32.h" />

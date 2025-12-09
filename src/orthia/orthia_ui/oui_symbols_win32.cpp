@@ -137,7 +137,7 @@ namespace oui
     VisibleStringInfo CWin32SymbolsAnalyzer_UCS2::CutVisibleString(String::string_type& str,
         int visibleSymCount)
     {
-        if (str.size() > visibleSymCount)
+        if ((int)str.size() > visibleSymCount)
         {
             str.resize(visibleSymCount);
             return VisibleStringInfo(visibleSymCount, visibleSymCount);

@@ -46,6 +46,9 @@ namespace orthia
 
         void LoadImports(ModuleInfo& mod);
         void LoadExports(ModuleInfo& mod);
+
+        CImportsLoader::ModuleIterator LoadModuleImpl(const std::string& dllName);
+
     public:
         CImportsLoader(std::shared_ptr<oui::BaseOperation> operation = nullptr);
         void QueryFunctionByOrdinal(const char* pDllName,

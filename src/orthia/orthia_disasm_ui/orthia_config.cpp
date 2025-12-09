@@ -5,6 +5,7 @@ namespace orthia
 {
     const PlatformString_type g_rootFolderName = ORTHIA_TCSTR("Orthia");
     const PlatformString_type g_nextDB = ORTHIA_TCSTR("db");
+    const PlatformString_type g_binFolder = ORTHIA_TCSTR("bin");
 
     void CConfigOptionsStorage::Init()
     {
@@ -19,8 +20,10 @@ namespace orthia
 
         m_appDir = appDataFolder + AddSlash2(g_rootFolderName);
         m_dbDir = m_appDir + AddSlash2(g_nextDB);
+        m_binDir = m_appDir + AddSlash2(g_binFolder);
 
         orthia::CreateAllDirectoriesForFile(m_dbDir);
+        orthia::CreateAllDirectoriesForFile(m_binDir);
     }
     PlatformString_type CConfigOptionsStorage::GetReadmeFileName() const
     {
@@ -39,6 +42,10 @@ namespace orthia
     PlatformString_type CConfigOptionsStorage::GetDBFolder() const
     {
         return m_dbDir;
+    }
+    PlatformString_type CConfigOptionsStorage::GetBinFolder() const
+    {
+        return m_binDir;
     }
 
 }

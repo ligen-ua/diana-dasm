@@ -20,8 +20,13 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "di_dumper", "diana_win\di_dumper\di_dumper_14_0.vcxproj", "{6029401C-5785-47EC-B34B-B7771835ACEA}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_disasm_ui", "orthia\orthia_disasm_ui\orthia_disasm_ui.vcxproj", "{69983EC6-F5E9-4C6E-B388-0B24E8E4F7C5}"
+	ProjectSection(ProjectDependencies) = postProject
+		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC} = {906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_ui", "orthia\orthia_ui\orthia_ui.vcxproj", "{497FA637-1A63-44CB-8681-3EDD9D8620A2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_win32_host", "orthia\orthia_win32_host\orthia_win32_host.vcxproj", "{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -111,6 +116,12 @@ Global
 		{497FA637-1A63-44CB-8681-3EDD9D8620A2}.Release|Win32.Build.0 = Release|Win32
 		{497FA637-1A63-44CB-8681-3EDD9D8620A2}.Release|x64.ActiveCfg = Release|x64
 		{497FA637-1A63-44CB-8681-3EDD9D8620A2}.Release|x64.Build.0 = Release|x64
+		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Debug|x64.ActiveCfg = Debug|Win32
+		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Debug|x64.Build.0 = Debug|Win32
+		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Release|Win32.ActiveCfg = Release|Win32
+		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Release|x64.ActiveCfg = Release|Win32
+		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Release|x64.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

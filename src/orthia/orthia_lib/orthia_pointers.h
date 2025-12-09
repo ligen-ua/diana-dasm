@@ -180,6 +180,10 @@ public:
         return m_pObject;
     }
 
+    operator bool() const 
+    {
+        return m_pObject != 0;
+    }
 };
 
 template<class Type>

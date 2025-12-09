@@ -125,7 +125,7 @@ namespace oui
                     {
                         textPosition = i;
                     }
-                    tmpStr = textPosition >= currentItem->text.size() ? String() : currentItem->text[textPosition];
+                    tmpStr = textPosition >= (int)currentItem->text.size() ? String() : currentItem->text[textPosition];
                     if (needPrintHeader && i < columnsCount)
                     {
                         tmpStr.native.insert(0, 1, String::symSpace);
