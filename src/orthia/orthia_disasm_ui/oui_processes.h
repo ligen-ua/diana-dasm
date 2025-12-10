@@ -18,11 +18,14 @@ namespace oui
     struct ThreadInfo
     {
         unsigned long long tid = 0;
+        unsigned long long startAddress = 0;
+        orthia::CCommonDateTime startTime;
     };
     struct IThread
     {
         virtual ~IThread() {};
         virtual int GetInfo(ThreadInfo & info) const = 0;
+        virtual int CaptureStack(int framesCount, std::vector<orthia::Address_type> & tstack) const = 0;
     };
     struct IThreadEnumerator
     {

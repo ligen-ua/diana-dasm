@@ -5,6 +5,7 @@
 #include "oui_window_thread.h"
 #include "oui_filesystem.h"
 #include "orthia_common_time.h"
+#include "orthia_common_print.h"
 
 namespace oui
 {
@@ -129,6 +130,16 @@ namespace orthia
         virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr;  }
     };
 
+    template<class PtrType>
+    oui::String QueryAddressNameDef(PtrType ptr, Address_type address, int dianaMode)
+    {
+        auto str = ptr->QueryAddressName(address);
+        if (str.native.empty())
+        {
+            return orthia::AddressToString(address, dianaMode);
+        }
+        return str;
+    }
 
     struct GotoItem
     {

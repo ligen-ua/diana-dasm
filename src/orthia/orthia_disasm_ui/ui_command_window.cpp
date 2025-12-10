@@ -238,12 +238,12 @@ void CCommandWindow::WriteLog(const oui::String& text)
         return;
     }
 
-    std::vector<oui::String::string_type> lines;
-    orthia::SplitStringWithoutWhitespace(text.native, L"\x0A", &lines);
+    std::vector<orthia::StringInfo> lines;
+    orthia::SplitString(text.native, L"\x0A", &lines);
 
     for (auto& line : lines)
     {
-        oui::String line2Add = std::move(line);
+        oui::String line2Add = line.ToString();
         console->FilterOrReplaceUnreadableSymbols(line2Add);
         AddLine(line2Add);
     }

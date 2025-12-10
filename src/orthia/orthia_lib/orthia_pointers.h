@@ -195,25 +195,25 @@ public:
     }
     Ptr(int)
         :
-            intrusive_ptr(0, false)
+            intrusive_ptr<Type>(0, false)
     {
     }
     template<class ObjectType>
     Ptr(ObjectType * pObject, bool bAddRef = false)
         :
-            intrusive_ptr(pObject, false)
+            intrusive_ptr<Type>(pObject, false)
     {
     }
     template<class OtherType>
     Ptr(intrusive_ptr<OtherType> & p)
         :
-            intrusive_ptr(p)
+            intrusive_ptr<Type>(p)
     {
     }
     template<class OtherType>
     Ptr(const intrusive_ptr<OtherType> & p)
         :
-            intrusive_ptr(p)
+            intrusive_ptr<Type>(p)
     {
     }
 };

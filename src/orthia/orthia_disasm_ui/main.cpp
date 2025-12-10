@@ -118,8 +118,16 @@ int wmain(int argc, const wchar_t* argv[])
         {
             if (nextIsPid)
             {
+                std::wstring text = argv[i];
                 unsigned long long pid = 0;
-                orthia::StringToObject(std::wstring(argv[i]), &pid);
+                if (text == L"self")
+                {
+                    pid = GetCurrentProcessId();
+                }
+                else
+                {
+                    orthia::StringToObject(text, &pid);
+                }
                 processesToOpen.push_back(pid);
                 nextIsPid = false;
                 continue;

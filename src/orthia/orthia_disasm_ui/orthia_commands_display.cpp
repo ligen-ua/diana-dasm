@@ -1,7 +1,6 @@
 #include "orthia_config.h"
 #include "orthia_model.h"
 #include "ui_common.h"
-#include "orthia_common_print.h"
 
 namespace orthia
 {
@@ -56,6 +55,7 @@ void CCommandProcessor::Handle_threads(CommandArguments& args)
     }
 
     orthia::PlatformString_type line;
+    std::vector<orthia::Address_type> stack;
     for (;;)
     {
         auto [error, thread] = enumerator->GetNextThread();
@@ -72,6 +72,29 @@ void CCommandProcessor::Handle_threads(CommandArguments& args)
 
         line = ORTHIA_TCSTR("THREAD ") + orthia::AddressToString(info.tid, dianaMode);
         args.ReplyLine(line);
+
+        line = ORTHIA_TCSTR("Start address: ") + QueryAddressNameDef(args.item, info.startAddress, dianaMode).native;
+        args.ReplyLine(line);
+
+        line = ORTHIA_TCSTR("Creation time: ") + info.startTime.GUI_QueryConvertedToLocal();
+        args.ReplyLine(line);
+
+        stack.clear();
+        thread->CaptureStack(20, stack);
+        line = ORTHIA_TCSTR("Stack:");
+        args.ReplyLine(line);
+
+        for (auto& address: stack)
+        {
+            line.clear();
+            line.resize(6, ORTHIA_TCHAR(' '));
+            auto name = QueryAddressNameDef(args.item, address, dianaMode);
+            line += name.native;
+            args.ReplyLine(line);
+        }
+        line.clear();
+        args.ReplyLine(line);
+
         line.clear();
     }
 }

@@ -10,7 +10,13 @@
 #include "orthia_streams.h"
 #include "orthia_log.h"
 #include "orthia_plugins_win32.h"
+#include "orthia_exec.h"
 
+extern "C"
+{
+#include "diana_processor/diana_processor_context.h"
+#include "diana_processor/diana_processor_win32_context.h"
+}
 
 namespace oui
 {
@@ -251,22 +257,106 @@ namespace oui
         return 0;
     }
     class CWin32Thread;
+    class CProcess;
+    
+
+    struct NtFunctions
+    {
+        decltype(NtQueryInformationThread)* ntQueryInformationThread;
+    };
+
     struct IThreadOpener
     {
         virtual ~IThreadOpener() {}
-        virtual std::tuple<int, std::shared_ptr<CWin32Thread>> OpenNextThread(HANDLE hProcess, HANDLE hThread) = 0;
+        virtual std::tuple<int, std::shared_ptr<CWin32Thread>> OpenNextThread(HANDLE hProcess, HANDLE hThread, std::shared_ptr<CProcess> process) = 0;
+        virtual NtFunctions GetNtFunctions() = 0;
     };
     class CWin32Thread:public IThread
     {
         mutable orthia::CHandleGuard m_handleGuard;
+        mutable std::weak_ptr<IProcess> m_proc;
+        std::shared_ptr<IThreadOpener> m_procSystem;
     public:
-        CWin32Thread(orthia::CHandleGuard & handleGuard)
+        CWin32Thread(orthia::CHandleGuard & handleGuard, std::shared_ptr<IProcess> proc, std::shared_ptr<IThreadOpener> procSystem)
+            :
+                m_proc(proc),
+                m_procSystem(procSystem)
         {
             m_handleGuard.Reset(handleGuard.Release());
         }
         int GetInfo(ThreadInfo& info) const override
         {
+            auto proc = m_proc.lock();
+            if (!proc)
+            {
+                return ERROR_INVALID_FUNCTION;
+            }
+            orthia::Address_type startAddress = 0;
+            auto ntStatus = m_procSystem->GetNtFunctions().ntQueryInformationThread(
+                m_handleGuard.Get(),
+                (THREADINFOCLASS)0x9,//ThreadQuerySetWin32StartAddress,
+                &startAddress,
+                sizeof(startAddress),
+                NULL
+            );
             info.tid = GetThreadId(m_handleGuard.Get());
+            info.startAddress = startAddress;
+
+            FILETIME creationTime = {0, };
+            FILETIME exitTime = { 0, };
+            FILETIME kernelTime = { 0, };
+            FILETIME userTime = { 0, };
+
+            if (GetThreadTimes(m_handleGuard.Get(),
+                &creationTime,
+                &exitTime,
+                &kernelTime,
+                &userTime))
+            {
+                SYSTEMTIME st;
+                FileTimeToSystemTime(&creationTime, &st);
+                info.startTime.InitFromSystemTime(st);
+            }
+            return 0;
+        }
+        int CaptureStack(int framesCount, std::vector<orthia::Address_type>& tstack) const
+        {
+            auto proc = m_proc.lock();
+            if (!proc)
+            {
+                return ERROR_INVALID_FUNCTION;
+            }
+            Diana_Processor_Registers_Context dianaContext;
+            int mode = DIANA_MODE64;
+            if (CheckIsWindows64() && CheckIsWow64Process(m_handleGuard.Get()))
+            {
+                WOW64_CONTEXT wowContext;
+                wowContext.ContextFlags = CONTEXT_FULL;
+                if (!Wow64GetThreadContext(m_handleGuard.Get(), &wowContext))
+                {
+                    return GetLastError();
+                }
+                DI_CHECK(DianaProcessor_ConvertContextToIndependent_Win32((DIANA_CONTEXT_NTLIKE_32*) &wowContext, &dianaContext));
+                mode = DIANA_MODE32;
+            }
+            else
+            {
+                CONTEXT context;
+                context.ContextFlags = CONTEXT_FULL;
+                if (!GetThreadContext(m_handleGuard.Get(), &context))
+                {
+                    return GetLastError();
+                }
+                DI_CHECK(DianaProcessor_ConvertContextToIndependent_X64((DIANA_CONTEXT_NTLIKE_64*)&context, &dianaContext));
+            }
+            orthia::ProcessReaderAdapter memReader(proc.get());
+            orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x4000);
+
+            orthia::CProcessor processor(&writeCache, mode, 0);
+            processor.Init();
+            DI_CHECK(DianaProcessor_InitContext(processor.GetSelf(), &dianaContext));
+
+            processor.QueryCallStack(&tstack, framesCount);
             return 0;
         }
         HANDLE GetHandle()
@@ -560,7 +650,7 @@ namespace oui
         {
             hThread = m_thread->GetHandle();
         }
-        auto [error, thread] = m_opener->OpenNextThread(hProc, hThread);
+        auto [error, thread] = m_opener->OpenNextThread(hProc, hThread, m_process);
         if (error || !thread)
         {
             if (error == ERROR_NO_MORE_ITEMS)
@@ -580,6 +670,7 @@ namespace oui
         orthia::CWin32OpenProcessPlugin m_openProcessPlugin;
         orthia::CDll m_ntdll;
         decltype(RtlNtStatusToDosError)* m_RtlNtStatusToDosError = 0;
+        NtFunctions ntFunctions;
     public:
         CProcessSystemImpl()
         {
@@ -587,21 +678,29 @@ namespace oui
             m_ntdll.Reset(ORTHIA_TCSTR("ntdll.dll"));
             m_ntdll.QueryFunction("NtGetNextThread", &m_getNextThread, false);
             m_ntdll.QueryFunction("RtlNtStatusToDosError", &m_RtlNtStatusToDosError, false);
+            m_ntdll.QueryFunction("NtQueryInformationThread", &ntFunctions.ntQueryInformationThread, false);
         }
         ~CProcessSystemImpl()
         {
         }
-        std::tuple<int, std::shared_ptr<CWin32Thread>> OpenNextThread(HANDLE hProcess, HANDLE hThread) override
+        NtFunctions GetNtFunctions()
+        {
+            return ntFunctions;
+        }
+        std::tuple<int, std::shared_ptr<CWin32Thread>> OpenNextThread(HANDLE hProcess, HANDLE hThread, std::shared_ptr<CProcess> process) override
         {
             HANDLE hNewThread = 0;
-            auto status = m_getNextThread(hProcess, hThread, THREAD_QUERY_INFORMATION, 0, 0, &hNewThread);
-
+            auto status = m_getNextThread(hProcess, hThread, THREAD_QUERY_INFORMATION|THREAD_GET_CONTEXT, 0, 0, &hNewThread);
+            if (!NT_SUCCESS(status))
+            {
+                status = m_getNextThread(hProcess, hThread, THREAD_QUERY_INFORMATION, 0, 0, &hNewThread);
+            }
             if (!NT_SUCCESS(status))
             {
                 return { m_RtlNtStatusToDosError(status), nullptr };
             }
             orthia::CHandleGuard guard(hNewThread);
-            auto res = std::make_shared<CWin32Thread>(guard);
+            auto res = std::make_shared<CWin32Thread>(guard, process, shared_from_this());
             return { 0, res };
         }
 
