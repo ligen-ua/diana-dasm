@@ -350,7 +350,10 @@ namespace oui
                 DI_CHECK(DianaProcessor_ConvertContextToIndependent_X64((DIANA_CONTEXT_NTLIKE_64*)&context, &dianaContext));
             }
             orthia::ProcessReaderAdapter memReader(proc.get());
-            orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x4000);
+            SYSTEM_INFO sysInfo;
+            GetSystemInfo(&sysInfo);
+            orthia::CMemoryStorageOfModifiedData writeCache(&memReader, sysInfo.dwPageSize);
+            writeCache.SetCacheReads(true);
 
             orthia::CProcessor processor(&writeCache, mode, 0);
             processor.Init();
@@ -463,6 +466,7 @@ namespace oui
             GetSystemInfo(&sysInfo);
             orthia::ProcessReaderAdapter memReader(this);
             orthia::CMemoryStorageOfModifiedData writeCache(&memReader, sysInfo.dwPageSize);
+            writeCache.SetCacheReads(true);
 
             std::vector<wchar_t> buffer(4096);
             for (auto hmod : modulesVec)
@@ -530,6 +534,7 @@ namespace oui
                             ModuleDisasmContext context;
                             context.dianaPeFile = &dianaPeFile;
                             context.stream = &stream;
+
                             contextCallback(info, context);
                         }
                     }

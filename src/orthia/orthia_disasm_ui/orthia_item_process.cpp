@@ -373,7 +373,8 @@ namespace orthia
        
         // diana PE analyzer uses relative pointers
         orthia::ProcessReaderAdapter memReader(m_proc.get());
-        orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x4000);
+        orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x1000);
+        writeCache.SetCacheReads(true);
         orthia::CMemoryCache module(&writeCache, moduleAddress);
         // adapter to C-code
         orthia::DianaMemoryStream stream(0, &module, moduleSize);
@@ -538,14 +539,17 @@ namespace orthia
         {
             std::shared_ptr<oui::IProcess> proc;
             orthia::ProcessReaderAdapter memReader;
+            orthia::CMemoryStorageOfModifiedData cache;
             orthia::DianaMemoryStream stream;
 
             DianaReadStreamAdapter(std::shared_ptr<oui::IProcess> proc_in, Address_type addressStart)
                 :
                 proc(proc_in),
                 memReader(proc_in.get()),
-                stream(addressStart, &memReader, 0)
+                cache(&memReader, 4096),
+                stream(addressStart, &cache, 0)
             {
+                cache.SetCacheReads(true);
             }
         };
 

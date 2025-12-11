@@ -81,7 +81,8 @@ private:
     };
     typedef std::map<Address_type, AllocationInfo> AllocationsMap_type;
     AllocationsMap_type m_allocations;
-        
+    bool m_cacheReads;
+    std::vector<char> m_tmp;
     Address_type QueryPageStartAddress(Address_type offset) const;
 
     bool ReportRegion(IAddressSpace * pExternalSpace, 
@@ -94,6 +95,8 @@ public:
     CMemoryStorageOfModifiedData(IMemoryReader * pReader, 
                                  int pageSize = 0x100,
                                  bool hasAssociatedSelector = false);
+    void SetCacheReads(bool cacheReads) { m_cacheReads = cacheReads; }
+
     void AddMemoryWriteBreakPoint(Address_type address);
     virtual bool ReportRegions(unsigned long long startAddress,
                                unsigned long long size,

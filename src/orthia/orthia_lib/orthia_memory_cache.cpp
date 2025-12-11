@@ -164,7 +164,8 @@ CMemoryStorageOfModifiedData::CMemoryStorageOfModifiedData(IMemoryReader * pRead
         m_lastSuccessEnd(0),
         m_pReader(pReader),
         m_pageSize(pageSize),
-        m_hasAssociatedSelector(hasAssociatedSelector)
+        m_hasAssociatedSelector(hasAssociatedSelector), 
+        m_cacheReads(false)
 {
     if (m_pageSize < 0x10 || (m_pageSize % 0x10))
     {
@@ -473,6 +474,37 @@ void CMemoryStorageOfModifiedData::Read(Address_type offset,
     Address_type firstPage = QueryPageStartAddress(offset);
     PagesMap_type::iterator it = m_pageMap.lower_bound(firstPage);
     PagesMap_type::iterator it_end = m_pageMap.end();
+
+    if (it == it_end)
+    {
+        if (m_cacheReads)
+        {
+            auto xbytesToRead = QueryPageStartAddress(bytesToRead);
+            if (xbytesToRead != bytesToRead)
+            {
+                xbytesToRead += m_pageSize;
+            }
+            m_tmp.resize(xbytesToRead);
+            Address_type xread = 0;
+            m_pReader->Read(firstPage,
+                xbytesToRead,
+                m_tmp.data(),
+                &xread,
+                flags,
+                selectorValue,
+                selectorHint);
+            if (xread == xbytesToRead)
+            {
+                auto readDataPtr = m_tmp.data();
+                for (auto addr = firstPage; xread; addr += m_pageSize, xread -= m_pageSize, readDataPtr += m_pageSize)
+                {
+                    m_pageMap[addr].data.assign(readDataPtr, readDataPtr + m_pageSize);
+                }
+                it = m_pageMap.lower_bound(firstPage);
+            }
+        }
+    }
+
     for(;it != it_end; ++it)
     {
         if (offset < it->first ||
@@ -481,7 +513,6 @@ void CMemoryStorageOfModifiedData::Read(Address_type offset,
             break;
         }
     }
-
     if (it == it_end)
     {
         m_pReader->Read(offset, 
