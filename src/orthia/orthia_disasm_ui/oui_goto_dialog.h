@@ -6,6 +6,7 @@
 #include "oui_processes.h"
 #include "oui_label.h"
 #include "orthia_model_interfaces.h"
+#include "oui_scrollable.h"
 
 namespace oui
 {
@@ -41,6 +42,7 @@ namespace oui
 
         std::shared_ptr<CLabel> m_fileLabel;
         std::shared_ptr<CEditBox> m_fileEdit;
+        std::shared_ptr<oui::CScrollable> m_listBoxScrollable;
 
         bool m_firstResult = false;
         std::shared_ptr<oui::BaseOperation> m_currentOperation;

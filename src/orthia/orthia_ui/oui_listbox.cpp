@@ -15,6 +15,11 @@ namespace oui
     }
     void CListBox::RenderColumnText(bool needPrintHeader, int columnPos, const String& inText, String& outText)
     {
+        if (outText.native.size() < inText.native.size())
+        {
+            std::copy(inText.native.begin(), inText.native.begin() + outText.native.size(), outText.native.begin());
+            return;
+        }
         auto format = m_columns[columnPos].GetFormat();
         if (needPrintHeader)
         {
@@ -68,6 +73,8 @@ namespace oui
             }
 
             int relRightX = 0;
+            bool cutHappens = false;
+
             if (HasReportMode()) 
             {
                 relRightX = leftX;
@@ -104,7 +111,6 @@ namespace oui
                 m_chunk.native.resize(size, needPrintHeader? String::char_type('_'):String::symSpace);
 
                 int symbolsCount = size - 1;
-                bool cutHappens = false;
                 decltype(ListBoxItem::colorsHandler) colorsHandler;
 
                 if (needPrintHeader || currentItemIt != m_pageItems.end())
@@ -131,33 +137,31 @@ namespace oui
                         tmpStr.native.insert(0, 1, String::symSpace);
                         tmpStr.native.append(1, String::symSpace);
                     }
-                    auto prevSize = tmpStr.native.size();
 
-                    const auto info = console->GetSymbolsAnalyzer().CutVisibleString(tmpStr.native, symbolsCount);
-
-                    auto newSize = tmpStr.native.size();
-
-                    if (!HasReportMode() || 
-                        info.visibleSize > info.symbolsCount || 
-                        tmpStr.native.size() == m_chunk.native.size() ||
-                        tmpStr.native.empty())
-                    {
-                        std::copy(tmpStr.native.begin(), tmpStr.native.end(), m_chunk.native.begin());
-                        if (info.visibleSize > info.symbolsCount)
-                        {
-                            cutSize = info.visibleSize - info.symbolsCount;
-                            m_chunk.native.erase(m_chunk.native.end() - cutSize, m_chunk.native.end());
-                        }
-                    }
-                    else
+                    // produce chunk
+                    if (HasReportMode())
                     {
                         if (i < (int)m_columns.size())
                         {
                             RenderColumnText(needPrintHeader, i, tmpStr, m_chunk);
                         }
                     }
+                    else
+                    {
+                        auto prevSize = tmpStr.native.size();
+                        const auto info = console->GetSymbolsAnalyzer().CutVisibleString(tmpStr.native, symbolsCount);
 
-                    cutHappens = newSize != prevSize;
+                        auto newSize = tmpStr.native.size();
+                        cutHappens = newSize != prevSize;
+                        std::copy(tmpStr.native.begin(), tmpStr.native.end(), m_chunk.native.begin());
+                        if (info.visibleSize > info.symbolsCount)
+                        {
+                            cutSize = info.visibleSize - info.symbolsCount;
+                            m_chunk.native.erase(m_chunk.native.end() - cutSize, m_chunk.native.end());
+                            cutHappens = true;
+                        }
+                    }
+
 
                     if (!needPrintHeader)
                     {
@@ -165,7 +169,21 @@ namespace oui
                     }
                 }
 
-                if ((i + 1) != m_columnsCount)
+                // do final cut
+                if (relRightX > absClientRect.size.width)
+                {
+                    int size = absClientRect.size.width - (leftX - absClientRect.position.x);
+                    auto info = console->GetSymbolsAnalyzer().CutVisibleString(m_chunk.native, size);
+                    if (info.visibleSize > info.symbolsCount)
+                    {
+                        cutSize = info.visibleSize - info.symbolsCount;
+                        m_chunk.native.erase(m_chunk.native.end() - cutSize, m_chunk.native.end());
+                    }
+                    cutHappens = true;
+                }
+
+
+                if ((i + 1) <= GetColumnsCount())
                 {
                     // not a last item, put vertical here
                     m_chunk.native.back() = String::char_type('/');

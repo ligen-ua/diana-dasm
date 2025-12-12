@@ -26,7 +26,7 @@ namespace oui
         if (clientRect.size.width < 5 || clientRect.size.height < 5)
         {
             Size zeroSize;
-            m_listBox->Resize(zeroSize);
+            m_listBoxScrollable->Resize(zeroSize);
             m_fileEdit->Resize(zeroSize);
             m_fileLabel->Resize(zeroSize);
             return;
@@ -38,8 +38,14 @@ namespace oui
         boxRect.size.width -= 4;
         boxRect.size.height -= 4;
 
-        m_listBox->MoveTo(boxRect.position);
-        m_listBox->Resize(boxRect.size);
+        auto listBoxSize = m_listBox->GetSize();
+        if (listBoxSize.width < boxRect.size.width)
+        {
+            m_listBox->Resize(boxRect.size);
+        }
+
+        m_listBoxScrollable->MoveTo(boxRect.position);
+        m_listBoxScrollable->Resize(boxRect.size);
 
         // file edit
         Rect fileEditRect = clientRect;
@@ -352,10 +358,14 @@ namespace oui
         IListBoxOwner* owner = this;
         m_listBox = std::make_shared<CListBox>(m_colorProfile, owner);
 
+        m_listBoxScrollable = std::make_shared<oui::CScrollable>(m_listBox);
+
         auto columnsNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.goto.columns"));
-        m_listBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }),
-            oui::ColumnParam([=] { return columnsNode->QueryValue(L"comment");  })
+        m_listBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }, 30),
+            oui::ColumnParam([=] { return columnsNode->QueryValue(L"comment");  }, 60)
         );
+        m_listBox->Dock();
+
         m_fileEdit = std::make_shared<CEditBox>(m_colorProfile);
         m_fileEdit->SetEnterHandler([this](const String& text) {
 
@@ -397,9 +407,10 @@ namespace oui
     }
     void CGotoDialog::ConstructChilds()
     {
-        AddChild(m_listBox);
+       // AddChild(m_listBox);
         AddChild(m_fileEdit);
-        AddChild(m_fileLabel);
+        AddChild(m_fileLabel);    
+        AddChild(m_listBoxScrollable);
     }
     void CGotoDialog::OnFinishDialog()
     {
