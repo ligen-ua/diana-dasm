@@ -104,6 +104,11 @@ namespace oui
             MultiLineViewItem item;
             item.text = OUI_TCSTR(" -  d[b,w,d,q,p,ps]         - Display memory");
             lines.push_back(item);
+        } {
+
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  threads                 - Display threads");
+            lines.push_back(item);
         }
     }
     CHelpWindow::CHelpWindow()
