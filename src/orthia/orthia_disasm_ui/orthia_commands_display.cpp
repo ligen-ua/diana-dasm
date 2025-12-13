@@ -96,6 +96,7 @@ void CCommandProcessor::Handle_threads(CommandArguments& args)
         args.ReplyLine(line);
 
         line.clear();
+        args.Sync();
     }
 }
 

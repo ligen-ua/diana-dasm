@@ -6,17 +6,21 @@ namespace oui
 {
     class CWindowThread:Noncopyable
     {
+    public:
+        using SharedFunction_type = std::shared_ptr<std::function<void()>>;
+
         std::mutex m_handlerLock;
         std::function<void()> m_addTaskHandler;
 
         std::mutex m_taskLock;
-        std::vector<std::function<void()>> m_tasks;
+        std::vector<SharedFunction_type> m_tasks;
 
-        std::vector<std::function<void()>> m_uiBuffer;
+        std::vector<SharedFunction_type> m_uiBuffer;
     public:
         CWindowThread(std::function<void()> addTaskHandler = nullptr);
         void SetWakeupHandler(std::function<void()> addTaskHandler);
-        void AddTask(std::function<void()> task);
+        SharedFunction_type AddTask(std::function<void()> task);
+        void RemoveTask(SharedFunction_type task);
         void GUI_ProcessTasks();
         void WakeUpUI();
     };
@@ -62,6 +66,34 @@ namespace oui
                 BaseOperation(thread),
                 m_handler(std::forward<Type>(value))
         {
+        }
+        bool Sync()
+        {
+            oui::CEvent readyEvent(oui::EventType::Manual);
+
+            if (IsCancelled())
+                return false;
+
+            if (!m_thread)
+                return false;
+
+            std::function<void()> task([&]() {
+                readyEvent.Set();
+            });
+            auto taskptr = m_thread->AddTask(task);
+
+            for(;;)
+            {
+                if (readyEvent.Wait(500)) 
+                {
+                    break;
+                }
+                if (IsCancelled())
+                {
+                    m_thread->RemoveTask(taskptr);
+                }
+            }
+            return true;
         }
         template<class... Args>
         bool Reply(Args&&... args)

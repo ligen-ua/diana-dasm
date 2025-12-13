@@ -9,6 +9,10 @@ struct ICalcNode;
 class CCommandProcessor
 {
 public:
+    struct RequestCanceledException:std::runtime_error
+    {
+        RequestCanceledException();
+    };
     using ExecuteProgressHandler_type = std::function<void(std::shared_ptr<oui::BaseOperation> operation,
         const oui::String& text,
         bool finalText)>;
@@ -18,8 +22,9 @@ public:
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler;
         CCommandParser& parser;
         std::shared_ptr<IWorkPlaceItem> item;
-
+        int linesWithoutSync = 0;
         void ReplyLine(const oui::String& text);
+        void Sync();
     };
 protected:
 

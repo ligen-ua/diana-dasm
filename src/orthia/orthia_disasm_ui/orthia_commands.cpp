@@ -7,12 +7,31 @@
 namespace orthia
 {
 
+    const int g_maxLinesWithoutSync = 100;
+    CCommandProcessor::RequestCanceledException::RequestCanceledException()
+        :   
+            std::runtime_error("Request canceled")
+    {
+    }
     void CCommandProcessor::CommandArguments::ReplyLine(const oui::String& text)
     {
         if (!progressHandler->Reply(progressHandler, text, false))
         {
-            throw std::runtime_error("Request canceled");
+            throw RequestCanceledException();
         }
+        if (++linesWithoutSync > g_maxLinesWithoutSync)
+        {
+            Sync();
+            Sleep(50);
+        }
+    }
+    void CCommandProcessor::CommandArguments::Sync()
+    {
+        if (!progressHandler->Sync())
+        {
+            throw RequestCanceledException();
+        }
+        linesWithoutSync = 0;
     }
 
     CCommandProcessor::CCommandProcessor()
