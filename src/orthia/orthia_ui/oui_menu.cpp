@@ -767,6 +767,10 @@ namespace oui
         }
         else
         {
+            if (m_enterStateIndex == m_selectedButtonIndex)
+            {
+                return;
+            }
             m_enterStateIndex = -1;
         }
         Activate();

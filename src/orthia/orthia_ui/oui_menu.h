@@ -103,6 +103,7 @@ namespace oui
         void ConstructChilds() override;
         void Dock();
         std::shared_ptr<MenuColorProfile> GetColorProfile();
+        std::shared_ptr<CMenuPopup> GetCurrentPopup() { return m_currentPopup; }
 
         std::shared_ptr<CMenuButtonWindow> GetSelectedButton();
         
