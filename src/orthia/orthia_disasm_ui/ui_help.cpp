@@ -104,13 +104,24 @@ namespace oui
             MultiLineViewItem item;
             item.text = OUI_TCSTR(" -  d[b,w,d,q,p,ps]         - Display memory");
             lines.push_back(item);
-        } {
+        } 
+        {
 
             MultiLineViewItem item;
             item.text = OUI_TCSTR(" -  threads                 - Display threads");
             lines.push_back(item);
         }
-    }
+        {
+
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  cls                     - Clear screen");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR("Note: pass CTRL+C to command edit box to stop the command");
+            lines.push_back(item);
+        }    }
     CHelpWindow::CHelpWindow()
         :
         Parent_type(

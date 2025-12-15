@@ -2,7 +2,71 @@
 #include <stdio.h>
 #include <stdlib.h>
 namespace orthia
+{   
+struct InvalidUtf8Exception :public std::runtime_error
 {
+    InvalidUtf8Exception()
+        :
+        std::runtime_error("Invalid UTF8")
+    {
+    }
+};
+
+
+static
+bool isValidUTF8(const char* data, int size, size_t& ascii_count) {
+    size_t i = 0;
+    ascii_count = 0;
+
+    while (i < size) {
+        unsigned char byte = data[i];
+
+        // ASCII (0-127)
+        if (byte <= 0x7F) {
+            ascii_count++;
+            i++;
+        }
+        // 2-byte UTF-8 sequence (110xxxxx 10xxxxxx)
+        else if ((byte & 0xE0) == 0xC0) {
+            if (i + 1 >= size || (data[i + 1] & 0xC0) != 0x80) {
+                return false;
+            }
+            i += 2;
+        }
+        // 3-byte UTF-8 sequence (1110xxxx 10xxxxxx 10xxxxxx)
+        else if ((byte & 0xF0) == 0xE0) {
+            if (i + 2 >= size ||
+                (data[i + 1] & 0xC0) != 0x80 ||
+                (data[i + 2] & 0xC0) != 0x80) {
+                return false;
+            }
+            i += 3;
+        }
+        // 4-byte UTF-8 sequence (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+        else if ((byte & 0xF8) == 0xF0) {
+            if (i + 3 >= size ||
+                (data[i + 1] & 0xC0) != 0x80 ||
+                (data[i + 2] & 0xC0) != 0x80 ||
+                (data[i + 3] & 0xC0) != 0x80) {
+                return false;
+            }
+            i += 4;
+        }
+        else {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+static bool IsUTF8SpecialByte(char t) {
+    
+    size_t asciiCount = 0;
+    return isValidUTF8(&t, 1, asciiCount) == false;
+}
+
 orthia::PlatformString_type ReadString(const Token& token)
 {
     orthia::PlatformString_type res;
@@ -760,6 +824,7 @@ bool CTokenizer::IsOtherNameSymbol(char ch)
     }
     return false;
 }
+
 bool CTokenizer::CaptureName(Token * pToken, int flags)
 {
     if (m_line[m_columnPos] == 'L')
@@ -798,7 +863,8 @@ bool CTokenizer::CaptureName(Token * pToken, int flags)
             (ch>='a' && ch<='z') || 
             (ch>='A' && ch<='Z') ||
             (ch == '_') ||
-            IsOtherNameSymbol(ch))
+            IsOtherNameSymbol(ch) ||
+            IsUTF8SpecialByte((unsigned char)ch))
         {
             if (isHexInt && !hexChar)
             {
@@ -937,6 +1003,11 @@ bool CTokenizer::GetNextToken(Token * pToken, int flags)
             }
             ++m_columnPos;
             continue;
+        }
+
+        if (flags & flags_ForceGetName)
+        {
+            return CaptureName(pToken, flags);
         }
         SymbolMatcherFnc_type symbolMatcher = 0;
         switch(ch)

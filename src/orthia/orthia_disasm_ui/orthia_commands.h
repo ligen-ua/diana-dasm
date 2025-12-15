@@ -13,9 +13,17 @@ public:
     {
         RequestCanceledException();
     };
+
+    enum class SpecialUICommands
+    {
+        None,
+        ClearScreen
+    };
     using ExecuteProgressHandler_type = std::function<void(std::shared_ptr<oui::BaseOperation> operation,
         const oui::String& text,
         bool finalText)>;
+    using SpecialUICommandHandler_type = std::function<void(std::shared_ptr<oui::BaseOperation> operation,
+        SpecialUICommands cmd)>;
 
     struct CommandArguments
     {
@@ -32,10 +40,9 @@ protected:
     std::atomic_bool m_busy = false;
     void ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
+        oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
         const orthia::PlatformString_type& text,
         std::shared_ptr<IWorkPlaceItem> item);
-    
-
 
     void ReportStop(CommandArguments& args);
     void Handle_u(CommandArguments& args);
@@ -51,7 +58,8 @@ public:
 
     CCommandProcessor();
     void AsyncExecute(ThreadPtr_type targetThread, 
-        oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
+        oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler, 
+        oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
         const orthia::PlatformString_type& text,
         std::shared_ptr<IWorkPlaceItem> item);
     bool IsBusy() const;

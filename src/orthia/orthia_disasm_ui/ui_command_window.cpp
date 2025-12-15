@@ -42,19 +42,37 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
                     WriteLog(text);
                     if (finalText)
                     {
+                        switch (m_lastCmd)
+                        {
+                        case orthia::CCommandProcessor::SpecialUICommands::ClearScreen:
+                            m_view->Clear();
+                            m_view->Invalidate();
+                            if (!m_cmdHistory.empty())
+                            {
+                                WriteCmdHeaderText(itemId, m_cmdHistory.back());
+                            }
+                            break;
+                        }
                         AddLine(oui::String());
                         m_currentOperation = nullptr;
                     }
                 }
             );
-        orthia::PlatformString_type itemStr;
-        orthia::ObjectToString_t(itemId, itemStr);
 
-        WriteLog(itemStr + OUI_TCSTR("> ") + text.native);
+        auto cmdCallbackOperation = std::make_shared<oui::Operation<orthia::CCommandProcessor::SpecialUICommandHandler_type>>(GetThread(),
+            [=](std::shared_ptr<oui::BaseOperation> operation,
+                orthia::CCommandProcessor::SpecialUICommands cmd)
+        {
+            m_lastCmd = cmd;
+        }
+        );
+
+        WriteCmdHeaderText(itemId, text);
         m_commandEdit->Clear();
         m_currentOperation = operation;
+        m_lastCmd = orthia::CCommandProcessor::SpecialUICommands::None;
         PushHistory(text);
-        model->GetCommandProcessor()->AsyncExecute(GetThread(), operation, text.native, item);
+        model->GetCommandProcessor()->AsyncExecute(GetThread(), operation, cmdCallbackOperation, text.native, item);
     });
 
     // label
@@ -68,6 +86,13 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
     RegisterSwitchParent(parentTabSwitcher);
 }
 
+void CCommandWindow::WriteCmdHeaderText(int itemId, const oui::String& text)
+{
+    orthia::PlatformString_type itemStr;
+    orthia::ObjectToString_t(itemId, itemStr);
+
+    WriteLog(itemStr + OUI_TCSTR("> ") + text.native);
+}
 void CCommandWindow::PushHistory(const oui::String& cmd)
 {
     m_cmdHistory.push_back(cmd);
@@ -91,6 +116,12 @@ bool CCommandWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
         bool handled = false;
         switch (evt.keyEvent.virtualKey)
         {
+        case oui::VirtualKey::kC:
+            if (m_currentOperation)
+            {
+                m_currentOperation->Cancel();
+            }
+            break;
         case oui::VirtualKey::Up:
             --m_cmdHistoryPointer;
             if (m_cmdHistoryPointer < 0)

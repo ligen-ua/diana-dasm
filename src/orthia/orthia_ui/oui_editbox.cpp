@@ -699,14 +699,17 @@ namespace oui
             case oui::VirtualKey::kC:
                 if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
-                    if (auto console = GetConsole())
+                    if (SelectionIsActive())
                     {
-                        if (!m_llHandlers.ctrlCHandler || !m_llHandlers.ctrlCHandler(evt))
+                        if (auto console = GetConsole())
                         {
-                            console->CopyTextToClipboard(ExtractSelected(false));
+                            if (!m_llHandlers.ctrlCHandler || !m_llHandlers.ctrlCHandler(evt))
+                            {
+                                console->CopyTextToClipboard(ExtractSelected(false));
+                            }
                         }
+                        handled = true;
                     }
-                    handled = true;
                 }
                 break;
             case oui::VirtualKey::Enter:

@@ -41,7 +41,7 @@ namespace orthia
     }
     void CCommandProcessor::ReportStop(CommandArguments& args)
     {
-        args.progressHandler->Reply(args.progressHandler, oui::String(), true);
+        args.progressHandler->ReplyAnyway(args.progressHandler, oui::String(), true);
     }
     int CCommandProcessor::PrepareTokens(CommandArguments& args, std::vector<Token> & tokens, const Address_type maxCountOfItems, Address_type & countOfItems)
     {
@@ -215,6 +215,7 @@ namespace orthia
 
     void CCommandProcessor::ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
+        oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
         const orthia::PlatformString_type& text,
         std::shared_ptr<IWorkPlaceItem> item)
     {
@@ -236,23 +237,25 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode());  });
             parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode(), true);  });
             parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { Handle_lm(args);  });
+            parser.SetHandler(OUI_TCSTR("cls"), [&](CCommandParser& parser) mutable { uiCommandHandler->Reply(uiCommandHandler, SpecialUICommands::ClearScreen);  });
 
             parser.Parse(text);
         }
         catch (std::exception& e)
         {
             auto errStr = orthia::Utf8ToUtf16(e.what());
-            args.progressHandler->Reply(args.progressHandler, errStr, false);
+            args.progressHandler->ReplyAnyway(args.progressHandler, errStr, false);
         }
     }
     void CCommandProcessor::AsyncExecute(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
+        oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
         const orthia::PlatformString_type& text,
         std::shared_ptr<IWorkPlaceItem> item)
     {
         m_pool.AddTask([=]() {
 
-            ExecuteImpl(targetThread, progressHandler, text, item);
+            ExecuteImpl(targetThread, progressHandler, uiCommandHandler, text, item);
         });
     }
     bool CCommandProcessor::IsBusy() const
