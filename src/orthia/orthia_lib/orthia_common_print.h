@@ -7,17 +7,17 @@ namespace orthia
 struct ITextPrinter
 {
     virtual ~ITextPrinter(){}
-    virtual void PrintLine(const std::wstring & line) = 0;
+    virtual void PrintLine(const PlatformString_type & line) = 0;
 };
 
 typedef void (*ConvertToTextPtr_type)(void * context, const char * pBinary, orthia::PlatformString_type * text);
 class CVmBinaryMemoryPrinter:public IVmMemoryRangesTarget
 {
     ITextPrinter * m_pTextPrinter;
-    std::wstring m_currentBlock;
-    std::wstring m_currentAscii;
+    PlatformString_type m_currentBlock;
+    PlatformString_type m_currentAscii;
     ConvertToTextPtr_type m_pConvertToTextFnc;
-    std::wstring m_noDataPattern;
+    PlatformString_type m_noDataPattern;
     int m_varSize;
     int m_dianaMode;
     int m_itemsInRow;
@@ -29,7 +29,7 @@ class CVmBinaryMemoryPrinter:public IVmMemoryRangesTarget
     void* m_pConvertContext;
     void ReportBlock();
     void ReportText(Address_type address, 
-                    const std::wstring & text,
+                    const PlatformString_type & text,
                     char charHint);
 public:
     CVmBinaryMemoryPrinter(ITextPrinter * pTextPrinter,
@@ -49,22 +49,47 @@ public:
 
 struct PrintStringWriter:public orthia::ITextPrinter
 {
-    std::wstring m_result;
+    PlatformString_type m_result;
 
-    virtual void PrintLine(const std::wstring & line)
+    virtual void PrintLine(const PlatformString_type & line)
     {
         m_result.append(line);
-        m_result.append(L"\n");
+        m_result.append(ORTHIA_TCSTR("\n"));
     }
 };
 
 char AsciiEscapeSymbol(char symbol);
-std::wstring Address64ToString(Address_type address);
-std::wstring AddressToString(Address_type address, int dianaMode);
+PlatformString_type Address64ToString(Address_type address);
+PlatformString_type AddressToString(Address_type address, int dianaMode);
 void VmDeserializeMemory(int varSize, 
-                         const std::wstring & text,
+                         const PlatformString_type & text,
                          std::vector<char> * pBuffer);
 
+
+namespace WindbgTextIteratorDetail 
+{
+    template<class InBuffer, class OutCharType>
+    void CopyBufferImpl(const InBuffer & buffer, std::basic_string<OutCharType> * pToken)
+    {
+        *pToken = buffer;
+    }
+    template<class InBuffer>
+    void CopyBufferImpl(const InBuffer & buffer, std::basic_string<char> * pToken)
+    {
+        *pToken = ToAnsiString_Silent(buffer);
+    }
+    template<class InBuffer>
+    void CopyBufferImpl(const InBuffer & buffer, std::basic_string<wchar_t> * pToken)
+    {
+        *pToken = ToWideString(buffer);
+    }
+
+    template<class InBuffer, class OutCharType>
+    void CopyBuffer(const InBuffer & buffer, std::basic_string<OutCharType> * pToken)
+    {
+        CopyBufferImpl(buffer, pToken);
+    }
+}
 template<class CharType>
 class CWindbgTextIterator
 {
@@ -76,7 +101,7 @@ class CWindbgTextIterator
     const CharType * m_pEnd;
     
     std::basic_string<CharType> m_buffer;
-    std::wstring m_addressBuffer;
+    PlatformString_type m_addressBuffer;
     std::vector<char> m_addressBufferUnparsed;
 
     template<class ParseStragy>
@@ -107,33 +132,6 @@ class CWindbgTextIterator
         m_buffer.assign(pRangeBegin, m_pBegin);
     }
 
-    template<class OutCharType>
-    void CopyBufferImpl(std::basic_string<OutCharType> * pToken)
-    {
-        char error[0];
-        &error;
-    }
-    template<>
-    void CopyBufferImpl<char>(std::basic_string<char> * pToken)
-    {
-        *pToken = ToAnsiString_Silent(m_buffer);
-    }
-    template<>
-    void CopyBufferImpl<wchar_t>(std::basic_string<wchar_t> * pToken)
-    {
-        *pToken = ToWideString(m_buffer);
-    }
-
-    template<class OutCharType>
-    void CopyBuffer(std::basic_string<OutCharType> * pToken)
-    {
-        CopyBufferImpl<OutCharType>(pToken);
-    }
-    template<>
-    void CopyBuffer(std::basic_string<CharType> * pToken)
-    {
-        *pToken = m_buffer;
-    }
 
 public:
     CWindbgTextIterator(const std::basic_string<CharType> & arg)
@@ -153,8 +151,8 @@ public:
 
     struct WhiteSpaceStrategy 
     {
-        template<class CharType>
-        bool IsEnd(CharType ch) const
+        template<class CharTypeEx>
+        bool IsEnd(CharTypeEx ch) const
         {
             return orthia::IsWhitespace(ch);
         }
@@ -166,8 +164,8 @@ public:
 
     struct EndOfDocumentStrategy
     {
-        template<class CharType>
-        bool IsEnd(CharType ch) const
+        template<class CharTypeEx>
+        bool IsEnd(CharTypeEx ch) const
         {
             return false;
         }
@@ -184,7 +182,7 @@ public:
         ParseTokenToBuffer(strategy);
         if (m_buffer.empty())
             return false;
-        CopyBuffer(pToken);
+        WindbgTextIteratorDetail::CopyBuffer(m_buffer, pToken);
         return true;
     }
     template<class ParseStragy>

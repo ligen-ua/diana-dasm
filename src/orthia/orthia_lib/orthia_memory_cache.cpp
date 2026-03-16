@@ -267,7 +267,7 @@ static bool TestAndReportReaderSpace(COutputWriteHelper & writeHelper,
     const int optimisticPageSize = 64*1024;
     const int pessimisticPageSize = 0x1000;
     
-    Address_type sizeToReport = std::min(size, writeHelper.GetRequiredBytesCount());
+    Address_type sizeToReport = std::min<orthia::Address_type>(size, writeHelper.GetRequiredBytesCount());
     Address_type startOffset = writeHelper.GetCurrentOffset();
 
     tmpBuffer.resize(optimisticPageSize);
@@ -443,7 +443,7 @@ void CMemoryStorageOfModifiedData::Read(Address_type offset,
 {
     if (m_breakpoints.find(offset) != m_breakpoints.end())
     {
-        __debugbreak();
+        DIANA_DEBUG_BREAK();
     }
     *pBytesRead = 0;
     if (!m_pReader)
@@ -872,7 +872,7 @@ void CMemoryStorageOfModifiedData::Write(Address_type offset,
 {
     if (m_breakpoints.find(offset) != m_breakpoints.end())
     {
-        __debugbreak();
+        DIANA_DEBUG_BREAK();
     }
     *pBytesWritten = 0;
     if (!m_pReader)
@@ -915,7 +915,7 @@ void CMemoryStorageOfModifiedData::Write(Address_type offset,
         {
             if (m_pageBreakpoints.find(currentPage) != m_pageBreakpoints.end())
             {
-                __debugbreak();
+                DIANA_DEBUG_BREAK();
             }
             std::pair<PagesMap_type::iterator, bool> res = m_pageMap.insert(std::make_pair(currentPage, PageInfo()));
             oldit = res.first;
@@ -991,6 +991,7 @@ void CReaderOverVector::Read(Address_type offset,
     *pBytesRead = bytesToRead;
 }
 
+#ifdef WIN32
 
 // CReaderOverRealWorld
 CReaderOverRealWorld::CReaderOverRealWorld()
@@ -1079,4 +1080,5 @@ void CReaderOverRealWorld::Read(Address_type offset,
     }
 }
 
+#endif
 }

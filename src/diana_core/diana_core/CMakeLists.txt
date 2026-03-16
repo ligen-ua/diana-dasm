@@ -1,5 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
 project(diana_core)
-
 
 include_directories(".")
 include_directories("./diana_patchers")
@@ -33,6 +33,7 @@ diana_uids.c
 diana_win32.c
 diana_win32_executable_heap.c
 diana_win32_sys_memcpy.c
+diana_elf.c
 
 diana_patchers/diana_ultimate_patcher.c
 diana_patchers/diana_ultimate_patcher_32.c

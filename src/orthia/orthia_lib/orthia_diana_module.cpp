@@ -13,11 +13,13 @@ extern "C"
 namespace orthia
 {
 
+static
 int DianaEnvironment_ConvertAddressToRelative(void * pThis, 
                                               OPERAND_SIZE address,              
                                               OPERAND_SIZE * pRelativeOffset,
                                               int * pbInvalidPointer);
 
+static
 int DianaEnvironment_AnalyzeJumpAddress(void * pThis, 
                                        OPERAND_SIZE address,
                                        int flags,
@@ -60,9 +62,9 @@ int DianaEnvironment_ConvertAddressToRelative(void * pThis,
         if ((long long)address > 0 && address & 0x80000000)
         {
             // sign extend the address
-            ULARGE_INTEGER temp;
+            orthia::UnsignedLargeInteger_type temp;
             temp.QuadPart = address;
-            temp.HighPart = (ULONG)-1;
+            temp.HighPart = (uint32_t)DI_MAX_OPERAND_SIZE;
             address = temp.QuadPart;
             *pRelativeOffset = address; 
         }
@@ -258,11 +260,11 @@ void CDianaModule::Analyze(int analyserFlags)
     m_impl->Analyze(analyserFlags);
 }
 
-std::wstring CDianaModule::GetName() const
+orthia::PlatformString_type CDianaModule::GetName() const
 {
-    std::wstringstream str;
+    orthia::PlatformStringStream_type str;
     std::hex(str);
-    str<<std::setfill(L'0') << std::setw(m_impl->GetDianaMode()*2) <<m_offset;
+    str<<std::setfill(ORTHIA_TCSTR('0')) << std::setw(m_impl->GetDianaMode()*2) <<m_offset;
     return str.str();
 }
 void CDianaModule::QueryInstructionIterator(CDianaInstructionIterator * pIterator)

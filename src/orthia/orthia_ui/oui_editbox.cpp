@@ -320,7 +320,7 @@ namespace oui
         }
 
         // skip initial ranges if scrolling
-        auto rangeIt = m_markup.ranges.begin();
+        std::vector<TextMarkup::Range>::const_iterator rangeIt = m_markup.ranges.begin();
         int rangePos = 0;
 
         for (; rangeIt != m_markup.ranges.end(); ++rangeIt) 

@@ -5,9 +5,10 @@ extern "C"
 #include "diana_processor/diana_processor_core.h"
 #include "diana_win32.h"
 }
-#include "windows.h"
 #include "vector"
 #include "map"
+
+#include "orthia_files.h"
 #pragma warning(disable:4996)
 
 std::vector<char> g_buffer;
@@ -22,10 +23,10 @@ static void test_vm_fake()
 
 static void test_crash()
 {
-    g_testMap[(void*)1] = &test_vm_fake;
-    g_testMap[(void*)2] = &test_crash;
-    g_testMap[(void*)3] = &g_buffer;
-    g_testMap[(void*)4] = &g_testMap;
+    g_testMap[(void*)1] = (void*)&test_vm_fake;
+    g_testMap[(void*)2] = (void*)&test_crash;
+    g_testMap[(void*)3] = (void*)&g_buffer;
+    g_testMap[(void*)4] = (void*)&g_testMap;
     // integration test for exec command testing:
     volatile static int global = 0;
     volatile int x = 0;
@@ -61,7 +62,12 @@ static void test_crash()
             *((double*)(char*)(pData+256)) = 1.5;
         }
     }
+#ifdef WIN32
     ULONG id = GetCurrentThreadId(); 
+#else
+    pid_t id = getpid();
+#endif
+
     // id should be in registers, usually in EAX
     global = 10;
     x = id/x;
@@ -77,6 +83,7 @@ void test_vm_shuttle();
 void test_shuttle_utils();
 void test_tokenizer();
 void test_expressions();
+void test_elf();
 
 int main(int argc, char * argv[])
 {
@@ -88,14 +95,25 @@ int main(int argc, char * argv[])
     DianaProcessor_GlobalInit();
     DianaWin32_Init();
 
+#ifdef WIN32
     if (argc == 2 && strcmp(argv[1], "/shuttle") == 0)
     {
         test_vm_shuttle();
     }
-    test_expressions();
-    test_tokenizer();
     test_shuttle_utils();
     test_pe();
+#else
+
+    orthia::EnvironmentPaths paths;
+    paths.m_ApplicationDataPath = ".";
+    paths.m_TempPath = '.';
+
+    orthia::InitEnvironmentPaths(paths);
+#endif
+    test_elf();
+
+    test_expressions();
+    test_tokenizer();
     test_memory_cache();
     test_vm();
     test_memory_manager();

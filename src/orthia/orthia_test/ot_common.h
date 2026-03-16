@@ -4,6 +4,7 @@
 #include "orthia_module_manager.h"
 #include "orthia_interfaces.h"
 #include "orthia_database_module.h"
+#include "orthia_files.h"
 
 // wcscat
 #pragma warning(disable:4996)
@@ -15,12 +16,13 @@ struct OT_TestEnv
 
     OT_TestEnv(bool force = true)
     {
-        std::vector<wchar_t> buf(1024);
-        GetTempPath((DWORD)buf.size(), &buf.front());
-        wcscat(&buf.front(), L"\\orthia_test");
-        CreateDirectory(&buf.front(), 0);
-        wcscat(&buf.front(), L"\\test.db");
-        manager.Reinit(&buf.front(), force);
+        orthia::PlatformString_type tmpPath = orthia::GetTempPathWithSlash();
+        orthia::AddSlash(tmpPath);
+        tmpPath += ORTHIA_TCSTR("orthia_test");
+        orthia::CreateDir(tmpPath);
+        orthia::AddSlash(tmpPath);
+        tmpPath += ORTHIA_TCSTR("test.db");
+        manager.Reinit(tmpPath, force);
     }
     orthia::intrusive_ptr<orthia::CDatabaseManager> GetDatabaseManager()
     {
@@ -83,6 +85,7 @@ public:
     }
 };
 
+#ifdef WIN32
 
 class CLinkObserverOverWin32:public diana::CBasePeLinkImportsObserver, public orthia::IAPIHandlerDebugInterface
 {
@@ -218,3 +221,6 @@ public:
         return res;
     }
 };
+
+
+#endif

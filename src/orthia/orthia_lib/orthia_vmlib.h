@@ -11,7 +11,7 @@ namespace orthia
 {
 
 long long DoCommand_vm_new(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManager, 
-                           const std::wstring & name,
+                           const orthia::PlatformString_type & name,
                            const long long * pID);
 void DoCommand_vm_del(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManager, 
                       long long id);
@@ -84,12 +84,12 @@ int DoCommand_vm_mod_load(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManag
                            _Diana_Processor_Registers_Context * pContext,
                            std::vector<OPERAND_SIZE> * pCallStack,
                            IAddressSpace * pAddressSpace,
-                           const std::wstring & fileNameHint,
+                           const orthia::PlatformString_type & fileNameHint,
                            IAPIHandlerDebugInterface * pAPIHandlerDebugInterface,
                            long long * pCommandsCount);
 
-typedef std::set<std::wstring> AttributesToDeleteSet_type;
-typedef std::map<std::wstring, std::wstring> AttributesToAddMap_type;
+typedef std::set<orthia::PlatformString_type> AttributesToDeleteSet_type;
+typedef std::map<orthia::PlatformString_type, orthia::PlatformString_type> AttributesToAddMap_type;
 void DoCommand_vm_mod_manage_custom_attributes(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManager, 
                                                long long vmId,
                                                long long moduleId,

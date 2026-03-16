@@ -3,7 +3,7 @@
 namespace orthia
 {
 
-    void ÑPersistentItemStorage::AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+    void CPersistentItemStorage::AsyncQueryGotoInfo(ThreadPtr_type targetThread,
         const oui::String& filter,
         oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
         int flags)
@@ -43,7 +43,7 @@ namespace orthia
         filterHandler->Reply(filterHandler, filter, items, error);
     }
 
-    void ÑPersistentItemStorage::AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+    void CPersistentItemStorage::AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
         oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
         orthia::Address_type address,
         int flags,
@@ -78,7 +78,7 @@ namespace orthia
         gotoHandler->ReplyWithRetain(gotoHandler, address, error);
     }
 
-    void ÑPersistentItemStorage::AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+    void CPersistentItemStorage::AsyncFetchPrevHistory(ThreadPtr_type targetThread,
         oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler)
     {
         orthia::CAutoCriticalSection guard(m_lock);
@@ -96,7 +96,7 @@ namespace orthia
         gotoHandler->ReplyWithRetain(gotoHandler, address, error, pageAddress);
     }
 
-    oui::String ÑPersistentItemStorage::SyncReadComment(orthia::Address_type address)
+    oui::String CPersistentItemStorage::SyncReadComment(orthia::Address_type address)
     {
         orthia::CAutoCriticalSection guard(m_lock);
 
@@ -107,7 +107,7 @@ namespace orthia
         }
         return it->second.text;
     }
-    oui::fsui::OpenResult ÑPersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
+    oui::fsui::OpenResult CPersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
     {
         orthia::CAutoCriticalSection guard(m_lock);
 

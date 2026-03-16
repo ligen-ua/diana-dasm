@@ -21,34 +21,34 @@ static void test_vm1_1()
     orthia::Ptr<orthia::CDatabaseManager> pDatabaseManager = testEnv.GetDatabaseManager();
     orthia::Ptr<orthia::CVMDatabase> pVmDatabase = pDatabaseManager->GetVMDatabase();
     
-    long long vmID1 = pVmDatabase->AddNewVM(L"test");
+    long long vmID1 = pVmDatabase->AddNewVM(ORTHIA_TCSTR("test"));
     DIANA_TEST_ASSERT(vmID1 == 1);
 
     // check info
     orthia::VmInfo vmInfo;
     DIANA_TEST_ASSERT(pVmDatabase->QueryVMInfo(vmID1, &vmInfo));
     DIANA_TEST_ASSERT(vmInfo.id == 1);
-    DIANA_TEST_ASSERT(vmInfo.name == L"test");
+    DIANA_TEST_ASSERT(vmInfo.name == ORTHIA_TCSTR("test"));
 
     // query all
     orthia::VmInfoListTargetOverVector allVms;
     pVmDatabase->QueryVirtualMachines(&allVms);
     DIANA_TEST_ASSERT(allVms.m_data.size() == 1);
     DIANA_TEST_ASSERT(allVms.m_data[0].id == 1);
-    DIANA_TEST_ASSERT(allVms.m_data[0].name == L"test");
+    DIANA_TEST_ASSERT(allVms.m_data[0].name == ORTHIA_TCSTR("test"));
 
     // add second
-    DIANA_TEST_EXCEPTION(pVmDatabase->AddNewVM(L"test"), const std::exception & );
+    DIANA_TEST_EXCEPTION(pVmDatabase->AddNewVM(ORTHIA_TCSTR("test")), const std::exception & );
 
-    long long vmID2 = pVmDatabase->AddNewVM(L"test2");
+    long long vmID2 = pVmDatabase->AddNewVM(ORTHIA_TCSTR("test2"));
 
     allVms.m_data.clear();
     pVmDatabase->QueryVirtualMachines(&allVms);
     DIANA_TEST_ASSERT(allVms.m_data.size() == 2);
     DIANA_TEST_ASSERT(allVms.m_data[0].id == 1);
-    DIANA_TEST_ASSERT(allVms.m_data[0].name == L"test");
+    DIANA_TEST_ASSERT(allVms.m_data[0].name == ORTHIA_TCSTR("test"));
     DIANA_TEST_ASSERT(allVms.m_data[1].id == 2);
-    DIANA_TEST_ASSERT(allVms.m_data[1].name == L"test2");
+    DIANA_TEST_ASSERT(allVms.m_data[1].name == ORTHIA_TCSTR("test2"));
 
     // add empty module
     long long modulePos = pVmDatabase->AddNewModule(vmID2);
@@ -214,7 +214,7 @@ static void test_vm2()
     orthia::Ptr<orthia::CDatabaseManager> pDatabaseManager = testEnv.GetDatabaseManager();
     orthia::Ptr<orthia::CVMDatabase> pVmDatabase = pDatabaseManager->GetVMDatabase();
 
-    long long vmId1 = pVmDatabase->AddNewVM(L"test");
+    long long vmId1 = pVmDatabase->AddNewVM(ORTHIA_TCSTR("test"));
     long long moduleId1 = pVmDatabase->AddNewModule(vmId1);
 
     // build our virtual virtual space
@@ -419,6 +419,8 @@ void test_vm()
     DIANA_TEST(test_vm2())
 }
 
+#ifdef WIN32
+
 class CTestAddressSpace:public orthia::IAddressSpace
 {
 public:
@@ -450,7 +452,7 @@ public:
     }
 };
 
-        
+
 static void test_vm_shuttle1()
 {
     CTestDataGenerator testDataGenerator;
@@ -459,7 +461,7 @@ static void test_vm_shuttle1()
     orthia::Ptr<orthia::CDatabaseManager> pDatabaseManager = testEnv.GetDatabaseManager();
     orthia::Ptr<orthia::CVMDatabase> pVmDatabase = pDatabaseManager->GetVMDatabase();
 
-    long long vmId1 = pVmDatabase->AddNewVM(L"test_shuttle");
+    long long vmId1 = pVmDatabase->AddNewVM(ORTHIA_TCSTR("test_shuttle"));
     long long moduleId1 = pVmDatabase->AddNewModule(vmId1);
 
 
@@ -485,10 +487,10 @@ static void test_vm_shuttle1()
     DI_CHECK_CPP(DianaProcessor_ConvertContextToIndependent_X64(&context, &dianaContext));
 #endif
 
-    std::wstring shuttleFileName(L"orthia_shuttle.dll");
+    std::wstring shuttleFileName(ORTHIA_TCSTR("orthia_shuttle.dll"));
     if (GetFileAttributes(shuttleFileName.c_str()) == INVALID_FILE_ATTRIBUTES)
     {
-        shuttleFileName = orthia::GetCurrentModuleDir() + shuttleFileName;
+        shuttleFileName = orthia::GetCurrentProcessDir() + shuttleFileName;
     }
     std::vector<char> dllData;
     orthia::LoadFileToVector(shuttleFileName.c_str(), dllData);
@@ -542,3 +544,5 @@ void test_vm_shuttle()
 {
     DIANA_TEST(test_vm_shuttle1());
 }
+
+#endif

@@ -30,8 +30,8 @@ struct DianaTestError:public std::runtime_error
 #define DIANA_TEST_VAR(X) try{ DIANA_TEST_ASSERT(X) }catch(DianaTestError & ){ std::cout<<"[ERROR] Test failed: "<<#X<<"\n\n"; }catch(const std::exception & e) {std::cout<<"[ERROR] Test failed: "<<#X<<", exception: \""<<e.what()<<"\"\n\n"; }
 
 
-#define DIANA_TEST_EXCEPTION(X, EXC)  try { X; DIANA_TEST_ASSERT((#X)?FALSE:FALSE); } catch(EXC) {  }
-#define DIANA_TEST_EXCEPTION2(X, EXC)  try { X; DIANA_TEST_ASSERT((#X)?FALSE:FALSE); } catch(EXC) 
+#define DIANA_TEST_EXCEPTION(X, EXC)  try { X; DIANA_TEST_ASSERT((#X)?0:0); } catch(EXC) {  }
+#define DIANA_TEST_EXCEPTION2(X, EXC)  try { X; DIANA_TEST_ASSERT((#X)?0:0); } catch(EXC) 
 
 int Diana_ParseCmdOnBuffer_test(int iMode,
                            void * pBuffer,
@@ -47,5 +47,10 @@ struct TestEntry_Name
     int iPrivileged;
 };
 
+#ifdef WIN32
+#define DIANA_TEST_WIN32(X)  DIANA_TEST(X)
+#else
+#define DIANA_TEST_WIN32(X) 
+#endif
 
 #endif

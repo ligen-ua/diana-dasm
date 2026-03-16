@@ -88,7 +88,7 @@ void CTextNode::RegisterValue(const orthia::PlatformString_type & name, const or
 {
     std::pair<Values_type::iterator, bool> res = m_values.insert(std::make_pair(name, value));
     if (!res.second)
-        throw std::runtime_error("Value already registered: " + orthia::PlatformStringToAcp(name));
+        throw std::runtime_error("Value already registered: " + orthia::PlatformStringToUtf8(name));
 
     if (!name.empty())
     {
@@ -276,7 +276,7 @@ CTextManager::NodeRef CTextManager::RegisterNode(const orthia::PlatformString_ty
     intrusive_ptr<CTextNode> pNode(new CTextNode(name));
     std::pair<Nodes_type::iterator, bool> res = m_nodes.insert(std::make_pair(name, pNode));
     if (!res.second)
-        throw std::runtime_error("Node already registered: " + orthia::PlatformStringToAcp(name));
+        throw std::runtime_error("Node already registered: " + orthia::PlatformStringToUtf8(name));
     return CTextManager::NodeRef(pNode);
 }
 CTextManager::ValueRef CTextManager::RegisterValue(const orthia::PlatformString_type & name, 
@@ -288,7 +288,7 @@ intrusive_ptr<CTextNode> CTextManager::QueryNode(const orthia::PlatformString_ty
 {
     Nodes_type::iterator it = m_nodes.find(name);
     if (it == m_nodes.end())
-        throw std::runtime_error("Node not found: " + orthia::PlatformStringToAcp(name));
+        throw std::runtime_error("Node not found: " + orthia::PlatformStringToUtf8(name));
     return it->second;
 }
 intrusive_ptr<CTextNode> CTextManager::QueryNodeDef(const orthia::PlatformString_type& name)

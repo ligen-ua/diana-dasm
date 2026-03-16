@@ -44,8 +44,8 @@ public:
     CDatabase();
     ~CDatabase();
     // file api
-    void CreateNew(const std::wstring & fullFileName);
-    void OpenExisting(const std::wstring & fullFileName);
+    void CreateNew(const orthia::PlatformString_type & fullFileName);
+    void OpenExisting(const orthia::PlatformString_type & fullFileName);
 
     orthia::intrusive_ptr<CClassicDatabase> GetClassicDatabase();
     orthia::intrusive_ptr<CVMDatabase> GetVMDatabase();
@@ -61,8 +61,8 @@ public:
     CDatabaseManager();
     ~CDatabaseManager();
     // file api
-    void CreateNew(const std::wstring & fullFileName);
-    void OpenExisting(const std::wstring & fullFileName);
+    void CreateNew(const orthia::PlatformString_type & fullFileName);
+    void OpenExisting(const orthia::PlatformString_type & fullFileName);
 
     orthia::intrusive_ptr<CDatabase> GetDatabase();
     orthia::intrusive_ptr<CClassicDatabase> GetClassicDatabase();

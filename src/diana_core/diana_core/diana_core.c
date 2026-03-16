@@ -63,7 +63,16 @@ int DianaExactRead(DianaReadStream * pThis,
         return DI_END_OF_STREAM;
     return DI_SUCCESS;
 }
-
+int DianaExactReadSafe(DianaReadStream* pThis,
+    void* pBuffer,
+    OPERAND_SIZE iBufferSize) 
+{
+    if (iBufferSize > DI_MAX_INT)
+    {
+        return DI_OVERFLOW;
+    }
+    return DianaExactRead(pThis, pBuffer, (int)iBufferSize);
+}
 void DianaResult_AddByte(DianaParserResult* result, DI_CHAR ch)
 {
     if (result->bytesCount >= DI_MAX_INSTRUCTION_SIZE)
@@ -179,7 +188,7 @@ void Diana_FatalBreak()
     #ifdef DIANA_CFG_USE_INLINE_ASSEMBLER
         __asm int 3
     #else
-        __debugbreak();
+        DIANA_DEBUG_BREAK();
     #endif
 #endif
 }

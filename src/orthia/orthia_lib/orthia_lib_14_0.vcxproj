@@ -87,7 +87,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)diana_core\diana_processor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -105,7 +105,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)diana_core\diana_processor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -121,7 +121,7 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)diana_core\diana_processor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader />
@@ -139,7 +139,7 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>$(SolutionDir)diana_core\diana_core;$(SolutionDir)diana_core\diana_processor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader />
@@ -180,6 +180,7 @@
     <ClCompile Include="orthia_text_manager.cpp" />
     <ClCompile Include="orthia_tokenizer.cpp" />
     <ClCompile Include="orthia_utils.cpp" />
+    <ClCompile Include="orthia_utils_win32.cpp" />
     <ClCompile Include="orthia_vmlib.cpp" />
     <ClCompile Include="orthia_vmlib_api_handlers.cpp" />
     <ClCompile Include="orthia_vmlib_api_handlers_common.cpp" />
@@ -195,6 +196,7 @@
     <ClInclude Include="orthia_common_print.h" />
     <ClInclude Include="orthia_common_reports.h" />
     <ClInclude Include="orthia_common_time.h" />
+    <ClInclude Include="orthia_core.h" />
     <ClInclude Include="orthia_database_impl_classic.h" />
     <ClInclude Include="orthia_database_impl_vm.h" />
     <ClInclude Include="orthia_database_module.h" />
@@ -229,6 +231,7 @@
     <ClInclude Include="orthia_tiny_xml.h" />
     <ClInclude Include="orthia_tokenizer.h" />
     <ClInclude Include="orthia_utils.h" />
+    <ClInclude Include="orthia_utils_win32.h" />
     <ClInclude Include="orthia_vmlib.h" />
     <ClInclude Include="orthia_vmlib_api_handlers.h" />
     <ClInclude Include="orthia_vmlib_api_handlers_common.h" />

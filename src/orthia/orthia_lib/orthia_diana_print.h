@@ -20,7 +20,7 @@ namespace orthia
         orthia::ITextPrinter* m_pTextPrinter;
         int m_dianaMode;
         AsmCommandWriterType m_writer;
-        std::wstring m_currentBlock;
+        orthia::PlatformString_type m_currentBlock;
         orthia::Address_type m_sizeInCommands;
         orthia::Address_type m_currentCommand;
         int m_bytesIdent;
@@ -60,8 +60,8 @@ namespace orthia
             m_writer.SetSpacesCount(spacesCount);
         }
         virtual void PrintCommand(unsigned long long address,
-            const std::wstring& bytes,
-            const std::wstring& command)
+            const orthia::PlatformString_type& bytes,
+            const orthia::PlatformString_type& command)
         {
             m_currentBlock.clear();
             m_currentBlock.append(orthia::AddressToString(address, m_dianaMode));
@@ -121,7 +121,7 @@ namespace orthia
             Diana_InitContext(&context, m_dianaMode);
             Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
 
-            std::wstring temp, binaryData;
+            orthia::PlatformString_type temp, binaryData;
             orthia::Address_type virtualOffset = vmRange.address;
             size_t offsetInPage = 0;
             bool prevWasBad = false;
@@ -176,7 +176,7 @@ namespace orthia
                         }
                         else
                         {
-                            std::wstring dbCommand = L"db";
+                            orthia::PlatformString_type dbCommand = L"db";
                             dbCommand.append(m_spacesCount, L' ');
                             PrintCommand(virtualOffset, temp, dbCommand + temp);
                         }

@@ -10,18 +10,21 @@ namespace orthia
 class CSQLStringCache
 {
     bool m_inited;
-    SYSTEMTIME m_time;
-    
+    orthia::WinSystemTime_type m_time;
+
 public:
     CSQLStringCache();
-    void LazyInit(const std::string & sqlTimeImpl);
-    void Init(const SYSTEMTIME & time);
+    void LazyInit(const std::string& sqlTimeImpl);
+    void Init(const orthia::WinSystemTime_type& time);
     void Clear();
-    const SYSTEMTIME * ToSystemTime() const;
-    std::wstring GUI_QueryConvertedToLocal() const;
-    bool GUI_QueryConvertedToLocal(SYSTEMTIME * pTimeRes) const;
-    std::wstring GUI_QueryStringJustDate() const;
+    const orthia::WinSystemTime_type* ToSystemTime() const;
+    orthia::PlatformString_type GUI_QueryConvertedToLocal() const;
+    bool GUI_QueryConvertedToLocal(orthia::WinSystemTime_type* pTimeRes) const;
+    orthia::PlatformString_type GUI_QueryStringJustDate() const;
+    orthia::PlatformString_type Android_QueryStringJustDate() const;
 };
+
+
 class CCommonDateTime
 {
     std::string m_sqlTimeImpl;
@@ -29,6 +32,10 @@ class CCommonDateTime
 public:
     CCommonDateTime()
     {
+    }
+    CCommonDateTime(const orthia::WinSystemTime_type& sqlValue)
+    {
+        InitFromSystemTime(sqlValue);
     }
     void Clear()
     {
@@ -40,12 +47,13 @@ public:
         return m_sqlTimeImpl.empty();
     }
     void InitFromCurrentTime();
-    void InitFromSystemTime(const SYSTEMTIME & sqlValue)
+    void InitFromFileTime(long long fileTime);
+    void InitFromSystemTime(const orthia::WinSystemTime_type& sqlValue)
     {
         m_sqlTimeImpl = orthia::ConvertSystemTimeToSQLite(sqlValue);
         m_cache.Init(sqlValue);
     }
-    void InitFromSQL(const std::string & sqlValue)
+    void InitFromSQL(const std::string& sqlValue)
     {
         m_sqlTimeImpl = sqlValue;
         m_cache.Clear();
@@ -54,31 +62,42 @@ public:
     {
         return m_sqlTimeImpl;
     }
-    std::wstring GUI_QueryConvertedToLocal() const 
+    orthia::PlatformString_type GUI_QueryConvertedToLocal() const
     {
         m_cache.LazyInit(m_sqlTimeImpl);
         return m_cache.GUI_QueryConvertedToLocal();
     }
-    bool GUI_QueryConvertedToLocal(SYSTEMTIME * pTimeRes) const 
+    bool GUI_QueryConvertedToLocal(orthia::WinSystemTime_type* pTimeRes) const
     {
         m_cache.LazyInit(m_sqlTimeImpl);
         return m_cache.GUI_QueryConvertedToLocal(pTimeRes);
     }
-    std::wstring GUI_QueryStringJustDate() const
+    orthia::PlatformString_type GUI_QueryStringJustDate() const
     {
         m_cache.LazyInit(m_sqlTimeImpl);
         return m_cache.GUI_QueryStringJustDate();
     }
-    const SYSTEMTIME * ToSystemTime() const
+    orthia::PlatformString_type Android_QueryStringJustDate() const
+    {
+        m_cache.LazyInit(m_sqlTimeImpl);
+        return m_cache.Android_QueryStringJustDate();
+    }
+    const orthia::WinSystemTime_type* ToSystemTime() const
     {
         m_cache.LazyInit(m_sqlTimeImpl);
         return m_cache.ToSystemTime();
     }
     long long ToLongLongTime() const
     {
-        return orthia::ConvertSystemTimeToFileTime(ToSystemTime());
+        const orthia::WinSystemTime_type* pSystemTime = ToSystemTime();
+        if (!pSystemTime)
+        {
+            return 0;
+        }
+        return orthia::ConvertSystemTimeToFileTime(pSystemTime);
     }
 };
+
 
 }
 

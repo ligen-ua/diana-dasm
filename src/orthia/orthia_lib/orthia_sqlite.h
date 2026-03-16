@@ -74,16 +74,16 @@ public:
 long long SQLite_ReadInt(sqlite3_stmt * statement, bool bSilent, int defaultValue);
 unsigned long long SQLite_ReadInt64(sqlite3_stmt* statement, bool bSilent, unsigned long long defaultValue);
 
-void SQLite_ReadWideString(sqlite3_stmt * statement, bool bSilent, const std::wstring & defaultValue, std::wstring * pResult);
+void SQLite_ReadPlatformString(sqlite3_stmt * statement, bool bSilent, const orthia::PlatformString_type & defaultValue, orthia::PlatformString_type * pResult);
 
 #define ORTHIA_CHECK_SQLITE(Expression, Text) { int orthia____code = (Expression); if (orthia____code != SQLITE_OK && orthia____code != SQLITE_DONE) { std::stringstream orthia____stream; orthia____stream<<"[SQLITE] "<<Text<<", code: "<<orthia____code; throw std::runtime_error(orthia____stream.str()); }} 
 #define ORTHIA_CHECK_SQLITE2(Expression) ORTHIA_CHECK_SQLITE(Expression, "Error")
 
 std::string ConvertTimeToSQLite(long long time);
 bool ConvertSQLTimeToSystemTime(const std::string & time_in,
-                                SYSTEMTIME * pSt);
+                                orthia::WinSystemTime_type * pSt);
 std::string SQLiteTimeFromISO8601(const std::string & time);
-std::string ConvertSystemTimeToSQLite(const SYSTEMTIME & st);
+std::string ConvertSystemTimeToSQLite(const orthia::WinSystemTime_type & st);
 
 int SQLiteStep_Wrapper(sqlite3_stmt* statement);
 int SQLiteExec_Wrapper(sqlite3* statement, const char* sql);

@@ -22,6 +22,7 @@
 #ifdef _WIN32
 
 #define DIANA_HAS_WIN32
+#define DIANA_DEBUG_BREAK()  __debugbreak()
 
 #endif
 
@@ -33,10 +34,23 @@
 
 
 #ifndef DIANA_INLINE_C
-# if __GNUC__ && !__GNUC_STDC_INLINE__
-#  define DIANA_INLINE_C extern inline
-# else
 
+#if __GNUC__ 
+// GNUC version
+
+#define DIANA_HAS_POSIX
+#define DIANA_HAS_LINUX
+
+#define DIANA_DEBUG_BREAK()  assert(false)
+
+#if __GNUC_STDC_INLINE__
+#define DIANA_INLINE_C static inline
+#else
+#define DIANA_INLINE_C extern inline
+#endif
+
+#else
+// other compilers
 #ifdef _MSC_VER
 #  define DIANA_INLINE_C __forceinline
 #else

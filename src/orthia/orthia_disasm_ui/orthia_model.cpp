@@ -235,7 +235,7 @@ namespace orthia
 
         WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
 
-        auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
+        auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
         info->ReloadModules();
 
@@ -341,15 +341,15 @@ namespace orthia
                         file->GetFullFileNameForUI());
 
                     std::stringstream textInfo;
-                    textInfo << Utf16ToUtf8(readmeHeader) << "\n";
-                    textInfo << Utf16ToUtf8(originalName.native) << "\n";
+                    textInfo << PlatformStringToUtf8(readmeHeader) << "\n";
+                    textInfo << PlatformStringToUtf8(originalName.native) << "\n";
                     auto str = textInfo.str();
                     readmeFile.WriteToFile_Silent(str.c_str(), str.size());
                 }
             }
 
             // fill the model data
-            auto persistentItemStorage = std::make_shared<ÑFilePersistentItemStorage>();
+            auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
 
             info->fullName = file->GetFullFileName();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_utils.h"
+#include "orthia_files.h"
 
 namespace orthia
 {
@@ -26,39 +27,46 @@ namespace orthia
     struct ILowLevelLog:public orthia::IRefCountedBase
     {
         virtual ~ILowLevelLog(){}
-        virtual void LogData(const ORTHIA_TCHAR * pData, ULONG size)=0;
+        virtual void LogData(const ORTHIA_TCHAR * pData, int size)=0;
         virtual log_meta::LogEncoding_type QueryEncoding() const=0;
     };
 
     inline void LogData(orthia::intrusive_ptr<ILowLevelLog> pLog,
                         const ORTHIA_TCHAR * pData)
     {
-        pLog->LogData(pData, (ULONG)wcslen(pData));
+        pLog->LogData(pData, (int)ORTHIA_TLEN(pData));
     }
+
+#ifdef WIN32
     class CLogOverWCOUT:public RefCountedBase_t<ILowLevelLog>
     {
     public:
-        virtual void LogData(const ORTHIA_TCHAR * pData, ULONG size);
+        virtual void LogData(const ORTHIA_TCHAR * pData, int size);
         virtual log_meta::LogEncoding_type QueryEncoding() const;
     };
+#endif
 
     template<class StreamType>
     class CLogOverCmdStream:public RefCountedBase_t<ILowLevelLog>
     {
         StreamType m_stream;
     public:
-        virtual void LogData(const ORTHIA_TCHAR * pData, ULONG size)
+        virtual void LogData(const ORTHIA_TCHAR * pData, int size)
         {
             m_stream.Write(orthia::PlatformString_type(pData, pData + size));
         }
         virtual log_meta::LogEncoding_type QueryEncoding() const
         {
+#ifdef WIN32 
             return log_meta::leUtf16LE;
+#else
+            return log_meta::leUtf8;
+#endif
         }
     };
     class CFileLog:public RefCountedBase_t<ILowLevelLog>
     {
-        orthia::CHandleGuard m_file;
+        orthia::CFile m_file;
         log_meta::LogEncoding_type m_encoding;
         bool m_bEnabled;
         int m_usedCP;
@@ -67,7 +75,7 @@ namespace orthia
                  log_meta::LogEncoding_type encoding);
         CFileLog();
         ~CFileLog();
-        virtual void LogData(const ORTHIA_TCHAR * pData, ULONG size);
+        virtual void LogData(const ORTHIA_TCHAR * pData, int size);
         virtual log_meta::LogEncoding_type QueryEncoding() const;
     };
     class CDebugOutputLog :public RefCountedBase_t<ILowLevelLog>
@@ -75,7 +83,7 @@ namespace orthia
     public:
         CDebugOutputLog();
         ~CDebugOutputLog();
-        virtual void LogData(const ORTHIA_TCHAR* pData, ULONG size);
+        virtual void LogData(const ORTHIA_TCHAR* pData, int size);
         virtual log_meta::LogEncoding_type QueryEncoding() const;
     };
     const int g_iLogParamMaxBufSize = 63;
@@ -96,17 +104,19 @@ namespace orthia
     public:
         CLogParam();
         CLogParam(LogSeverity severity);
-        CLogParam(const ORTHIA_TCHAR * pData, ULONG size);
+        CLogParam(const ORTHIA_TCHAR * pData, int size);
         CLogParam(const orthia::PlatformString_type & str);
+#ifdef WIN32
         CLogParam(const std::string & str);
+        CLogParam(const char * pValue);
+#endif
         CLogParam(long value, long radix = 10);
         CLogParam(unsigned long value, long radix = 10);
         CLogParam(unsigned long long value, long radix = 10);
-        CLogParam(const LARGE_INTEGER & value);
+        CLogParam(const orthia::LargeInteger_type & value);
         CLogParam(long long value);
         CLogParam(bool value);
         CLogParam(const ORTHIA_TCHAR * pValue);
-        CLogParam(const char * pValue);
   
         bool IsSeverity(LogSeverity & severity) const;
         const ORTHIA_TCHAR * GetBegin() const;
@@ -138,17 +148,19 @@ namespace orthia
     public:
         CLogParamEx() {} 
         CLogParamEx(LogSeverity severity) : CLogParam(severity) {   }
-        CLogParamEx(const ORTHIA_TCHAR * pData, ULONG size) : CLogParam(pData, size)  {   }
+        CLogParamEx(const ORTHIA_TCHAR * pData, int size) : CLogParam(pData, size)  {   }
         CLogParamEx(const orthia::PlatformString_type & str) : CLogParam(str)  {   }
-        CLogParamEx(const std::string & str) : CLogParam(str)  {   }
         CLogParamEx(long value, long radix = 10) : CLogParam(value, radix)  {   }
         CLogParamEx(unsigned long value, long radix = 10) : CLogParam(value, radix)  {   }
-        CLogParamEx(const LARGE_INTEGER & value) : CLogParam(value)  {   }
+        CLogParamEx(const orthia::LargeInteger_type & value) : CLogParam(value)  {   }
         CLogParamEx(long long value) : CLogParam(value)  {   }
         CLogParamEx(bool value) : CLogParam(value)  {   }
         CLogParamEx(const ORTHIA_TCHAR * pValue) : CLogParam(pValue)  {   }
-        CLogParamEx(const char * pValue) : CLogParam(pValue)  {   }
 
+#ifdef WIN32
+        CLogParamEx(const std::string & str) : CLogParam(str)  {   }
+        CLogParamEx(const char * pValue) : CLogParam(pValue)  {   }
+#endif
 
         CLogParamEx(const LogHelper<long> & obj) : CLogParam(obj.m_value, obj.m_radix)  {   }
         CLogParamEx(const LogHelper<unsigned long> & obj) : CLogParam(obj.m_value, obj.m_radix)  {   }
@@ -256,7 +268,7 @@ namespace orthia
         virtual void LogNewLine(orthia::PlatformString_type & data)
         {
             data.append(ORTHIA_TCSTR("\n"));
-            m_pLog->LogData(data.c_str(), (ULONG)data.size());
+            m_pLog->LogData(data.c_str(), (int)data.size());
         }
     };
 

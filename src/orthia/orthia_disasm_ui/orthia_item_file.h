@@ -5,11 +5,11 @@
 namespace orthia
 {
     class CDatabaseManager;
-    class ÑFilePersistentItemStorage :public ÑPersistentItemStorage
+    class CFilePersistentItemStorage :public CPersistentItemStorage
     {
         orthia::intrusive_ptr<CDatabaseManager> m_databaseManager;
     public:
-        ÑFilePersistentItemStorage();
+        CFilePersistentItemStorage();
         void Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager);
         oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment);
     };
@@ -20,9 +20,9 @@ namespace orthia
         oui::String fullName, shortName;
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;
-        std::shared_ptr<ÑFilePersistentItemStorage> persistentItemStorage;
+        std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage;
 
-        FileWorkplaceItem(std::shared_ptr<ÑFilePersistentItemStorage> peristentItemStorage_in);
+        FileWorkplaceItem(std::shared_ptr<CFilePersistentItemStorage> peristentItemStorage_in);
 
         // public interface
         WorkAddressData ReadData(Address_type address, Address_type size) override;

@@ -63,4 +63,14 @@ int DianaStreams_MemsetData(DianaReadWriteRandomStream * pOutStream,
                             int pageSize);
 
 
+typedef struct _DianaMovableReadStreamOverMemory
+{
+    DianaMovableReadStream stream;
+    DianaMemoryStream memoryStream;
+}DianaMovableReadStreamOverMemory;
+
+void DianaMovableReadStreamOverMemory_Init(DianaMovableReadStreamOverMemory* pThis,
+    const void* pBuffer,
+    OPERAND_SIZE bufferSize);
+
 #endif

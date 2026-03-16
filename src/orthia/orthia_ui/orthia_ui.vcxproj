@@ -166,6 +166,7 @@
     <ClCompile Include="oui_button.cpp" />
     <ClCompile Include="oui_color.cpp" />
     <ClCompile Include="oui_console.cpp" />
+    <ClCompile Include="oui_console_win32.cpp" />
     <ClCompile Include="oui_containers.cpp" />
     <ClCompile Include="oui_editbox.cpp" />
     <ClCompile Include="oui_filesystem.cpp" />
@@ -199,6 +200,7 @@
     <ClInclude Include="oui_color.h" />
     <ClInclude Include="oui_column_param.h" />
     <ClInclude Include="oui_console.h" />
+    <ClInclude Include="oui_console_win32.h" />
     <ClInclude Include="oui_containers.h" />
     <ClInclude Include="oui_editbox.h" />
     <ClInclude Include="oui_filesystem.h" />

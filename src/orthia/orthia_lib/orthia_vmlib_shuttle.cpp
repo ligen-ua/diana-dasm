@@ -102,9 +102,9 @@ void CShuttleArgsBuilder::Produce(PrebuiltShuttleArgument * pArg)
 class CShuttlePrintStream 
 {
     CommonHandlerParameters & m_parameters;
-    std::wstring m_tmp;
+    orthia::PlatformString_type m_tmp;
     std::string m_tmpAnsi;
-    std::wstringstream m_res;
+    orthia::PlatformStringStream_type m_res;
     std::vector<char> m_buffer;
 public:
     CShuttlePrintStream(CommonHandlerParameters & parameters)
@@ -143,7 +143,7 @@ public:
                               reg_DS));
         m_buffer[m_buffer.size()-2] = 0;
         m_buffer[m_buffer.size()-1] = 0;
-        m_tmp = (wchar_t*)&m_buffer.front();
+        m_tmp = (ORTHIA_TCHAR*)&m_buffer.front();
       
     }
     void Flush()
@@ -168,7 +168,7 @@ public:
             break;
         case orthia_shuttle::PrintArgument::paAnsi: 
             ReadAnsi(op.int64Data);
-            m_res<<orthia::ToWideString(m_tmpAnsi);
+            m_res<<orthia::Utf8ToPlatformString(m_tmpAnsi);
             break;
         case orthia_shuttle::PrintArgument::paWide:
             ReadWide(op.int64Data);

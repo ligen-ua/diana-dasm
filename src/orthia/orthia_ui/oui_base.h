@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <set>
+#include <list>
 #include <unordered_map>
 #include <functional>
 #include <tuple>
@@ -16,10 +17,17 @@
 #include <mutex>
 #include <cstdint>
 #include <sstream>
+#include <cstring>
+#include <thread>
 
 #if defined(_WIN32) || (_MSC_VER)
 
 #define OUI_SYS_WINDOWS
+
+#else
+
+
+#define OUI_SYS_POSIX
 
 #endif
 
@@ -120,10 +128,6 @@ namespace oui
         return (ch & 0xC0) != 0x80;
     }
 
-    void FilterUnreadableSymbols(std::wstring& text);
-    bool StartsWith(const std::wstring& text, const std::wstring& phrase);
-    std::wstring Uppercase_Silent(const std::wstring& str);
-
     enum class BorderStyle
     {
         None,
@@ -168,9 +172,16 @@ namespace oui
     std::wstring ToStringW(LogFlags flags);
 }
 
-#ifdef OUI_SYS_WINDOWS
+
+namespace oui
+{
+    enum class EventType 
+    { 
+        Auto,
+        Manual
+    };
+}
 
 #include "oui_base_win32.h"
-
-#endif
+#include "oui_base_posix.h"
 

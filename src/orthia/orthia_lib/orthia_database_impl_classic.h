@@ -56,7 +56,7 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtWriteComment;
 
     void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to);
-    void InsertModule(Address_type baseAddress, Address_type size, const std::wstring & moduleName);
+    void InsertModule(Address_type baseAddress, Address_type size, const orthia::PlatformString_type & moduleName);
 
     void Init();
 
@@ -67,7 +67,7 @@ public:
     // module loading process:
     void StartSaveModule(Address_type baseAddress, 
                          Address_type size, 
-                         const std::wstring & moduleName,
+                         const orthia::PlatformString_type & moduleName,
                          CAutoRollbackClassicDatabase * pRollback);
     void DoneSave();
     void CleanupResources();

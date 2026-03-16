@@ -167,6 +167,7 @@ public:
     const RegionData_type & GetData() const { return m_regionData; }
 };
 
+#ifdef WIN32
 
 class CReaderOverRealWorld:public IMemoryReader
 {
@@ -189,6 +190,7 @@ public:
                       DianaUnifiedRegister selectorHint);
 };
 
+#endif
 
 }
 

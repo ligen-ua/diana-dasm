@@ -107,10 +107,10 @@ void CClassicDatabase::InsertReference(sqlite3_stmt * stmt, Address_type from, A
     sqlite3_reset(stmt);
 }
 
-static std::wstring Escape(const std::wstring & moduleName)
+static orthia::PlatformString_type Escape(const orthia::PlatformString_type & moduleName)
 {
-    std::wstring copy = moduleName;
-    for(std::wstring::iterator it = copy.begin(), it_end = copy.end();
+    orthia::PlatformString_type copy = moduleName;
+    for(orthia::PlatformString_type::iterator it = copy.begin(), it_end = copy.end();
         it != it_end;
         ++it)
     {
@@ -129,18 +129,18 @@ static std::wstring Escape(const std::wstring & moduleName)
 
 void CClassicDatabase::InsertModule(Address_type baseAddress, 
                              Address_type size, 
-                             const std::wstring & moduleName)
+                             const orthia::PlatformString_type & moduleName)
 {
     CSQLAutoReset autoStatement(m_stmtInsertModule.Get());
     sqlite3_bind_int64(m_stmtInsertModule.Get(), 1, baseAddress);
     sqlite3_bind_int64(m_stmtInsertModule.Get(), 2, size);
-    SQLBindWideString(m_stmtInsertModule.Get(), orthia::Escape(moduleName), 3);
+    ORTHIA_BIND_PLATFORM_STRING(m_stmtInsertModule.Get(), orthia::Escape(moduleName), 3);
 
     ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertModule.Get()), L"Can't insert module");
 }
 void CClassicDatabase::StartSaveModule(Address_type baseAddress, 
                                 Address_type size, 
-                                const std::wstring & moduleName,
+                                const orthia::PlatformString_type & moduleName,
                                 CAutoRollbackClassicDatabase * pRollback)
 {
     orthia::CAutoCriticalSection guard(m_lock);
@@ -395,7 +395,7 @@ bool CClassicDatabase::QueryModule(Address_type moduleAddress, CommonModuleInfo*
             {
                 Address_type size = sqlite3_column_int64(m_stmtQueryModuleById.Get(), 0);
                 std::string name = (char*)sqlite3_column_text(m_stmtQueryModuleById.Get(), 1);
-                *pResult = CommonModuleInfo(moduleAddress, size, orthia::ToWideString(name));
+                *pResult = CommonModuleInfo(moduleAddress, size, orthia::Utf8ToPlatformString(name));
                 return true;
             }
         throw std::runtime_error("SQLiteStep_Wrapper failed");
@@ -422,7 +422,7 @@ bool CClassicDatabase::QueryNearestModule(Address_type address, CommonModuleInfo
                 Address_type moduleAddress = sqlite3_column_int64(m_stmtQueryNearestModuleById.Get(), 0);
                 Address_type size = sqlite3_column_int64(m_stmtQueryNearestModuleById.Get(), 1);
                 std::string name = (char*)sqlite3_column_text(m_stmtQueryNearestModuleById.Get(), 2);
-                *pResult = CommonModuleInfo(moduleAddress, size, orthia::ToWideString(name));
+                *pResult = CommonModuleInfo(moduleAddress, size, orthia::Utf8ToPlatformString(name));
                 return true;
             }
         throw std::runtime_error("SQLiteStep_Wrapper failed");
@@ -449,7 +449,7 @@ void CClassicDatabase::QueryModules(std::vector<CommonModuleInfo> * pResult)
             Address_type address = sqlite3_column_int64(m_stmtQueryModules.Get(), 0);
             Address_type size = sqlite3_column_int64(m_stmtQueryModules.Get(), 1);
             std::string name = (char*)sqlite3_column_text(m_stmtQueryModules.Get(), 2);
-            pResult->push_back(CommonModuleInfo(address, size, orthia::ToWideString(name)));
+            pResult->push_back(CommonModuleInfo(address, size, orthia::Utf8ToPlatformString(name)));
             continue;
         }
         throw std::runtime_error("SQLiteStep_Wrapper failed");

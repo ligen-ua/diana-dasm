@@ -1,10 +1,6 @@
 #include "orthia_sqlite.h"
 #include "orthia_sqlite_utils.h"
 #include "orthia_utils.h"
-#include "algorithm"
-
-#define _CRT_SECURE_NO_WARNINGS
-#pragma warning(disable:4996)
 
 #ifdef DIANA_HAS_CPP11
 #include <chrono>
@@ -17,7 +13,7 @@ namespace orthia
 #ifdef DIANA_HAS_CPP11
     int SQLiteStep_Wrapper(sqlite3_stmt* statement)
     {
-        int secondsToWaitLock = IsDebuggerPresent() ? 60 : g_secondsToWaitLock;
+        int secondsToWaitLock = ORTHIA_IS_DEBUGGER_PRESENT() ? 60 : g_secondsToWaitLock;
         auto operationStart = std::chrono::steady_clock::now();
         for (;;)
         {
@@ -39,7 +35,7 @@ namespace orthia
 
     int SQLiteExec_Wrapper(sqlite3* statement, const char* sql)
     {
-        int secondsToWaitLock = IsDebuggerPresent() ? 60 : g_secondsToWaitLock;
+        int secondsToWaitLock = ORTHIA_IS_DEBUGGER_PRESENT() ? 60 : g_secondsToWaitLock;
         auto operationStart = std::chrono::steady_clock::now();
         for (;;)
         {
@@ -96,7 +92,7 @@ static bool IsNotDigit(wchar_t ch)
 }
 
 bool ConvertSQLTimeToSystemTime(const std::string & time_in,
-                                SYSTEMTIME * pSt)
+                                orthia::WinSystemTime_type * pSt)
 {
     memset(pSt, 0, sizeof(*pSt));
     if (time_in.empty())
@@ -145,22 +141,13 @@ long long SQLReadDatetime(sqlite3_stmt * statement, int pos)
 {
     long long failResult = 0;
     std::string time = SQLReadUtf8String(statement, pos);
-    SYSTEMTIME st;
+    orthia::WinSystemTime_type st;
     if (!ConvertSQLTimeToSystemTime(time, &st))
     {
         return failResult;
     }
 
-    FILETIME ftResult = {0,0};
-    if (!SystemTimeToFileTime(&st, &ftResult))
-    {
-        return failResult;
-    }
-
-    LARGE_INTEGER result;
-    result.HighPart = ftResult.dwHighDateTime;
-    result.LowPart = ftResult.dwLowDateTime;
-    return result.QuadPart;
+    return ConvertSystemTimeToFileTime(&st);
 }
 
 CSQLStatement::CSQLStatement(sqlite3_stmt * statement)
@@ -352,10 +339,10 @@ unsigned long long SQLite_ReadInt64(sqlite3_stmt* statement, bool bSilent, unsig
     return result;
 }
 
-void SQLite_ReadWideString(sqlite3_stmt * statement, 
+void SQLite_ReadPlatformString(sqlite3_stmt * statement, 
                            bool bSilent, 
-                           const std::wstring & defaultValue, 
-                           std::wstring * pResult)
+                           const orthia::PlatformString_type & defaultValue, 
+                           orthia::PlatformString_type * pResult)
 {
     bool bResult = false;
     for(;;)
@@ -372,7 +359,7 @@ void SQLite_ReadWideString(sqlite3_stmt * statement,
             {
                 throw std::runtime_error("SQLiteStep_Wrapper failed: only one row expected");
             }
-            *pResult = SQLReadWideString(statement, 0);
+            *pResult = ORTHIA_READ_PLATFORM_STRING(statement, 0);
             bResult = true;
             continue;
         }
@@ -388,29 +375,26 @@ void SQLite_ReadWideString(sqlite3_stmt * statement,
     }
 }
 
+
 std::string ConvertTimeToSQLite(long long time)
 {
-    LARGE_INTEGER value;
-    value.QuadPart = time;
-    
-    FILETIME fileTime;
-    fileTime.dwHighDateTime = value.HighPart;
-    fileTime.dwLowDateTime = value.LowPart;
-
-    SYSTEMTIME st = {0};
-    if (!FileTimeToSystemTime(&fileTime, &st))
+    if (time < 0)
+    {
+        time = 0;
+    }
+    orthia::WinSystemTime_type st = {0,};
+    if (!ConvertFileTimeToSystemTime(time, &st))
     {
         throw std::runtime_error("Can't convert time");
     }
-
     return ConvertSystemTimeToSQLite(st);
 }
 
-std::string ConvertSystemTimeToSQLite(const SYSTEMTIME & st)
+std::string ConvertSystemTimeToSQLite(const orthia::WinSystemTime_type & st)
 {
     //YYYY-MM-DD HH:MM:SS.SSS 
     char buffer[64];
-    _snprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), 
+    ORTHIA_SNPRINTF(buffer, sizeof(buffer)/sizeof(buffer[0]),
         "%4i-%02i-%02i %02i:%02i:%02i.%03i",
         (int)st.wYear,
         (int)st.wMonth,
@@ -422,32 +406,32 @@ std::string ConvertSystemTimeToSQLite(const SYSTEMTIME & st)
     return buffer;
 }
 
-std::string SQLiteTimeFromISO8601(const std::string & time_in)
+std::string SQLiteTimeFromISO8601(const std::string & time)
 {
-    std::string time = time_in;
+    orthia::PlatformString_type timew = orthia::Utf8ToPlatformString(time);
     const int partsCount = 7;
     int intParts[partsCount] = {0,};
     
-    std::vector<orthia::StringInfo_Ansi> parts;
-    std::replace_if(time.begin(), time.end(), IsNotDigit, ' ');
-    orthia::SplitString(time, " ", &parts);
+    std::vector<orthia::StringInfo> parts;
+    std::replace_if(timew.begin(), timew.end(), IsNotDigit, ' ');
+    orthia::SplitString(timew, ORTHIA_TCSTR(" "), &parts);
 
     int  * pCurrentPart = intParts;
-    for(std::vector<orthia::StringInfo_Ansi>::iterator it = parts.begin(), it_end = parts.end();
+    for(std::vector<orthia::StringInfo>::iterator it = parts.begin(), it_end = parts.end();
         it != it_end;
         ++it)
     {
         if (it->size() == 0)
             continue;
-        std::string data(it->ToString());
-        orthia::Trim(data);
+        orthia::PlatformString_type data(it->ToString());
+        orthia::TrimString(data);
         orthia::StringToObject(data, pCurrentPart); 
         ++pCurrentPart;
         if (pCurrentPart - intParts >= partsCount)
             break;
     }
 
-    SYSTEMTIME st;
+    orthia::WinSystemTime_type st;
     st.wYear = intParts[0];
     st.wMonth = intParts[1];
     st.wDayOfWeek = 0;
@@ -459,7 +443,7 @@ std::string SQLiteTimeFromISO8601(const std::string & time_in)
 
     //YYYY-MM-DD HH:MM:SS.SSS 
     char buffer[64];
-    _snprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), 
+    ORTHIA_SNPRINTF(buffer, sizeof(buffer)/sizeof(buffer[0]),
         "%4i-%02i-%02i %02i:%02i:%02i.%03i",
         (int)st.wYear,
         (int)st.wMonth,

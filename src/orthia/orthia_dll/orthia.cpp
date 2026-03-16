@@ -1,3 +1,4 @@
+#include "orthia_core.h"
 #include "orthia.h"
 #include "orthia_module_manager.h"
 #include "orthia_memory_cache.h"

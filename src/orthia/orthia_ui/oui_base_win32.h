@@ -1,15 +1,19 @@
+#ifdef OUI_SYS_WINDOWS
+
 #pragma once
 #include <windows.h>
 #undef max
 #undef min
 
+#define OUI_DEBUG_BREAK      __debugbreak()
+#define OUI_TLEN   wcslen
+    
 namespace oui
 {
-    enum class EventType 
-    { 
-        Auto,
-        Manual
-    };
+    std::wstring Uppercase_Silent(const std::wstring& str);
+    void FilterUnreadableSymbols(std::wstring& text);
+    bool StartsWith(const std::wstring& text, const std::wstring& phrase);
+
 
     class CEvent:Noncopyable
     {
@@ -93,3 +97,5 @@ namespace oui
 
 
 }
+
+#endif

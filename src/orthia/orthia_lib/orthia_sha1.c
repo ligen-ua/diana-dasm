@@ -58,7 +58,7 @@ void SHA1ProcessMessageBlock(SHA1Context *);
  *      sha Error Code.
  *
  */
-int __stdcall SHA1Reset(SHA1Context *context)
+int ORTHIA_STDCALL SHA1Reset(SHA1Context *context)
 {
     if (!context)
     {
@@ -101,7 +101,7 @@ int __stdcall SHA1Reset(SHA1Context *context)
  *
  */
 
-int __stdcall SHA1Result( SHA1Context *context,
+int ORTHIA_STDCALL SHA1Result( SHA1Context *context,
                         uint8_t Message_Digest[SHA1HashSize])
 {
     int i;
@@ -158,7 +158,7 @@ int __stdcall SHA1Result( SHA1Context *context,
  *      sha Error Code.
  *
  */
-int __stdcall SHA1Input(  SHA1Context    *context,
+int ORTHIA_STDCALL SHA1Input(  SHA1Context    *context,
                         const uint8_t  *message_array,
                         unsigned       length)
 {
@@ -386,7 +386,7 @@ void SHA1PadMessage(SHA1Context *context)
     SHA1ProcessMessageBlock(context);
 }
 
-void __stdcall Sha1Hash(const unsigned char * pData, unsigned int iSize, uint8_t * pResult)
+void ORTHIA_STDCALL Sha1Hash(const unsigned char * pData, unsigned int iSize, uint8_t * pResult)
 {
     int err=0, i=0;
     SHA1Context sha;

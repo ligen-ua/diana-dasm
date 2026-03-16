@@ -18,7 +18,7 @@ public:
     {
 
     }
-    void LogData(const ORTHIA_TCHAR* pData, ULONG size)
+    void LogData(const ORTHIA_TCHAR* pData, int size)
     {
         if (auto out = m_outputWindow.lock())
         {

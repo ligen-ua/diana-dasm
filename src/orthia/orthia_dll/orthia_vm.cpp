@@ -42,7 +42,7 @@ ORTHIA_DECLARE_API(vm_vm_new)
    ORTHIA_CMD_START
 
 
-       std::wstring wargs = orthia::UnescapeArg(orthia::ToWideString(orthia::Trim(args)));
+       orthia::PlatformString_type wargs = orthia::UnescapeArg(orthia::ToWideString(orthia::Trim(args)));
        if (wargs.empty())
        {
            throw std::runtime_error("Name expected");
@@ -50,7 +50,7 @@ ORTHIA_DECLARE_API(vm_vm_new)
        std::vector<orthia::StringInfo> optionsParts;
        orthia::SplitString(wargs, L" ", &optionsParts);
 
-       std::wstring name;
+       orthia::PlatformString_type name;
        int position = -1;
        long long vmID = 0;
        long long * pVmID = 0;
@@ -109,7 +109,7 @@ ORTHIA_DECLARE_API(vm_vm_list)
    ORTHIA_CMD_START
 
         bool useHeader = true;
-        std::wstring wargs = orthia::ToWideString(orthia::Trim(args));
+        orthia::PlatformString_type wargs = orthia::ToWideString(orthia::Trim(args));
         if (wcsncmp(wargs.c_str(), L"--no-header", 11) == 0)
         {
             useHeader = false;
@@ -203,7 +203,7 @@ ORTHIA_DECLARE_API(vm_mod_list)
    ORTHIA_CMD_START
 
         bool useHeader = true;
-        std::wstring wargs = orthia::ToWideString(orthia::Trim(args));
+        orthia::PlatformString_type wargs = orthia::ToWideString(orthia::Trim(args));
         if (wcsncmp(wargs.c_str(), L"--no-header", 11) == 0)
         {
             useHeader = false;
@@ -237,7 +237,7 @@ ORTHIA_DECLARE_API(vm_mod_list)
         {
             bool isEnabled = !(it->rawInfo.flags & orthia::VmModuleInfo::flags_disabled);
          
-            std::wstring description = it->description;
+            orthia::PlatformString_type description = it->description;
                             
             orthia::CReportRow row = report.StartRow()
                 << orthia::ToWideStringAsHex_Short(it->rawInfo.id)
@@ -438,7 +438,7 @@ ORTHIA_DECLARE_API(vm_mod_write_bin)
         const char * pTail = orthia::ReadExpressitonValue(args, vmId, false);
         pTail = orthia::ReadExpressitonValue(pTail, moduleId, false);
         pTail = orthia::ReadExpressitonValue(pTail, startAddress, false);
-        std::wstring filename = orthia::UnescapeArg(orthia::ToWideString(orthia::Trim(pTail)));
+        orthia::PlatformString_type filename = orthia::UnescapeArg(orthia::ToWideString(orthia::Trim(pTail)));
         if (filename.empty())
         {
             throw std::runtime_error("Filename expected");
@@ -525,20 +525,20 @@ ORTHIA_DECLARE_API(vm_mod_ep)
 }
 #define CHECK_REG(RegName) if (orthia::Downcase_Ansi(#RegName) == regValue) { \
     orthia::Address_type value = 0; \
-    const char* pTail = orthia::ReadExpressitonValue(orthia::Utf16ToUtf8(optionsParts[1].ToString()).c_str(), value, true); \
+    const char* pTail = orthia::ReadExpressitonValue(orthia::PlatformStringToUtf8(optionsParts[1].ToString()).c_str(), value, true); \
     context->reg_##RegName.value = value; \
     return true; \
  }
 
-static bool ApplyRegister(const std::wstring& arg, Diana_Processor_Registers_Context* context) {
+static bool ApplyRegister(const orthia::PlatformString_type& arg, Diana_Processor_Registers_Context* context) {
 
     std::vector<orthia::StringInfo> optionsParts;
-    std::wstring downcaseArg = orthia::Downcase(arg);
+    orthia::PlatformString_type downcaseArg = orthia::Downcase(arg);
     orthia::SplitString(downcaseArg, L"=", &optionsParts);
     if (optionsParts.size() != 2) {
         return false;
     }
-    std::string regValue = orthia::Utf16ToUtf8(optionsParts[0].ToString());
+    std::string regValue = orthia::PlatformStringToUtf8(optionsParts[0].ToString());
     CHECK_REG(RAX);
     CHECK_REG(RCX);
     CHECK_REG(RDX);
@@ -566,7 +566,7 @@ void UnparseCallParameters(const char * pTail,
 {
     orthia::Address_type commandsCountRaw = 0;
    
-    std::wstring options;
+    orthia::PlatformString_type options;
     if (!orthia::ToWideString(orthia::Trim(pTail)).empty())
     {
         pTail = orthia::ReadWindbgSize(pTail, &commandsCountRaw, false, true);
@@ -600,7 +600,7 @@ void UnparseCallParameters(const char * pTail,
             continue;
         }
 
-        throw std::runtime_error("Unknown option: " + orthia::Utf16ToUtf8(orthia::Trim(it->ToString())));
+        throw std::runtime_error("Unknown option: " + orthia::PlatformStringToUtf8(orthia::Trim(it->ToString())));
     }
 }
 
@@ -730,13 +730,13 @@ ORTHIA_DECLARE_API(vm_mod_load)
         const char * pTail = orthia::ReadExpressitonValue(args, vmId, false);
         pTail = orthia::ReadExpressitonValue(pTail, moduleId, false);
         pTail = orthia::ReadExpressitonValue(pTail, startAddress, false);
-        std::wstring filenameArg = orthia::UnescapeArg(orthia::ToWideString(orthia::Trim(pTail)));
+        orthia::PlatformString_type filenameArg = orthia::UnescapeArg(orthia::ToWideString(orthia::Trim(pTail)));
         if (filenameArg.empty())
         {
             throw std::runtime_error("Filename expected");
         }
 
-        std::wstring filename = filenameArg;
+        orthia::PlatformString_type filename = filenameArg;
         if (!orthia::IsFileExists(filename))
         {
             filename = orthia::GetCurrentModuleDir() + filename;

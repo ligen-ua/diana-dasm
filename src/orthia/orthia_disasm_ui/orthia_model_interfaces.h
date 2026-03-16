@@ -192,7 +192,7 @@ namespace orthia
     };
 
 
-    class ÑPersistentItemStorage :public IPeristentItemStorage
+    class CPersistentItemStorage :public IPeristentItemStorage
     {
         orthia::CCriticalSection m_lock;
 

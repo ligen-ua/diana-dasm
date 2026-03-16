@@ -21,7 +21,6 @@ extern "C"
 #include "diana_core_gen_tags.h"
 #include "diana_processor/diana_processor_cmd_j.h"
 }
-#include "intrin.h"
 
 namespace orthia
 {
@@ -42,7 +41,7 @@ static
 int orthia_rdtsc(struct _dianaContext * pDianaContext,
                         DianaProcessor * pCallContext)
 {
-    ULARGE_INTEGER res;
+    orthia::UnsignedLargeInteger_type res;
     res.QuadPart = __rdtsc();
     
     SET_REG_EDX(res.HighPart);
@@ -53,7 +52,7 @@ static
 int orthia_rdtscp(struct _dianaContext * pDianaContext,
                         DianaProcessor * pCallContext)
 {
-    ULARGE_INTEGER res;
+    orthia::UnsignedLargeInteger_type res;
     res.QuadPart = __rdtsc();
     
     SET_REG_RDX(res.HighPart);

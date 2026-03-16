@@ -84,14 +84,14 @@ long long CVMDatabase::QueryLastId()
     return SQLite_ReadInt(m_stmtSelectRowId.Get(), false, 0);
 }
 
-long long CVMDatabase::AddNewVM(const std::wstring & name,
+long long CVMDatabase::AddNewVM(const orthia::PlatformString_type & name,
                                 const long long * pID)
 {
     CSQLTransaction transaction;
     transaction.Init(m_pDatabase->Get());
     {
         CSQLAutoReset autoStatement(m_stmtSelectVMByName.Get());
-        SQLBindWideString(m_stmtSelectVMByName.Get(), name, 1);
+        ORTHIA_BIND_PLATFORM_STRING(m_stmtSelectVMByName.Get(), name, 1);
         if (SQLStep(m_stmtSelectVMByName.Get()))
         {
             throw std::runtime_error("Can't add new VM, name already exists");
@@ -101,7 +101,7 @@ long long CVMDatabase::AddNewVM(const std::wstring & name,
     if (pID)
     {
         CSQLAutoReset autoStatement(m_stmtInsertVM_withID.Get());
-        SQLBindWideString(m_stmtInsertVM_withID.Get(), name, 1);
+        ORTHIA_BIND_PLATFORM_STRING(m_stmtInsertVM_withID.Get(), name, 1);
         SQLBindInt64(m_stmtInsertVM_withID.Get(), *pID, 2);
         SQLExecute(m_stmtInsertVM_withID.Get());
         id = *pID;
@@ -109,7 +109,7 @@ long long CVMDatabase::AddNewVM(const std::wstring & name,
     else
     {
         CSQLAutoReset autoStatement(m_stmtInsertVM.Get());
-        SQLBindWideString(m_stmtInsertVM.Get(), name, 1);
+        ORTHIA_BIND_PLATFORM_STRING(m_stmtInsertVM.Get(), name, 1);
         SQLExecute(m_stmtInsertVM.Get());
         id = QueryLastId();
     }
@@ -133,7 +133,7 @@ void CVMDatabase::DelVM(long long id)
 static void InternalReadFields(CSQLStatement & statement, VmInfo * pInfo)
 {
     pInfo->id = SQLReadInt64(statement.Get(), 0);
-    pInfo->name = SQLReadWideString(statement.Get(), 1);
+    pInfo->name = ORTHIA_READ_PLATFORM_STRING(statement.Get(), 1);
     pInfo->creationTime.InitFromSQL(SQLReadUtf8String(statement.Get(), 2));
     pInfo->lastWriteTime.InitFromSQL(SQLReadUtf8String(statement.Get(), 3));
 }
@@ -177,7 +177,7 @@ long long CVMDatabase::AddNewModule(long long vmId)
         if (SQLStep(m_stmtSelectMaxModulePosByVM.Get()))
         {
             long long maxId = SQLReadInt64(m_stmtSelectMaxModulePosByVM.Get(), 0);
-            if (maxId < 0 || maxId == MAXLONGLONG)
+            if (maxId < 0 || maxId == DI_MAX_OPERAND_SIZE)
             {
                 throw std::runtime_error("Invalid VM state");
             }

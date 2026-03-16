@@ -73,7 +73,7 @@ namespace orthia
             imageBase,
             &writeStream,
             &page.front(),
-            (ULONG)page.size(),
+            (DI_UINT32)page.size(),
             params.mapFlags));
 
 

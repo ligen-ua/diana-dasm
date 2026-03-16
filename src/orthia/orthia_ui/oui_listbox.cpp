@@ -519,7 +519,7 @@ namespace oui
     {
         if (m_paintInProgress)
         {
-            __debugbreak();
+            OUI_DEBUG_BREAK;
         }
         m_offset = 0;
         m_pageItems.clear();
@@ -557,7 +557,7 @@ namespace oui
     {
         if (m_paintInProgress)
         {
-            __debugbreak();
+            OUI_DEBUG_BREAK;
         }
         return m_pageItems;
     }

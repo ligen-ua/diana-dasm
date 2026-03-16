@@ -1,8 +1,7 @@
 #ifndef ORTHIA_POINTERS_H
 #define ORTHIA_POINTERS_H
 
-#include "windows.h"
-#include "algorithm"
+#include "orthia_core.h"
 
 namespace orthia
 {
@@ -28,11 +27,11 @@ public:
     }
     virtual void OrthiaAddRef()
     {
-        InterlockedIncrement(&m_count);
+        orthia::Increment(&m_count);
     }
     virtual void OrthiaRelease()
     {
-        if (!InterlockedDecrement(&m_count))
+        if (!orthia::Decrement(&m_count))
         {
             delete this;
         }
@@ -54,11 +53,11 @@ public:
     }
     virtual void OrthiaAddRef()
     {
-        InterlockedIncrement(&m_count);
+        orthia::Increment(&m_count);
     }
     virtual void OrthiaRelease()
     {
-        if (!InterlockedDecrement(&m_count))
+        if (!orthia::Decrement(&m_count))
         {
             delete this;
         }

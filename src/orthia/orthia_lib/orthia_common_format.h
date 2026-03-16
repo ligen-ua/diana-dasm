@@ -29,16 +29,19 @@ public:
     ~CCommonFormatBuilder();
 
     void AddMetadata(const std::string & name, const std::string & value);
-    void AddMetadata(const std::wstring & name, const std::wstring & value);
     void AddMetadata(const std::string & name, long long value);
-    void AddMetadata(const std::wstring& name, long long value);
     void AddMetadata(const std::string& name, unsigned long long value);
-    void AddMetadata(const std::wstring& name, unsigned long long value);
     void AddMetadata(const std::string& name, int value);
-    void AddMetadata(const std::wstring& name, int value);
+
+#ifdef WIN32
+    void AddMetadata(const orthia::PlatformString_type& name, const orthia::PlatformString_type & value);
+    void AddMetadata(const orthia::PlatformString_type& name, long long value);
+    void AddMetadata(const orthia::PlatformString_type& name, unsigned long long value);
+    void AddMetadata(const orthia::PlatformString_type& name, int value);
+    void DeleteMetadata(const orthia::PlatformString_type & name);
+#endif
 
     void DeleteMetadata(const std::string & utf8name);
-    void DeleteMetadata(const std::wstring & name);
 
     void Produce(const std::vector<char> & value, std::vector<char> * pResult);
     void Produce(std::vector<char> * pResult);
@@ -69,17 +72,20 @@ public:
     CCommonFormatParser();
     ~CCommonFormatParser();
 
-    bool Parse(const std::wstring & strValue);
     bool Parse(const std::string & strValue);
     bool Parse(const std::vector<char> & source, bool bMakeCopy);
     bool Parse(const char * pStart, const char * pEnd, bool bMakeCopy);
     bool Parse(const char * pStart, bool bMakeCopy);
 
     bool QueryMetadata(const std::string & name, std::string * pValue) const;
-    bool QueryMetadata(const std::string & name, std::wstring * pValue) const;
-    bool QueryMetadata(const std::wstring & name, std::wstring * pValue) const;
     bool QueryMetadata(const std::string & name, long long * pValue) const;
     bool QueryMetadata(const std::string & name, unsigned long long * pValue) const;
+
+#ifdef WIN32
+    bool QueryMetadata(const std::string & name, orthia::PlatformString_type * pValue) const;
+    bool Parse(const orthia::PlatformString_type & strValue);
+    bool QueryMetadata(const orthia::PlatformString_type & name, orthia::PlatformString_type * pValue) const;
+#endif
 
     bool QueryValue(std::vector<char> * pValue) const;
     long long QuerySize() const;

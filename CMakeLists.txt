@@ -1,5 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
 project(diana_dasm)
-cmake_minimum_required(VERSION 2.8.2)
 
 if(UNIX AND NOT APPLE)
     set(LINUX TRUE)
