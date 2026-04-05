@@ -1,6 +1,6 @@
 #include "orthia_utils.h"
 #include <sys/stat.h>
-#include "utf8/utf8rewind.h"
+#include "utf8rewind.h"
 #include "orthia_files.h"
 
 namespace orthia

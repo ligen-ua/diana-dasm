@@ -46,17 +46,9 @@ add_library(${PROJECT_NAME} SHARED
     tinyxml2.cpp
 
     
-    utf8/internal/casemapping.c
-    utf8/internal/codepoint.c
-    utf8/internal/composition.c
-    utf8/internal/database.c
-    utf8/internal/decomposition.c
-    utf8/internal/seeking.c
-    utf8/internal/streaming.c
-
-    utf8/unicodedatabase.c
-    utf8/utf8rewind.c
 )
+
+target_link_libraries(${PROJECT_NAME} utf8rewind)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 

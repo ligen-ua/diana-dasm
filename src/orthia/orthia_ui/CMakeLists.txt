@@ -32,5 +32,14 @@ oui_window_thread.cpp
 
 )
 
+if(UNIX)
+    target_sources(${PROJECT_NAME} PRIVATE
+        oui_base_posix.cpp
+        oui_console_posix.cpp
+        oui_symbols_posix.cpp
+    )
+    target_link_libraries(${PROJECT_NAME} utf8rewind)
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 

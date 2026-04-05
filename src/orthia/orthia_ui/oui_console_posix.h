@@ -1,5 +1,7 @@
 #ifdef OUI_SYS_POSIX
 
+#include <termios.h>
+
 namespace oui
 {
     class CConsole
@@ -14,7 +16,7 @@ namespace oui
         void Init();
         Size GetSize();
         void FixupAfterResize();
-        void PaintRect(const Rect& rect, 
+        void PaintRect(const Rect& rect,
             Color background,
             bool keepText);
         void ShowCursor();
@@ -30,6 +32,31 @@ namespace oui
 
     class CConsoleDrawAdapter:Noncopyable
     {
+        struct TerminalCell
+        {
+            std::string character = " ";
+            Color fgColor = {200, 200, 200};
+            Color bgColor = {0, 0, 0};
+            bool operator==(const TerminalCell& o) const
+            {
+                return character == o.character &&
+                       fgColor == o.fgColor &&
+                       bgColor == o.bgColor;
+            }
+            bool operator!=(const TerminalCell& o) const { return !(*this == o); }
+        };
+
+        Size m_size;
+        std::vector<TerminalCell> m_backBuffer;
+        std::vector<TerminalCell> m_frontBuffer;
+        bool m_fullRedraw = true;
+        CConsole* m_console = nullptr;
+
+        static std::string ExtractUtf8Char(const std::string& str, size_t& i);
+        static void AppendMoveCursor(std::string& out, int x, int y);
+        static void AppendAnsiColor(std::string& out, Color fg, Color bg);
+
+        void PaintCell(int x, int y, const std::string& ch, Color fg, Color bg);
 
     public:
         void PaintMenuSeparator(const Point& position,
@@ -51,7 +78,7 @@ namespace oui
             Color highlightTextBgColor = Color()
             );
 
-        void PaintBorder(const Rect & rect, 
+        void PaintBorder(const Rect & rect,
             Color textColor,
             Color textBgColor,
             BorderStyle style);
@@ -64,16 +91,18 @@ namespace oui
         void PaintScrollMark(const Point& position, ScrollMarkType type, Color textColor, Color textBgColor);
 
         // main interface
-        CConsole* GetConsole();
-        Size GetSize() const;
+        CConsole* GetConsole() { return m_console; }
+        Size GetSize() const { return m_size; }
 
         void StartDraw(Size size, CConsole* console);
         void FinishDraw();
 
         void CopyRectWindow(const Rect & rect, const Point& targetPosition, CConsoleDrawAdapter& consoleOut) const;
     };
+
     class CConsoleStateSaver:Noncopyable
     {
+        struct termios m_originalTermios;
     public:
         CConsoleStateSaver();
         ~CConsoleStateSaver();

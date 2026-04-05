@@ -192,6 +192,9 @@
     <ProjectReference Include="..\orthia_ui\orthia_ui.vcxproj">
       <Project>{497fa637-1a63-44cb-8681-3edd9d8620a2}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\utf8rewind\utf8rewind.vcxproj">
+      <Project>{a2f5e8b1-c4d7-4a3e-9f62-1b08d3e5a7c9}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="orthia.rc" />
