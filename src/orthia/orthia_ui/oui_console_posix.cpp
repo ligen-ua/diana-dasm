@@ -9,6 +9,11 @@
 namespace oui
 {
 
+static void WriteToStdout(const void* data, size_t size)
+{
+    write(STDOUT_FILENO, data, size);
+}
+
 // ---------------------------------------------------------
 // UTF-8 box-drawing character tables (3-byte UTF-8 sequences)
 // Index layout mirrors the Win32 g_symsOfBorder* arrays:
@@ -56,7 +61,7 @@ void CConsole::Init()
 {
     // Enter alternate screen buffer, clear it, hide cursor
     const char* seq = "\x1B[?1049h\x1B[2J\x1B[?25l";
-    write(STDOUT_FILENO, seq, strlen(seq));
+    WriteToStdout(seq, strlen(seq));
 
     // Switch terminal to raw mode so keys arrive immediately without echo.
     // CConsoleStateSaver (created before Init() is called) already saved the
@@ -79,7 +84,7 @@ void CConsole::Init()
 void CConsole::SetTitle(const String& caption)
 {
     std::string seq = "\x1B]0;" + caption.native + "\x07";
-    write(STDOUT_FILENO, seq.data(), seq.size());
+    WriteToStdout(seq.data(), seq.size());
 }
 
 ISymbolsAnalyzer& CConsole::GetSymbolsAnalyzer()
@@ -126,20 +131,20 @@ void CConsole::PaintRect(const Rect& /*rect*/, Color /*background*/, bool /*keep
 void CConsole::ShowCursor()
 {
     const char* seq = "\x1B[?25h";
-    write(STDOUT_FILENO, seq, strlen(seq));
+    WriteToStdout(seq, strlen(seq));
 }
 
 void CConsole::HideCursor()
 {
     const char* seq = "\x1B[?25l";
-    write(STDOUT_FILENO, seq, strlen(seq));
+    WriteToStdout(seq, strlen(seq));
 }
 
 void CConsole::SetCursorPositon(const Point& pt)
 {
     char buf[32];
     int len = snprintf(buf, sizeof(buf), "\x1B[%d;%dH", pt.y + 1, pt.x + 1);
-    write(STDOUT_FILENO, buf, len);
+    WriteToStdout(buf, len);
 }
 
 bool CConsole::CopyTextToClipboard(const String& text)
@@ -235,7 +240,7 @@ void CConsoleDrawAdapter::AppendAnsiColor(std::string& out, Color fg, Color bg)
     char buf[64];
     int len = snprintf(buf, sizeof(buf),
         "\x1B[38;2;%d;%d;%dm\x1B[48;2;%d;%d;%dm",
-        fg.r, fg.g, fg.b, bg.r, bg.g, bg.b);
+        fg.Red(), fg.Green(), fg.Blue(), bg.Red(), bg.Green(), bg.Blue());
     out.append(buf, len);
 }
 
@@ -410,7 +415,7 @@ void CConsoleDrawAdapter::FinishDraw()
     }
 
     if (!out.empty())
-        write(STDOUT_FILENO, out.data(), out.size());
+        WriteToStdout(out.data(), out.size());
 
     m_fullRedraw = false;
 }
@@ -451,7 +456,7 @@ CConsoleStateSaver::~CConsoleStateSaver()
     // Restore terminal settings, leave alternate buffer, show cursor
     tcsetattr(STDIN_FILENO, TCSANOW, &m_originalTermios);
     const char* seq = "\x1B[?1049l\x1B[?25h";
-    write(STDOUT_FILENO, seq, strlen(seq));
+    WriteToStdout(seq, strlen(seq));
 }
 
 // ---------------------------------------------------------
