@@ -235,11 +235,11 @@ namespace oui
             addCommentSeparator();
             if (tag->newOffset > tag->index.GetIndex())
             {
-                m_currentBlock.append(1, ORTHIA_TCSTR('\x2193'));
+                m_currentBlock.append(1, ORTHIA_TCSTR('\x2193')); // TODO FIXIT
             }
             else
             {
-                m_currentBlock.append(1, ORTHIA_TCSTR('\x2191'));
+                m_currentBlock.append(1, ORTHIA_TCSTR('\x2191')); // TODO FIXIT
             }
         }
 

@@ -123,9 +123,9 @@ void ObjectToString_t(const OutType & object, std::basic_string<Type, Traits<Typ
 }
 
 template<class OutType>
-inline std::wstring ObjectToString(const OutType & object)
+inline PlatformString_type ObjectToString(const OutType & object)
 {
-    std::wstring res;
+    PlatformString_type res;
     ObjectToString_t(object, res);
     return res;
 }

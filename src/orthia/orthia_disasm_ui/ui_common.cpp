@@ -110,13 +110,13 @@ void Load(const orthia::PlatformString_type & id, oui::String& value, NodePtr ba
 
 void GetCommonDialogStrings(const oui::String& dialog, oui::CommonDialogStrings& strs)
 {
-    auto baseDialogNode = g_textManager->QueryNodeDef(L"ui.dialog.basedialog");
+    auto baseDialogNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.basedialog"));
     auto dialogNode = g_textManager->QueryNodeDef(dialog.native);
-    Load(L"caption", strs.caption, baseDialogNode, dialogNode);
-    Load(L"opening", strs.openingText, baseDialogNode, dialogNode);
-    Load(L"error", strs.errorText, baseDialogNode, dialogNode);
-    Load(L"ok", strs.okText, baseDialogNode, dialogNode);
-    Load(L"cancel", strs.cancelText, baseDialogNode, dialogNode);
+    Load(ORTHIA_TCSTR("caption"), strs.caption, baseDialogNode, dialogNode);
+    Load(ORTHIA_TCSTR("opening"), strs.openingText, baseDialogNode, dialogNode);
+    Load(ORTHIA_TCSTR("error"), strs.errorText, baseDialogNode, dialogNode);
+    Load(ORTHIA_TCSTR("ok"), strs.okText, baseDialogNode, dialogNode);
+    Load(ORTHIA_TCSTR("cancel"), strs.cancelText, baseDialogNode, dialogNode);
 }
 
 
@@ -132,7 +132,7 @@ namespace oui
         {
             throw std::runtime_error("Invalid argument");
         }
-        ULONGLONG address = 0;
+        orthia::Address_type address = 0;
         if (addressString.size() > 2 && addressString[0] == OUI_TCHAR('0') && addressString[1] == OUI_TCHAR('x'))
         {
             orthia::HexStringToObject(orthia::PlatformString_type(addressString.begin() + 2, addressString.end()), &address);

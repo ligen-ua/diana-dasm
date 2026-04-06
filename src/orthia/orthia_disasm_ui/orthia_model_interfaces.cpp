@@ -11,7 +11,7 @@ namespace orthia
         orthia::CAutoCriticalSection guard(m_lock);
 
         auto filterLowercase = orthia::Downcase(filter.native);
-        std::wstring text;
+        orthia::PlatformString_type text;
 
         std::vector<GotoItem> items;
         for (auto& pair : m_dataItems)
@@ -19,7 +19,7 @@ namespace orthia
             if (!filterLowercase.empty())
             {
                 text = orthia::ToWideStringAsHex(pair.first);
-                text.append(L"|");
+                text.append(ORTHIA_TCSTR("|"));
                 text.append(pair.second.comment.native);
 
                 text = orthia::Downcase(text);

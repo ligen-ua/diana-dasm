@@ -333,12 +333,12 @@ void CMainWindow::ConstuctMenu()
         std::vector<oui::PopupItem> help =
         {
             {
-                L"&Help",
+                OUI_TCSTR("&Help"),
                 [this]() { ShowHelp(); },
                 oui::Hotkey(oui::VirtualKey::kH)
             },
             {
-                L"&About",
+                OUI_TCSTR("&About"),
                 [this]() { ShowAbout();  },
                 oui::Hotkey(oui::VirtualKey::kA)
             }
