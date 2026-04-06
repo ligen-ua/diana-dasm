@@ -4,6 +4,12 @@
 #include "ui_modules_window.h"
 #include <ctime>
 
+const int CModulesWindow::field_selectedModuleAddress;
+const int CModulesWindow::field_namesBox_Offset;
+const int CModulesWindow::field_cachedNamesPage_size;
+const int CModulesWindow::field_modulesBox_Offset;
+const int CModulesWindow::field_modulesBox_Position;
+
 oui::String NameInfoFlagsToString(int flags)
 {
     if (flags & orthia::NameInfo::flags_Import)

@@ -50,7 +50,10 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_link_libraries(${PROJECT_NAME} orthia_lib orthia_ui diana_core utf8rewind)
+add_library(gtest_lib STATIC ../orthia_ui/gtest/gtest-all.cc)
+target_include_directories(gtest_lib PUBLIC ../orthia_ui)
+
+target_link_libraries(${PROJECT_NAME} orthia_lib orthia_ui diana_core utf8rewind gtest_lib)
 
 if(UNIX)
     target_link_libraries(${PROJECT_NAME} pthread)

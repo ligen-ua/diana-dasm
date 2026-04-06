@@ -4,6 +4,9 @@
 #include "oui_goto_dialog.h"
 #include "oui_disasm_colors.h"
 
+const int CDisasmWindow::field_peAddress_index;
+const int CDisasmWindow::field_peAddress_subIndex;
+
 // == Structure ==
 // [PE HEADER]
 // [SECTION HEADER]

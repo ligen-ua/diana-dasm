@@ -37,6 +37,8 @@ if(UNIX)
         oui_base_posix.cpp
         oui_console_posix.cpp
         oui_symbols_posix.cpp
+        oui_input_posix.cpp
+        oui_filesystem_posix.cpp
     )
     target_link_libraries(${PROJECT_NAME} utf8rewind)
 endif()
