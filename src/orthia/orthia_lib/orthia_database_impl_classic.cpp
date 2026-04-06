@@ -136,7 +136,7 @@ void CClassicDatabase::InsertModule(Address_type baseAddress,
     sqlite3_bind_int64(m_stmtInsertModule.Get(), 2, size);
     ORTHIA_BIND_PLATFORM_STRING(m_stmtInsertModule.Get(), orthia::Escape(moduleName), 3);
 
-    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertModule.Get()), L"Can't insert module");
+    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertModule.Get()), "Can't insert module");
 }
 void CClassicDatabase::StartSaveModule(Address_type baseAddress, 
                                 Address_type size, 
@@ -315,14 +315,14 @@ void CClassicDatabase::UnloadModule(Address_type address, bool bSilent)
             std::stringstream sql;
             sql<<"DELETE FROM tbl_references WHERE UINT_LESSOE("<<(long long)address<<", ref_address_from) and UINT_LESSOE(ref_address_from, "<<(long long)(address+size)<<")";
             std::string sqlString = sql.str();
-            ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), sqlString.c_str()), L"Can't unload module");
+            ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), sqlString.c_str()), "Can't unload module");
         }
 
         {
             std::stringstream sql;
             sql<<"DELETE FROM tbl_modules WHERE mod_address = "<<(long long)address;
             std::string sqlString = sql.str();
-            ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), sqlString.c_str()), L"Can't unload module");
+            ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), sqlString.c_str()), "Can't unload module");
         }
     }
     catch(const std::exception & e)
@@ -476,7 +476,7 @@ void CClassicDatabase::InsertMetaInfo(Address_type moduleAddress, int metaType, 
     sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 3, metaType);
     SQLBindUtf8String(m_stmtInsertMetainfo.Get(), text, 4);
 
-    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertMetainfo.Get()), L"Can't insert meta info");
+    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertMetainfo.Get()), "Can't insert meta info");
 }
 void CClassicDatabase::QueryMetaInfo(int metaType, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler)
 {
@@ -661,7 +661,7 @@ void CClassicDatabase::InsertComment(Address_type address, const std::string& te
     sqlite3_bind_int64(m_stmtWriteComment.Get(), 1, address);
     SQLBindUtf8String(m_stmtWriteComment.Get(), text, 2);
 
-    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtWriteComment.Get()), L"Can't insert meta info");
+    ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtWriteComment.Get()), "Can't insert meta info");
 }
 
 }

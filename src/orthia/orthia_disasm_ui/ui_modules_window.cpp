@@ -40,10 +40,10 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
     m_modulesOwner.shiftViewWindowToSymbol = [this](const oui::String& symbol) { return Modules_ShiftViewWindowToSymbol(symbol); };
 
     m_modulesBox = std::make_shared<oui::CListBox>(m_colorProfile, &m_modulesOwner);
-    m_modulesBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  }, 25),
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }, 19, oui::ColumnFormat::ctCenter),
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"mapped-size");  }, 11, oui::ColumnFormat::ctCenter),
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"full-path");  }, 55, oui::ColumnFormat::ctLeft)
+    m_modulesBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("name"));  }, 25),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("address"));  }, 19, oui::ColumnFormat::ctCenter),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("mapped-size"));  }, 11, oui::ColumnFormat::ctCenter),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("full-path"));  }, 55, oui::ColumnFormat::ctLeft)
 
     );
     m_modulesBox->SetBorderStyle(oui::BorderStyle::None);
@@ -62,9 +62,9 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
 
     m_namesBox = std::make_shared<oui::CListBox>(m_colorProfile, &m_namesOwner);
     m_namesBox->InitColumns(
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"type");  }, 8, oui::ColumnFormat::ctCenter),
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"name");  }, 60),
-        oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }, 19, oui::ColumnFormat::ctCenter)
+        oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("type"));  }, 8, oui::ColumnFormat::ctCenter),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("name"));  }, 60),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("address"));  }, 19, oui::ColumnFormat::ctCenter)
     );
     m_namesBox->SetBorderStyle(oui::BorderStyle::None);
     m_namesBox->Dock();

@@ -52,7 +52,7 @@ void CModuleManager::ReloadRange(Address_type offset,
     CAutoCriticalSection guard(m_lock);
     orthia::PlatformStringStream_type regionName;
     std::hex(regionName);
-    regionName<<L"region_"<<offset<<"_"<<size;
+    regionName<<ORTHIA_TCSTR("region_")<<offset<<ORTHIA_TCSTR("_")<<size;
 
     CDianaModule module;
     module.InitRaw(offset, size, pMemoryReader, mode);
