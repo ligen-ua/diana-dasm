@@ -515,24 +515,27 @@ namespace oui
                     // adapter to C-code
                     orthia::DianaMemoryStream stream(0, &module, info.size);
 
-                    Diana_PeFile dianaPeFile;
-                    if (!DianaPeFile_Init(&dianaPeFile,
+                    DianaExecutable exe = {};
+                    exe.type = DIANA_EXECUTABLE_TYPE_PE;
+                    if (!DianaPeFile_Init(&exe.u.peFile,
                         &stream.parent,
                         info.size,
                         DIANA_PE_FILE_FLAGS_MODULE_MODE))
                     {
                         // yahoo, success
-                        diana::Guard<diana::PeFile> peFileGuard(&dianaPeFile);
+                        diana::Guard<diana::PeFile> peFileGuard(&exe.u.peFile);
 
-                        info.dianaMode = dianaPeFile.pImpl->dianaMode;
+                        exe.dianaMode = exe.u.peFile.pImpl->dianaMode;
+                        info.dianaMode = exe.dianaMode;
 
-                        info.entryPoint = dianaPeFile.pImpl->addressOfEntryPoint;
+                        exe.entryPoint = exe.u.peFile.pImpl->addressOfEntryPoint;
+                        info.entryPoint = exe.entryPoint;
                         Diana_SafeAdd(&info.entryPoint, info.address);
 
                         if (contextCallback)
                         {
                             ModuleDisasmContext context;
-                            context.dianaPeFile = &dianaPeFile;
+                            context.executable = &exe;
                             context.stream = &stream;
 
                             contextCallback(info, context);
