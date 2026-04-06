@@ -173,14 +173,14 @@ void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1_in, const oui:
     }
     struct DisasmCopier:oui::DisasmWriter
     {
-        std::wstring text;
-        void PrintLine(const std::wstring& line) override
+        orthia::PlatformString_type text;
+        void PrintLine(const orthia::PlatformString_type& line) override
         {
-            text.append(line + L"\n");
+            text.append(line + OUI_TCSTR("\n"));
         }
-        void PrintLine(const std::wstring& line, const oui::TextMarkup& markup, std::shared_ptr<oui::IMultilineViewTag> tag)
+        void PrintLine(const orthia::PlatformString_type& line, const oui::TextMarkup& markup, std::shared_ptr<oui::IMultilineViewTag> tag)
         {
-            text.append(line + L"\n");
+            text.append(line + OUI_TCSTR("\n"));
         }
     }
     writer;

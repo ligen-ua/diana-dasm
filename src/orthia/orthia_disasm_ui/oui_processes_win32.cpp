@@ -564,6 +564,18 @@ namespace oui
             return { 0, res };
         }
 
+        int GetDianaMode() const override
+        {
+            if (m_is32bit) 
+            {
+                return DIANA_MODE32;
+            }
+            else
+            {
+                return DIANA_MODE64;
+            }
+        }
+
         orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) override
         {
             std::vector<ProcessNoAccessRegion> noAccessRegions;

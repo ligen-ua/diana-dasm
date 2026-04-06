@@ -179,7 +179,7 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize, bool dps)
         {
         }
 
-        virtual void PrintLine(const std::wstring& line)
+        virtual void PrintLine(const orthia::PlatformString_type& line)
         {
             m_handler(line);
         }

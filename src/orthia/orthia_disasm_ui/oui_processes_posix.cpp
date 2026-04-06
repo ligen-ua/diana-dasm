@@ -406,6 +406,18 @@ namespace oui
             std::shared_ptr<IThreadEnumerator> result = enumerator;
             return { 0, result };
         }
+        
+        int GetDianaMode() const override
+        {
+            if (m_is32bit) 
+            {
+                return DIANA_MODE32;
+            }
+            else
+            {
+                return DIANA_MODE64;
+            }
+        }
     };
 
     // -------------------------------------------------------------------------

@@ -45,6 +45,7 @@ namespace oui
             std::function<void (const orthia::ModuleInfo& info, ModuleDisasmContext&)> contextCallback) = 0;
     
         virtual std::tuple<int, std::shared_ptr<IThreadEnumerator>> CreateThreadEnumerator() = 0;
+        virtual int GetDianaMode() const = 0;
     };
 
     struct ProcessUnifiedId

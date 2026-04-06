@@ -223,15 +223,7 @@ namespace orthia
         int platformError = 0;
         unsigned long long fileSize = 0;
         std::tie(platformError, fileSize) = proc->GetSizeInBytes();
-        int dianaMode = 0;
-        if (fileSize == MAXUINT32)
-        {
-            dianaMode = DIANA_MODE32;
-        }
-        else
-        {
-            dianaMode = DIANA_MODE64;
-        }
+        int dianaMode = proc->GetDianaMode();
 
         WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
 
@@ -370,7 +362,7 @@ namespace orthia
                 if (!orthia::LoadFileToVector_Silent(readmeFileName, readmeBuffer))
                 {
                     readmeBuffer.push_back(0);
-                    WriteLog(completeHandler->GetThread(), Utf8ToUtf16(readmeBuffer.data()));
+                    WriteLog(completeHandler->GetThread(), Utf8ToPlatformString(readmeBuffer.data()));
                 }
             }
 

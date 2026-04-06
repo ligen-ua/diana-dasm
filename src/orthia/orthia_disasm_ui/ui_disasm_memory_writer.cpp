@@ -411,7 +411,7 @@ namespace oui
                 }
                 else
                 {
-                    temp = orthia::ToWideString(Parent_type::m_writer.Assign(&result, virtualOffset.GetIndex()));
+                    temp = orthia::Utf8ToPlatformString(Parent_type::m_writer.Assign(&result, virtualOffset.GetIndex()));
                     binaryData = orthia::ToHexString(result.bytes, result.bytesCount);
 
                     PrintCommand(virtualOffset, binaryData, temp);
