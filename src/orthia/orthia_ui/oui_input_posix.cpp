@@ -1,5 +1,3 @@
-#ifdef OUI_SYS_POSIX
-
 #include "oui_input_posix.h"
 #include "oui_input.h"
 #include <unistd.h>
@@ -346,4 +344,3 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
 
 } // namespace oui
 
-#endif // OUI_SYS_POSIX

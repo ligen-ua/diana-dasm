@@ -1,5 +1,3 @@
-#ifdef OUI_SYS_POSIX
-
 #include "oui_filesystem.h"
 #include "oui_window_thread.h"
 #include <sys/types.h>
@@ -270,8 +268,7 @@ public:
         {
             error = QueryDir(fileId.fullFileName.native, highlightName, result);
         }
-
-        handler->ReplyWithRetain(handler, fileId, result, error, tag);
+        handler->ReplyWithRetain(handler, handler, fileId, result, error, tag);
     }
 
     void AsyncQueryDefaultRoot(ThreadPtr_type targetThread,
@@ -303,4 +300,3 @@ std::shared_ptr<IFileSystem> CreateDefaultFSProvider()
 
 } // namespace oui
 
-#endif // OUI_SYS_POSIX
