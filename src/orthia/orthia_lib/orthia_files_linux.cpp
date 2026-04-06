@@ -156,6 +156,46 @@ int CFile::FlushBuffers_Silent()
 
 }
 
+int CFile::Open_Silent(const std::string & fullname, int /*desiredAccess*/, int /*shareMode*/, int creationDisposition)
+{
+    try
+    {
+        if (creationDisposition == g_create_always)
+            CreateNewAlways(fullname);
+        else
+            OpenExistingRead(fullname);
+        return 0;
+    }
+    catch (...)
+    {
+        return -1;
+    }
+}
+int CFile::WriteToFile_Silent(const void * pBegin, size_t size)
+{
+    try
+    {
+        WriteToFile(pBegin, size);
+        return 0;
+    }
+    catch (...)
+    {
+        return -1;
+    }
+}
+int LoadFileToVector_Silent(const std::string& fileName, std::vector<char>& data)
+{
+    try
+    {
+        LoadFileToVector(fileName, data);
+        return 0;
+    }
+    catch (...)
+    {
+        return -1;
+    }
+}
+
 void CreateDir(const std::string & fileName, const char * pData)
 {
     if (mkdir(fileName.c_str(), S_IRWXU|S_IRWXG|S_IRWXO) != 0 && errno != EEXIST)

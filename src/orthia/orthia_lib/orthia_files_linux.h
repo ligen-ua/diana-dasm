@@ -5,6 +5,12 @@
 namespace orthia
 {
 
+const int g_desired_read  = 0;
+const int g_desired_write = 1;
+const int g_share_read    = 0;
+const int g_open_existing = 0;
+const int g_create_always = 1;
+
 struct EnvironmentPaths
 {
     std::string m_ApplicationDataPath;
@@ -143,6 +149,9 @@ public:
     void FlushBuffers();
     int FlushBuffers_Silent();
 
+    int Open_Silent(const std::string & fullname, int desiredAccess, int shareMode, int creationDisposition);
+    int WriteToFile_Silent(const void * pBegin, size_t size);
+
     void swap(CFile & file);
 };
 
@@ -171,6 +180,8 @@ void SaveDataToFile(const std::string& fileName,
 
     file.WriteToFile(pData, sizeInBytes);
 }
+
+int LoadFileToVector_Silent(const std::string& fileName, std::vector<char>& data);
 
 inline void LoadFileToVector(const std::string& fileName, std::vector<char>& data)
 {
