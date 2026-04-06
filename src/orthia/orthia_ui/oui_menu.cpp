@@ -2,7 +2,7 @@
 
 namespace oui
 {
-    static const auto g_HotKeySymbol = String::char_type('&');
+    static const String g_HotKeySymbol = OUI_TCSTR("&");
 
     // CMenuButtonWindow
     CMenuButtonWindow::CMenuButtonWindow(const String& caption,
@@ -100,7 +100,7 @@ namespace oui
         {
             return;
         }
-        int symbols = console->GetSymbolsAnalyzer().CalculateSymbolsCount(m_caption.native, g_HotKeySymbol);
+        int symbols = console->GetSymbolsAnalyzer().CalculateSymbolsCount(m_caption.native, g_HotKeySymbol.native[0]);
         Size size = { m_spaceAroundName * 2 + symbols, 1 };
         this->Resize(size);
     }
@@ -339,7 +339,7 @@ namespace oui
         result.native.append(g_spacesBefore, String::symSpace);
 
         // -- 
-        symCount += console->GetSymbolsAnalyzer().CalculateSymbolsCount(item.text.native, g_HotKeySymbol);
+        symCount += console->GetSymbolsAnalyzer().CalculateSymbolsCount(item.text.native, g_HotKeySymbol.native[0]);
         result.native += item.text.native;
 
         if (fixedWidth)

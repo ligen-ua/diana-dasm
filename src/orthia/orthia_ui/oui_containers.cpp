@@ -637,7 +637,7 @@ namespace oui
         Point target = { rect.position.x, rect.position.y + 1 };
         PanelCaptionProfile* currentColors = &m_panelColorProfile->normal;
         m_chunk.native.clear();
-        m_chunk.native.push_back(symbols.vertical);
+        m_chunk.native += symbols.vertical.native;
         for (auto i = 1; i < rect.size.height; ++i)
         {
             parameters.console.PaintText(target,
@@ -688,7 +688,9 @@ namespace oui
         if (absClientRect.size.width <= minSize)
         {
             // just draw the line
-            m_chunk.native.resize(absClientRect.size.width, symbols.horizontal);
+            m_chunk.native.clear();
+            for (int i = 0; i < absClientRect.size.width; ++i)
+                m_chunk.native += symbols.horizontal.native;
 
             parameters.console.PaintText(target,
                 m_panelColorProfile->borderText,
@@ -699,7 +701,8 @@ namespace oui
 
         // draw prefix
         m_chunk.native.clear();
-        m_chunk.native.resize(m_drawLeftBorder?4:3, symbols.horizontal);
+        for (int i = 0, prefixCount = m_drawLeftBorder ? 4 : 3; i < prefixCount; ++i)
+            m_chunk.native += symbols.horizontal.native;
         m_chunk.native.back() = oui::String::symSpace;
 
         parameters.console.PaintText(target,
@@ -769,7 +772,8 @@ namespace oui
         m_chunk.native.clear();
 
         const int processedSize = target.x - initialTarget.x;
-        m_chunk.native.resize(absClientRect.size.width - processedSize, symbols.horizontal);
+        for (int i = 0, suffixCount = absClientRect.size.width - processedSize; i < suffixCount; ++i)
+            m_chunk.native += symbols.horizontal.native;
 
         if (!m_chunk.native.empty())
         {

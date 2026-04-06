@@ -193,7 +193,7 @@ namespace oui
                     }
                     else
                     {
-                        m_chunk.native.push_back(symbols.vertical);
+                        m_chunk.native += symbols.vertical.native;
                     }
                 }
 
@@ -238,7 +238,7 @@ namespace oui
                     color->text,
                     color->background,
                     m_chunk.native,
-                    String::char_type('/'),
+                    String(OUI_TCSTR("/")),
                     *borderColorToUse,
                     *borderBackgroundColorToUse);
                 ++pos;

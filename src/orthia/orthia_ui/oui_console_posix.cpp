@@ -258,7 +258,7 @@ int CConsoleDrawAdapter::PaintText(const Point& position,
     Color textColor,
     Color textBgColor,
     const String& text,
-    String::char_type hotkeySymbol,
+    String hotkeySymbol,
     Color highlightTextColor,
     Color highlightTextBgColor)
 {
@@ -272,7 +272,8 @@ int CConsoleDrawAdapter::PaintText(const Point& position,
         if (currentX >= m_size.width) break;
         if (currentY >= m_size.height) break;
 
-        bool isHotkey = (hotkeySymbol != 0 && nativeStr[i] == hotkeySymbol);
+        bool isHotkey = (!hotkeySymbol.native.empty() &&
+            nativeStr.compare(i, hotkeySymbol.native.size(), hotkeySymbol.native) == 0);
         std::string charStr = ExtractUtf8Char(nativeStr, i);
 
         if (currentX >= 0 && currentY >= 0)
@@ -469,12 +470,12 @@ CConsoleStateSaver::~CConsoleStateSaver()
 PanelBorderSymbols GetPanelBorderSymbols()
 {
     PanelBorderSymbols symbols;
-    symbols.vertical     = '|';
-    symbols.horizontal   = '-';
-    symbols.left_top     = '+';
-    symbols.right_top    = '+';
-    symbols.left_bottom  = '+';
-    symbols.right_bottom = '+';
+    symbols.vertical     = String("|");
+    symbols.horizontal   = String("-");
+    symbols.left_top     = String("+");
+    symbols.right_top    = String("+");
+    symbols.left_bottom  = String("+");
+    symbols.right_bottom = String("+");
     return symbols;
 }
 

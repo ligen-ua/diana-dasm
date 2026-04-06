@@ -424,12 +424,12 @@ namespace oui
     PanelBorderSymbols GetPanelBorderSymbols()
     {
         PanelBorderSymbols symbols;
-        symbols.vertical = g_symsOfBorderThin[3];
-        symbols.horizontal = g_symsOfBorderThin[1];
-        symbols.left_top = g_symsOfBorderThin[0];
-        symbols.right_top = g_symsOfBorderThin[2];
-        symbols.left_bottom = g_symsOfBorderThin[4];
-        symbols.right_bottom = g_symsOfBorderThin[6];
+        symbols.vertical     = String(String::string_type(1, g_symsOfBorderThin[3]));
+        symbols.horizontal   = String(String::string_type(1, g_symsOfBorderThin[1]));
+        symbols.left_top     = String(String::string_type(1, g_symsOfBorderThin[0]));
+        symbols.right_top    = String(String::string_type(1, g_symsOfBorderThin[2]));
+        symbols.left_bottom  = String(String::string_type(1, g_symsOfBorderThin[4]));
+        symbols.right_bottom = String(String::string_type(1, g_symsOfBorderThin[6]));
         return symbols;
     }
 
@@ -463,7 +463,7 @@ namespace oui
         Color textColor,
         Color textBgColor,
         const String& text,
-        String::char_type hotkeySymbol,
+        String hotkeySymbol,
         Color highlightTextColor,
         Color highlightTextBgColor)
     {
@@ -471,7 +471,7 @@ namespace oui
         {
             return 0;
         }
-        String::char_type hotkeySymbolTmp = hotkeySymbol;
+        String hotkeySymbolTmp = hotkeySymbol;
         if (position.x >= m_size.width)
         {
             return 0;
@@ -486,13 +486,13 @@ namespace oui
         const int backColor = m_console->TranslateColorEx(textBgColor, true);
         const int normalAttributes = frontColor | backColor;
 
-        int highFrontColor = 0; 
-        int highBackColor = 0; 
-        int highAttributes = 0; 
+        int highFrontColor = 0;
+        int highBackColor = 0;
+        int highAttributes = 0;
 
         int currentAttributes = normalAttributes;
 
-        if (hotkeySymbol)
+        if (!hotkeySymbol.native.empty())
         {
             highFrontColor = m_console->TranslateColorEx(highlightTextColor, false);
             highBackColor = m_console->TranslateColorEx(highlightTextBgColor, true);
@@ -509,9 +509,9 @@ namespace oui
             {
                 break;
             }
-            if (*textPtr == hotkeySymbolTmp)
+            if (!hotkeySymbolTmp.native.empty() && *textPtr == hotkeySymbolTmp.native[0])
             {
-                hotkeySymbolTmp = 0;
+                hotkeySymbolTmp.native.clear();
                 --p;
                 currentAttributes = highAttributes;
                 continue;

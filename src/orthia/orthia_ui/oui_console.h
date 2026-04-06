@@ -8,12 +8,12 @@ namespace oui
 {
     struct PanelBorderSymbols
     {
-        oui::String::char_type vertical;
-        oui::String::char_type horizontal;
-        oui::String::char_type left_top;
-        oui::String::char_type right_top;
-        oui::String::char_type left_bottom;
-        oui::String::char_type right_bottom;
+        oui::String vertical;
+        oui::String horizontal;
+        oui::String left_top;
+        oui::String right_top;
+        oui::String left_bottom;
+        oui::String right_bottom;
     };
 
     PanelBorderSymbols GetPanelBorderSymbols();

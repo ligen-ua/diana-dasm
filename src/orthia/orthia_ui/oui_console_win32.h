@@ -60,7 +60,7 @@ namespace oui
             Color textColor,
             Color textBgColor,
             const String& text,
-            String::char_type hotkeySymbol = 0,
+            String hotkeySymbol = String(),
             Color highlightTextColor = Color(),
             Color highlightTextBgColor = Color()
             );
