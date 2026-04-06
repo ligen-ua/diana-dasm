@@ -10,7 +10,6 @@ extern "C"
 #include "diana_processor/diana_processor_core.h"
 }
 #include "orthia_files.h"
-#include "orthia_processes_ex.h"
 #include <unistd.h>
 
 orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
