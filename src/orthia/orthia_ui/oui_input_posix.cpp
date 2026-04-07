@@ -66,9 +66,9 @@ static VirtualKey MapEscapeSequence(const char* buf, int len, KeyState& keyState
         if (len == 6 && buf[2] == '1' && buf[3] == ';' && buf[5] >= 'A' && buf[5] <= 'D')
         {
             int mod = buf[4] - '1';
-            if (mod & 1) keyState.state |= KeyState::AnyShift;
-            if (mod & 2) keyState.state |= KeyState::AnyAlt;
-            if (mod & 4) keyState.state |= KeyState::AnyCtrl;
+            if (mod & 1) keyState.state |= KeyState::AnyShift | KeyState::LeftShift | KeyState::RightShift;
+            if (mod & 2) keyState.state |= KeyState::AnyAlt | KeyState::LeftAlt | KeyState::RightAlt;
+            if (mod & 4) keyState.state |= KeyState::AnyCtrl | KeyState::LeftCtrl | KeyState::RightCtrl;
             switch (buf[5])
             {
             case 'A': return VirtualKey::Up;
@@ -132,14 +132,9 @@ static VirtualKey MapEscapeSequence(const char* buf, int len, KeyState& keyState
 // Map a control character (0x01-0x1A) to VirtualKey
 static VirtualKey ControlCharToVKey(char c, KeyState& keyState)
 {
-    if (c == 3) // Ctrl+C
-    {
-        keyState.state |= KeyState::AnyCtrl;
-        return VirtualKey::CtrlC;
-    }
     if (c >= 1 && c <= 26)
     {
-        keyState.state |= KeyState::AnyCtrl;
+        keyState.state |= KeyState::AnyCtrl | KeyState::LeftCtrl;
         // map to letter keys: Ctrl+A=1, ..., Ctrl+Z=26
         return static_cast<VirtualKey>(static_cast<int>(VirtualKey::kA) + (c - 1));
     }
@@ -262,7 +257,7 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
                     {
                         evt.keyEvent.valid = true;
                         evt.keyEvent.rawText.native = std::string(1, buf[i]);
-                        evt.keyState.state |= KeyState::AnyAlt;
+                        evt.keyState.state |= KeyState::AnyAlt | KeyState::LeftAlt;
                         i++;
                     }
                     else
@@ -318,23 +313,23 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
 
             evt.keyEvent.valid = true;
             evt.keyEvent.rawText.native.assign(buf + i, cpLen);
+            i += cpLen;
+        }
 
+        if (evt.keyEvent.valid || evt.mouseEvent.valid || evt.resizeEvent.valid)
+        {
             // Map single ASCII letter/digit to a VirtualKey as well
-            if (cpLen == 1)
+            if (evt.keyEvent.rawText.native.size() == 1)
             {
-                char ch = buf[i];
-                if (ch >= 'a' && ch <= 'z')
+                char ch = evt.keyEvent.rawText.native[0];
+                if (ch >= 'a' && ch <= 'z') 
                     evt.keyEvent.virtualKey = static_cast<VirtualKey>(static_cast<int>(VirtualKey::kA) + (ch - 'a'));
                 else if (ch >= 'A' && ch <= 'Z')
                     evt.keyEvent.virtualKey = static_cast<VirtualKey>(static_cast<int>(VirtualKey::kA) + (ch - 'A'));
                 else if (ch >= '0' && ch <= '9')
                     evt.keyEvent.virtualKey = static_cast<VirtualKey>(static_cast<int>(VirtualKey::k0) + (ch - '0'));
             }
-            i += cpLen;
-        }
-
-        if (evt.keyEvent.valid || evt.mouseEvent.valid || evt.resizeEvent.valid)
-        {
+            //printf("DEBUG: %s -> %i\n", evt.keyEvent.rawText.native.c_str(), (int)evt.keyEvent.virtualKey);
             input.push_back(evt);
         }
     }

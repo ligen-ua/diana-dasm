@@ -186,10 +186,10 @@ namespace oui
                 if ((i + 1) <= GetColumnsCount())
                 {
                     // not a last item, put vertical here
-                    m_chunk.native.back() = String::char_type('/');
+                    m_chunk.native.back() = OUI_TCHAR('|'); // TODO: fixme
                     if (cutHappens)
                     {
-                        m_chunk.native.push_back(String::char_type('}'));
+                        m_chunk.native.push_back(OUI_TCHAR('}'));
                     }
                     else
                     {
@@ -238,7 +238,7 @@ namespace oui
                     color->text,
                     color->background,
                     m_chunk.native,
-                    String(OUI_TCSTR("/")),
+                    String(OUI_TCHAR("|")),
                     *borderColorToUse,
                     *borderBackgroundColorToUse);
                 ++pos;

@@ -117,7 +117,7 @@ bool CCommandWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
         switch (evt.keyEvent.virtualKey)
         {
         case oui::VirtualKey::kC:
-            if (m_currentOperation)
+            if (m_currentOperation && (evt.keyState.state & evt.keyState.AnyCtrl))
             {
                 m_currentOperation->Cancel();
             }

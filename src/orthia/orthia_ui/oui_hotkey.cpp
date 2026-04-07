@@ -74,4 +74,11 @@ namespace oui
         }
         return nullptr;
     }
+
+    static const String g_HotKeySymbol = OUI_TCSTR("&");
+    String GetHotKeySymbol()
+    {
+        return g_HotKeySymbol;
+    }
+
 }

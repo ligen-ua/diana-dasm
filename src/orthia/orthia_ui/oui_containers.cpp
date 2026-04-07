@@ -1,5 +1,6 @@
 #include "oui_containers.h"
 #include "oui_layouts_calc.h"
+#include "oui_hotkey.h"
 
 namespace oui
 {
@@ -701,18 +702,25 @@ namespace oui
 
         // draw prefix
         m_chunk.native.clear();
-        for (int i = 0, prefixCount = m_drawLeftBorder ? 4 : 3; i < prefixCount; ++i)
+        int chunkSymbolsCount = 0;
+        for (int i = 0, prefixCount = m_drawLeftBorder ? 3 : 2; i < prefixCount; ++i) 
+        {
+            ++chunkSymbolsCount;
             m_chunk.native += symbols.horizontal.native;
-        m_chunk.native.back() = oui::String::symSpace;
+        }
+        ++chunkSymbolsCount;
+        m_chunk.native.push_back(oui::String::symSpace);
 
         parameters.console.PaintText(target,
             m_panelColorProfile->borderText,
             m_panelColorProfile->borderBackground,
             m_chunk.native);
 
-        target.x += (int)m_chunk.native.size();
-        symbolsLeft -= (int)m_chunk.native.size();
-        symbolsLeft -= (int)m_chunk.native.size();
+        target.x += chunkSymbolsCount;
+        symbolsLeft -= chunkSymbolsCount;
+        symbolsLeft -= chunkSymbolsCount;
+
+        String hotKeySymbol = GetHotKeySymbol();
 
         for (auto panel : m_panels)
         {
@@ -761,7 +769,11 @@ namespace oui
             parameters.console.PaintText(target,
                 currentColors->text,
                 currentColors->background,
-                m_chunk.native);
+                m_chunk.native,
+                hotKeySymbol,
+                currentColors->hotkeyText,
+                currentColors->background
+            );
 
             target.x += tableCharsCount;
             symbolsLeft -= tableCharsCount;
@@ -773,11 +785,13 @@ namespace oui
 
         const int processedSize = target.x - initialTarget.x;
         for (int i = 0, suffixCount = absClientRect.size.width - processedSize; i < suffixCount; ++i)
-            m_chunk.native += symbols.horizontal.native;
+            if (m_chunk.native.empty())
+                m_chunk.native.push_back(oui::String::symSpace);
+            else
+                m_chunk.native += symbols.horizontal.native;
 
         if (!m_chunk.native.empty())
         {
-            m_chunk.native[0] = oui::String::symSpace;
             parameters.console.PaintText(target,
                 m_panelColorProfile->borderText,
                 m_panelColorProfile->borderBackground,
