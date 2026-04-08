@@ -4,7 +4,7 @@
 
 #include "assert.h"
 
-#define OUI_DEBUG_BREAK   assert(false)
+#define OUI_DEBUG_BREAK   assert(0)
 #define OUI_INFINITE      ((unsigned int)-1)
 #define OUI_TLEN   strlen
 

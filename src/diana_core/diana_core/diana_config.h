@@ -41,7 +41,7 @@
 #define DIANA_HAS_POSIX
 #define DIANA_HAS_LINUX
 
-#define DIANA_DEBUG_BREAK()  assert(false)
+#define DIANA_DEBUG_BREAK()  assert(0)
 
 #if __GNUC_STDC_INLINE__
 #define DIANA_INLINE_C static inline

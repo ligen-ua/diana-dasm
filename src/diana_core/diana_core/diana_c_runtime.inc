@@ -2,6 +2,7 @@
 #include "stdio.h"
 #include "string.h"
 #include "search.h"
+#include "assert.h"
 
 #ifdef _MSC_VER
 #define snprintf _snprintf
