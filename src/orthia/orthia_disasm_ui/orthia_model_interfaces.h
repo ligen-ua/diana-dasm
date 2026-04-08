@@ -54,6 +54,8 @@ namespace orthia
         std::function<void(WorkAddressData*)> completeHandler;
 
         WorkAddressData()
+            :
+                rangeFlags(flags_FullInvalid)
         {
         }
         ~WorkAddressData()
