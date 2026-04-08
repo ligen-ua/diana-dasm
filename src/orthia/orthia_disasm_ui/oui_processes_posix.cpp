@@ -335,6 +335,8 @@ namespace oui
                     c.baseAddr = e.startAddr;
                     c.path     = e.path;
                     candidates.push_back(c);
+
+                    ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Candidate: ", orthia::CLogParamEx(c.baseAddr, 16), " ", c.path);
                 }
                 // Compute size of each candidate = end of last segment with same path
                 for (auto& c : candidates)

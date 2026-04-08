@@ -154,6 +154,7 @@ namespace orthia
         CLogParamEx(unsigned long value, long radix = 10) : CLogParam(value, radix)  {   }
         CLogParamEx(const orthia::LargeInteger_type & value) : CLogParam(value)  {   }
         CLogParamEx(long long value) : CLogParam(value)  {   }
+        CLogParamEx(unsigned long long value, long radix = 10) : CLogParam(value, radix)  {   }
         CLogParamEx(bool value) : CLogParam(value)  {   }
         CLogParamEx(const ORTHIA_TCHAR * pValue) : CLogParam(pValue)  {   }
 

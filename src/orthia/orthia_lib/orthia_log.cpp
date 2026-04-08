@@ -451,7 +451,12 @@ void CLogWrapper::LogData(const CLogParamEx & param)
 
 // default log support
 static orthia::intrusive_ptr<ILog> g_pDefLog;
-static std::atomic<LogSeverity> g_defSeverity = LogSeverity::Info;
+static std::atomic<LogSeverity> g_defSeverity =
+#ifdef _DEBUG 
+    LogSeverity::Debug;
+#else
+    LogSeverity::Info;
+#endif
 
 LogSeverity DefLog_GetLogSeverity()
 {
