@@ -174,7 +174,7 @@ namespace orthia
     {
         virtual ~IPeristentItemStorage() {}
 
-        const static int goto_flags_history_mode = 1;
+        inline const static int goto_flags_history_mode = 1;
         virtual void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
             const oui::String& filter,
             oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,

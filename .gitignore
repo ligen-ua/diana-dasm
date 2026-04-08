@@ -10,3 +10,6 @@
 /build
 .vscode
 .claude
+/cmake-debug
+/cmake-release
+

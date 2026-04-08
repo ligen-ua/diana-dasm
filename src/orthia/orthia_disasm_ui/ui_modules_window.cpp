@@ -5,6 +5,7 @@
 #include <ctime>
 
 const int CModulesWindow::field_selectedModuleAddress;
+const int CModulesWindow::field_selectedModuleName;
 const int CModulesWindow::field_namesBox_Offset;
 const int CModulesWindow::field_cachedNamesPage_size;
 const int CModulesWindow::field_modulesBox_Offset;

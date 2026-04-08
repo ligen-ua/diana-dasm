@@ -289,7 +289,7 @@ namespace oui
             return;
         }
         bool reportNoData = false;
-        if (!vmRange.HasData())
+        if (!vmRange.HasData() || !pDataStart)
         {
             if (!m_printInvalidPages)
             {
@@ -298,7 +298,7 @@ namespace oui
             }
             reportNoData = true;
         }
-
+        
         Diana_InitContext(&context, m_dianaMode);
         Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
 
@@ -351,10 +351,12 @@ namespace oui
                 }
                 else
                 {
-                    iRes = stream.parent.pReadFnc(&stream,
-                        &data,
-                        1,
-                        &bytesRead);
+                    if (!reportNoData) {
+                        iRes = stream.parent.pReadFnc(&stream,
+                            &data,
+                            1,
+                            &bytesRead);
+                    }
                 }
                 result.iFullCmdSize = 1;
                 result.iLinkedOpCount = 0;
