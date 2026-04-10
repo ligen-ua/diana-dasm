@@ -193,7 +193,7 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize, bool dps)
     {
         auto sizeToRead = std::min<Address_type>(page.size(), bytesLeft);
         auto range = args.item->ReadData(curAddress, sizeToRead);
-        if (!range.dataSize)
+        if (!range.dataSize || !range.pDataStart)
         {
             range.rangeFlags |= orthia::WorkAddressData::flags_FullInvalid;
             range.dataSize = sizeToRead;

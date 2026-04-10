@@ -16,8 +16,6 @@ typedef struct _DianaExecutable
 {
     int type;              /* DIANA_EXECUTABLE_TYPE_PE or DIANA_EXECUTABLE_TYPE_ELF */
     int dianaMode;         /* DIANA_MODE32 or DIANA_MODE64 */
-    OPERAND_SIZE entryPoint;
-
     union
     {
         Diana_PeFile  peFile;
@@ -25,6 +23,12 @@ typedef struct _DianaExecutable
     } u;
 } DianaExecutable;
 
+
+
+int DianaExecutable_Init(DianaExecutable * pPeFile,
+                     DianaMovableReadStream * pStream,
+                     OPERAND_SIZE sizeOfFile,
+                     int flags);
 
 void DianaExecutable_Free(DianaExecutable* pExe);
 

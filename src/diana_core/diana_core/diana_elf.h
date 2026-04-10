@@ -43,8 +43,9 @@ typedef struct _diana_ElfFile
 Diana_ElfFile;
 
 // Flags:
-#define DIANA_ELF_FILE_FLAGS_MODULE_MODE     0
-#define DIANA_ELF_FILE_FLAGS_FILE_MODE       1
+#define DIANA_ELF_FILE_FLAGS_MODULE_MODE     DIANA_EXECUTABLE_FILE_FLAGS_MODULE_MODE
+#define DIANA_ELF_FILE_FLAGS_FILE_MODE       DIANA_EXECUTABLE_FILE_FLAGS_FILE_MODE
+
 
 int DianaElfFile_Init(/* out */ Diana_ElfFile* pElfFile,
     /* in */ DianaMovableReadStream* pStream,

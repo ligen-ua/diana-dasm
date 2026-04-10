@@ -283,6 +283,12 @@ CLogParam::CLogParam(long value, long radix)
     :
         m_type(lpInt)
 {
+    if (radix == 10 && value < 0) 
+    {
+        m_buf[0] = '-';
+        portable_ui64toa(-value, m_buf+1, sizeof(m_buf)-2, radix);
+        return;
+    }
     portable_ui64toa(value, m_buf, sizeof(m_buf)-1, radix);
 }
 CLogParam::CLogParam(unsigned long value, long radix)
@@ -301,6 +307,12 @@ CLogParam::CLogParam(long long value)
     :
         m_type(lpInt)
 {
+    if (value < 0) 
+    {
+        m_buf[0] = '-';
+        portable_ui64toa(-value, m_buf+1, sizeof(m_buf)-2, 10);
+        return;
+    }
     portable_ui64toa(value, m_buf, sizeof(m_buf)-1, 10);
 }
 

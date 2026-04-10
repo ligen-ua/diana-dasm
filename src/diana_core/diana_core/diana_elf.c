@@ -286,10 +286,6 @@ int Diana_VerifyElfHeader(DIANA_ELF_HEADER* pElfHeader,
     if (sizeOfFile && pElfHeader->e_phoff >= sizeOfFile)
         return DI_INVALID_INPUT;
 
-    // Validate section header offset and size
-    if (sizeOfFile && pElfHeader->e_shoff >= sizeOfFile)
-        return DI_INVALID_INPUT;
-
     return DI_SUCCESS;
 }
 
@@ -1099,13 +1095,13 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
         switch (pEntry->d_tag)
         {
         case DI_ELF_DT_SYMTAB:
-            symtabAddr = baseAddress + pEntry->d_val;
+            symtabAddr = pEntry->d_val;
             break;
         case DI_ELF_DT_STRTAB:
-            strtabAddr = baseAddress + pEntry->d_val;
+            strtabAddr = pEntry->d_val;
             break;
         case DI_ELF_DT_JMPREL:
-            jmprelAddr = baseAddress + pEntry->d_val;
+            jmprelAddr = pEntry->d_val;
             break;
         case DI_ELF_DT_PLTRELSZ:
             jmprelSize = pEntry->d_val;
@@ -1151,7 +1147,7 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                 relBuf,
                 (int)relaEntSize,
                 &readBytes,
-                streamFlags));
+                streamFlags | DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
             if (readBytes != relaEntSize)
                 DI_CHECK_GOTO(DI_ERROR);
 
@@ -1201,7 +1197,7 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                 is64bit,
                 isLE,
                 &sym,
-                streamFlags));
+                streamFlags | DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
 
             if (bImports) 
             {
@@ -1231,21 +1227,44 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                     funcName,
                     sizeof(funcName) - 1,
                     &readBytes,
-                    streamFlags));
+                    streamFlags | DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
                 if (!readBytes)
                     DI_CHECK_GOTO(DI_ERROR);
                 funcName[sizeof(funcName) - 1] = 0;
 
                 // We don't have exact DLL name mapping here; pass NULL or a generic name
                 const char* dllName = 0;
-                OPERAND_SIZE dummy = 0;
+                OPERAND_SIZE stValue =  sym.st_value;
 
+                if (!stValue) 
+                {
+                    // After extracting r_offset from the relocation entry:
+                    OPERAND_SIZE gotSlotAddr = r_offset;
+
+                    // For ET_DYN (shared lib / PIE): r_offset is relative to load base
+                    // For ET_EXEC (non-PIE): r_offset is already absolute
+                    // You need to check e_type from the ELF header to decide
+                    if (pElfFile->pImpl->elfHeader.e_type == DIANA_ET_DYN)
+                        DI_CHECK_GOTO(Diana_SafeAdd(&gotSlotAddr, baseAddress)); 
+
+                    // Read the resolved pointer from the GOT slot
+                    OPERAND_SIZE resolvedAddr = 0;
+                    DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+                        gotSlotAddr,
+                        &resolvedAddr,
+                        is64bit ? 8 : 4,
+                        &readBytes,
+                        streamFlags | DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
+
+                    // resolvedAddr now holds what the loader wrote â€” the real symbol address
+                    stValue = resolvedAddr;  // use instead of sym.st_value
+                }
                 DI_CHECK_GOTO(pObserver->queryFunctionByName(
                     pObserver,
                     dllName,
                     funcName,
                     0,
-                    &dummy));
+                    &stValue));
             }
         }
     }
@@ -1378,7 +1397,7 @@ static int DianaElf_Write64(DianaReadWriteRandomStream* pOut,
  * is64 / isLE = class / endianness flags
  *
  * Symbol-dependent relocs (r_sym != 0) that are not RELATIVE are
- * SKIPPED here — they are resolved later by DianaElfFile_QueryImports.
+ * SKIPPED here ï¿½ they are resolved later by DianaElfFile_QueryImports.
  */
 static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
     OPERAND_SIZE                loadBias,
@@ -1411,7 +1430,7 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
 
         case DIANA_R_X86_64_64:
         {
-            if (pEntry->r_sym != 0) return DI_SUCCESS; /* needs symbol – skip */
+            if (pEntry->r_sym != 0) return DI_SUCCESS; /* needs symbol ï¿½ skip */
             /* *patchVA += B + A */
             unsigned char cur[8];
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
@@ -1440,7 +1459,7 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
             return DI_SUCCESS;
 
         default:
-            return DI_SUCCESS; /* unknown type – ignore safely */
+            return DI_SUCCESS; /* unknown type ï¿½ ignore safely */
         }
     }
 
@@ -1568,7 +1587,7 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
     }
 
     default:
-        return DI_SUCCESS; /* unsupported arch – skip silently */
+        return DI_SUCCESS; /* unsupported arch ï¿½ skip silently */
     }
 }
 
@@ -1694,7 +1713,7 @@ static int DianaElf_ProcessRelocTable(DianaReadWriteRandomStream* pOut,
  *             For ET_DYN this is the chosen load address.
  * pOutStream - the read/write random-access stream over the mapped image.
  *
- * Symbol-dependent relocations (GLOB_DAT, JUMP_SLOT, …) are NOT resolved
+ * Symbol-dependent relocations (GLOB_DAT, JUMP_SLOT, ï¿½) are NOT resolved
  * here; they are handled by DianaElfFile_QueryImports.
  */
 int DianaElfFile_Relocate(/* in */    Diana_ElfFile* pElfFile,
@@ -1717,7 +1736,7 @@ int DianaElfFile_Relocate(/* in */    Diana_ElfFile* pElfFile,
      * walk its entries to find the relocation tables.
      * ---------------------------------------------------------------- */
     if (pImpl->dynamicSize == 0)
-        return DI_SUCCESS;  /* no dynamic segment – nothing to do */
+        return DI_SUCCESS;  /* no dynamic segment ï¿½ nothing to do */
 
     /* Dynamic segment VA in the mapped image = preferred VA + loadBias */
     OPERAND_SIZE dynVA = (OPERAND_SIZE)pImpl->dynamicAddress + loadBias;
@@ -1963,7 +1982,7 @@ int DianaElfFile_MapEx(/* in */  Diana_ElfFile* pElfFile,
     }
 
     // ----------------------------------------------------------------
-    // Relocations (placeholder – implement similarly to DianaPeFile_Relocate)
+    // Relocations (placeholder ï¿½ implement similarly to DianaPeFile_Relocate)
     // ----------------------------------------------------------------
     return DianaElfFile_Relocate(pElfFile,
         address,

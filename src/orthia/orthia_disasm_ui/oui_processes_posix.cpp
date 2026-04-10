@@ -291,8 +291,9 @@ namespace oui
             if (ReadProcessMemoryPosix(m_pid, offset, buffer.data(), size))
                 return orthia::WorkAddressData();
 
+            auto* pBufferStart = buffer.data();
             return orthia::WorkAddressData(
-                buffer.data(),
+                pBufferStart,
                 size,
                 nullptr,
                 orthia::WorkAddressData::flags_FullValid,
@@ -319,33 +320,30 @@ namespace oui
 
             std::vector<ModCandidate> candidates;
             {
-                std::map<std::string, unsigned long long> seenPath;
                 for (auto& e : entries)
                 {
-                    if (e.path.empty() || !e.isExec)
+                    if (e.path.empty())
                         continue;
-                    if (e.offset != 0)
-                        continue; // only the first segment marks the base
-
-                    if (seenPath.count(e.path))
-                        continue;
-                    seenPath[e.path] = e.startAddr;
-
-                    ModCandidate c;
-                    c.baseAddr = e.startAddr;
-                    c.path     = e.path;
-                    candidates.push_back(c);
-
-                    ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Candidate: ", orthia::CLogParamEx(c.baseAddr, 16), " ", c.path);
-                }
-                // Compute size of each candidate = end of last segment with same path
-                for (auto& c : candidates)
-                {
-                    for (auto& e : entries)
+                    
+                    if (e.offset == 0)
                     {
-                        if (e.path == c.path && e.endAddr > c.baseAddr + c.size)
-                            c.size = e.endAddr - c.baseAddr;
+                        ModCandidate c;
+                        c.baseAddr = e.startAddr;
+                        c.path     = e.path;
+                        candidates.push_back(c);
+                        continue;
                     }
+                    if (candidates.empty() || candidates.back().path != e.path)
+                    {
+                        continue;
+                    }
+                    
+                    ModCandidate & last  = candidates.back();
+                    auto distance =  e.endAddr - last.baseAddr;
+                    if (last.size < distance)
+                        last.size = distance;
+
+                   // ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Candidate: ", orthia::CLogParamEx(e.offset, 16), ":",orthia::CLogParamEx(e.startAddr, 16), " ", e.path);
                 }
             }
 
@@ -386,8 +384,7 @@ namespace oui
                     exe.dianaMode = exe.u.elfFile.dianaMode;
                     info.dianaMode = exe.dianaMode;
 
-                    exe.entryPoint = 0;
-                    info.entryPoint = c.baseAddr; // approximate
+                    info.entryPoint = c.baseAddr + exe.u.elfFile.pImpl->elfHeader.e_entry;
 
                     if (contextCallback)
                     {

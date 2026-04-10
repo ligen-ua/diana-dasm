@@ -1,5 +1,36 @@
 #include "diana_executable.h"
 
+
+int DianaExecutable_Init(DianaExecutable * pExecutable,
+                     DianaMovableReadStream * pStream,
+                     OPERAND_SIZE sizeOfFile,
+                     int flags) 
+{
+
+    memset(pExecutable, 0, sizeof(DianaExecutable));
+
+    if (!DianaPeFile_Init(&pExecutable->u.peFile,
+        pStream,
+        sizeOfFile,
+        flags))
+    {
+        pExecutable->type = DIANA_EXECUTABLE_TYPE_PE;
+        pExecutable->dianaMode = pExecutable->u.peFile.pImpl->dianaMode;
+        return DI_SUCCESS;
+    }
+
+    if (!DianaElfFile_Init(&pExecutable->u.elfFile,
+        pStream,
+        sizeOfFile,
+        flags))
+    {
+        pExecutable->type = DIANA_EXECUTABLE_TYPE_ELF;
+        pExecutable->dianaMode = pExecutable->u.elfFile.dianaMode;
+        return DI_SUCCESS;
+    }
+    return DI_UNSUPPORTED;
+}
+
 void DianaExecutable_Free(DianaExecutable* pExe)
 {
     if (!pExe)

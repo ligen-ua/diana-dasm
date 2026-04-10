@@ -3,6 +3,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
+#include "orthia_log.h"
 
 namespace orthia
 {
@@ -380,16 +381,15 @@ namespace orthia
         orthia::DianaMemoryStream stream(0, &module, moduleSize);
 
         DianaExecutable exe = {};
-        exe.type = DIANA_EXECUTABLE_TYPE_PE;
-        if (DianaPeFile_Init(&exe.u.peFile,
+        if (int status = DianaExecutable_Init(&exe,
             &stream.parent,
             moduleSize,
-            DIANA_PE_FILE_FLAGS_MODULE_MODE))
+            DIANA_EXECUTABLE_FILE_FLAGS_MODULE_MODE))
         {
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Module: ", orthia::CLogParamEx(moduleAddress, 16), ":",orthia::CLogParamEx(moduleSize, 16), " ->", (long)status);
             return;
         }
-        diana::Guard<diana::PeFile> exeGuard(&exe.u.peFile);
-        exe.dianaMode = exe.u.peFile.pImpl->dianaMode;
+        diana::Guard<diana::ExecutableFile> exeGuard(&exe);
 
         int importsCount = 0;
         CImportsCollector importsCollector(nameFilter, names, [this](auto address) {
