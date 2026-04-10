@@ -134,7 +134,30 @@ namespace oui
                        >> flags >> minflt >> cminflt >> majflt >> cmajflt
                        >> utime >> stime >> cutime >> cstime >> priority >> nice
                        >> numthreads >> itrealvalue >> starttime;
-                    // starttime is in clock ticks since boot — no direct conversion available, leave default
+
+                    // Convert starttime (clock ticks since boot) to a Unix timestamp:
+                    //   1. Read the boot time in seconds since Unix epoch from /proc/stat.
+                    //   2. thread_start = btime + starttime / CLK_TCK
+                    long long btime = 0;
+                    {
+                        std::ifstream fstat("/proc/stat");
+                        std::string statLine;
+                        while (std::getline(fstat, statLine))
+                        {
+                            if (statLine.compare(0, 6, "btime ") == 0)
+                            {
+                                btime = std::stoll(statLine.substr(6));
+                                break;
+                            }
+                        }
+                    }
+                    if (btime > 0)
+                    {
+                        long long clkTck = sysconf(_SC_CLK_TCK);
+                        if (clkTck <= 0) clkTck = 100;
+                        long long threadStartUnix = btime + (long long)starttime / clkTck;
+                        info.startTime.InitFromUnixTime(threadStartUnix);
+                    }
                 }
             }
             return 0;

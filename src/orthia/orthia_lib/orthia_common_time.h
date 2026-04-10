@@ -48,6 +48,7 @@ public:
     }
     void InitFromCurrentTime();
     void InitFromFileTime(long long fileTime);
+    void InitFromUnixTime(long long unixSeconds);
     void InitFromSystemTime(const orthia::WinSystemTime_type& sqlValue)
     {
         m_sqlTimeImpl = orthia::ConvertSystemTimeToSQLite(sqlValue);

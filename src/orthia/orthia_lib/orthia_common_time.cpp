@@ -4,6 +4,14 @@ namespace orthia
 {
 
 // Time
+void CCommonDateTime::InitFromUnixTime(long long unixSeconds)
+{
+    // Unix epoch (1970-01-01) is 116444736000000000 100-ns intervals after the
+    // Windows FILETIME epoch (1601-01-01).
+    long long fileTime = unixSeconds * 10000000LL + 116444736000000000LL;
+    InitFromFileTime(fileTime);
+}
+
 void CCommonDateTime::InitFromFileTime(long long utcTime)
 {
     orthia::WinSystemTime_type st;
