@@ -5,16 +5,24 @@
 #include <sys/select.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <time.h>
 
 namespace oui
 {
 
 // Pipe used to wake up the blocking select() from Interrupt()
+static const long kDoubleClickMs = 400;
+
 struct CConsoleInputReader::Impl
 {
     int pipeFd[2] = {-1, -1};
     MouseButton lastMouseButton = MouseButton::None;
     bool mouseReportingEnabled = false;
+
+    // Double-click tracking
+    struct timespec lastClickTime = {0, 0};
+    Point           lastClickPoint = {0, 0};
+    MouseButton     lastClickButton = MouseButton::None;
 
     Impl()
     {
@@ -367,6 +375,34 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
                 if (TryParseSGRMouse(seq, seqLen, evt, m_impl->lastMouseButton))
                 {
                     i += seqLen;
+
+                    // Detect double-click: two Pressed events on the same button/position within kDoubleClickMs
+                    if (evt.mouseEvent.state == MouseState::Pressed &&
+                        evt.mouseEvent.button == MouseButton::Left)
+                    {
+                        struct timespec now;
+                        clock_gettime(CLOCK_MONOTONIC, &now);
+
+                        long elapsedMs = (now.tv_sec  - m_impl->lastClickTime.tv_sec)  * 1000
+                                       + (now.tv_nsec - m_impl->lastClickTime.tv_nsec) / 1000000;
+
+                        if (elapsedMs <= kDoubleClickMs &&
+                            evt.mouseEvent.button == m_impl->lastClickButton &&
+                            evt.mouseEvent.point.x == m_impl->lastClickPoint.x &&
+                            evt.mouseEvent.point.y == m_impl->lastClickPoint.y)
+                        {
+                            evt.mouseEvent.state = MouseState::DoubleClick;
+                            // Reset so a third click doesn't become another double-click
+                            m_impl->lastClickTime  = {0, 0};
+                            m_impl->lastClickButton = MouseButton::None;
+                        }
+                        else
+                        {
+                            m_impl->lastClickTime   = now;
+                            m_impl->lastClickPoint  = evt.mouseEvent.point;
+                            m_impl->lastClickButton = evt.mouseEvent.button;
+                        }
+                    }
                 }
                 else
                 {
