@@ -528,8 +528,7 @@ namespace oui
                         exe.dianaMode = exe.u.peFile.pImpl->dianaMode;
                         info.dianaMode = exe.dianaMode;
 
-                        exe.entryPoint = exe.u.peFile.pImpl->addressOfEntryPoint;
-                        info.entryPoint = exe.entryPoint;
+                        info.entryPoint = exe.u.peFile.pImpl->addressOfEntryPoint;
                         Diana_SafeAdd(&info.entryPoint, info.address);
 
                         if (contextCallback)

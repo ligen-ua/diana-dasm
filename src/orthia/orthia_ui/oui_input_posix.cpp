@@ -13,15 +13,35 @@ namespace oui
 struct CConsoleInputReader::Impl
 {
     int pipeFd[2] = {-1, -1};
+    MouseButton lastMouseButton = MouseButton::None;
+    bool mouseReportingEnabled = false;
 
     Impl()
     {
         pipe(pipeFd);
+        EnableMouseReporting();
     }
     ~Impl()
     {
+        DisableMouseReporting();
         if (pipeFd[0] >= 0) close(pipeFd[0]);
         if (pipeFd[1] >= 0) close(pipeFd[1]);
+    }
+    void EnableMouseReporting()
+    {
+        // Enable mouse click events (?1000h), button-motion tracking (?1002h),
+        // and SGR extended coordinate format (?1006h)
+        const char seq[] = "\x1b[?1000h\x1b[?1002h\x1b[?1006h";
+        write(STDOUT_FILENO, seq, sizeof(seq) - 1);
+        mouseReportingEnabled = true;
+    }
+    void DisableMouseReporting()
+    {
+        if (!mouseReportingEnabled) return;
+        // Disable in reverse order
+        const char seq[] = "\x1b[?1006l\x1b[?1002l\x1b[?1000l";
+        write(STDOUT_FILENO, seq, sizeof(seq) - 1);
+        mouseReportingEnabled = false;
     }
 };
 
@@ -36,6 +56,7 @@ CConsoleInputReader::~CConsoleInputReader()
 
 void CConsoleInputReader::Interrupt()
 {
+    m_impl->DisableMouseReporting();
     char c = 1;
     write(m_impl->pipeFd[1], &c, 1);
 }
@@ -141,6 +162,100 @@ static VirtualKey ControlCharToVKey(char c, KeyState& keyState)
     return VirtualKey::None;
 }
 
+// Parse an SGR mouse sequence: ESC [ < Cb ; Cx ; Cy M|m
+// Returns true and fills evt on success.
+// lastButton is updated on press and used as fallback on release.
+static bool TryParseSGRMouse(const char* seq, int seqLen, InputEvent& evt, MouseButton& lastButton)
+{
+    // Minimum: ESC [ < 0 ; 1 ; 1 M  = 9 chars
+    if (seqLen < 9) return false;
+    if (seq[1] != '[' || seq[2] != '<') return false;
+
+    char terminator = seq[seqLen - 1];
+    if (terminator != 'M' && terminator != 'm') return false;
+
+    const char* p   = seq + 3;
+    const char* end = seq + seqLen - 1;
+
+    // Parse one non-negative integer
+    auto parseNum = [&](int& val) -> bool {
+        if (p >= end || *p < '0' || *p > '9') return false;
+        val = 0;
+        while (p < end && *p >= '0' && *p <= '9')
+            val = val * 10 + (*p++ - '0');
+        return true;
+    };
+
+    int cb = 0, cx = 0, cy = 0;
+    if (!parseNum(cb)) return false;
+    if (p >= end || *p++ != ';') return false;
+    if (!parseNum(cx)) return false;
+    if (p >= end || *p++ != ';') return false;
+    if (!parseNum(cy)) return false;
+
+    bool released = (terminator == 'm');
+
+    // Modifier bits in cb: bit2=Shift, bit3=Alt, bit4=Ctrl
+    KeyState ks;
+    if (cb & 4)  ks.state |= KeyState::AnyShift | KeyState::LeftShift;
+    if (cb & 8)  ks.state |= KeyState::AnyAlt   | KeyState::LeftAlt;
+    if (cb & 16) ks.state |= KeyState::AnyCtrl  | KeyState::LeftCtrl;
+
+    MouseButton button = MouseButton::None;
+    MouseState  state  = MouseState::None;
+
+    if (cb & 64) // wheel — bit6 set
+    {
+        // bit0: 0=WheelUp, 1=WheelDown
+        button = (cb & 1) ? MouseButton::WheelDown : MouseButton::WheelUp;
+        state  = MouseState::None;
+    }
+    else if (cb & 32) // button-motion (drag or hover) — bit5 set
+    {
+        button = MouseButton::Move;
+        state  = MouseState::None;
+    }
+    else
+    {
+        // bits 0-1 encode the button
+        int btnBits = cb & 3;
+        if (btnBits == 3)
+        {
+            // no button (pure motion in ?1003 mode); use lastButton as fallback
+            button = lastButton;
+        }
+        else
+        {
+            switch (btnBits)
+            {
+            case 0: button = MouseButton::Left;   break;
+            case 1: button = MouseButton::Middle; break;
+            case 2: button = MouseButton::Right;  break;
+            default: button = MouseButton::None;  break;
+            }
+        }
+
+        if (released)
+        {
+            state = MouseState::Released;
+        }
+        else
+        {
+            lastButton = button;
+            state = MouseState::Pressed;
+        }
+    }
+
+    evt.keyState          = ks;
+    evt.mouseEvent.valid  = true;
+    evt.mouseEvent.button = button;
+    evt.mouseEvent.state  = state;
+    evt.mouseEvent.point.x = cx - 1; // SGR uses 1-based coordinates
+    evt.mouseEvent.point.y = cy - 1;
+
+    return true;
+}
+
 bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
 {
     input.clear();
@@ -210,10 +325,10 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
                 int seqLen = 1;
                 // SS3: ESC O x  (3 bytes)
                 // CSI: ESC [ ... final_byte
-                char seq[32];
+                char seq[64];
                 seq[0] = 0x1B;
                 int j = i + 1;
-                int maxSeq = (n - i) < 20 ? (n - i) : 20;
+                int maxSeq = (n - i) < (int)(sizeof(seq) - 1) ? (n - i) : (int)(sizeof(seq) - 1);
                 while (seqLen < maxSeq)
                 {
                     seq[seqLen] = buf[j];
@@ -240,31 +355,39 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
                 }
                 seq[seqLen] = '\0';
 
-                KeyState keyState;
-                VirtualKey vk = MapEscapeSequence(seq, seqLen, keyState);
-                if (vk != VirtualKey::None)
+                // Try SGR mouse sequence first (ESC [ < ...)
+                if (TryParseSGRMouse(seq, seqLen, evt, m_impl->lastMouseButton))
                 {
-                    evt.keyEvent.valid = true;
-                    evt.keyEvent.virtualKey = vk;
-                    evt.keyState = keyState;
                     i += seqLen;
                 }
                 else
                 {
-                    // Alt + next character
-                    i++;
-                    if (i < n)
+                    KeyState keyState;
+                    VirtualKey vk = MapEscapeSequence(seq, seqLen, keyState);
+                    if (vk != VirtualKey::None)
                     {
                         evt.keyEvent.valid = true;
-                        evt.keyEvent.rawText.native = std::string(1, buf[i]);
-                        evt.keyState.state |= KeyState::AnyAlt | KeyState::LeftAlt;
-                        i++;
+                        evt.keyEvent.virtualKey = vk;
+                        evt.keyState = keyState;
+                        i += seqLen;
                     }
                     else
                     {
-                        // Standalone ESC
-                        evt.keyEvent.valid = true;
-                        evt.keyEvent.virtualKey = VirtualKey::Escape;
+                        // Alt + next character
+                        i++;
+                        if (i < n)
+                        {
+                            evt.keyEvent.valid = true;
+                            evt.keyEvent.rawText.native = std::string(1, buf[i]);
+                            evt.keyState.state |= KeyState::AnyAlt | KeyState::LeftAlt;
+                            i++;
+                        }
+                        else
+                        {
+                            // Standalone ESC
+                            evt.keyEvent.valid = true;
+                            evt.keyEvent.virtualKey = VirtualKey::Escape;
+                        }
                     }
                 }
             }
@@ -322,7 +445,7 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
             if (evt.keyEvent.rawText.native.size() == 1)
             {
                 char ch = evt.keyEvent.rawText.native[0];
-                if (ch >= 'a' && ch <= 'z') 
+                if (ch >= 'a' && ch <= 'z')
                     evt.keyEvent.virtualKey = static_cast<VirtualKey>(static_cast<int>(VirtualKey::kA) + (ch - 'a'));
                 else if (ch >= 'A' && ch <= 'Z')
                     evt.keyEvent.virtualKey = static_cast<VirtualKey>(static_cast<int>(VirtualKey::kA) + (ch - 'A'));
@@ -338,4 +461,3 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
 }
 
 } // namespace oui
-
