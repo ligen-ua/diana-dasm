@@ -18,6 +18,8 @@ struct CConsoleInputReader::Impl
     int pipeFd[2] = {-1, -1};
     MouseButton lastMouseButton = MouseButton::None;
     bool mouseReportingEnabled = false;
+    int lastWidth  = -1;
+    int lastHeight = -1;
 
     // Double-click tracking
     struct timespec lastClickTime = {0, 0};
@@ -295,6 +297,24 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
         return false;
     }
 
+    // Check for terminal resize on every wakeup (timeout, input, or interrupt)
+    {
+        struct winsize ws;
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0)
+        {
+            if ((int)ws.ws_col != m_impl->lastWidth || (int)ws.ws_row != m_impl->lastHeight)
+            {
+                m_impl->lastWidth  = (int)ws.ws_col;
+                m_impl->lastHeight = (int)ws.ws_row;
+                InputEvent evt;
+                evt.resizeEvent.valid     = true;
+                evt.resizeEvent.newWidth  = (int)ws.ws_col;
+                evt.resizeEvent.newHeight = (int)ws.ws_row;
+                input.push_back(evt);
+            }
+        }
+    }
+
     // Drain the interrupt pipe
     if (FD_ISSET(m_impl->pipeFd[0], &fds))
     {
@@ -307,16 +327,6 @@ bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
     {
         // Timeout — return empty (gives caller a chance to redraw)
         return true;
-    }
-
-    // Check for SIGWINCH resize
-    {
-        struct winsize ws;
-        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0)
-        {
-            // We'll let the app detect size changes on every iteration via GetSize().
-            // Here we just deliver a resize event when we have no buffered input yet.
-        }
     }
 
     char buf[64];
