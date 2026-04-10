@@ -235,11 +235,19 @@ namespace oui
             addCommentSeparator();
             if (tag->newOffset > tag->index.GetIndex())
             {
-                m_currentBlock.append(1, ORTHIA_TCSTR('\x2193')); // TODO FIXIT
+#ifdef DIANA_HAS_POSIX
+                m_currentBlock.append("\xe2\x86\x93"); // ↓ UTF-8
+#else
+                m_currentBlock.append(1, L'\x2193'); // ↓
+#endif
             }
             else
             {
-                m_currentBlock.append(1, ORTHIA_TCSTR('\x2191')); // TODO FIXIT
+#ifdef DIANA_HAS_POSIX
+                m_currentBlock.append("\xe2\x86\x91"); // ↑ UTF-8
+#else
+                m_currentBlock.append(1, L'\x2191'); // ↑
+#endif
             }
         }
 
