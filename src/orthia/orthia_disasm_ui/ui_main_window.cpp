@@ -113,6 +113,11 @@ void CMainWindow::ConstructChilds()
         defaultGroup->AddPanel(m_disasmWindow);
 
         m_stateManager.Register(m_disasmWindow);
+
+        m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
+            oui::VirtualKey::kD), [=]() { 
+                defaultGroup->SwitchPanel(m_disasmWindow);
+            });
     }
     {
         // modules window
@@ -127,8 +132,12 @@ void CMainWindow::ConstructChilds()
         });
         defaultGroup->AddPanel(m_modulesWindow);
         m_stateManager.Register(m_modulesWindow);
+
+        m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
+            oui::VirtualKey::kM), [=]() { 
+                defaultGroup->SwitchPanel(m_modulesWindow);
+            });
     }
-#if 1
     {
         // commands window
         auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.commands"));
@@ -137,8 +146,12 @@ void CMainWindow::ConstructChilds()
             defaultGroup);
         defaultGroup->AddPanel(m_commandWindow);
         m_stateManager.Register(m_commandWindow);
+
+        m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
+            oui::VirtualKey::kC), [=]() { 
+                defaultGroup->SwitchPanel(m_commandWindow);
+            });
     }
-#endif
     {
         // output window
         auto bottomPanel = m_panelContainerWindow->AttachNewGroup(defaultGroup, oui::GroupLocation::Bottom, oui::GroupAttachMode::Sibling);
@@ -148,6 +161,11 @@ void CMainWindow::ConstructChilds()
         // m_outputWindow->SetBackgroundColor(oui::ColorBlue());
 
         bottomPanel->AddPanel(m_outputWindow);
+
+        m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
+            oui::VirtualKey::kO), [=]() { 
+                bottomPanel->SwitchPanel(m_outputWindow);
+            });
     }
     {
         // workspace window
@@ -161,6 +179,14 @@ void CMainWindow::ConstructChilds()
         workspacePanel->AddPanel(m_workspaceWindow);
         workspacePanel->SetVisible(false);
         m_stateManager.Register(m_workspaceWindow);
+
+        m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
+            oui::VirtualKey::kW), [=]() { 
+                if (workspacePanel->IsVisible())
+                {
+                    workspacePanel->SwitchPanel(m_workspaceWindow);
+                }
+            });
     }
     m_model->SetUILog(m_outputWindow);
 
@@ -276,6 +302,7 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
         }
 
         // check linux style terminal switch
+#ifndef DIANA_HAS_POSIX
         if (evt.keyState.HasJustAlt())
         {
             if (evt.keyEvent.virtualKey == oui::VirtualKey::k0)
@@ -290,6 +317,7 @@ bool CMainWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& ev
                 defGroup->SwitchPanel(tabId);
             }
         }
+#endif
     }
     return true;
 }

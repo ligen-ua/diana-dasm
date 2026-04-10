@@ -2,8 +2,6 @@
 
 namespace oui
 {
-    static const auto g_HotKeySymbol = String::char_type('&');
-
     // CMenuButtonWindow
     CMenuButtonWindow::CMenuButtonWindow(const String& caption,
         std::function<void()> handler,
@@ -63,6 +61,8 @@ namespace oui
     }
     void CMenuButtonWindow::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
+        String hotKeySymbol = GetHotKeySymbol();
+
         auto parentMenu = GetParent_t<CMenuWindow>(this);
         if (!parentMenu)
         {
@@ -89,18 +89,20 @@ namespace oui
             profile->buttonText,
             profile->buttonBackground,
             m_caption,
-            g_HotKeySymbol,
+            hotKeySymbol,
             profile->buttonHotkeyText,
             profile->buttonBackground);
     }
     void CMenuButtonWindow::Dock()
     {
+        String hotKeySymbol = GetHotKeySymbol();
+
         auto console = GetConsole();
         if (!console)
         {
             return;
         }
-        int symbols = console->GetSymbolsAnalyzer().CalculateSymbolsCount(m_caption.native, g_HotKeySymbol);
+        int symbols = console->GetSymbolsAnalyzer().CalculateSymbolsCount(m_caption.native, hotKeySymbol.native[0]);
         Size size = { m_spaceAroundName * 2 + symbols, 1 };
         this->Resize(size);
     }
@@ -318,6 +320,8 @@ namespace oui
     }
     static int ToString(CConsole * console, const PopupItem& item, int fixedWidth, String& result)
     {
+        String hotKeySymbol = GetHotKeySymbol();
+
         const int g_spacesBefore = 2;
         const int g_spacesAfter = 2;
 
@@ -339,7 +343,7 @@ namespace oui
         result.native.append(g_spacesBefore, String::symSpace);
 
         // -- 
-        symCount += console->GetSymbolsAnalyzer().CalculateSymbolsCount(item.text.native, g_HotKeySymbol);
+        symCount += console->GetSymbolsAnalyzer().CalculateSymbolsCount(item.text.native, hotKeySymbol.native[0]);
         result.native += item.text.native;
 
         if (fixedWidth)
@@ -400,6 +404,8 @@ namespace oui
     }
     void CMenuPopup::DoPaint(const Rect& rect, DrawParameters& parameters)
     {
+        String hotKeySymbol = GetHotKeySymbol();
+
         auto console = GetConsole();
         if (!console)
         {
@@ -453,7 +459,7 @@ namespace oui
                     profile->buttonText,
                     profile->buttonBackground,
                     tmp,
-                    g_HotKeySymbol,
+                    hotKeySymbol,
                     profile->buttonHotkeyText,
                     profile->buttonBackground);
             }

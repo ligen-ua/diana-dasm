@@ -203,19 +203,21 @@ struct PositionsBuilder
 // --- test int --
 static void test_int_tokenizer()
 {
+    int maxInt = std::numeric_limits<int32_t>::max();
+
     char maxBin[1024];
-    _i64toa(MAXINT, maxBin, 2);
+    orthia::portable_ui64toa(maxInt, maxBin, sizeof(maxBin), 2);
 
     char maxOct[100];
-    _i64toa(MAXINT, maxOct, 8);
+    orthia::portable_ui64toa(maxInt, maxOct, sizeof(maxOct), 8);
     
     orthia::CStreamTokenFileSource sources[] = {"42", 
                                                 "0x42", 
                                                 "042", 
                                                 "0b101011010",
                                                 "0000000000000000000000000000000000000000000001",
-                                                orthia::ObjectToString_Ansi(MAXINT),
-                                                "0x" + orthia::ToAnsiStringAsHex(MAXINT),
+                                                orthia::ObjectToString_Ansi(maxInt),
+                                                "0x" + orthia::ToAnsiStringAsHex(maxInt),
                                                 std::string("0") + maxOct,
                                                 std::string("0b") + maxBin,
                                                 "0"
@@ -228,10 +230,10 @@ static void test_int_tokenizer()
                     042,
                     0x15A,
                     1,
-                    MAXINT,
-                    MAXINT,
-                    MAXINT,
-                    MAXINT,
+                    maxInt,
+                    maxInt,
+                    maxInt,
+                    maxInt,
                     0
     };
 
@@ -243,11 +245,13 @@ static void test_int_tokenizer()
 
 static void test_uint_tokenizer()
 {
+    unsigned int maxInt = std::numeric_limits<uint32_t>::max();
+
     char maxBin[1024];
-    _i64toa(MAXUINT, maxBin, 2);
+    orthia::portable_ui64toa(maxInt, maxBin, sizeof(maxBin), 2);
 
     char maxOct[100];
-    _i64toa(MAXUINT, maxOct, 8);
+    orthia::portable_ui64toa(maxInt, maxOct, sizeof(maxOct), 8);
     
     orthia::CStreamTokenFileSource source;
     
@@ -257,8 +261,8 @@ static void test_uint_tokenizer()
                       <<"042U"
                       <<"0b101011010U"
                       <<"0000000000000000000000000000000000000000000001U"
-                      <<orthia::ObjectToString_Ansi(MAXUINT) + "U"
-                      <<"0x" + orthia::ToAnsiStringAsHex(MAXUINT)+ "U"
+                      <<orthia::ObjectToString_Ansi(maxInt) + "U"
+                      <<"0x" + orthia::ToAnsiStringAsHex(maxInt)+ "U"
                       <<std::string("0") + maxOct + "U"
                       <<std::string("0b") + maxBin + "U"
                       <<"0U";
@@ -268,10 +272,10 @@ static void test_uint_tokenizer()
                     042,
                     0x15A,
                     1,
-                    MAXUINT,
-                    MAXUINT,
-                    MAXUINT,
-                    MAXUINT,
+                    maxInt,
+                    maxInt,
+                    maxInt,
+                    maxInt,
                     0
     };
 
@@ -290,19 +294,22 @@ static void test_uint_tokenizer()
 // --- test int64 --
 static void test_int64_tokenizer()
 {
+    DI_INT64 maxInt = std::numeric_limits<DI_INT64>::max();
+
     char maxBin[1024];
-    _i64toa(MAXINT64, maxBin, 2);
+    orthia::portable_ui64toa(maxInt, maxBin, sizeof(maxBin), 2);
 
     char maxOct[100];
-    _i64toa(MAXINT64, maxOct, 8);
+    orthia::portable_ui64toa(maxInt, maxOct, sizeof(maxOct), 8);
+
     
     orthia::CStreamTokenFileSource sources[] = {"42LL", 
                                                 "0x42LL", 
                                                 "042LL", 
                                                 "0b101011010LL",
                                                 "0000000000000000000000000000000000000000000001LL",
-                                                orthia::ObjectToString_Ansi(MAXINT64) + "LL",
-                                                "0x" + orthia::ToAnsiStringAsHex(MAXINT64) + "LL",
+                                                orthia::ObjectToString_Ansi(maxInt) + "LL",
+                                                "0x" + orthia::ToAnsiStringAsHex(maxInt) + "LL",
                                                 std::string("0") + maxOct + "LL",
                                                 std::string("0b") + maxBin + "LL",
                                                 "0LL"
@@ -310,15 +317,15 @@ static void test_int64_tokenizer()
     
     size_t count = sizeof(sources)/sizeof(sources[0]);
 
-    __int64 values[] = {42,
+    DI_INT64 values[] = {42,
                     0x42,
                     042,
                     0x15A,
                     1,
-                    MAXINT64,
-                    MAXINT64,
-                    MAXINT64,
-                    MAXINT64,
+                    maxInt,
+                    maxInt,
+                    maxInt,
+                    maxInt,
                     0
     };
 
@@ -330,11 +337,13 @@ static void test_int64_tokenizer()
 
 static void test_uint64_tokenizer()
 {
+    DI_UINT64 maxInt = std::numeric_limits<DI_UINT64>::max();
+
     char maxBin[1024];
-    _i64toa(MAXUINT64, maxBin, 2);
+    orthia::portable_ui64toa(maxInt, maxBin, sizeof(maxBin), 2);
 
     char maxOct[100];
-    _i64toa(MAXUINT64, maxOct, 8);
+    orthia::portable_ui64toa(maxInt, maxOct, sizeof(maxOct), 8);
     
     orthia::CStreamTokenFileSource source;
     
@@ -344,21 +353,21 @@ static void test_uint64_tokenizer()
                       <<"042ULL"
                       <<"0b101011010ULL"
                       <<"0000000000000000000000000000000000000000000001ULL"
-                      <<orthia::ObjectToString_Ansi(MAXUINT64) + "ULL"
-                      <<"0x" + orthia::ToAnsiStringAsHex(MAXUINT64)+ "ULL"
+                      <<orthia::ObjectToString_Ansi(maxInt) + "ULL"
+                      <<"0x" + orthia::ToAnsiStringAsHex(maxInt)+ "ULL"
                       <<std::string("0") + maxOct + "ULL"
                       <<std::string("0b") + maxBin + "ULL"
                       <<"0ULL";
 
-    unsigned __int64 values[] = {42,
+    DI_UINT64 values[] = {42,
                     0x42,
                     042,
                     0x15A,
                     1,
-                    MAXUINT64,
-                    MAXUINT64,
-                    MAXUINT64,
-                    MAXUINT64,
+                    maxInt,
+                    maxInt,
+                    maxInt,
+                    maxInt,
                     0
     };
 
@@ -526,7 +535,6 @@ static void test_wchar_tokenizer()
                count);
 }
 
-
 // --- test name --
 static void test_name_tokenizer()
 {
@@ -583,8 +591,8 @@ static void test_various_tokenizer()
     env.GetBinaryStorage().RegisterTokenData(&tokens[5], "c", 1);
     env.GetBinaryStorage().RegisterTokenData(&tokens[6], "d", 1);
 
-    const __int32 value1 = 1;
-    const __int32 value2 = 2;
+    const DI_INT32 value1 = 1;
+    const DI_INT32 value2 = 2;
     env.GetBinaryStorage().RegisterTokenData(&tokens[3], &value1, sizeof(value1));
     env.GetBinaryStorage().RegisterTokenData(&tokens[4], &value2, sizeof(value2));
 
@@ -602,17 +610,16 @@ static void test_various_tokenizer()
 
 static void test_tokenizer_errors()
 {
-    unsigned long long maxIntPlus1 = MAXINT64;
-    ++maxIntPlus1;
+    unsigned long long maxIntPlus1 = std::numeric_limits<DI_UINT64>::max();
     
     char incorrectIntBin[1024];
-    _i64toa(maxIntPlus1, incorrectIntBin, 2);
+    orthia::portable_ui64toa(maxIntPlus1, incorrectIntBin, sizeof(incorrectIntBin), 2);
 
     char incorrectIntOct[100];
-    _i64toa(maxIntPlus1, incorrectIntOct, 8);
+    orthia::portable_ui64toa(maxIntPlus1, incorrectIntOct, sizeof(incorrectIntOct),  8);
 
     char incorrectIntHex[100];
-    _i64toa(maxIntPlus1, incorrectIntHex, 16);
+    orthia::portable_ui64toa(maxIntPlus1, incorrectIntHex, sizeof(incorrectIntHex),  16);
 
     orthia::CStreamTokenFileSource sources[] = {
         "L\"\\xxx\"",
@@ -620,9 +627,9 @@ static void test_tokenizer_errors()
         "/*hi",
         "184467440737095516160ULL",
         "5ULULU",
-        std::string("0b") + incorrectIntBin,
-        std::string("0") + incorrectIntOct,
-        std::string("0x") + incorrectIntHex,
+        std::string("0b") + incorrectIntBin + "0",
+        std::string("0") + incorrectIntOct + "0",
+        std::string("0x") + incorrectIntHex + "0",
         
     };
     size_t count = sizeof(sources)/sizeof(sources[0]);
@@ -733,9 +740,9 @@ void test_tokenizer()
     DIANA_TEST(test_int64_tokenizer());
     DIANA_TEST(test_uint64_tokenizer());
     DIANA_TEST(test_char_tokenizer());
-    DIANA_TEST(test_wchar_tokenizer());
+    DIANA_TEST_WIN32(test_wchar_tokenizer());
     DIANA_TEST(test_string_tokenizer());
-    DIANA_TEST(test_wstring_tokenizer());    
+    DIANA_TEST_WIN32(test_wstring_tokenizer());    
     DIANA_TEST(test_name_tokenizer());
     DIANA_TEST(test_various_tokenizer());
     DIANA_TEST(test_tokenizer_errors());

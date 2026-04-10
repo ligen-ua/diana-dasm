@@ -411,7 +411,7 @@ namespace orthia
             imageBase,
             &writeStream,
             &page.front(),
-            (ULONG)page.size(),
+            (DI_UINT32)page.size(),
             GetParent()));
 
         for (auto& pair: m_mappedModules)

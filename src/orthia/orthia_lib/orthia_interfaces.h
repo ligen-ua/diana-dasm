@@ -118,7 +118,7 @@ struct CommonRangeInfo
 struct CommonModuleInfo
 {
     Address_type address;
-    std::wstring name;
+    orthia::PlatformString_type name;
     Address_type size;
     CommonModuleInfo()
         :
@@ -128,7 +128,7 @@ struct CommonModuleInfo
     }
     CommonModuleInfo(Address_type address_in,
                      Address_type size_in,
-                     const std::wstring & name_in)
+                     const orthia::PlatformString_type & name_in)
                      :
         address(address_in),
         name(name_in),
@@ -198,7 +198,7 @@ struct IAPIHandlerDebugInterface
     typedef enum {dtNone, dtKernel, dtUser} Debuggee_type;
         
     virtual void Init(CMemoryStorageOfModifiedData * pVirtualEnvironment)=0;
-    virtual void Print(const std::wstring & text)=0;
+    virtual void Print(const orthia::PlatformString_type & text)=0;
     virtual Debuggee_type GetDebuggeeType()=0;
     virtual OPERAND_SIZE QueryModule(const char * pDllName)=0;
     virtual OPERAND_SIZE QueryFunctionAddress(OPERAND_SIZE module,

@@ -7,3 +7,9 @@
 *.user
 *.aps
 /tmp
+/build
+.vscode
+.claude
+/cmake-debug
+/cmake-release
+

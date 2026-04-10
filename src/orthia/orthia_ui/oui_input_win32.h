@@ -1,3 +1,5 @@
+#ifdef OUI_SYS_WINDOWS
+
 #pragma once
 
 #include "oui_base_win32.h"
@@ -27,3 +29,4 @@ namespace oui
     };
 }
 
+#endif

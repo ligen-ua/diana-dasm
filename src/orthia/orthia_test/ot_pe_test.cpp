@@ -46,14 +46,14 @@ static void parse_pe_test()
                                  (OPERAND_SIZE)hModule,
                                  &writeStream,
                                  &page.front(),
-                                 (ULONG)page.size()));
+                                 (DI_UINT32)page.size()));
 
     CLinkObserverOverWin32 win32Loader;
     DI_CHECK_CPP(DianaPeFile_LinkImports(&dianaPeFile,
                                          (OPERAND_SIZE)hModule,
                                          &writeStream,
                                          &page.front(),
-                                         (ULONG)page.size(),
+                                         (DI_UINT32)page.size(),
                                          win32Loader.GetParent()));
     // compare the loaded modules
     DianaMovableReadStreamOverMemory peFileStream_CurrentModule;

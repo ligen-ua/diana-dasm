@@ -1,7 +1,14 @@
 #include "orthia_expressions.h"
 #include "orthia_common_print.h"
+#include "orthia_utils.h"
 
 namespace orthia {
+
+NameNotFound::NameNotFound(const orthia::PlatformString_type& name)
+    :
+    std::runtime_error("Name not found: " + orthia::PlatformStringToUtf8(name))
+{
+}
 
 // MapNameResolver
 Address_type MapNameResolver::QueryAddress(const PlatformString_type& name)

@@ -10,7 +10,7 @@ CDatabaseSaver::CDatabaseSaver()
 
 void CDatabaseSaver::Save(CDianaModule & dianaModule,
                           CDatabaseManager & databaseManager,
-                          const std::wstring & moduleName)
+                          const orthia::PlatformString_type & moduleName)
 {
     orthia::intrusive_ptr<CDatabase> databaseModule = databaseManager.GetDatabase();
     orthia::intrusive_ptr<CClassicDatabase> classicDatabase = databaseModule->GetClassicDatabase();

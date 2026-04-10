@@ -223,19 +223,11 @@ namespace orthia
         int platformError = 0;
         unsigned long long fileSize = 0;
         std::tie(platformError, fileSize) = proc->GetSizeInBytes();
-        int dianaMode = 0;
-        if (fileSize == MAXUINT32)
-        {
-            dianaMode = DIANA_MODE32;
-        }
-        else
-        {
-            dianaMode = DIANA_MODE64;
-        }
+        int dianaMode = proc->GetDianaMode();
 
         WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
 
-        auto persistentItemStorage = std::make_shared<ÑPersistentItemStorage>();
+        auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
         info->ReloadModules();
 
@@ -341,15 +333,15 @@ namespace orthia
                         file->GetFullFileNameForUI());
 
                     std::stringstream textInfo;
-                    textInfo << Utf16ToUtf8(readmeHeader) << "\n";
-                    textInfo << Utf16ToUtf8(originalName.native) << "\n";
+                    textInfo << PlatformStringToUtf8(readmeHeader) << "\n";
+                    textInfo << PlatformStringToUtf8(originalName.native) << "\n";
                     auto str = textInfo.str();
                     readmeFile.WriteToFile_Silent(str.c_str(), str.size());
                 }
             }
 
             // fill the model data
-            auto persistentItemStorage = std::make_shared<ÑFilePersistentItemStorage>();
+            auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
 
             info->fullName = file->GetFullFileName();
@@ -370,7 +362,7 @@ namespace orthia
                 if (!orthia::LoadFileToVector_Silent(readmeFileName, readmeBuffer))
                 {
                     readmeBuffer.push_back(0);
-                    WriteLog(completeHandler->GetThread(), Utf8ToUtf16(readmeBuffer.data()));
+                    WriteLog(completeHandler->GetThread(), Utf8ToPlatformString(readmeBuffer.data()));
                 }
             }
 

@@ -1,4 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include "orthia_log.h"
 #include "iostream"
 #include "atomic"
@@ -38,7 +37,9 @@ PlatformString_type SeverityValueToString(LogSeverity severity)
     }
 }
 
-void CLogOverWCOUT::LogData(const wchar_t * pData, ULONG size)
+#ifdef WIN32
+
+void CLogOverWCOUT::LogData(const ORTHIA_TCHAR * pData, int size)
 {
     std::wcout.write(pData, size);
 }
@@ -47,6 +48,8 @@ log_meta::LogEncoding_type CLogOverWCOUT::QueryEncoding() const
     return log_meta::leUtf16LE;
 }
 
+#endif
+
 CFileLog::CFileLog()
     :  
         m_encoding(log_meta::leUnknown), 
@@ -54,13 +57,14 @@ CFileLog::CFileLog()
         m_usedCP(0)
 {
 }
-CFileLog::CFileLog(const std::wstring & fileName, 
+CFileLog::CFileLog(const orthia::PlatformString_type & fileName, 
                    log_meta::LogEncoding_type encoding)
     :  
         m_encoding(encoding),
         m_usedCP(0)
 {
-            
+
+#ifdef WIN32 
     switch(m_encoding)
     {
     case log_meta::leUtf16LE:
@@ -74,24 +78,23 @@ CFileLog::CFileLog(const std::wstring & fileName,
     default:
         throw std::runtime_error("Can't support encoding: " + orthia::ObjectToString_Ansi((int)m_encoding));
     }
+#else
+    switch(m_encoding)
+    {
+    case log_meta::leUtf8:
+        break;
+    default:
+        throw std::runtime_error("Can't support encoding: " + orthia::ObjectToString_Ansi((int)m_encoding));
+    }
+#endif
 
-
-    HANDLE hFile = 
-        CreateFile(fileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_DELETE, 0, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, 0);
-    if (hFile == INVALID_HANDLE_VALUE)
-        ORTHIA_THROW_WIN32("CFileLog.CannotCreateLog.CreateFile");
-    m_file.Reset(hFile);
-    
+    m_file.CreateNewAlways(fileName);    
     m_bEnabled = true;
 
     if (m_encoding == log_meta::leUtf16LE)
     {
-        DWORD written = 0;
         unsigned char bytes[] = {0xFF, 0xFE};
-        if (!WriteFile(hFile, bytes, 2, &written, 0))
-        {
-            ORTHIA_THROW_WIN32("CFileLog.CannotCreateLog.WriteFile");
-        }
+        m_file.WriteToFile(bytes, 2);
     }
 }
     
@@ -102,36 +105,38 @@ log_meta::LogEncoding_type CFileLog::QueryEncoding() const
 {
     return m_encoding;
 }
-void CFileLog::LogData(const wchar_t * pData, ULONG size)
+void CFileLog::LogData(const ORTHIA_TCHAR * pData, int size)
 {
     if (!size)
     {
         return;
     }
-    DWORD written = 0;
+    
+#ifdef WIN32
     if (m_encoding == log_meta::leUtf16LE)
     {
-        WriteFile(m_file.Get(), pData, size*sizeof(wchar_t), &written, 0);
+        m_file.WriteToFile(pData, size*sizeof(ORTHIA_TCHAR));
     }
     else
     {
         try
         {
-            std::string result = orthia::ToAnsiString_Silent(std::wstring(pData, pData + size), m_usedCP);
+            std::string result = orthia::ToAnsiString_Silent(orthia::PlatformString_type(pData, pData + size), m_usedCP);
             
             if (!result.empty())
             {
-                WriteFile(m_file.Get(), 
-                          result.c_str(), 
-                          (ULONG)result.size(), 
-                          &written, 
-                          0);
+                m_file.WriteToFile(result.c_str(),
+                    (int)result.size());
             }
         }
         catch(...)
         {
         }
     }
+#else
+    m_file.WriteToFile(pData, size);
+#endif
+
 }
 
 CDebugOutputLog::CDebugOutputLog()
@@ -141,19 +146,25 @@ CDebugOutputLog::CDebugOutputLog()
 CDebugOutputLog::~CDebugOutputLog()
 {
 }
-void CDebugOutputLog::LogData(const ORTHIA_TCHAR* pData, ULONG size)
+void CDebugOutputLog::LogData(const ORTHIA_TCHAR* pData, int size)
 {
-    std::wstring text(pData, pData + size);
+    orthia::PlatformString_type text(pData, pData + size);
     if (text.empty()) 
     {
         return;
     }
     if (text.back() != 0xA) 
     {
+#ifdef WIN32
         text.push_back(0xD);
+#endif
         text.push_back(0xA);
     }
+#ifdef WIN32
     OutputDebugStringW(text.c_str());
+#else
+    fprintf(stderr, "%s", text.c_str());
+#endif
 }
 log_meta::LogEncoding_type CDebugOutputLog::QueryEncoding() const
 {
@@ -173,7 +184,7 @@ CLogParam::CLogParam(LogSeverity severity)
 {
     m_severity = severity;
 }
-CLogParam::CLogParam(const wchar_t * pData, ULONG size)
+CLogParam::CLogParam(const ORTHIA_TCHAR * pData, int size)
     :
         m_type(lpString)
 {
@@ -185,10 +196,10 @@ CLogParam::CLogParam(const wchar_t * pData, ULONG size)
     }
     catch(...)
     {
-        wcscpy(m_buf, L"[Out-of-memory]");
+        ORTHIA_TSTRCPY(m_buf, ORTHIA_TCSTR("[Out-of-memory]"));
     }
 }
-CLogParam::CLogParam(const std::wstring & str)
+CLogParam::CLogParam(const orthia::PlatformString_type & str)
     :
         m_type(lpString)
 {
@@ -198,14 +209,15 @@ CLogParam::CLogParam(const std::wstring & str)
         if (str.size() > g_iLogParamMaxBufSize)
             m_param = str;
         else
-            wcscpy(m_buf, str.c_str());
+            ORTHIA_TSTRCPY(m_buf, str.c_str());
            
     }
     catch(...)
     {
-        wcscpy(m_buf, L"[Out-of-memory]");
+        ORTHIA_TSTRCPY(m_buf, ORTHIA_TCSTR("[Out-of-memory]"));
     }
 }
+#ifdef WIN32
 CLogParam::CLogParam(const std::string & str)
     :
         m_type(lpString)
@@ -213,18 +225,19 @@ CLogParam::CLogParam(const std::string & str)
     m_buf[0] = 0;
     try
     {
-        std::wstring wstr = orthia::ToWideString(str);
+        orthia::PlatformString_type wstr = orthia::ToWideString(str);
 
         if (wstr.size() > g_iLogParamMaxBufSize)
             m_param = wstr;
         else
-            wcscpy(m_buf, wstr.c_str());
+            ORTHIA_TSTRCPY(m_buf, wstr.c_str());
     }
     catch(...)
     {
-        wcscpy(m_buf, L"[Out-of-memory]");
+        ORTHIA_TSTRCPY(m_buf, ORTHIA_TCSTR("[Out-of-memory]"));
     }
 }
+
 CLogParam::CLogParam(unsigned long long value, long radix)
     :
         m_type(lpInt)
@@ -243,7 +256,7 @@ CLogParam::CLogParam(unsigned long value, long radix)
 {
     _ultow(value, m_buf, radix);
 }
-CLogParam::CLogParam(const LARGE_INTEGER & value)
+CLogParam::CLogParam(const orthia::LargeInteger_type & value)
     :
         m_type(lpInt)
 {
@@ -255,33 +268,87 @@ CLogParam::CLogParam(long long value)
 {
     _i64tow(value, m_buf, 10);
 }
+
+#else
+
+int portable_ui64toa(uint64_t value, char* buffer, size_t size, int radix);
+
+CLogParam::CLogParam(unsigned long long value, long radix)
+    :
+        m_type(lpInt)
+{
+    portable_ui64toa(value, m_buf, sizeof(m_buf)-1, radix);
+}
+CLogParam::CLogParam(long value, long radix)
+    :
+        m_type(lpInt)
+{
+    if (radix == 10 && value < 0) 
+    {
+        m_buf[0] = '-';
+        portable_ui64toa(-value, m_buf+1, sizeof(m_buf)-2, radix);
+        return;
+    }
+    portable_ui64toa(value, m_buf, sizeof(m_buf)-1, radix);
+}
+CLogParam::CLogParam(unsigned long value, long radix)
+    :
+        m_type(lpInt)
+{
+    portable_ui64toa(value, m_buf, sizeof(m_buf)-1, radix);
+}
+CLogParam::CLogParam(const orthia::LargeInteger_type & value)
+    :
+        m_type(lpInt)
+{
+    portable_ui64toa(value.QuadPart, m_buf, sizeof(m_buf)-1, 10);
+}
+CLogParam::CLogParam(long long value)
+    :
+        m_type(lpInt)
+{
+    if (value < 0) 
+    {
+        m_buf[0] = '-';
+        portable_ui64toa(-value, m_buf+1, sizeof(m_buf)-2, 10);
+        return;
+    }
+    portable_ui64toa(value, m_buf, sizeof(m_buf)-1, 10);
+}
+
+
+#endif
+
+
 CLogParam::CLogParam(bool value)
     :
         m_type(lpBool)
 {
     if (value)
-        wcscpy(m_buf, L"true");
+        ORTHIA_TSTRCPY(m_buf, ORTHIA_TCSTR("true"));
     else
-        wcscpy(m_buf, L"false");
+        ORTHIA_TSTRCPY(m_buf, ORTHIA_TCSTR("false"));
 }
-CLogParam::CLogParam(const wchar_t * pValue)
+CLogParam::CLogParam(const ORTHIA_TCHAR * pValue)
     :
         m_type(lpString)
 {
-    size_t size = wcslen(pValue);
+    size_t size = ORTHIA_TLEN(pValue);
     m_buf[0] = 0;
     try
     {
         if (size > g_iLogParamMaxBufSize)
             m_param.assign(pValue, pValue + size);
         else
-            wcscpy(m_buf, pValue);
+            ORTHIA_TSTRCPY(m_buf, pValue);
     }
     catch(...)
     {
-        wcscpy(m_buf, L"[Out-of-memory]");
+        ORTHIA_TSTRCPY(m_buf, ORTHIA_TCSTR("[Out-of-memory]"));
     }
 }
+
+#ifdef WIN32
 CLogParam::CLogParam(const char * pValue)
     :
         m_type(lpString)
@@ -289,18 +356,20 @@ CLogParam::CLogParam(const char * pValue)
     m_buf[0] = 0;
     try
     {
-        std::wstring wstr = orthia::ToWideString(pValue);
+        orthia::PlatformString_type wstr = orthia::ToWideString(pValue);
 
         if (wstr.size() > g_iLogParamMaxBufSize)
             m_param = wstr;
         else
-            wcscpy(m_buf, wstr.c_str());
+            ORTHIA_TSTRCPY(m_buf, wstr.c_str());
     }
     catch(...)
     {
-        wcscpy(m_buf, L"[Out-of-memory]");
+        ORTHIA_TSTRCPY(m_buf, ORTHIA_TCSTR("[Out-of-memory]"));
     }
 }
+#endif
+
 bool CLogParam::IsSeverity(LogSeverity& severity) const
 {
     if (m_type == lpSeverity)
@@ -310,23 +379,23 @@ bool CLogParam::IsSeverity(LogSeverity& severity) const
     }
     return false;
 }
-const wchar_t * CLogParam::GetBegin() const
+const ORTHIA_TCHAR * CLogParam::GetBegin() const
 {
     if (m_buf[0])
         return m_buf;
     return m_param.c_str();
 }
-const wchar_t * CLogParam::GetEnd() const
+const ORTHIA_TCHAR * CLogParam::GetEnd() const
 {
     return GetBegin() + GetSize();
 }
 size_t CLogParam::GetSize() const
 {
     if (m_buf[0])
-        return wcslen(m_buf);
+        return ORTHIA_TLEN(m_buf);
     return m_param.size();
 }
-std::wstring CLogParam::ToString() const
+orthia::PlatformString_type CLogParam::ToString() const
 {
     if (m_buf[0])
         return m_buf;
@@ -336,13 +405,13 @@ CLogParam::LogParam_type CLogParam::GetType() const
 {
     return m_type;
 }
-void GenerateTimestamp(std::wstring * pTime)
+void GenerateTimestamp(orthia::PlatformString_type * pTime)
 {
-    SYSTEMTIME st;
-    GetSystemTime(&st);
-    wchar_t buffer[64];
-    _snwprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), 
-        L"[%4i/%02i/%02i %02i:%02i:%02i:%03i]",
+    orthia::WinSystemTime_type st;
+    GetUtcTime(&st);
+    ORTHIA_TCHAR buffer[64];
+    ORTHIA_SNTPRINTF(buffer, sizeof(buffer)/sizeof(buffer[0]), 
+        ORTHIA_TCSTR("[%4i/%02i/%02i %02i:%02i:%02i:%03i]"),
         (int)st.wYear,
         (int)st.wMonth,
         (int)st.wDay,
@@ -394,7 +463,12 @@ void CLogWrapper::LogData(const CLogParamEx & param)
 
 // default log support
 static orthia::intrusive_ptr<ILog> g_pDefLog;
-static std::atomic<LogSeverity> g_defSeverity = LogSeverity::Info;
+static std::atomic<LogSeverity> g_defSeverity =
+#ifdef _DEBUG 
+    LogSeverity::Debug;
+#else
+    LogSeverity::Info;
+#endif
 
 LogSeverity DefLog_GetLogSeverity()
 {

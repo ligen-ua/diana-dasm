@@ -30,12 +30,12 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     // panels
     // disasm
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.disasm"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Disassembly"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Disassembly"))
         ;
 
     // modules
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Modules"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Modules"))
         ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules.columns"))
         << textManager->RegisterValue(ORTHIA_TCSTR("name"), ORTHIA_TCSTR("Name"))
@@ -55,10 +55,10 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         ;
     // output
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.output"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Output"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Output"))
         ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.commands"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Commands"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Commands"))
         ;
 
     // workspace

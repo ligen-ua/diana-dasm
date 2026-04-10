@@ -3,6 +3,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
+#include "orthia_log.h"
 
 namespace orthia
 {
@@ -99,9 +100,9 @@ namespace orthia
             m_exports.insert(fncAddress, m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName));
         }
     };
-    template<class T, class Stream, class DianaPeFile>
+    template<class T, class Stream>
     void DeliverExtraExports(T& exportsCollector, Address_type moduleAddress, OPERAND_SIZE entryPoint, Stream& stream,
-        DianaPeFile& dianaPeFile)
+        DianaExecutable& exe)
     {
         if (entryPoint && entryPoint != moduleAddress)
         {
@@ -111,7 +112,7 @@ namespace orthia
         void* pTlsCallbacks = 0;
         int tlsCallbacksCount = 0;
         OPERAND_SIZE addressOfTLSIndex = 0;
-        if (!DianaPeFile_QueryTLSCallbacks(&dianaPeFile,
+        if (!DianaExecutable_QueryTLSCallbacks(&exe,
             moduleAddress,
             &stream,
             &pTlsCallbacks,
@@ -122,10 +123,10 @@ namespace orthia
             char* pTls = (char*)pTlsCallbacks;
             for (int i = 0; i < tlsCallbacksCount; ++i)
             {
-                OPERAND_SIZE callback = Diana_ReadValue(pTls, dianaPeFile.pImpl->dianaMode);
+                OPERAND_SIZE callback = Diana_ReadValue(pTls, exe.dianaMode);
                 auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
                 exportsCollector.QueryFunctionByName("$", name.c_str(), 0, &callback);
-                pTls += dianaPeFile.pImpl->dianaMode;
+                pTls += exe.dianaMode;
             }
             DIANA_FREE(pTlsCallbacks);
         }
@@ -142,9 +143,9 @@ namespace orthia
             exportsCollector.SetCurrentModule(&moduleInfo);
 
             exportsCollector.m_fixupAddresses = false;
-            DeliverExtraExports(exportsCollector, moduleInfo.address, moduleInfo.entryPoint, *context.stream, *context.dianaPeFile);
+            DeliverExtraExports(exportsCollector, moduleInfo.address, moduleInfo.entryPoint, *context.stream, *context.executable);
             exportsCollector.m_fixupAddresses = true;
-            DianaPeFile_QueryExports(context.dianaPeFile, &context.stream->parent, page.data(), (int)page.size(), exportsCollector.GetParent(), 0);
+            DianaExecutable_QueryExports(context.executable, &context.stream->parent, page.data(), (int)page.size(), exportsCollector.GetParent(), 0);
         });
 
         Address_type processModuleAddress = 0;
@@ -379,18 +380,20 @@ namespace orthia
         // adapter to C-code
         orthia::DianaMemoryStream stream(0, &module, moduleSize);
 
-        Diana_PeFile dianaPeFile;
-        if (DianaPeFile_Init(&dianaPeFile,
+        DianaExecutable exe = {};
+        if (int status = DianaExecutable_Init(&exe,
             &stream.parent,
             moduleSize,
-            DIANA_PE_FILE_FLAGS_MODULE_MODE))
+            DIANA_EXECUTABLE_FILE_FLAGS_MODULE_MODE))
         {
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Module: ", orthia::CLogParamEx(moduleAddress, 16), ":",orthia::CLogParamEx(moduleSize, 16), " ->", (long)status);
             return;
         }
+        diana::Guard<diana::ExecutableFile> exeGuard(&exe);
 
         int importsCount = 0;
         CImportsCollector importsCollector(nameFilter, names, [this](auto address) {
-         
+
             return QueryAddressName(address);
         },
             count,
@@ -399,7 +402,7 @@ namespace orthia
         std::vector<char> page(4096);
         if (!nameFilter.excludeImports)
         {
-            DianaPeFile_QueryImports(&dianaPeFile,
+            DianaExecutable_QueryImports(&exe,
                 moduleAddress,
                 &stream,
                 page.data(),
@@ -427,10 +430,10 @@ namespace orthia
 
             exportsCollector.SetFound(importsCollector.IsMarkFound());
 
-            DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, dianaPeFile);
+            DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
 
             // report regular exports
-            DianaPeFile_QueryExports(&dianaPeFile,
+            DianaExecutable_QueryExports(&exe,
                     &stream.parent,
                     page.data(),
                     (int)page.size(),

@@ -186,14 +186,14 @@ namespace oui
                 if ((i + 1) <= GetColumnsCount())
                 {
                     // not a last item, put vertical here
-                    m_chunk.native.back() = String::char_type('/');
+                    m_chunk.native.back() = OUI_TCHAR('|'); // TODO: fixme
                     if (cutHappens)
                     {
-                        m_chunk.native.push_back(String::char_type('}'));
+                        m_chunk.native.push_back(OUI_TCHAR('}'));
                     }
                     else
                     {
-                        m_chunk.native.push_back(symbols.vertical);
+                        m_chunk.native += symbols.vertical.native;
                     }
                 }
 
@@ -238,7 +238,7 @@ namespace oui
                     color->text,
                     color->background,
                     m_chunk.native,
-                    String::char_type('/'),
+                    String(OUI_TCHAR("|")),
                     *borderColorToUse,
                     *borderBackgroundColorToUse);
                 ++pos;
@@ -519,7 +519,7 @@ namespace oui
     {
         if (m_paintInProgress)
         {
-            __debugbreak();
+            OUI_DEBUG_BREAK;
         }
         m_offset = 0;
         m_pageItems.clear();
@@ -557,7 +557,7 @@ namespace oui
     {
         if (m_paintInProgress)
         {
-            __debugbreak();
+            OUI_DEBUG_BREAK;
         }
         return m_pageItems;
     }

@@ -256,59 +256,6 @@ int Diana_PE_AnalyzePE(Diana_PeFile * pPeFile,
     return status;
 }
 
-
-int DianaMovableReadStreamOverMemory_MoveTo(void * pThis, OPERAND_SIZE offset)
-{
-    DianaMovableReadStreamOverMemory * pStream = pThis;
-    if (offset >= pStream->memoryStream.bufferSize)
-        return DI_END_OF_STREAM;
-    pStream->memoryStream.curSize = (DIANA_SIZE_T)offset;
-    return DI_SUCCESS;
-}
-int DianaMovableReadStreamOverMemory_Read(void * pThis,
-                                            void * pBuffer,
-                                            int iBufferSize,
-                                            int * readBytes)
-{
-    DianaMovableReadStreamOverMemory * pStream = pThis;
-    return pStream->memoryStream.parent.parent.parent.pReadFnc(&pStream->memoryStream.parent.parent, 
-                                                 pBuffer, 
-                                                 iBufferSize, 
-                                                 readBytes);
-}
-
-int DianaMovableReadStreamOverMemory_RandomRead(void * pThis, 
-                                                OPERAND_SIZE offset,
-                                                void * pBuffer, 
-                                                int iBufferSize, 
-                                                OPERAND_SIZE * readBytes,
-                                                int flags)
-{
-    DianaMovableReadStreamOverMemory * pStream = pThis;
-    if (flags & DIANA_ANALYZE_RANDOM_READ_ABSOLUTE)
-    {
-        return DI_END_OF_STREAM;
-    }
-    return DianaMemoryStream_RandomRead(&pStream->memoryStream.parent, 
-                                        offset, 
-                                        pBuffer, 
-                                        iBufferSize, 
-                                        readBytes);
-}
-                                           
-void DianaMovableReadStreamOverMemory_Init(DianaMovableReadStreamOverMemory * pThis,
-                                           const void * pBuffer,
-                                           OPERAND_SIZE bufferSize)
-{
-    DianaMovableReadStream_Init(&pThis->stream, 
-                                DianaMovableReadStreamOverMemory_Read,
-                                DianaMovableReadStreamOverMemory_MoveTo,
-                                DianaMovableReadStreamOverMemory_RandomRead);
-    Diana_InitMemoryStream(&pThis->memoryStream, 
-                           (void*)pBuffer, 
-                           (DIANA_SIZE_T)bufferSize);
-}
-
 int DianaAnalyzeObserverOverMemory_AnalyzeJumpAddress(void * pThis, 
                                                        OPERAND_SIZE address,
                                                        int flags,

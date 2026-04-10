@@ -15,12 +15,12 @@ extern "C"
 namespace orthia
 {
 
-#define ORTHIA_CUSTOM_ATTRIBUTE_PE_ADDRESS_UTF16        L"ca_pe_address"
-#define ORTHIA_CUSTOM_ATTRIBUTE_PE_FILENAME_UTF16       L"ca_pe_filename"
-#define ORTHIA_CUSTOM_ATTRIBUTE_PE_MODULE_SIZE_UTF16    L"ca_pe_module_size"
+#define ORTHIA_CUSTOM_ATTRIBUTE_PE_ADDRESS_UTF16        ORTHIA_TCSTR("ca_pe_address")
+#define ORTHIA_CUSTOM_ATTRIBUTE_PE_FILENAME_UTF16       ORTHIA_TCSTR("ca_pe_filename")
+#define ORTHIA_CUSTOM_ATTRIBUTE_PE_MODULE_SIZE_UTF16    ORTHIA_TCSTR("ca_pe_module_size")
 
 long long DoCommand_vm_new(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManager, 
-                           const std::wstring & name,
+                           const orthia::PlatformString_type & name,
                            const long long * pID)
 {
     return pDatabaseManager->GetVMDatabase()->AddNewVM(name, pID);
@@ -603,14 +603,14 @@ int DoCommand_vm_mod_load(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManag
                            
                            std::vector<OPERAND_SIZE> * pCallStack,
                            IAddressSpace * pAddressSpace,
-                           const std::wstring & fileNameHint,
+                           const orthia::PlatformString_type & fileNameHint,
                            IAPIHandlerDebugInterface * pAPIHandlerDebugInterface,
                            long long * pCommandsCount)
 {
     bool kernelModule = false;
-    std::wstring fileNameExtension;
+    orthia::PlatformString_type fileNameExtension;
     GetExtensionOfFile(fileNameHint, &fileNameExtension);
-    if (_wcsicmp(fileNameExtension.c_str(), L"sys")==0)
+    if (ORTHIA_TSTRICMP(fileNameExtension.c_str(), ORTHIA_TCSTR("sys"))==0)
     {
         kernelModule = true;
     }
@@ -689,13 +689,13 @@ int DoCommand_vm_mod_load(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManag
                                  moduleAddress,
                                  &writeStream,
                                  &page.front(),
-                                 (ULONG)page.size()));
+                                 (DI_UINT32)page.size()));
 
     DI_CHECK_CPP(DianaPeFile_LinkImports(&dianaPeFile,
                                          moduleAddress,
                                          &writeStream,
                                          &page.front(),
-                                         (ULONG)page.size(),
+                                         (DI_UINT32)page.size(),
                                          pLinkObserver->GetParent()));
 
     int resultOfDllMain = 0;
@@ -774,10 +774,11 @@ int DoCommand_vm_mod_load(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManag
     newAttributes[ORTHIA_CUSTOM_ATTRIBUTE_PE_MODULE_SIZE_UTF16] = orthia::ToWideStringAsHex_Short(dianaPeFile.pImpl->sizeOfModule);
     newAttributes[ORTHIA_CUSTOM_ATTRIBUTE_PE_FILENAME_UTF16] = fileNameHint;
     
+    AttributesToDeleteSet_type attrs;
     DoCommand_vm_mod_manage_custom_attributes(pDatabaseManager, 
                                               vmId, 
                                               moduleId,
-                                              AttributesToDeleteSet_type(),
+                                              attrs,
                                               newAttributes);
 
 

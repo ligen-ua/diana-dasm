@@ -10,8 +10,10 @@ Param::Param(const String::char_type* pData, int size)
 {
     try
     {
-        if (size < 0)
-            size = (int)wcslen(pData);
+        if (size < 0) 
+        {
+            size = (int)OUI_TLEN(pData);
+        }
         m_param.native.assign(pData, pData + size);
     }
     catch(const std::bad_alloc &)

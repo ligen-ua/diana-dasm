@@ -361,8 +361,8 @@ namespace oui
         m_listBoxScrollable = std::make_shared<oui::CScrollable>(m_listBox);
 
         auto columnsNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.goto.columns"));
-        m_listBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(L"address");  }, 30),
-            oui::ColumnParam([=] { return columnsNode->QueryValue(L"comment");  }, 60)
+        m_listBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("address"));  }, 30),
+            oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("comment"));  }, 60)
         );
         m_listBox->Dock();
 
@@ -376,7 +376,7 @@ namespace oui
             }
             catch (std::exception& e)
             {
-                oui::String error(orthia::Utf8ToUtf16(e.what()));
+                oui::String error(orthia::Utf8ToPlatformString(e.what()));
                 
                 auto waitBox = AddChildAndInit_t(std::make_shared<CMessageBoxWindow>(
                     [=]() {

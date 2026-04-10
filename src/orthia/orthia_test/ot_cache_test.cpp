@@ -25,7 +25,7 @@ static void test_memory_cache1(int pageSize)
 
     // do write
     orthia::Address_type bytesWritten = 0;
-    cache.Write(0x2001, 0x2, "\x11\x22", &bytesWritten, 0, 0, reg_none);
+    cache.Write(0x2001, 0x2, (void*)"\x11\x22", &bytesWritten, 0, 0, reg_none);
     DIANA_TEST_ASSERT(bytesWritten == 2);
 
     // full read
@@ -40,7 +40,7 @@ static void test_memory_cache1(int pageSize)
     DIANA_TEST_ASSERT(buffer[0] == (char)0x11 && bytesRead == 1);
 
     // write to the end
-    cache.Write(0x2FFF, 0x1, "\x33", &bytesWritten, 0, 0, reg_none);
+    cache.Write(0x2FFF, 0x1, (void*)"\x33", &bytesWritten, 0, 0, reg_none);
     DIANA_TEST_ASSERT(bytesWritten == 1);
 
     // read custom
@@ -51,7 +51,7 @@ static void test_memory_cache1(int pageSize)
     buffer.resize(eqPage3.size());
     DIANA_TEST_ASSERT(buffer == eqPage3);
 
-    cache.Write(0x2FFE, 0x1, "\x44", &bytesWritten, 0, 0, reg_none);
+    cache.Write(0x2FFE, 0x1, (void*)"\x44", &bytesWritten, 0, 0, reg_none);
     DIANA_TEST_ASSERT(bytesWritten == 1);
 
     // full read

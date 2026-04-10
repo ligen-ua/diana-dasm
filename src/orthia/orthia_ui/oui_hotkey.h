@@ -15,4 +15,6 @@ namespace oui
         bool ProcessEvent(InputEvent& evt);
         std::function<void()> QueryHandler(const Hotkey& hotkey);
     };
+
+    String GetHotKeySymbol();
 }

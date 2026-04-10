@@ -7,7 +7,7 @@ namespace orthia
 CModuleManager::CModuleManager()
 {
 }
-void CModuleManager::Reinit(const std::wstring & fullFileName,
+void CModuleManager::Reinit(const orthia::PlatformString_type & fullFileName,
                             bool bForce)
 {
     CAutoCriticalSection guard(m_lock);
@@ -32,7 +32,7 @@ orthia::intrusive_ptr<CDatabaseManager> CModuleManager::QueryDatabaseManager()
     }
     return m_pDatabaseManager;
 }
-std::wstring CModuleManager::GetDatabaseName() const
+orthia::PlatformString_type CModuleManager::GetDatabaseName() const
 {
     return m_fullFileName;
 }
@@ -50,9 +50,9 @@ void CModuleManager::ReloadRange(Address_type offset,
                                  int analyserFlags)
 {
     CAutoCriticalSection guard(m_lock);
-    std::wstringstream regionName;
+    orthia::PlatformStringStream_type regionName;
     std::hex(regionName);
-    regionName<<L"region_"<<offset<<"_"<<size;
+    regionName<<ORTHIA_TCSTR("region_")<<offset<<ORTHIA_TCSTR("_")<<size;
 
     CDianaModule module;
     module.InitRaw(offset, size, pMemoryReader, mode);
@@ -74,7 +74,7 @@ void CModuleManager::ReloadRange(Address_type offset,
 void CModuleManager::ReloadModule(Address_type offset,
                                   IMemoryReader * pMemoryReader,
                                   bool bForce,
-                                  const std::wstring & name,
+                                  const orthia::PlatformString_type & name,
                                   int analyserFlags)
 {
     CAutoCriticalSection guard(m_lock);

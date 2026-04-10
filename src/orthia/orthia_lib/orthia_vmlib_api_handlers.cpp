@@ -102,8 +102,10 @@ orthia::Ptr<IAPIHandler> CreateAPIHandler(IAPIHandlerDebugInterface * pDebugInte
         break;
     case IAPIHandlerDebugInterface::dtUser:
         {
+#ifdef WIN32
             CWin32APIHandlerPopulator populator;
             populator.RegisterHandlers(pResult.get(), pDebugInterface, dianaMode);
+#endif
         }
         break;
     default:

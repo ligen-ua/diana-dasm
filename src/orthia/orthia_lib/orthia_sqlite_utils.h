@@ -43,6 +43,7 @@ bool SQLStep(sqlite3_stmt * statement)
     throw std::runtime_error("Can't execute");
 }
 
+#ifdef WIN32
 inline 
 void SQLBindWideString(sqlite3_stmt * statement, const std::wstring & value, int pos)
 {
@@ -50,12 +51,20 @@ void SQLBindWideString(sqlite3_stmt * statement, const std::wstring & value, int
     ORTHIA_CHECK_SQLITE(sqlite3_bind_text(statement, pos, utf8.c_str(), (int)utf8.size(), SQLITE_TRANSIENT),
                       "Can't bind parameter at position: "<<pos);
 }
+
+#define ORTHIA_BIND_PLATFORM_STRING   SQLBindWideString
+#else
+#define ORTHIA_BIND_PLATFORM_STRING   SQLBindUtf8String
+
+#endif
+
 inline 
 void SQLBindUtf8String(sqlite3_stmt * statement, const std::string & utf8, int pos)
 {
     ORTHIA_CHECK_SQLITE(sqlite3_bind_text(statement, pos, utf8.c_str(), (int)utf8.size(), SQLITE_TRANSIENT),
                       "Can't bind parameter at position: "<<pos);
 }
+
 
 inline 
 void SQLBindBlob(sqlite3_stmt * statement, const std::vector<char> & value, int pos)
@@ -100,6 +109,9 @@ void SQLBindSQLTime(sqlite3_stmt * statement, const std::string & value, int pos
     ORTHIA_CHECK_SQLITE(sqlite3_bind_text(statement, pos, value.c_str(), (int)value.size(), SQLITE_TRANSIENT),
                       "Can't bind parameter at position: "<<pos);
 }
+
+#ifdef WIN32
+
 inline 
 std::wstring SQLReadWideString(sqlite3_stmt * statement, int pos, bool allowNull = true)
 {
@@ -114,6 +126,14 @@ std::wstring SQLReadWideString(sqlite3_stmt * statement, int pos, bool allowNull
     }
     return orthia::Utf8ToUtf16(pData);
 }
+
+#define ORTHIA_READ_PLATFORM_STRING   SQLReadWideString
+#else
+#define ORTHIA_READ_PLATFORM_STRING   SQLReadUtf8String
+
+
+#endif
+
 inline 
 std::string SQLReadUtf8String(sqlite3_stmt * statement, int pos, bool allowNull = true)
 {
@@ -230,18 +250,18 @@ struct SQLResult_1_DatetimeSQL
 
 struct SQLResult_1_WideString
 {
-    typedef std::wstring Type;
-    std::wstring m_value;
-    SQLResult_1_WideString(const std::wstring & value = std::wstring())
+    typedef orthia::PlatformString_type Type;
+    orthia::PlatformString_type m_value;
+    SQLResult_1_WideString(const orthia::PlatformString_type & value = orthia::PlatformString_type())
         :
             m_value(value)
     {
     }
     void Deserialize(sqlite3_stmt * statement)
     {
-        m_value = SQLReadWideString(statement, 0);
+        m_value = ORTHIA_READ_PLATFORM_STRING(statement, 0);
     }
-    void Export(std::wstring * pValue)
+    void Export(orthia::PlatformString_type * pValue)
     {
         *pValue = m_value;
     }

@@ -109,26 +109,19 @@ void CDatabase::DoVersionScripts()
 
     transaction.Commit();
 }
-void CDatabase::OpenExisting(const std::wstring & fullFileName)
+void CDatabase::OpenExisting(const orthia::PlatformString_type & fullFileName)
 {
     CSQLDatabase database;
-    ORTHIA_CHECK_SQLITE(sqlite3_open16(fullFileName.c_str(), database.Get2()), "Can't open the database: "<<orthia::ToAnsiString_Silent(fullFileName));
+    ORTHIA_CHECK_SQLITE(ORTHIA_SQLITE3_OPEN(fullFileName.c_str(), database.Get2()), "Can't open the database: "<<orthia::ToAnsiString_Silent(fullFileName));
     m_pDatabase = new CSQLDatabase2(database);
     Init();
 }
-void CDatabase::CreateNew(const std::wstring & fullFileName)
+void CDatabase::CreateNew(const orthia::PlatformString_type & fullFileName)
 {
-    BOOL res = DeleteFile(fullFileName.c_str());
-    if (!res)
-    {
-        ULONG error = GetLastError();
-        if (error != ERROR_FILE_NOT_FOUND)
-        {
-            ORTHIA_THROW_WIN32("Can't access the database: "<<orthia::ToAnsiString_Silent(fullFileName)<<", code: "<<orthia____code);
-        }
-    }
+    PlatformDeleteFile(fullFileName);
+
     CSQLDatabase database;
-    ORTHIA_CHECK_SQLITE(sqlite3_open16(fullFileName.c_str(), database.Get2()), "Can't create the database: "<<orthia::ToAnsiString_Silent(fullFileName));
+    ORTHIA_CHECK_SQLITE(ORTHIA_SQLITE3_OPEN(fullFileName.c_str(), database.Get2()), "Can't create the database: "<<orthia::ToAnsiString_Silent(fullFileName));
     m_pDatabase = new CSQLDatabase2(database);
 
     ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "PRAGMA encoding = \"UTF-8\""), "Can't create database");
@@ -161,13 +154,13 @@ CDatabaseManager::~CDatabaseManager()
 }
  
 // file api
-void CDatabaseManager::CreateNew(const std::wstring & fullFileName)
+void CDatabaseManager::CreateNew(const orthia::PlatformString_type & fullFileName)
 {
     orthia::intrusive_ptr<CDatabase> database(new CDatabase());
     database->CreateNew(fullFileName);
     m_database = database;
 }
-void CDatabaseManager::OpenExisting(const std::wstring & fullFileName)
+void CDatabaseManager::OpenExisting(const orthia::PlatformString_type & fullFileName)
 {
     orthia::intrusive_ptr<CDatabase> database(new CDatabase());
     database->OpenExisting(fullFileName);

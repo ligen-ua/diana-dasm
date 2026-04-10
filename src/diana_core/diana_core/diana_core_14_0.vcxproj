@@ -168,6 +168,8 @@
     <ClCompile Include="diana_core_parsers.c" />
     <ClCompile Include="diana_core_utils.c" />
     <ClCompile Include="diana_core_win32_context.c" />
+    <ClCompile Include="diana_elf.c" />
+    <ClCompile Include="diana_executable.c" />
     <ClCompile Include="diana_gen.c" />
     <ClCompile Include="diana_list.c" />
     <ClCompile Include="diana_operands.c" />
@@ -239,6 +241,9 @@
     <ClInclude Include="diana_core_utils.h" />
     <ClInclude Include="diana_core_win32_context.h" />
     <ClInclude Include="diana_disable_warnings.h" />
+    <ClInclude Include="diana_elf.h" />
+    <ClInclude Include="diana_elfs_defs.h" />
+    <ClInclude Include="diana_executable.h" />
     <ClInclude Include="diana_gen.h" />
     <ClInclude Include="diana_list.h" />
     <ClInclude Include="diana_operands.h" />

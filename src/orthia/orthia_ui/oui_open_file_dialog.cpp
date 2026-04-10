@@ -10,11 +10,11 @@ namespace oui
         fileInfo.sortKey.native.reserve(10 + info.fileName.native.size()*2);
         if (info.flags & info.flag_directory)
         {
-            fileInfo.sortKey.native.append(L"0|");
+            fileInfo.sortKey.native.append(OUI_TCSTR("0|"));
         }
         else
         {
-            fileInfo.sortKey.native.append(L"1|");
+            fileInfo.sortKey.native.append(OUI_TCSTR("1|"));
         }
         fileInfo.sortKey.native.append(Uppercase_Silent(info.fileName.native));
         fileInfo.sortKey.native.append(1, 1);

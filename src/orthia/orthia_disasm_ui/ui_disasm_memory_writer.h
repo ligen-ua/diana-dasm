@@ -13,8 +13,8 @@ namespace oui
     {
         std::vector<oui::MultiLineViewItem> items;
         int lastCmdSize = 0;
-        void PrintLine(const std::wstring& line) override;
-        virtual void PrintLine(const std::wstring& line, const oui::TextMarkup& markup, std::shared_ptr<IMultilineViewTag> tag);
+        void PrintLine(const orthia::PlatformString_type& line) override;
+        virtual void PrintLine(const orthia::PlatformString_type& line, const oui::TextMarkup& markup, std::shared_ptr<IMultilineViewTag> tag);
     };
 
     struct DisasmLineContextTag:IMultilineViewTag
@@ -49,7 +49,7 @@ namespace oui
         oui::LineIndex m_endAddress;
         bool m_haveEndAddress = false;
 
-        void PackCommand(const std::wstring& command, std::shared_ptr<DisasmLineContextTag> tag);
+        void PackCommand(const orthia::PlatformString_type& command, std::shared_ptr<DisasmLineContextTag> tag);
         Diana_LinkedAdditionalGroupInfo* GetLinkedInfo();
     public:
         MemoryPrinter(DisasmWriter* pTextPrinter,
@@ -64,16 +64,16 @@ namespace oui
         void OnStream(DianaPrintContext* pDianaPrintContext, oui::LineIndex virtualOffset, bool reportNoData);
 
         void PrintMetaInfo(const oui::LineIndex& address,
-            const std::wstring& text);
+            const orthia::PlatformString_type& text);
         void PrintCommand(unsigned long long address,
-            const std::wstring& bytes,
-            const std::wstring& command) override;
+            const orthia::PlatformString_type& bytes,
+            const orthia::PlatformString_type& command) override;
         void PrintCommand(const oui::LineIndex& address,
-            const std::wstring& bytes,
-            const std::wstring& command);
+            const orthia::PlatformString_type& bytes,
+            const orthia::PlatformString_type& command);
         void PrintCommandEx(unsigned long long address,
-            const std::wstring& bytes,
-            const std::wstring& command,
+            const orthia::PlatformString_type& bytes,
+            const orthia::PlatformString_type& command,
             std::shared_ptr<DisasmLineContextTag> tag);
         void SetFlags(const char* pDataFlags, orthia::Address_type routeStart);
         bool IsBadByte(orthia::Address_type virtualOffset) override;

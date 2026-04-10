@@ -1,5 +1,6 @@
 #include "orthia_shuttle_interface.h"
 #include "test_common.h"
+#include "orthia_utils.h"
 
 struct CTestHypervisorInterface:orthia_shuttle::IHypervisorInterface
 {
@@ -7,7 +8,7 @@ struct CTestHypervisorInterface:orthia_shuttle::IHypervisorInterface
 
 
 static int g_count = 0;
-static long __stdcall PrintStream(const orthia_shuttle::PrintArgument * pText, int count)
+static long ORTHIA_STDCALL PrintStream(const orthia_shuttle::PrintArgument * pText, int count)
 {
     g_count += count;
     return 0;

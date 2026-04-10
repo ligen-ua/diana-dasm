@@ -95,6 +95,7 @@ typedef enum
 
 #define DI_FULL_CHAR           unsigned int
 #define DI_FULL_CHAR_NULL      ((unsigned int)(-1))
+#define DI_MAX_INT             (0x7FFFFFFF)
 #define DI_MAX_OPERANDS_COUNT  (4)
 #define DI_MAX_OPCODE_COUNT    (4)
 
@@ -305,10 +306,12 @@ void DianaResult_AddByte(DianaParserResult * result, DI_CHAR ch);
 #define DI_ERROR_NOT_IMPLEMENTED    ((int)-15)
 #define DI_OVERFLOW                 ((int)-16)
 #define DI_NOT_FOUND                ((int)-17)
+#define DI_UNSUPPORTED              ((int)-18)
 
 #define DI_SUCCESS ((int)0)
 
 #define DI_CHECK_ALLOC(x) { if(!(x)) { Diana_OnError(DI_OUT_OF_MEMORY); return DI_OUT_OF_MEMORY; } }
+#define DI_CHECK_ALLOC_GOTO(x) { if(!(x)) { Diana_OnError(DI_OUT_OF_MEMORY); DI_CHECK_GOTO(DI_OUT_OF_MEMORY); } }
 
 #ifdef _DEBUG
 #define DI_CHECK(x) { int di____code = (x); if (di____code != DI_SUCCESS) { Diana_OnError(di____code); return di____code; } }
@@ -344,6 +347,9 @@ int DianaExactRead(DianaReadStream * pThis,
                    void * pBuffer,
                    int iBufferSize);
 
+int DianaExactReadSafe(DianaReadStream* pThis,
+                        void* pBuffer,
+                        OPERAND_SIZE iBufferSize);
 // pseudo random streams
 typedef int (* DianaAnalyzeMoveTo_fnc)(void * pThis, OPERAND_SIZE offset);
 

@@ -93,7 +93,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)orthia\utf8rewind</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)orthia\utf8rewind</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
@@ -129,7 +129,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)orthia\utf8rewind</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
@@ -147,7 +147,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>.</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;$(SolutionDir)orthia\utf8rewind</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
     </ClCompile>
@@ -166,6 +166,7 @@
     <ClCompile Include="oui_button.cpp" />
     <ClCompile Include="oui_color.cpp" />
     <ClCompile Include="oui_console.cpp" />
+    <ClCompile Include="oui_console_win32.cpp" />
     <ClCompile Include="oui_containers.cpp" />
     <ClCompile Include="oui_editbox.cpp" />
     <ClCompile Include="oui_filesystem.cpp" />
@@ -199,6 +200,7 @@
     <ClInclude Include="oui_color.h" />
     <ClInclude Include="oui_column_param.h" />
     <ClInclude Include="oui_console.h" />
+    <ClInclude Include="oui_console_win32.h" />
     <ClInclude Include="oui_containers.h" />
     <ClInclude Include="oui_editbox.h" />
     <ClInclude Include="oui_filesystem.h" />
@@ -225,6 +227,11 @@
     <ClInclude Include="oui_window.h" />
     <ClInclude Include="oui_win_styles.h" />
     <ClInclude Include="oui_window_thread.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\utf8rewind\utf8rewind.vcxproj">
+      <Project>{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

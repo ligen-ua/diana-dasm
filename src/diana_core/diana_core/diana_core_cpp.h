@@ -5,6 +5,8 @@ extern "C"
 {
 #include "diana_core.h"
 #include "diana_pe.h"
+#include "diana_elf.h"
+#include "diana_executable.h"
 #include "diana_text_output_masm.h"
 #include "diana_allocators.h"
 }
@@ -93,6 +95,25 @@ struct PeFile
     static void Free(Diana_PeFile * pObject)
     {
         DianaPeFile_Free(pObject);
+    }
+};
+
+struct ElfFile
+{
+    typedef Diana_ElfFile* ObjectType;
+    static void Free(Diana_ElfFile* pObject)
+    {
+        DianaElfFile_Free(pObject);
+    }
+};
+
+
+struct ExecutableFile
+{
+    typedef DianaExecutable * ObjectType;
+    static void Free(DianaExecutable * pObject)
+    {
+        DianaExecutable_Free(pObject);
     }
 };
 

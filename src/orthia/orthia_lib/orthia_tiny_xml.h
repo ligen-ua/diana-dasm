@@ -118,18 +118,21 @@ inline TiXmlNode * Scan(TiXmlNode * pRoot, TiXmlNode * node, const std::string &
     return 0;
 }
 
-inline void QueryAttribute(TiXmlNode * pNode, const std::string & attrName, std::wstring * pResult)
+#ifdef WIN32
+inline void QueryAttribute(TiXmlNode * pNode, const std::string & attrName, orthia::PlatformString_type * pResult)
 {
     std::string value8;
     if (QueryValueAttribute(pNode, attrName, &value8) == TIXML_SUCCESS)
     {
-        *pResult = orthia::Utf8ToUtf16(value8);
+        *pResult = orthia::Utf8ToPlatformString(value8);
         return;
     }
     std::stringstream res;
     res<<"["<<pNode->ToElement()->Value()<<"] Attribute not found: "<<attrName;
     throw std::runtime_error(res.str());
 }
+#endif
+
 inline bool QueryAttribute_Silent_Utf8(TiXmlNode * pNode, const std::string & attrName, std::string * pResult)
 {
     pResult->clear();

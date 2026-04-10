@@ -17,18 +17,18 @@ class CModuleManager
 
     mutable CCriticalSection m_lock;
     mutable orthia::intrusive_ptr<CDatabaseManager> m_pDatabaseManager;
-    std::wstring m_fullFileName;
+    orthia::PlatformString_type m_fullFileName;
 public:
     CModuleManager();
-    void Reinit(const std::wstring & fullFileName, bool bForce);
-    std::wstring GetDatabaseName() const;
+    void Reinit(const orthia::PlatformString_type & fullFileName, bool bForce);
+    orthia::PlatformString_type GetDatabaseName() const;
     orthia::intrusive_ptr<CDatabaseManager> QueryDatabaseManager(); 
 
     void UnloadModule(Address_type offset);
     void ReloadModule(Address_type offset,
                       IMemoryReader * pMemoryReader,
                       bool bForce,
-                      const std::wstring & name,
+                      const orthia::PlatformString_type & name,
                       int analyserFlags);
     void ReloadRange(Address_type offset,
                      Address_type size,

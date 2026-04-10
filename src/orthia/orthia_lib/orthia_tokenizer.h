@@ -102,7 +102,6 @@ protected:
     int m_lineNumber;
     int m_columnPos;
 
-    bool m_tokensCacheReady;
     Token m_tokensCache;
     std::vector<char> m_tempStorage;
     std::vector<char> m_tempStorage2;
@@ -150,6 +149,12 @@ class CStreamTokenFileSource:public ITokenFileSource
     const int m_maxLineChars;
     std::stringstream m_stream;
 public:
+    CStreamTokenFileSource(const char * str)
+            :
+            m_maxLineChars(1024)
+    {
+        m_stream<<str;
+    }
     CStreamTokenFileSource(const std::string & str = std::string(), int maxLineChars = 1024)
         :
             m_maxLineChars(maxLineChars)
@@ -199,5 +204,8 @@ public:
     CReservedWordsStorage & GetReservedWordsStorage() { return m_reservedWordsStorage; }
     const CReservedWordsStorage & GetReservedWordsStorage() const { return m_reservedWordsStorage; }
 };
+
+
+int portable_ui64toa(uint64_t value, char* buffer, size_t size, int radix);
 
 }

@@ -144,6 +144,8 @@
     <ClCompile Include="libpdb\pdb.c">
       <Filter>pdb</Filter>
     </ClCompile>
+    <ClCompile Include="diana_elf.c" />
+    <ClCompile Include="diana_executable.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="diana_allocators.h" />
@@ -308,6 +310,9 @@
     <ClInclude Include="libpdb\pdb.h">
       <Filter>pdb</Filter>
     </ClInclude>
+    <ClInclude Include="diana_elf.h" />
+    <ClInclude Include="diana_elfs_defs.h" />
+    <ClInclude Include="diana_executable.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="diana_custom_config.inc" />

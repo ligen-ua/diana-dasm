@@ -1,5 +1,6 @@
 #include "oui_containers.h"
 #include "oui_layouts_calc.h"
+#include "oui_hotkey.h"
 
 namespace oui
 {
@@ -637,7 +638,7 @@ namespace oui
         Point target = { rect.position.x, rect.position.y + 1 };
         PanelCaptionProfile* currentColors = &m_panelColorProfile->normal;
         m_chunk.native.clear();
-        m_chunk.native.push_back(symbols.vertical);
+        m_chunk.native += symbols.vertical.native;
         for (auto i = 1; i < rect.size.height; ++i)
         {
             parameters.console.PaintText(target,
@@ -688,7 +689,9 @@ namespace oui
         if (absClientRect.size.width <= minSize)
         {
             // just draw the line
-            m_chunk.native.resize(absClientRect.size.width, symbols.horizontal);
+            m_chunk.native.clear();
+            for (int i = 0; i < absClientRect.size.width; ++i)
+                m_chunk.native += symbols.horizontal.native;
 
             parameters.console.PaintText(target,
                 m_panelColorProfile->borderText,
@@ -699,17 +702,25 @@ namespace oui
 
         // draw prefix
         m_chunk.native.clear();
-        m_chunk.native.resize(m_drawLeftBorder?4:3, symbols.horizontal);
-        m_chunk.native.back() = oui::String::symSpace;
+        int chunkSymbolsCount = 0;
+        for (int i = 0, prefixCount = m_drawLeftBorder ? 3 : 2; i < prefixCount; ++i) 
+        {
+            ++chunkSymbolsCount;
+            m_chunk.native += symbols.horizontal.native;
+        }
+        ++chunkSymbolsCount;
+        m_chunk.native.push_back(oui::String::symSpace);
 
         parameters.console.PaintText(target,
             m_panelColorProfile->borderText,
             m_panelColorProfile->borderBackground,
             m_chunk.native);
 
-        target.x += (int)m_chunk.native.size();
-        symbolsLeft -= (int)m_chunk.native.size();
-        symbolsLeft -= (int)m_chunk.native.size();
+        target.x += chunkSymbolsCount;
+        symbolsLeft -= chunkSymbolsCount;
+        symbolsLeft -= chunkSymbolsCount;
+
+        String hotKeySymbol = GetHotKeySymbol();
 
         for (auto panel : m_panels)
         {
@@ -758,7 +769,11 @@ namespace oui
             parameters.console.PaintText(target,
                 currentColors->text,
                 currentColors->background,
-                m_chunk.native);
+                m_chunk.native,
+                hotKeySymbol,
+                currentColors->hotkeyText,
+                currentColors->background
+            );
 
             target.x += tableCharsCount;
             symbolsLeft -= tableCharsCount;
@@ -769,11 +784,14 @@ namespace oui
         m_chunk.native.clear();
 
         const int processedSize = target.x - initialTarget.x;
-        m_chunk.native.resize(absClientRect.size.width - processedSize, symbols.horizontal);
+        for (int i = 0, suffixCount = absClientRect.size.width - processedSize; i < suffixCount; ++i)
+            if (m_chunk.native.empty())
+                m_chunk.native.push_back(oui::String::symSpace);
+            else
+                m_chunk.native += symbols.horizontal.native;
 
         if (!m_chunk.native.empty())
         {
-            m_chunk.native[0] = oui::String::symSpace;
             parameters.console.PaintText(target,
                 m_panelColorProfile->borderText,
                 m_panelColorProfile->borderBackground,

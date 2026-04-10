@@ -180,6 +180,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ot_cache_test.cpp" />
+    <ClCompile Include="ot_elf_test.cpp" />
     <ClCompile Include="ot_expressions.cpp" />
     <ClCompile Include="ot_memory_manager.cpp" />
     <ClCompile Include="ot_pe_test.cpp" />
@@ -199,6 +200,9 @@
     <ProjectReference Include="..\orthia_lib\orthia_lib_14_0.vcxproj">
       <Project>{7e610324-3ec7-46eb-978f-c2c2698783ce}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\utf8rewind\utf8rewind.vcxproj">
+      <Project>{a2f5e8b1-c4d7-4a3e-9f62-1b08d3e5a7c9}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

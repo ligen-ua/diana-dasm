@@ -7,7 +7,7 @@ namespace oui
     {
         if (sizeInTChars > std::numeric_limits<uint16_t>::max())
         {
-            __debugbreak();
+            OUI_DEBUG_BREAK;
             return;
         }
         TextMarkup::Range range;

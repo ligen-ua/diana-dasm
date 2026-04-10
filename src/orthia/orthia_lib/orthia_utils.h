@@ -1,90 +1,27 @@
 #ifndef ORTHIA_UTILS_H
 #define ORTHIA_UTILS_H
-struct IUnknown;
 
-#include "vector"
-#include "set"
-#include "stdexcept"
-#include "sstream"
-#include "algorithm"
-#include "map"
-#include "iomanip"
-#include "windows.h"
-
+#include "orthia_core.h"
 #include "orthia_pointers.h"
 #include "orthia_sha1.h"
-#include "diana_win32_cpp.h"
+
+#include "orthia_utils_win32.h"
+#include "orthia_utils_posix.h"
 
 namespace orthia
 {
-typedef ULONG64 Address_type;
-typedef diana::CWin32Exception CWin32Exception;
 
-#ifdef _WIN32
+bool IsFileNameSeparator(ORTHIA_TCHAR ch);
 
-typedef std::wstring PlatformString_type;
-typedef std::wstringstream PlatformStringStream_type;
-#define ORTHIA_TCSTR(X) L##X
-#define ORTHIA_TSTRNCMP(X1, X2, X3)  wcsncmp(X1, X2, X3)
-#define ORTHIA_TCHAR wchar_t
-#define ORTHIA_SYM_PLATFORM_SLASH L'\\'
+void PlatformDeleteFile(const PlatformString_type & fullFileName);
+bool IsFileExist(const PlatformString_type & fullFileName);
+Address_type GetSizeOfFile(const PlatformString_type & fullFileName);
+void CreateAllDirectoriesForFile(const PlatformString_type & fullFileName);
 
-#endif
+PlatformString_type ExpandVariable(const PlatformString_type & possibleVar);
+PlatformString_type ToWideString(Address_type address);
 
-class CHandleGuard
-{
-    CHandleGuard(const CHandleGuard&);
-    CHandleGuard & operator = (const CHandleGuard&);
-    HANDLE m_hFile;
-public:
-    CHandleGuard()
-        :
-            m_hFile(0)
-    {
-    }
-    explicit CHandleGuard(HANDLE hFile)
-        : m_hFile(hFile)
-    {
-    }
-    ~CHandleGuard()
-    {
-        Reset(0);
-    }
-    HANDLE Get()
-    {
-        return m_hFile;
-    }
-    HANDLE Release()
-    {
-        HANDLE hFile = m_hFile;
-        m_hFile = 0;
-        return hFile;
-    }
-    void Reset(HANDLE hFile)
-    {
-        if (m_hFile && m_hFile != INVALID_HANDLE_VALUE)
-        {
-            CloseHandle(m_hFile);
-            m_hFile = 0;
-        }
-        m_hFile = hFile;
-    }
-};
-#define ORTHIA_THROW_WIN32(Text) { ULONG orthia____code = ::GetLastError(); std::stringstream orthia____stream; orthia____stream<<Text; throw orthia::CWin32Exception(orthia____stream.str(), orthia____code);} 
-#define ORTHIA_THROW_STD(Text) { std::stringstream orthia____stream; orthia____stream<<Text; throw std::runtime_error(orthia____stream.str());} 
-
-
-bool IsFileExist(const std::wstring & fullFileName);
-Address_type GetSizeOfFile(const std::wstring & fullFileName);
-void CreateAllDirectoriesForFile(const std::wstring & fullFileName);
-
-std::wstring ExpandVariable(const std::wstring & possibleVar);
-std::wstring ToWideString(const std::string & str, UINT codePage = CP_ACP);
-std::wstring ToWideString(Address_type address);
-
-Address_type ToAddress(const std::wstring & sourceStr);
-std::string ToAnsiString_Silent(const std::wstring & sourceStr,
-                                ULONG codePage = CP_ACP);
+Address_type ToAddress(const PlatformString_type & sourceStr);
 inline std::string ToAnsiString_Silent(const std::string& sourceStr) {
     return sourceStr;
 }
@@ -186,9 +123,9 @@ void ObjectToString_t(const OutType & object, std::basic_string<Type, Traits<Typ
 }
 
 template<class OutType>
-inline std::wstring ObjectToString(const OutType & object)
+inline PlatformString_type ObjectToString(const OutType & object)
 {
-    std::wstring res;
+    PlatformString_type res;
     ObjectToString_t(object, res);
     return res;
 }
@@ -265,7 +202,7 @@ void ToStringAsHex(ObjectType id, std::basic_string<Type, Traits<Type>, Allocato
 template<template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex(long long id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
 {
-    LARGE_INTEGER li;
+    orthia::LargeInteger_type li;
     li.QuadPart = id;
     typedef std::basic_string<Type, Traits<Type>, AllocatorType<Type> > StringType;
 
@@ -285,7 +222,7 @@ void ToStringAsHex(long long id, std::basic_string<Type, Traits<Type>, Allocator
 template<template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex(unsigned long long id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
 {
-    ULARGE_INTEGER li;
+    orthia::UnsignedLargeInteger_type li;
     li.QuadPart = id;
     typedef std::basic_string<Type, Traits<Type>, AllocatorType<Type> > StringType;
 
@@ -341,39 +278,39 @@ inline std::string ToAnsiStringAsHex(unsigned int id)
 }
 
 // wide
-inline std::wstring ToWideStringAsHex(long long id)
+inline PlatformString_type ToWideStringAsHex(long long id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex(id, &res);
     return res;
 }
-inline std::wstring ToWideStringAsHex(unsigned long long id)
+inline PlatformString_type ToWideStringAsHex(unsigned long long id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex(id, &res);
     return res;
 }
-inline std::wstring ToWideStringAsHex(short id)
+inline PlatformString_type ToWideStringAsHex(short id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex((unsigned short )id, &res);
     return res;
 }
-inline std::wstring ToWideStringAsHex(unsigned short id)
+inline PlatformString_type ToWideStringAsHex(unsigned short id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex(id, &res);
     return res;
 }
-inline std::wstring ToWideStringAsHex(int id)
+inline PlatformString_type ToWideStringAsHex(int id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex((unsigned int)id, &res);
     return res;
 }
-inline std::wstring ToWideStringAsHex(unsigned int id)
+inline PlatformString_type ToWideStringAsHex(unsigned int id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex(id, &res);
     return res;
 }
@@ -381,7 +318,7 @@ inline std::wstring ToWideStringAsHex(unsigned int id)
 template<template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex_Short(long long id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
 {
-    LARGE_INTEGER li;
+    orthia::LargeInteger_type li;
     li.QuadPart = id;
     typedef std::basic_string<Type, Traits<Type>, AllocatorType<Type> > StringType;
 
@@ -400,7 +337,7 @@ void ToStringAsHex_Short(long long id, std::basic_string<Type, Traits<Type>, All
 template<template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex_Short(unsigned long long id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
 {
-    ULARGE_INTEGER li;
+    orthia::UnsignedLargeInteger_type li;
     li.QuadPart = id;
     typedef std::basic_string<Type, Traits<Type>, AllocatorType<Type> > StringType;
 
@@ -417,27 +354,27 @@ void ToStringAsHex_Short(unsigned long long id, std::basic_string<Type, Traits<T
         throw std::runtime_error("Cannot convert");
 }
 
-inline std::wstring ToWideStringAsHex_Short(long long id)
+inline PlatformString_type ToWideStringAsHex_Short(long long id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex_Short(id, &res);
     return res;
 }
-inline std::wstring ToWideStringAsHex_Short(unsigned long long id)
+inline PlatformString_type ToWideStringAsHex_Short(unsigned long long id)
 {
-    std::wstring res;
+    PlatformString_type res;
     ToStringAsHex_Short(id, &res);
     return res;
 }
-std::wstring ToHexString(const char * pArray, 
+PlatformString_type ToHexString(const char * pArray, 
                          size_t size);
 template<class Type>
-std::wstring ToHexString(const Type & obj)
+PlatformString_type ToHexString(const Type & obj)
 {
     return ToHexString((const char * )&obj, sizeof(obj));
 }
 template<class Type>
-std::wstring ToHexString(Type * pArray, 
+PlatformString_type ToHexString(Type * pArray, 
                          size_t count)
 {
     return ToHexString((const char * )pArray, sizeof(Type)*count);
@@ -543,43 +480,43 @@ void SplitString(const StringInfo_Ansi & str,
 // Wide
 struct StringInfo
 {
-    const wchar_t * m_pBegin;
-    const wchar_t * m_pEnd;
+    const ORTHIA_TCHAR * m_pBegin;
+    const ORTHIA_TCHAR * m_pEnd;
 
     static const int npos = (int)-1;
-    StringInfo(const wchar_t * pBegin,
-                    const wchar_t * pEnd)
+    StringInfo(const ORTHIA_TCHAR * pBegin,
+                    const ORTHIA_TCHAR * pEnd)
         : 
             m_pBegin(pBegin),
             m_pEnd(pEnd)
     {
     }
-    StringInfo(const wchar_t * pBegin,
+    StringInfo(const ORTHIA_TCHAR * pBegin,
                size_t sizeInWchars)
         : 
             m_pBegin(pBegin),
             m_pEnd(pBegin + sizeInWchars)
     {
     }
-    StringInfo(const std::wstring & str)
+    StringInfo(const PlatformString_type & str)
         : 
            m_pBegin(str.c_str()),
            m_pEnd(str.c_str()+str.size())
     {   
     }
-    StringInfo(const wchar_t * pBegin)
+    StringInfo(const ORTHIA_TCHAR * pBegin)
         : 
             m_pBegin(pBegin),
             m_pEnd(0)
     {
-        m_pEnd = m_pBegin + wcslen(pBegin);
+        m_pEnd = m_pBegin + ORTHIA_TLEN(pBegin);
     }
-    const wchar_t * c_str() const;
+    const ORTHIA_TCHAR * c_str() const;
     int size() const;
-    int find(const wchar_t * separator,
+    int find(const ORTHIA_TCHAR * separator,
              int startOffset, 
              int separatorSize) const;
-    std::wstring ToString() const;
+    PlatformString_type ToString() const;
     
     bool empty() const
     {
@@ -594,7 +531,7 @@ inline bool operator == (const StringInfo & info1, const StringInfo & info2)
     if (iSize1 != iSize2)
         return false;
 
-    return wcsncmp(info1.c_str(), info2.c_str(), iSize1) == 0;
+    return ORTHIA_TSTRNCMP(info1.c_str(), info2.c_str(), iSize1) == 0;
 }
 
 inline bool operator != (const StringInfo & info1, const StringInfo & info2)
@@ -624,32 +561,6 @@ typename ContainerType::const_pointer GetFrontPointer(const ContainerType & cont
     return &container.front();
 }
 
-class CDll
-{
-    CDll(const CDll&);
-    CDll&operator = (const CDll&);
-    HMODULE m_hLib;
-public:
-    CDll();
-    explicit CDll(const std::wstring & dllName);
-    ~CDll();
-    HMODULE GetBase();
-    void Reset(const std::wstring & dllName);
-    void Reset(const wchar_t * pDllName);
-    int Reset_Silent(const wchar_t* pName);
-
-    FARPROC QueryFunctionRaw(const char * pFunctionName, 
-                            bool bSilent);
-    template<class Type>
-    void QueryFunction(const char * pFunctionName, 
-                       Type * ppFnc,
-                       bool bSilent)
-    {
-        *ppFnc = (Type)QueryFunctionRaw(pFunctionName, bSilent);
-    }
-};
-
-
 inline void CalcSHA1(const std::vector<char> & data,
                      std::vector<char> & sha1)
 {
@@ -659,58 +570,28 @@ inline void CalcSHA1(const std::vector<char> & data,
 }
 
 
-inline std::string Utf16ToUtf8(const std::wstring & wstr)
-{
-    return ToAnsiString_Silent(wstr, CP_UTF8);
-}
-inline std::string Utf16ToAcp(const std::wstring & wstr)
-{
-    return ToAnsiString_Silent(wstr, CP_ACP);
-}
-inline std::wstring Utf8ToUtf16(const std::string & str)
-{
-    return ToWideString(str, CP_UTF8);
-}
-inline std::wstring AcpToUtf16(const std::string & str)
-{
-    return ToWideString(str, CP_ACP);
-}
+bool ConvertFileTimeToSystemTime(long long fileTime, orthia::WinSystemTime_type * pTime);
+long long ConvertSystemTimeToFileTime(const orthia::WinSystemTime_type * pTime);
 
-inline std::wstring Downcase(const std::wstring & str)
-{
-    if (str.empty())
-        return std::wstring();
+PlatformString_type SystemTimeToString(const orthia::WinSystemTime_type & st);
+PlatformString_type SystemTimeToStringJustDate(const orthia::WinSystemTime_type & st);
 
-    std::vector<wchar_t> temp(str.c_str(), str.c_str() + str.size());
-    DWORD dwSize = (DWORD)(str.size());
-    if (CharLowerBuffW( &temp.front(), dwSize)!=dwSize)
-        throw std::runtime_error("Can't convert string");
+void GetUtcTime(orthia::WinSystemTime_type * pTime);
+bool ConvertFileTimeToSystemTime(long long fileTime, orthia::WinSystemTime_type * pTime);
+long long ConvertSystemTimeToFileTime(const orthia::WinSystemTime_type * pTime);
+long long GetUtcTime();
+void CommonSleepMS(unsigned int msToSleep);
 
-    return std::wstring(&temp.front(), &temp.front() + dwSize);
-}
+bool UtcTimeToLocal(const orthia::WinSystemTime_type & utcTime, orthia::WinSystemTime_type * pLocalTime);
 
-inline std::string Downcase_Ansi(const std::string & str)
-{
-    if (str.empty())
-        return std::string();
+void RuntimeFatalError();
+void Debug_RuntimeFatalError();
 
-    std::vector<char> temp(str.c_str(), str.c_str() + str.size());
-    DWORD dwSize = (DWORD)(str.size());
-    if (CharLowerBuffA( &temp.front(), dwSize)!=dwSize)
-        throw std::runtime_error("Can't convert string");
-
-    return std::string(&temp.front(), &temp.front() + dwSize);
-}
-
-long long GetCurrentUTCTime();
-long long ConvertSystemTimeToFileTime(const SYSTEMTIME * pTime);
-std::wstring SystemTimeToWideString(const SYSTEMTIME & st);
-std::wstring SystemTimeToWideStringJustDate(const SYSTEMTIME & st);
+std::string UTCTimeToISO8601(long long timeMS);
+long long UTCTimeFromISO8601(const std::string & timew_in);
 
 
-HMODULE GetCurrentModule();
-std::wstring GetModuleName(HMODULE hModule);
-std::wstring GetCurrentModuleDir();
+PlatformString_type GetCurrentProcessDir();
 
 template<class ContainerStr>
 void EraseName(ContainerStr & fullName)
@@ -718,8 +599,8 @@ void EraseName(ContainerStr & fullName)
     int size = (int)fullName.size();
     for(int i = size-1; i > 0; --i)
     {
-        wchar_t ch = (wchar_t)fullName[i];
-        if (ch == '\\' || ch == L'/')
+        ORTHIA_TCHAR ch = fullName[i];
+        if (IsFileNameSeparator(ch))
         {
             if (i < size-1)
             {
@@ -738,8 +619,8 @@ void UnparseFileNameFromFullFileName(const ContainerStr & fullName, ContainerStr
     int size = (int)fullName.size();
     for(int i = size-1; i > 0; --i)
     {
-        wchar_t ch = (wchar_t)fullName[i];
-        if (ch == '\\' || ch == L'/')
+        ORTHIA_TCHAR ch = fullName[i];
+        if (IsFileNameSeparator(ch))
         {
             if (i < size-1)
             {
@@ -759,8 +640,8 @@ void GetExtensionOfFile(const ContainerStr & fullName, ContainerStr * pExtension
     int size = (int)fullName.size();
     for(int i = size-1; i > 0; --i)
     {
-        wchar_t ch = (wchar_t)fullName[i];
-        if (ch == '\\' || ch == L'/')
+        ORTHIA_TCHAR ch = fullName[i];
+        if (IsFileNameSeparator(ch))
         {
             return;
         }
@@ -771,26 +652,6 @@ void GetExtensionOfFile(const ContainerStr & fullName, ContainerStr * pExtension
         }
     }
 }
-
-inline
-void GetFullPathNameX(const std::wstring & name,
-                     std::vector<wchar_t> & nameOut,
-                     int iResOffset)
-{
-    wchar_t * pOut = 0;
-    nameOut.resize(1024);
-    ULONG dwSize = GetFullPathNameW(name.c_str(), 
-                     (DWORD)nameOut.size() - iResOffset, 
-                     &nameOut.front() + iResOffset,
-                     &pOut
-                     );
-    if (!dwSize)
-    {
-        ORTHIA_THROW_WIN32("Invalid path: " + Utf16ToAcp(name));
-    }
-    nameOut.resize( dwSize + iResOffset );
-}
-
 
 
 struct orthia_pcg32_random
@@ -805,48 +666,6 @@ struct orthia_pcg32_random
 unsigned int orthia_pcg32_random_r(orthia_pcg32_random * rng);
 
 
-
-class CCriticalSection
-{
-    CRITICAL_SECTION  m_section;
-    CCriticalSection(const CCriticalSection&);
-    CCriticalSection&operator = (const CCriticalSection&);
-
-    bool CreateInternal()
-    {
-        memset(&m_section, 0, sizeof(m_section));
-        bool bResult = false;
-        __try
-        {
-            InitializeCriticalSection(&m_section);
-            bResult = true;
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            bResult = false;
-        }
-        return bResult;
-    }
-
-public:
-    void Lock()
-    {
-        EnterCriticalSection(&m_section);
-    }
-    void Unlock()
-    {
-        LeaveCriticalSection(&m_section);
-    }
-    CCriticalSection()
-    {
-        if (!CreateInternal())
-            throw std::bad_alloc();
-    }
-    ~CCriticalSection()
-    {
-        DeleteCriticalSection(&m_section);
-    }
-};
 
 class CAutoCriticalSection
 {
@@ -865,22 +684,9 @@ public:
     }
 };
 
-#ifdef _WIN32
-inline std::string PlatformStringToAcp(const std::wstring& wstr)
-{
-    return ToAnsiString_Silent(wstr, CP_ACP);
-}
-inline std::string PlatformStringToUtf8(const std::wstring& wstr)
-{
-    return Utf16ToUtf8(wstr);
-}
-inline std::wstring Utf8ToPlatformString(const std::string& wstr)
-{
-    return Utf8ToUtf16(wstr);
-}
-#endif
 
-const wchar_t* QueryModuleVersion(HMODULE module);
+int TrimStringAllWhiteSpace(std::wstring& str);
+int TrimStringAllWhiteSpace(std::string& str);
 
 // whitespace
 template<class StringType>
@@ -1062,8 +868,6 @@ void TrimString(std::wstring& str);
 void TrimString(std::string& str);
 std::wstring TrimString2(const std::wstring& str);
 std::string TrimString2(const std::string& str);
-int TrimStringAllWhiteSpace(std::wstring& str);
-int TrimStringAllWhiteSpace(std::string& str);
 
 // splitters
 void SplitStringWithoutWhitespace(const StringInfo& str,
@@ -1149,4 +953,8 @@ public:
 };
 
 }
+
 #endif 
+
+
+

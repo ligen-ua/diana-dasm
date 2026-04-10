@@ -46,7 +46,7 @@ public:
     CVMDatabase(intrusive_ptr<CSQLDatabase2> pDatabase);
     ~CVMDatabase();
 
-    long long AddNewVM(const std::wstring & name, const long long * pID = 0);
+    long long AddNewVM(const orthia::PlatformString_type & name, const long long * pID = 0);
     void DelVM(long long id);
     void QueryVirtualMachines(IVmInfoListTarget * pVmListTarget);
     bool QueryVMInfo(long long id, VmInfo * pVmInfo);

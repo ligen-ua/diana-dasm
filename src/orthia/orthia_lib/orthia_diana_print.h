@@ -20,7 +20,7 @@ namespace orthia
         orthia::ITextPrinter* m_pTextPrinter;
         int m_dianaMode;
         AsmCommandWriterType m_writer;
-        std::wstring m_currentBlock;
+        orthia::PlatformString_type m_currentBlock;
         orthia::Address_type m_sizeInCommands;
         orthia::Address_type m_currentCommand;
         int m_bytesIdent;
@@ -60,8 +60,8 @@ namespace orthia
             m_writer.SetSpacesCount(spacesCount);
         }
         virtual void PrintCommand(unsigned long long address,
-            const std::wstring& bytes,
-            const std::wstring& command)
+            const orthia::PlatformString_type& bytes,
+            const orthia::PlatformString_type& command)
         {
             m_currentBlock.clear();
             m_currentBlock.append(orthia::AddressToString(address, m_dianaMode));
@@ -103,7 +103,7 @@ namespace orthia
             {
                 if (!m_printInvalidPages)
                 {
-                    PrintCommand(vmRange.address, L"??", L"???");
+                    PrintCommand(vmRange.address, ORTHIA_TCSTR("??"), ORTHIA_TCSTR("???"));
                     throw std::runtime_error("Memory access error");
                 }
                 reportNoData = true;
@@ -121,7 +121,7 @@ namespace orthia
             Diana_InitContext(&context, m_dianaMode);
             Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
 
-            std::wstring temp, binaryData;
+            orthia::PlatformString_type temp, binaryData;
             orthia::Address_type virtualOffset = vmRange.address;
             size_t offsetInPage = 0;
             bool prevWasBad = false;
@@ -172,12 +172,12 @@ namespace orthia
                     {
                         if (prevWasBad)
                         {
-                            PrintCommand(virtualOffset, L"??", L"???");
+                            PrintCommand(virtualOffset, ORTHIA_TCSTR("??"), ORTHIA_TCSTR("???"));
                         }
                         else
                         {
-                            std::wstring dbCommand = L"db";
-                            dbCommand.append(m_spacesCount, L' ');
+                            orthia::PlatformString_type dbCommand = ORTHIA_TCSTR("db");
+                            dbCommand.append(m_spacesCount, ORTHIA_TCHAR(' '));
                             PrintCommand(virtualOffset, temp, dbCommand + temp);
                         }
                     }
@@ -196,11 +196,11 @@ namespace orthia
                 {
                     if (prevWasBad)
                     {
-                        PrintCommand(virtualOffset, L"??", L"???");
+                        PrintCommand(virtualOffset, ORTHIA_TCSTR("??"), ORTHIA_TCSTR("???"));
                     }
                     else
                     {
-                        temp = orthia::ToWideString(m_writer.Assign(&result, virtualOffset));
+                        temp = orthia::Utf8ToPlatformString(m_writer.Assign(&result, virtualOffset));
                         binaryData = orthia::ToHexString(pDataStart + offsetInPage, result.iFullCmdSize);
 
                         PrintCommand(virtualOffset, binaryData, temp);

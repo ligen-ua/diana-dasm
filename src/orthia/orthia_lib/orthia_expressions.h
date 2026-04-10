@@ -3,6 +3,7 @@
 #include "orthia_tokenizer.h"
 #include <optional>
 #include <unordered_set>
+#include <memory>
 
 namespace orthia {
 
@@ -70,11 +71,7 @@ struct NoTokenError :public std::runtime_error
 };
 struct NameNotFound:public std::runtime_error
 {
-    NameNotFound(const orthia::PlatformString_type& name)
-        :
-        std::runtime_error("Name not found: " + orthia::PlatformStringToUtf8(name))
-    {
-    }
+    NameNotFound(const orthia::PlatformString_type& name);
 };
 class BasicNode : public ICalcNode
 {

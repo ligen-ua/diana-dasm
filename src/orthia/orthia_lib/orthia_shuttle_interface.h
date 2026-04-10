@@ -35,7 +35,14 @@ inline void InitArgument(PrintArgument & arg,
     arg.type = type;
     arg.flags = flags;
 }
-typedef long (__stdcall * PrintStream_type)(const PrintArgument * pText, int count);
+
+#ifdef WIN32
+#define ORTHIA_SHUTTLE_STDCALL  __stdcall
+#else
+#define ORTHIA_SHUTTLE_STDCALL
+#endif
+
+typedef long (ORTHIA_SHUTTLE_STDCALL * PrintStream_type)(const PrintArgument * pText, int count);
 struct IHypervisorInterface
 {
     PrintStream_type printStream;

@@ -26,6 +26,8 @@ Derivative works are acceptable, even for commercial purposes, so long as
 the work is derivative, and (2) the source code includes prominent notice with
 these four paragraphs for those parts of this code that are retained.
 =============================================================================*/
+#ifndef DIANA_SOFTFLOAT_H
+#define DIANA_SOFTFLOAT_H
 
 #include "diana_core.h"
 
@@ -253,7 +255,7 @@ float64 float32_to_float64(float32, float_status_t *status);
 /*----------------------------------------------------------------------------
 | Software IEC/IEEE single-precision operations.
 *----------------------------------------------------------------------------*/
-float32 float32_round_to_int(float32, float_status_t *status);
+DIANA_INLINE_C float32 float32_round_to_int(float32, float_status_t *status);
 float32 float32_round_to_int_with_scale(float32, DI_UINT8 scale, float_status_t *status);
 float32 float32_add(float32, float32, float_status_t *status);
 float32 float32_sub(float32, float32, float_status_t *status);
@@ -293,9 +295,9 @@ int float32_compare(float32, float32, float_status_t *status);
 int float32_compare_quiet(float32, float32, float_status_t *status);
 
 float_class_t float32_class(float32);
-int float32_is_signaling_nan(float32);
-int float32_is_nan(float32);
-int float32_is_denormal(float32);
+DIANA_INLINE_C int float32_is_signaling_nan(float32);
+DIANA_INLINE_C int float32_is_nan(float32);
+DIANA_INLINE_C int float32_is_denormal(float32);
 
 float32 float32_min(float32 a, float32 b, float_status_t *status);
 float32 float32_max(float32 a, float32 b, float_status_t *status);
@@ -319,7 +321,7 @@ float32 float64_to_float32(float64, float_status_t *status);
 /*----------------------------------------------------------------------------
 | Software IEC/IEEE double-precision operations.
 *----------------------------------------------------------------------------*/
-float64 float64_round_to_int(float64, float_status_t *status);
+DIANA_INLINE_C float64 float64_round_to_int(float64, float_status_t *status);
 float64 float64_round_to_int_with_scale(float64, DI_UINT8 scale, float_status_t *status);
 float64 float64_add(float64, float64, float_status_t *status);
 float64 float64_sub(float64, float64, float_status_t *status);
@@ -359,9 +361,9 @@ int float64_compare(float64, float64, float_status_t *status);
 int float64_compare_quiet(float64, float64, float_status_t *status);
 
 float_class_t float64_class(float64);
-int float64_is_signaling_nan(float64);
-int float64_is_nan(float64);
-int float64_is_denormal(float64);
+DIANA_INLINE_C int float64_is_signaling_nan(float64);
+DIANA_INLINE_C int float64_is_nan(float64);
+DIANA_INLINE_C int float64_is_denormal(float64);
 
 float64 float64_min(float64 a, float64 b, float_status_t *status);
 float64 float64_max(float64 a, float64 b, float_status_t *status);
@@ -374,9 +376,9 @@ float32 float16_to_float32(float16, float_status_t *status);
 float16 float32_to_float16(float32, float_status_t *status);
 
 float_class_t float16_class(float16);
-int float16_is_signaling_nan(float16);
-int float16_is_nan(float16);
-int float16_is_denormal(float16);
+DIANA_INLINE_C int float16_is_signaling_nan(float16);
+DIANA_INLINE_C int float16_is_nan(float16);
+DIANA_INLINE_C int float16_is_denormal(float16);
 #endif
 
 #ifdef FLOATX80
@@ -429,8 +431,8 @@ floatx80_t floatx80_div(floatx80_t, floatx80_t, float_status_t *status);
 floatx80_t floatx80_sqrt(floatx80_t, float_status_t *status);
 
 float_class_t floatx80_class(floatx80_t);
-int floatx80_is_signaling_nan(floatx80_t);
-int floatx80_is_nan(floatx80_t);
+DIANA_INLINE_C int floatx80_is_signaling_nan(floatx80_t);
+DIANA_INLINE_C int floatx80_is_nan(floatx80_t);
 
 #endif  /* FLOATX80 */
 
@@ -472,4 +474,7 @@ float128_t float128_div(float128_t a, float128_t b, float_status_t *status);
 #endif  /* FLOAT128 */
 
 #include "softfloat_end.h"
+#endif
+
+
 #endif

@@ -1,6 +1,8 @@
 #ifndef ORTHIA_SHA1_H
 #define ORTHIA_SHA1_H
 
+#include "orthia_core.h"
+
 #ifdef __cplusplus
 extern "C"{
 #endif
@@ -56,28 +58,28 @@ typedef struct SHA1Context
  */
 
 
-int __stdcall SHA1Reset(  SHA1Context *);
-int __stdcall SHA1Input(  SHA1Context *,
+int ORTHIA_STDCALL SHA1Reset(  SHA1Context *);
+int ORTHIA_STDCALL SHA1Input(  SHA1Context *,
                         const uint8_t *,
                         unsigned int);
-int __stdcall SHA1Result( SHA1Context *,
+int ORTHIA_STDCALL SHA1Result( SHA1Context *,
                         uint8_t Message_Digest[SHA1HashSize]);
 
 #define SHA1_HASH_SIZE 20
-void __stdcall Sha1Hash(const unsigned char * pData, unsigned int iSize, uint8_t * pResult);
+void ORTHIA_STDCALL Sha1Hash(const unsigned char * pData, unsigned int iSize, uint8_t * pResult);
 
 #ifdef __cplusplus
 }; //extern "C"
 
 template<class Type>
-int __stdcall SHA1Input2(SHA1Context    *context,
+int ORTHIA_STDCALL SHA1Input2(SHA1Context    *context,
                         Type * pObject)
 {
     return SHA1Input(context, (uint8_t*)pObject, sizeof(Type));
 }
 
 template<class Type>
-int __stdcall SHA1Input2(SHA1Context    *context,
+int ORTHIA_STDCALL SHA1Input2(SHA1Context    *context,
                         Type * pObject,
                         size_t size)
 {

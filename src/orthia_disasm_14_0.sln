@@ -28,6 +28,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_ui", "orthia\orthia_
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_win32_host", "orthia\orthia_win32_host\orthia_win32_host.vcxproj", "{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "utf8rewind", "orthia\utf8rewind\utf8rewind.vcxproj", "{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -122,6 +124,14 @@ Global
 		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Release|Win32.ActiveCfg = Release|Win32
 		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Release|x64.ActiveCfg = Release|Win32
 		{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}.Release|x64.Build.0 = Release|Win32
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Debug|Win32.Build.0 = Debug|Win32
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Debug|x64.ActiveCfg = Debug|x64
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Debug|x64.Build.0 = Debug|x64
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Release|Win32.ActiveCfg = Release|Win32
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Release|Win32.Build.0 = Release|Win32
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Release|x64.ActiveCfg = Release|x64
+		{A2F5E8B1-C4D7-4A3E-9F62-1B08D3E5A7C9}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

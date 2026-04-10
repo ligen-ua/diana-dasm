@@ -117,7 +117,7 @@ bool CCommandWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
         switch (evt.keyEvent.virtualKey)
         {
         case oui::VirtualKey::kC:
-            if (m_currentOperation)
+            if (m_currentOperation && (evt.keyState.state & evt.keyState.AnyCtrl))
             {
                 m_currentOperation->Cancel();
             }
@@ -270,7 +270,7 @@ void CCommandWindow::WriteLog(const oui::String& text)
     }
 
     std::vector<orthia::StringInfo> lines;
-    orthia::SplitString(text.native, L"\x0A", &lines);
+    orthia::SplitString(text.native, ORTHIA_TCSTR("\x0A"), &lines);
 
     for (auto& line : lines)
     {

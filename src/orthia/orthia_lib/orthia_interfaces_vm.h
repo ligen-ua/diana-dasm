@@ -9,7 +9,7 @@ namespace orthia
 struct VmInfo
 {
     long long id;
-    std::wstring name;
+    orthia::PlatformString_type name;
     CCommonDateTime creationTime;
     CCommonDateTime lastWriteTime;
 
@@ -80,9 +80,9 @@ struct GUIVmModuleInfo
     long long writesCount;
     unsigned long long lowestAddress;
     unsigned long long sizeInBytes;
-    std::wstring description;
+    orthia::PlatformString_type description;
 
-    typedef std::map<std::wstring, std::wstring> AttributesMap_type;
+    typedef std::map<orthia::PlatformString_type, orthia::PlatformString_type> AttributesMap_type;
     AttributesMap_type customAttributes;
 
     long long guiFlags;

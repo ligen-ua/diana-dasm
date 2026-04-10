@@ -3,14 +3,14 @@
 
 namespace orthia
 {
-static const wchar_t * g_no_data_patterns[] = 
+static const ORTHIA_TCHAR * g_no_data_patterns[] = 
 {
-    L"??",
-    L"????",
-    L"????????",
-    L"????????`????????"
+    ORTHIA_TCSTR("??"),
+    ORTHIA_TCSTR("????"),
+    ORTHIA_TCSTR("????????"),
+    ORTHIA_TCSTR("????????`????????")
 };
-std::wstring AddressToString(Address_type address, int dianaMode)
+PlatformString_type AddressToString(Address_type address, int dianaMode)
 {
     switch (dianaMode)
     {
@@ -23,29 +23,29 @@ std::wstring AddressToString(Address_type address, int dianaMode)
         return orthia::ToWideStringAsHex((DI_UINT32)address);
     }
 }
-std::wstring Address64ToString(Address_type address)
+PlatformString_type Address64ToString(Address_type address)
 {
-    ULARGE_INTEGER largeInt;
+    orthia::UnsignedLargeInteger_type largeInt;
     largeInt.QuadPart = address;
 
-    std::wstring result = orthia::ToWideStringAsHex((unsigned int)largeInt.HighPart);
-    result.append(L"`");
+    PlatformString_type result = orthia::ToWideStringAsHex((unsigned int)largeInt.HighPart);
+    result.append(ORTHIA_TCSTR("`"));
     result.append(orthia::ToWideStringAsHex((unsigned int)largeInt.LowPart));
     return result;
 }
-static void ConvertToText1(void *, const char * pBinary, std::wstring * pText)
+static void ConvertToText1(void *, const char * pBinary, PlatformString_type * pText)
 {
     *pText = orthia::ToHexString(pBinary, 1);
 }
-static void ConvertToText2(void*, const char * pBinary, std::wstring * pText)
+static void ConvertToText2(void*, const char * pBinary, PlatformString_type * pText)
 {
     *pText = orthia::ToWideStringAsHex(*(unsigned short*)pBinary);
 }
-static void ConvertToText4(void*, const char * pBinary, std::wstring * pText)
+static void ConvertToText4(void*, const char * pBinary, PlatformString_type * pText)
 {
     *pText = orthia::ToWideStringAsHex(*(unsigned int*)pBinary);
 }
-static void ConvertToText8(void*, const char * pBinary, std::wstring * pText)
+static void ConvertToText8(void*, const char * pBinary, PlatformString_type * pText)
 {
     *pText = Address64ToString(*(unsigned long long*)pBinary);
 }
@@ -129,7 +129,7 @@ void CVmBinaryMemoryPrinter::OnRange(const VmMemoryRangeInfo & vmRange_in,
     {
         throw std::runtime_error("Overflow");
     }
-    std::wstring currentText;
+    PlatformString_type currentText;
     if (startOffsetInRange <= lastOfRange)
     {
         for(Address_type offsetInRange = startOffsetInRange; ;offsetInRange += m_varSize)
@@ -184,7 +184,7 @@ void CVmBinaryMemoryPrinter::ReportBlock()
     m_currentAscii.clear();
 }
 void CVmBinaryMemoryPrinter::ReportText(Address_type address, 
-                                        const std::wstring & text,
+                                        const PlatformString_type & text,
                                         char charHint)
 {
     if (m_currentItemInRow >= m_itemsInRow)
@@ -202,19 +202,19 @@ void CVmBinaryMemoryPrinter::ReportText(Address_type address,
         {   
             m_currentBlock.append(Address64ToString(address));
         }
-        m_currentBlock.append(L" ");
+        m_currentBlock.append(ORTHIA_TCSTR(" "));
     }
     if (m_varSize == 1 && m_currentItemInRow == 8)
     {
-        m_currentBlock.append(L"-");
+        m_currentBlock.append(ORTHIA_TCSTR("-"));
     }
     else
     {
-        m_currentBlock.append(L" ");
+        m_currentBlock.append(ORTHIA_TCSTR(" "));
     }
     if (m_varSize == 1)
     {
-        m_currentAscii += ((wchar_t)AsciiEscapeSymbol(charHint));
+        m_currentAscii += ((ORTHIA_TCHAR)AsciiEscapeSymbol(charHint));
     }
     m_currentBlock.append(text);
     ++m_currentItemInRow;
@@ -233,8 +233,8 @@ char AsciiEscapeSymbol(char symbol)
 }
 
 
-static bool ReadNext(const wchar_t *& pData,
-                     const wchar_t * pEnd,
+static bool ReadNext(const ORTHIA_TCHAR *& pData,
+                     const ORTHIA_TCHAR * pEnd,
                      Address_type & result)
 {
     result = 0;
@@ -249,8 +249,8 @@ static bool ReadNext(const wchar_t *& pData,
             break;
         }
     };
-    wchar_t * pParam = (wchar_t * )pEnd; 
-    result = _wcstoui64(pData, &pParam, 16);
+    ORTHIA_TCHAR * pParam = (ORTHIA_TCHAR * )pEnd; 
+    result = ORTHIA_STR_TO_ULL(pData, &pParam, 16);
     if (pData == pParam)
     {
         throw std::runtime_error("Can't deserialize");
@@ -260,11 +260,11 @@ static bool ReadNext(const wchar_t *& pData,
 }
 class CVmDeserializeIterator
 {
-    const wchar_t * m_pCurrentData;
-    const wchar_t * m_pEnd;
+    const ORTHIA_TCHAR * m_pCurrentData;
+    const ORTHIA_TCHAR * m_pEnd;
 
 public:
-    CVmDeserializeIterator(const std::wstring & text)
+    CVmDeserializeIterator(const PlatformString_type & text)
         :
             m_pCurrentData(text.c_str()), 
             m_pEnd(text.c_str() + text.size())
@@ -281,7 +281,7 @@ public:
     {
         ++m_pCurrentData;
     }
-    wchar_t GetNextChar() const
+    ORTHIA_TCHAR GetNextChar() const
     {
         return *m_pCurrentData;
     }
@@ -296,7 +296,7 @@ void Append(std::vector<char> * pBuffer,
 }
 
 template<class TargetType, unsigned long long MaxValue>
-void VmDeserializeMemory_t(const std::wstring & text_in,
+void VmDeserializeMemory_t(const PlatformString_type & text_in,
                            std::vector<char> * pBuffer)
 {
     Address_type result = 0;
@@ -310,14 +310,14 @@ void VmDeserializeMemory_t(const std::wstring & text_in,
         Append(pBuffer, (TargetType)result);
     }
 }
-static void VmDeserializeMemory_8(const std::wstring & text_in,
+static void VmDeserializeMemory_8(const PlatformString_type & text_in,
                                   std::vector<char> * pBuffer)
 {
     Address_type result = 0;
     CVmDeserializeIterator iterator(text_in);
     while(iterator.ReadNext(result))
     {
-        if (iterator.GetNextChar() != L'`')
+        if (iterator.GetNextChar() != ORTHIA_TCSTR('`'))
         {
             Append(pBuffer, (unsigned long long)result);
             continue;
@@ -341,11 +341,11 @@ static void VmDeserializeMemory_8(const std::wstring & text_in,
     }
 }
 void VmDeserializeMemory(int varSize, 
-                         const std::wstring & text_in,
+                         const PlatformString_type & text_in,
                          std::vector<char> * pBuffer)
 {
     pBuffer->clear();
-    const std::wstring & text = text_in;
+    const PlatformString_type & text = text_in;
     switch(varSize)
     {
     default:

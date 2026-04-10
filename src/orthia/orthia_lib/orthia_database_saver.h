@@ -6,14 +6,14 @@
 
 namespace orthia
 {
-    
+
 class CDatabaseSaver
 {
 public:
     CDatabaseSaver();
     void Save(CDianaModule & dianaModule,
               CDatabaseManager & databaseManager,
-              const std::wstring & moduleName);
+              const orthia::PlatformString_type & moduleName);
 };
 
 }

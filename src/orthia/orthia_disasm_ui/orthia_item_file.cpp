@@ -6,23 +6,23 @@
 
 namespace orthia
 {
-    ÑFilePersistentItemStorage::ÑFilePersistentItemStorage()
+    CFilePersistentItemStorage::CFilePersistentItemStorage()
     {
     }
-    void ÑFilePersistentItemStorage::Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager)
+    void CFilePersistentItemStorage::Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager)
     {
         m_databaseManager = databaseManager;
         m_databaseManager->GetClassicDatabase()->QueryAllComments([=](Address_type address, const std::string& text) {
-            ÑPersistentItemStorage::SyncWriteComment(address, orthia::Utf8ToPlatformString(text));
+            CPersistentItemStorage::SyncWriteComment(address, orthia::Utf8ToPlatformString(text));
             return true;
         });
     }
-    oui::fsui::OpenResult ÑFilePersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
+    oui::fsui::OpenResult CFilePersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
     {
         oui::fsui::OpenResult result;
         try
         {
-            ÑPersistentItemStorage::SyncWriteComment(address, comment);
+            CPersistentItemStorage::SyncWriteComment(address, comment);
             m_databaseManager->GetClassicDatabase()->InsertComment(address, orthia::PlatformStringToUtf8(comment.native));
         }
         catch (std::exception& e)
@@ -32,7 +32,7 @@ namespace orthia
         return result;
     }
 
-    FileWorkplaceItem::FileWorkplaceItem(std::shared_ptr<ÑFilePersistentItemStorage> peristentItemStorage_in)
+    FileWorkplaceItem::FileWorkplaceItem(std::shared_ptr<CFilePersistentItemStorage> peristentItemStorage_in)
         : persistentItemStorage(peristentItemStorage_in)
     {
     }
@@ -220,7 +220,6 @@ namespace orthia
     int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-        std::vector<CommonModuleInfo> dbModules;
         return classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export);
     }
     int FileWorkplaceItem::GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const

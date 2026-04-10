@@ -1,6 +1,7 @@
 #include "orthia_tokenizer.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <cinttypes>
 namespace orthia
 {   
 struct InvalidUtf8Exception :public std::runtime_error
@@ -578,6 +579,71 @@ bool CTokenizer::CaptureStringLiteral(Token::LiteralType_type literalType,
     return false;
 }
 
+int portable_ui64toa(uint64_t value, char* buffer, size_t size, int radix) {
+    if (buffer == NULL || size == 0) {
+        return EINVAL;
+    }
+
+    int len = -1;
+
+    switch (radix) {
+        case 10:
+            len = snprintf(buffer, size, "%" PRIu64, value);
+            break;
+        case 16:
+            len = snprintf(buffer, size, "%" PRIx64, value); /* Lowercase hex */
+            break;
+        case 8:
+            len = snprintf(buffer, size, "%" PRIo64, value);
+            break;
+        case 2:
+            /* snprintf does not support binary, so we handle it manually */
+            {
+                if (value == 0) {
+                    if (size < 2) return ERANGE;
+                    buffer[0] = '0';
+                    buffer[1] = '\0';
+                    return 0;
+                }
+
+                /* Calculate number of bits required */
+                uint64_t temp = value;
+                int bits = 0;
+                while (temp != 0) {
+                    temp >>= 1;
+                    bits++;
+                }
+
+                if ((size_t)bits + 1 > size) {
+                    return ERANGE;
+                }
+
+                /* Fill buffer backwards */
+                buffer[bits] = '\0';
+                for (int i = bits - 1; i >= 0; i--) {
+                    buffer[i] = (value & 1) ? '1' : '0';
+                    value >>= 1;
+                }
+                return 0;
+            }
+        default:
+            buffer[0] = '\0';
+            return EINVAL; /* Unsupported radix */
+    }
+
+    /* Handle snprintf errors */
+    if (len < 0) {
+        return EINVAL; /* Encoding error */
+    }
+    
+    /* Check for truncation (snprintf returns required length) */
+    if ((size_t)len >= size) {
+        return ERANGE; /* Buffer too small */
+    }
+
+    return 0;
+}
+
 bool CTokenizer::CaptureDigitLiteral(Token * pToken)
 {
     *pToken = BuildNewToken(Token::ttLiteral);
@@ -689,20 +755,20 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
     // sequence is ready
     m_tempStorage.push_back(0);
     char * endOfSequence = 0;
-    unsigned __int64 value = _strtoui64(&m_tempStorage[0], &endOfSequence, radix);
+    unsigned long long value = strtoull(&m_tempStorage[0], &endOfSequence, radix);
     if (*endOfSequence)
     {
         RaiseError("Can't convert literal");
         return false;
     }
-    if (value == _UI64_MAX)
+    if (value == ULLONG_MAX)
     {
         // can ve overflow
         m_tempStorage2 = m_tempStorage;
-        _ui64toa_s(value, &m_tempStorage2[0], m_tempStorage2.size(), radix);
+        portable_ui64toa(value, &m_tempStorage2[0], m_tempStorage2.size(), radix);
         size_t size2 = strlen(&m_tempStorage2[0]);
         size_t zeroBytesOffset = m_tempStorage2.size() - size2 - 1;
-        if (_stricmp(&m_tempStorage[0] + zeroBytesOffset, &m_tempStorage2[0]) != 0)
+        if (DIANA_STRICMP(&m_tempStorage[0] + zeroBytesOffset, &m_tempStorage2[0]) != 0)
         {
             RaiseError("Integer overflow");
         }
@@ -768,8 +834,8 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
         }
         else
         {
-            __int64 signedValue = (__int64)value;
-            if (signedValue < 0 || (unsigned __int64)signedValue != value)
+            DI_INT64 signedValue = (DI_INT64)value;
+            if (signedValue < 0 || (DI_UINT64)signedValue != value)
             {
                 RaiseError("Constant too big");
                 return false;
@@ -780,8 +846,8 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
     }
     else
     {     
-        unsigned __int32 value32 = (unsigned __int32)value;
-        if ((unsigned __int64)value32 != value)
+        DI_UINT32 value32 = (DI_UINT32)value;
+        if ((DI_UINT64)value32 != value)
         {
             RaiseError("Constant too big");
             return false;
@@ -792,8 +858,8 @@ bool CTokenizer::CaptureDigitLiteral(Token * pToken)
         }
         else
         {
-            __int32 signedValue = (__int32)value32;
-            if (signedValue < 0 || (unsigned __int32)signedValue != value32)
+            DI_INT32 signedValue = (DI_INT32)value32;
+            if (signedValue < 0 || (DI_UINT32)signedValue != value32)
             {
                 RaiseError("Constant too big");
                 return false;
@@ -1091,7 +1157,7 @@ bool CTokenizer::GetNextToken(Token * pToken, int flags)
                 return CaptureDigitLiteral(pToken);
 
             default:
-                if (ch < 20 || (unsigned char(ch))>127)
+                if (ch < 20 || ((unsigned char)(ch))>127)
                 {
                     RaiseError("Invalid characters");
                 }

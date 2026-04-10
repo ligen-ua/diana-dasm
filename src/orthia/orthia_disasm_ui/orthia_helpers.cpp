@@ -73,7 +73,7 @@ namespace orthia
             {
                 pageToRead = (size_t)sizeToRead;
             }
-            file.ExactRead(page.data(), (ULONG)pageToRead);
+            file.ExactRead(page.data(), (unsigned int)pageToRead);
             SHA1Input(&context, (const uint8_t*)page.data(), (unsigned int)pageToRead);
             sizeToRead -= (unsigned long long)pageToRead;
         }

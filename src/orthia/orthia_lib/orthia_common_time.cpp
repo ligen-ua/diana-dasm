@@ -3,27 +3,39 @@
 namespace orthia
 {
 
-
 // Time
+void CCommonDateTime::InitFromUnixTime(long long unixSeconds)
+{
+    // Unix epoch (1970-01-01) is 116444736000000000 100-ns intervals after the
+    // Windows FILETIME epoch (1601-01-01).
+    long long fileTime = unixSeconds * 10000000LL + 116444736000000000LL;
+    InitFromFileTime(fileTime);
+}
+
+void CCommonDateTime::InitFromFileTime(long long utcTime)
+{
+    orthia::WinSystemTime_type st;
+    orthia::ConvertFileTimeToSystemTime(utcTime, &st);
+    InitFromSystemTime(st);
+}
 void CCommonDateTime::InitFromCurrentTime()
 {
-    SYSTEMTIME st;
-    memset(&st, 0, sizeof(st));
-    GetSystemTime(&st);
+    orthia::WinSystemTime_type st;
+    orthia::GetUtcTime(&st);
     InitFromSystemTime(st);
 }
 CSQLStringCache::CSQLStringCache()
     :
-        m_inited(false)
+    m_inited(false)
 {
     memset(&m_time, 0, sizeof(m_time));
 }
-void CSQLStringCache::Init(const SYSTEMTIME & time)
+void CSQLStringCache::Init(const orthia::WinSystemTime_type& time)
 {
     m_time = time;
     m_inited = true;
 }
-void CSQLStringCache::LazyInit(const std::string & sqlTimeImpl)
+void CSQLStringCache::LazyInit(const std::string& sqlTimeImpl)
 {
     if (m_inited)
     {
@@ -36,49 +48,58 @@ void CSQLStringCache::Clear()
     m_inited = false;
     memset(&m_time, 0, sizeof(m_time));
 }
-const SYSTEMTIME * CSQLStringCache::ToSystemTime() const
+const orthia::WinSystemTime_type* CSQLStringCache::ToSystemTime() const
 {
     if (!m_inited)
         return 0;
     return &m_time;
 }
-bool CSQLStringCache::GUI_QueryConvertedToLocal(SYSTEMTIME * pTimeRes) const
+bool CSQLStringCache::GUI_QueryConvertedToLocal(orthia::WinSystemTime_type* pTimeRes) const
 {
     if (!m_inited)
     {
         return false;
     }
-    SYSTEMTIME localTime = {0,};
-    if (!SystemTimeToTzSpecificLocalTime(0, &m_time, &localTime))
+    orthia::WinSystemTime_type localTime = { 0, };
+    if (!orthia::UtcTimeToLocal(m_time, &localTime))
     {
         return false;
     }
     *pTimeRes = localTime;
     return true;
 }
-std::wstring CSQLStringCache::GUI_QueryConvertedToLocal() const
+orthia::PlatformString_type CSQLStringCache::GUI_QueryConvertedToLocal() const
 {
     if (!m_inited)
     {
-        return std::wstring();
+        return orthia::PlatformString_type();
     }
 
-    SYSTEMTIME localTime = {0,};
-    if (!SystemTimeToTzSpecificLocalTime(0, &m_time, &localTime))
+    orthia::WinSystemTime_type localTime = { 0, };
+    if (!orthia::UtcTimeToLocal(m_time, &localTime))
     {
-        return std::wstring();
+        return orthia::PlatformString_type();
     }
 
-    return orthia::SystemTimeToWideString(localTime);
+    return orthia::SystemTimeToString(localTime);
 }
-std::wstring CSQLStringCache::GUI_QueryStringJustDate() const
+orthia::PlatformString_type CSQLStringCache::GUI_QueryStringJustDate() const
 {
     if (!m_inited)
     {
-        return std::wstring();
+        return orthia::PlatformString_type();
     }
 
-    return orthia::SystemTimeToWideStringJustDate(m_time);
+    return orthia::SystemTimeToStringJustDate(m_time);
+}
+orthia::PlatformString_type CSQLStringCache::Android_QueryStringJustDate() const
+{
+    if (!m_inited)
+    {
+        return orthia::PlatformString_type();
+    }
+
+    return orthia::SystemTimeToStringJustDate(m_time);
 }
 
 }

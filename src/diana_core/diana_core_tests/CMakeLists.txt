@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.5)
 project(diana_core_tests LANGUAGES CXX)
 
 include_directories("../diana_core")

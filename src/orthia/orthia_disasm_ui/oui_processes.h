@@ -3,6 +3,11 @@
 #include "oui_filesystem.h"
 #include "orthia_model_interfaces.h"
 
+extern "C"
+{
+#include "diana_executable.h"
+}
+
 namespace orthia
 {
     struct DianaMemoryStream;
@@ -12,7 +17,7 @@ namespace oui
     struct ModuleDisasmContext
     {
         orthia::DianaMemoryStream * stream = nullptr;
-        Diana_PeFile * dianaPeFile = nullptr;
+        DianaExecutable * executable = nullptr;
     };
 
     struct ThreadInfo
@@ -40,6 +45,7 @@ namespace oui
             std::function<void (const orthia::ModuleInfo& info, ModuleDisasmContext&)> contextCallback) = 0;
     
         virtual std::tuple<int, std::shared_ptr<IThreadEnumerator>> CreateThreadEnumerator() = 0;
+        virtual int GetDianaMode() const = 0;
     };
 
     struct ProcessUnifiedId

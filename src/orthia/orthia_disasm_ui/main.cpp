@@ -1,3 +1,4 @@
+#include "orthia_core.h"
 #include "ui_main_window.h"
 #include "orthia_config.h"
 #include <iostream>

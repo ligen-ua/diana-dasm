@@ -45,20 +45,10 @@ void CCommonFormatBuilder::InitNew()
     m_xml->InsertEndChild(m_pRoot);
     m_pXML = m_xml.get();
 }
-void CCommonFormatBuilder::AddMetadata(const std::wstring & name, const std::wstring & value)
-{
-    std::string utf8name(orthia::Utf16ToUtf8(name));
-    std::string utf8value(orthia::Utf16ToUtf8(value));
-    AddMetadata(utf8name, utf8value);
-}
 void CCommonFormatBuilder::AddMetadata(const std::string & utf8name, const std::string & utf8value)
 {
     m_wasMetadata = true;
     m_pRoot->SetAttribute(utf8name.c_str(), utf8value.c_str());
-}
-void CCommonFormatBuilder::DeleteMetadata(const std::wstring & name)
-{
-    DeleteMetadata(orthia::Utf16ToUtf8(name));
 }
 void CCommonFormatBuilder::DeleteMetadata(const std::string & utf8name)
 {
@@ -76,30 +66,42 @@ void CCommonFormatBuilder::AddMetadata(const std::string& name, unsigned long lo
     orthia::ToStringAsHex_Short(value, &text);
     AddMetadata(name, text);
 }
-void CCommonFormatBuilder::AddMetadata(const std::wstring& name, long long value)
-{
-    std::wstring text;
-    orthia::ToStringAsHex_Short(value, &text);
-    AddMetadata(name, text);
-}
-void CCommonFormatBuilder::AddMetadata(const std::wstring& name, unsigned long long value)
-{
-    std::wstring text;
-    orthia::ToStringAsHex_Short(value, &text);
-    AddMetadata(name, text);
-}
 void CCommonFormatBuilder::AddMetadata(const std::string& name, int value)
 {
     std::string text;
     orthia::ToStringAsHex_Short((long long)value, &text);
     AddMetadata(name, text);
 }
-void CCommonFormatBuilder::AddMetadata(const std::wstring& name, int value)
+#ifdef WIN32
+void CCommonFormatBuilder::AddMetadata(const orthia::PlatformString_type & name, const orthia::PlatformString_type & value)
 {
-    std::wstring text;
+    std::string utf8name(orthia::PlatformStringToUtf8(name));
+    std::string utf8value(orthia::PlatformStringToUtf8(value));
+    AddMetadata(utf8name, utf8value);
+}
+void CCommonFormatBuilder::DeleteMetadata(const orthia::PlatformString_type & name)
+{
+    DeleteMetadata(orthia::PlatformStringToUtf8(name));
+}
+void CCommonFormatBuilder::AddMetadata(const orthia::PlatformString_type& name, long long value)
+{
+    orthia::PlatformString_type text;
+    orthia::ToStringAsHex_Short(value, &text);
+    AddMetadata(name, text);
+}
+void CCommonFormatBuilder::AddMetadata(const orthia::PlatformString_type& name, unsigned long long value)
+{
+    orthia::PlatformString_type text;
+    orthia::ToStringAsHex_Short(value, &text);
+    AddMetadata(name, text);
+}
+void CCommonFormatBuilder::AddMetadata(const orthia::PlatformString_type& name, int value)
+{
+    orthia::PlatformString_type text;
     orthia::ToStringAsHex_Short((long long)value, &text);
     AddMetadata(name, text);
 }
+#endif
 void CCommonFormatBuilder::Produce(const std::vector<char> & value, std::vector<char> * pResult)
 {
     if (value.empty())
@@ -166,12 +168,6 @@ bool CCommonFormatParser::Parse(const std::string & data)
 {
     return Parse(data.c_str(), data.c_str() + data.size(), true);
 }
-bool CCommonFormatParser::Parse(const std::wstring & strValue)
-{
-    std::string data = orthia::Utf16ToUtf8(strValue);
-    return Parse(data.c_str(), data.c_str() + data.size(), true);
-}
-
 bool CCommonFormatParser::Parse(const std::vector<char> & source, bool bMakeCopy)
 {
     const char * pStart = orthia::GetFrontPointer(source);
@@ -266,7 +262,13 @@ bool CCommonFormatParser::QueryMetadata(const std::string & name, long long * pV
     }
     return HexStringToObject_Silent(value, pValue);
 }
-bool CCommonFormatParser::QueryMetadata(const std::string & name, std::wstring * pValue) const
+#ifdef WIN32
+bool CCommonFormatParser::Parse(const orthia::PlatformString_type & strValue)
+{
+    std::string data = orthia::PlatformStringToUtf8(strValue);
+    return Parse(data.c_str(), data.c_str() + data.size(), true);
+}
+bool CCommonFormatParser::QueryMetadata(const std::string & name, orthia::PlatformString_type * pValue) const
 {
     pValue->clear();
     std::string utf8;
@@ -278,7 +280,7 @@ bool CCommonFormatParser::QueryMetadata(const std::string & name, std::wstring *
     *pValue = orthia::Utf8ToUtf16(utf8);
     return res;
 }
-bool CCommonFormatParser::QueryMetadata(const std::wstring & name, std::wstring * pValue) const
+bool CCommonFormatParser::QueryMetadata(const orthia::PlatformString_type & name, orthia::PlatformString_type * pValue) const
 {
     pValue->clear();
     std::string utf8;
@@ -290,6 +292,7 @@ bool CCommonFormatParser::QueryMetadata(const std::wstring & name, std::wstring 
     *pValue = orthia::Utf8ToUtf16(utf8);
     return res;
 }
+#endif
 bool CCommonFormatParser::QueryValue(std::vector<char> * pValue) const
 {
     pValue->clear();

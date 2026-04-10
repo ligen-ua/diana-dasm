@@ -18,7 +18,7 @@ public:
     {
 
     }
-    void LogData(const ORTHIA_TCHAR* pData, ULONG size)
+    void LogData(const ORTHIA_TCHAR* pData, int size)
     {
         if (auto out = m_outputWindow.lock())
         {
@@ -118,7 +118,7 @@ void COutputWindow::WriteLog(const oui::String& text)
     }
 
     std::vector<oui::String::string_type> lines;
-    orthia::SplitStringWithoutWhitespace(text.native, L"\x0A", &lines);
+    orthia::SplitStringWithoutWhitespace(text.native, ORTHIA_TCSTR("\x0A"), &lines);
 
     for (auto& line : lines)
     {

@@ -109,6 +109,5 @@ namespace oui
     };
 }
 
-#if defined(_WIN32)
 #include "oui_input_win32.h"
-#endif
+#include "oui_input_posix.h"

@@ -48,7 +48,7 @@ void CDescriptionManager::UnparseCustomAttributes(GUIVmModuleInfo * pInfo)
         {
             continue;
         }
-        pInfo->customAttributes[orthia::Utf8ToUtf16(pAttribute->Name())] = orthia::Utf8ToUtf16(pAttribute->Value());
+        pInfo->customAttributes[orthia::Utf8ToPlatformString(pAttribute->Name())] = orthia::Utf8ToPlatformString(pAttribute->Value());
     }
 }
 void CDescriptionManager::Convert(const VmModuleInfo & source,

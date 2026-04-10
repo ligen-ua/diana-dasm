@@ -108,7 +108,7 @@ public:
             {
                 void * pArray = &ripsBuffer[ripOffset];
                 &pArray;
-                __debugbreak();
+                DIANA_DEBUG_BREAK();
                 return res;
             }            
             if (++ripOffset >= ripsCount)

@@ -22,7 +22,7 @@ namespace orthia
         if (++linesWithoutSync > g_maxLinesWithoutSync)
         {
             Sync();
-            Sleep(50);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     }
     void CCommandProcessor::CommandArguments::Sync()
@@ -120,11 +120,11 @@ namespace orthia
                 m_handler(handler)
             {
             }
-            void PrintLine(const std::wstring& line) override
+            void PrintLine(const orthia::PlatformString_type& line) override
             {
                 m_handler(line);
             }
-            void PrintLine(const std::wstring& line, const oui::TextMarkup& markup, std::shared_ptr<oui::IMultilineViewTag> tag)
+            void PrintLine(const orthia::PlatformString_type& line, const oui::TextMarkup& markup, std::shared_ptr<oui::IMultilineViewTag> tag)
             {
                 m_handler(line);
             }
@@ -243,7 +243,7 @@ namespace orthia
         }
         catch (std::exception& e)
         {
-            auto errStr = orthia::Utf8ToUtf16(e.what());
+            auto errStr = orthia::Utf8ToPlatformString(e.what());
             args.progressHandler->ReplyAnyway(args.progressHandler, errStr, false);
         }
     }
