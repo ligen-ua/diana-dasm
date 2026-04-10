@@ -32,6 +32,7 @@ struct CConsoleInputReader::Impl
     }
     void EnableMouseReporting()
     {
+        if (mouseReportingEnabled) return;
         // Enable mouse click events (?1000h), button-motion tracking (?1002h),
         // and SGR extended coordinate format (?1006h)
         const char seq[] = "\x1b[?1000h\x1b[?1002h\x1b[?1006h";
