@@ -19,7 +19,10 @@ struct CConsoleInputReader::Impl
     Impl()
     {
         pipe(pipeFd);
-        EnableMouseReporting();
+        // EnableMouseReporting() is called lazily on the first Read() so that
+        // it runs after CConsole::Init() enters the alternate screen (?1049h).
+        // VTE (GNOME Terminal) saves DEC private mode state on ?1049h, so any
+        // mouse-enable sequences sent before that switch get wiped on entry.
     }
     ~Impl()
     {
@@ -259,6 +262,10 @@ static bool TryParseSGRMouse(const char* seq, int seqLen, InputEvent& evt, Mouse
 bool CConsoleInputReader::Read(std::vector<InputEvent>& input)
 {
     input.clear();
+
+    // Enable mouse reporting on the first Read() call, which is guaranteed to
+    // run after CConsole::Init() has entered the alternate screen (?1049h).
+    m_impl->EnableMouseReporting();
 
     // Wait for input on stdin or the interrupt pipe
     fd_set fds;
