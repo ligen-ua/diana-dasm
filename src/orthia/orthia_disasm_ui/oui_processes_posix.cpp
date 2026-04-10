@@ -39,6 +39,20 @@ namespace oui
         return true;
     }
 
+    static bool CheckReadAccess(int pid)
+    {
+        bool result = false; 
+        char memPath[64];
+        snprintf(memPath, sizeof(memPath), "/proc/%d/mem", (int)pid);
+        int fd = open(memPath, O_RDONLY);
+        if (fd >= 0)
+        { 
+            result = true;
+            close(fd);
+        }
+        return result;
+    }
+
     // Returns 0 on success, errno-style error on failure.
     static int ReadProcessMemoryPosix(pid_t pid,
         unsigned long long offset,
@@ -461,6 +475,9 @@ namespace oui
             if (stat(path, &st) != 0)
                 return { errno, nullptr };
 
+            if (!CheckReadAccess((int)pid)) 
+                return { EPERM, nullptr };
+
             int pointerSize = DetectPointerSize(pid);
             bool is32bit    = (pointerSize == 4);
 
@@ -551,13 +568,9 @@ namespace oui
 
                 if (flags & IProcessSystem::queryFlags_TryOpenProcessAsReader)
                 {
-                    // Check we can open process memory
-                    char memPath[64];
-                    snprintf(memPath, sizeof(memPath), "/proc/%d/mem", (int)pid);
-                    int fd = open(memPath, O_RDONLY);
-                    if (fd >= 0)
+                    // Check we can open process memory                    
+                    if (CheckReadAccess((int)pid)) 
                     {
-                        close(fd);
                         info.flags |= ProcessInfo::flag_hasReaderAccess;
                     }
                 }

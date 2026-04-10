@@ -273,11 +273,13 @@ void CMainWindow::ConstuctMenu()
         // build file menu
         std::vector<oui::PopupItem> file =
         {
+#ifndef DIANA_HAS_POSIX
             {
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_executable")),
                 [this]() { OpenExecutable();  },
                 oui::Hotkey(oui::VirtualKey::kE)
             },
+#endif
             {
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_process")),
                 [this]() {  OpenProcess();  },
