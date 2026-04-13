@@ -10,6 +10,7 @@ typedef struct _dianaMemoryStream
     DIANA_SIZE_T bufferSize;
     DIANA_SIZE_T curSize;
     OPERAND_SIZE addressDifference;
+    int (*translateAbsoluteAddress)(struct _dianaMemoryStream* pThis, OPERAND_SIZE * address);
 }DianaMemoryStream;
 
 void Diana_InitMemoryStream(DianaMemoryStream * pStream,

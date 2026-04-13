@@ -46,6 +46,10 @@ public:
     }
 };
 
+static int TranslateAbsoluteAddress(OPERAND_SIZE* address)
+{
+    return DI_SUCCESS;
+}
 
 static void test_elf1()
 {
@@ -69,7 +73,7 @@ static void test_elf1()
 
     ::DianaMemoryStream rwStream;
     Diana_InitMemoryStreamEx2(&rwStream, &data.front(), data.size(), 0, 0);
-
+    rwStream.translateAbsoluteAddress = TranslateAbsoluteAddress;
     ImportsObserver observer;
     DI_CHECK_CPP(DianaElfFile_QueryImports(&dianaElfFile,
         0,

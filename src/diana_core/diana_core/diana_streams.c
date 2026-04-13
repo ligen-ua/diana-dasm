@@ -73,7 +73,14 @@ int DianaMemoryStream_RandomWrite_V(void * pThis,
     DI_CHECK(Translate(pStream, offset_in, &offset));
     if (flags & DIANA_ANALYZE_RANDOM_READ_ABSOLUTE)
     {
-        return DI_END_OF_STREAM;
+        if (pStream->translateAbsoluteAddress)
+        {
+            DI_CHECK(pStream->translateAbsoluteAddress(pStream, &offset));
+        }
+        else
+        {
+            return DI_END_OF_STREAM;
+        }
     }
     if (offset >= pStream->bufferSize)
     {
@@ -104,7 +111,14 @@ int DianaMemoryStream_RandomRead_V(void * pThis,
 
     if (flags & DIANA_ANALYZE_RANDOM_READ_ABSOLUTE)
     {
-        return DI_END_OF_STREAM;
+        if (pStream->translateAbsoluteAddress)
+        {
+            DI_CHECK(pStream->translateAbsoluteAddress(pStream, &offset));
+        }
+        else
+        {
+            return DI_END_OF_STREAM;
+        }
     }
     if (offset >= pStream->bufferSize)
     {
