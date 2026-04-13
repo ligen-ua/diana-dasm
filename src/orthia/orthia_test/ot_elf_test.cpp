@@ -46,7 +46,7 @@ public:
     }
 };
 
-static int TranslateAbsoluteAddress(OPERAND_SIZE* address)
+static int TranslateAbsoluteAddress(struct _dianaMemoryStream* pThis, OPERAND_SIZE* address)
 {
     return DI_SUCCESS;
 }
