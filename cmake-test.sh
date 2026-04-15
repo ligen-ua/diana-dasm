@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-buildDir=cmake
+buildDir=cmake-release
 mkdir -p "${buildDir}"
 cd "${buildDir}"
 
