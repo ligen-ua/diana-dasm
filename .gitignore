@@ -12,4 +12,4 @@
 .claude
 /cmake-debug
 /cmake-release
-
+test_results.log

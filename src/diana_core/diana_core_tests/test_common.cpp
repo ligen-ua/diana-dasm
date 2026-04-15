@@ -3,6 +3,7 @@ extern "C"
 {
 #include "diana_streams.h"
 }
+int g_diana_resultCode = 0;
 
 int Diana_ParseCmdOnBuffer_test(int iMode,
                                 void * pBuffer,

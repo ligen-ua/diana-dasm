@@ -79,8 +79,8 @@ int DianaMemoryStream_RandomWrite_V(void * pThis,
         }
         else
         {
-            return DI_END_OF_STREAM;
-        }
+        return DI_END_OF_STREAM;
+    }
     }
     if (offset >= pStream->bufferSize)
     {
@@ -117,7 +117,7 @@ int DianaMemoryStream_RandomRead_V(void * pThis,
         }
         else
         {
-            return DI_END_OF_STREAM;
+        return DI_END_OF_STREAM;
         }
     }
     if (offset >= pStream->bufferSize)

@@ -1,4 +1,4 @@
-#include "test_suxx.h"
+#include "test_misc.h"
 extern "C"
 {
 #include "diana_streams.h"
@@ -8,7 +8,7 @@ extern "C"
 #include "test_common.h"
 #include "string.h"
 
-static void test_suxx_impl()
+static void test_misc_impl()
 {
     DianaGroupInfo * pGroupInfo=0;
     DianaParserResult result;
@@ -1516,7 +1516,7 @@ static void test_suxx_impl()
     }
 }
 
-void test_suxx()
+void test_misc()
 {
-    DIANA_TEST(test_suxx_impl());
+    DIANA_TEST(test_misc_impl());
 }

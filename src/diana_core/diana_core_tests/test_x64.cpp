@@ -480,7 +480,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_XMM0);
-        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 8);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_DS);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RSI);
@@ -553,7 +553,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
         DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "movdqu")==0);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
-        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 8);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_RSP);
@@ -596,7 +596,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
         DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "movdqa")==0);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
-        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 8);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_RCX);
@@ -620,7 +620,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
         DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "movdqa")==0);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
-        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 8);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_RCX);
@@ -788,7 +788,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_XMM0);
-        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 4);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 0x10);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_EAX);
     }

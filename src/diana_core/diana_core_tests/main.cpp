@@ -16,7 +16,7 @@ extern "C"
 #include "test_call.h"
 #include "test_jmp.h"
 #include "test_or.h"
-#include "test_suxx.h"
+#include "test_misc.h"
 #include "test_integrated.h"
 #include "test_x64.h"
 #include "test_x64_integrated.h"
@@ -25,9 +25,10 @@ extern "C"
 #include "test_stack.h"
 #include "test_new.h"
 #include "test_avx.h"
+#include "test_aesni.h"
 
-void test_masm1();
-void test_patchers();
+#include "test_masm1.h"
+#include "test_patchers.h"
 
 int main()
 {
@@ -35,6 +36,7 @@ int main()
     DianaProcessor_GlobalInit();
     test_new();
     test_avx();
+    test_aesni();
     test_stack();
     test_analyze();
     test_integrated2();
@@ -53,9 +55,9 @@ int main()
     test_call();
     test_jmp();
     test_or();
-    test_suxx();
+    test_misc();
     test_integrated();
     test_masm1();
     test_patchers();
-    return 0;
+    return g_diana_resultCode;
 }

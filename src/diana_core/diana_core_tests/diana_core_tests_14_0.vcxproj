@@ -180,6 +180,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="test_add.cpp" />
+    <ClCompile Include="test_aesni.cpp" />
     <ClCompile Include="test_analyze.cpp" />
     <ClCompile Include="test_call.cpp" />
     <ClCompile Include="test_cmp.cpp" />
@@ -200,7 +201,7 @@
     <ClCompile Include="test_patchers.cpp" />
     <ClCompile Include="test_push.cpp" />
     <ClCompile Include="test_stack.cpp" />
-    <ClCompile Include="test_suxx.cpp" />
+    <ClCompile Include="test_misc.cpp" />
     <ClCompile Include="test_x64.cpp" />
     <ClCompile Include="test_x64_integrated.cpp" />
   </ItemGroup>
@@ -219,12 +220,16 @@
     <ClInclude Include="test_mov2.h" />
     <ClInclude Include="test_mov_as.h" />
     <ClInclude Include="test_mov_spec.h" />
+    <ClInclude Include="test_aesni.h" />
     <ClInclude Include="test_avx.h" />
+    <ClInclude Include="test_masm1.h" />
+    <ClInclude Include="test_misc.h" />
     <ClInclude Include="test_new.h" />
     <ClInclude Include="test_or.h" />
+    <ClInclude Include="test_patchers.h" />
+    <ClInclude Include="test_processor_impl.h" />
     <ClInclude Include="test_push.h" />
     <ClInclude Include="test_stack.h" />
-    <ClInclude Include="test_suxx.h" />
     <ClInclude Include="test_x64.h" />
     <ClInclude Include="test_x64_integrated.h" />
   </ItemGroup>
