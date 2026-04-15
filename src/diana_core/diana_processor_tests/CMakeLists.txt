@@ -6,6 +6,7 @@ include_directories("../diana_core_tests")
 
 set(FILES_LIST 
 main.cpp
+../diana_core_tests/test_common.cpp
 test_processor.cpp
 test_processor_a.cpp
 test_processor_b.cpp

@@ -11,6 +11,7 @@ include_directories("../../diana_core/diana_core_tests")
 
 set(FILES_LIST 
 main.cpp
+../../diana_core/diana_core_tests/test_common.cpp
 ot_cache_test.cpp  
 ot_expressions.cpp     
 ot_tokenizer.cpp  

@@ -106,7 +106,7 @@ int main(int argc, char * argv[])
 
     orthia::EnvironmentPaths paths;
     paths.m_ApplicationDataPath = ".";
-    paths.m_TempPath = '.';
+    paths.m_TempPath = orthia::GetCurrentProcessDir() + "/../";
 
     orthia::InitEnvironmentPaths(paths);
 #endif

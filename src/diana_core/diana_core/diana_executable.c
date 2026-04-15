@@ -16,6 +16,7 @@ int DianaExecutable_Init(DianaExecutable * pExecutable,
     {
         pExecutable->type = DIANA_EXECUTABLE_TYPE_PE;
         pExecutable->dianaMode = pExecutable->u.peFile.pImpl->dianaMode;
+        pExecutable->sizeOfModule = pExecutable->u.peFile.pImpl->sizeOfModule;
         return DI_SUCCESS;
     }
 
@@ -26,6 +27,7 @@ int DianaExecutable_Init(DianaExecutable * pExecutable,
     {
         pExecutable->type = DIANA_EXECUTABLE_TYPE_ELF;
         pExecutable->dianaMode = pExecutable->u.elfFile.dianaMode;
+        pExecutable->sizeOfModule = pExecutable->u.elfFile.pImpl->sizeOfModule;
         return DI_SUCCESS;
     }
     return DI_UNSUPPORTED;
