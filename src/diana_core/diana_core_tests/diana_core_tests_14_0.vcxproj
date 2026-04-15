@@ -194,6 +194,7 @@
     <ClCompile Include="test_mov2.cpp" />
     <ClCompile Include="test_mov_as.cpp" />
     <ClCompile Include="test_mov_spec.cpp" />
+    <ClCompile Include="test_avx.cpp" />
     <ClCompile Include="test_new.cpp" />
     <ClCompile Include="test_or.cpp" />
     <ClCompile Include="test_patchers.cpp" />
@@ -218,6 +219,7 @@
     <ClInclude Include="test_mov2.h" />
     <ClInclude Include="test_mov_as.h" />
     <ClInclude Include="test_mov_spec.h" />
+    <ClInclude Include="test_avx.h" />
     <ClInclude Include="test_new.h" />
     <ClInclude Include="test_or.h" />
     <ClInclude Include="test_push.h" />

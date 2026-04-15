@@ -29,4 +29,9 @@ DI_CHAR Diana_CacheEatOne(DianaContext * pContext);
 int Diana_ReadCache(DianaContext * pContext,
                     DianaReadStream * readStream,
                     int bOptimize);
+
+int Di_ProcessVexPrefix(unsigned char firstByte,
+                        int * pbVexFound,
+                        DianaContext * pContext,
+                        DianaReadStream * readStream);
 #endif

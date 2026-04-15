@@ -334,6 +334,7 @@ int Diana_LinkOperands(DianaContext * pContext, //IN
         case diana_orReg16_32_64_mem16:
         case diana_orMemoryMMX:
         case diana_orMemoryXMM:
+        case diana_orMemoryYMM:
         case diana_orRegMem:
             if (DianaGetHandler(addrSizeUsed!=2)(pContext,
                                                  pLinkedOp,
@@ -623,8 +624,20 @@ int Diana_LinkOperands(DianaContext * pContext, //IN
 
         case diana_orRegXMM:
             pLinkedOp->type = diana_register;
-            pLinkedOp->value.recognizedRegister = reg_XMM0 + Diana_GetReg2(pContext, ( DI_CHAR )PostByte);
+            if (pContext->iVexPrefix && (pResult->pInfo->m_flags & DI_FLAG_CMD_VEX_NDS) && i == 1)
+                pLinkedOp->value.recognizedRegister = reg_XMM0 + pContext->iVexVVVV;
+            else
+                pLinkedOp->value.recognizedRegister = reg_XMM0 + Diana_GetReg2(pContext, ( DI_CHAR )PostByte);
             pLinkedOp->usedSize = 16;
+            break;
+
+        case diana_orRegYMM:
+            pLinkedOp->type = diana_register;
+            if (pContext->iVexPrefix && (pResult->pInfo->m_flags & DI_FLAG_CMD_VEX_NDS) && i == 1)
+                pLinkedOp->value.recognizedRegister = reg_YMM0 + pContext->iVexVVVV;
+            else
+                pLinkedOp->value.recognizedRegister = reg_YMM0 + Diana_GetReg2(pContext, ( DI_CHAR )PostByte);
+            pLinkedOp->usedSize = 32;
             break;
 
         case diana_orRegMMX:

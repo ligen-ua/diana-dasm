@@ -36,6 +36,9 @@ typedef enum
  reg_XMM0,  reg_XMM1,  reg_XMM2,  reg_XMM3,  reg_XMM4,  reg_XMM5,  reg_XMM6,  reg_XMM7,
  reg_XMM8,  reg_XMM9,  reg_XMM10, reg_XMM11, reg_XMM12, reg_XMM13, reg_XMM14, reg_XMM15,
 
+ reg_YMM0,  reg_YMM1,  reg_YMM2,  reg_YMM3,  reg_YMM4,  reg_YMM5,  reg_YMM6,  reg_YMM7,
+ reg_YMM8,  reg_YMM9,  reg_YMM10, reg_YMM11, reg_YMM12, reg_YMM13, reg_YMM14, reg_YMM15,
+
  reg_fpu_ST0, reg_fpu_ST1, reg_fpu_ST2, reg_fpu_ST3, reg_fpu_ST4, reg_fpu_ST5, reg_fpu_ST6, reg_fpu_ST7,
 
  reg_CR8,   reg_CR9,   reg_CR10,  reg_CR11,  reg_CR12,  reg_CR13,  reg_CR14,  reg_CR15,
@@ -68,6 +71,28 @@ typedef enum
 #define DI_FLAG_CMD_TEST_MODE_ONLY          0x00010000
 
 #define DI_FLAG_CMD_MUST_BE_ALIGNED         0x00020000
+
+// VEX encoding flags (bits 18-26)
+#define DI_FLAG_CMD_VEX_ENCODED             0x00040000  // is a VEX-encoded instruction
+#define DI_FLAG_CMD_VEX_L1                  0x00080000  // L=1 (256-bit, YMM operands)
+// pp field (bits 20-21): implied mandatory prefix
+#define DI_FLAG_CMD_VEX_PP_66               0x00100000  // pp=01 (implied 66h)
+#define DI_FLAG_CMD_VEX_PP_F3               0x00200000  // pp=10 (implied F3h)
+#define DI_FLAG_CMD_VEX_PP_F2               0x00300000  // pp=11 (implied F2h)
+// map_select (bits 22-23): implied leading opcode escape bytes
+#define DI_FLAG_CMD_VEX_MAP_0F              0x00400000  // map=01 (0F)
+#define DI_FLAG_CMD_VEX_MAP_0F38            0x00800000  // map=10 (0F 38)
+#define DI_FLAG_CMD_VEX_MAP_0F3A            0x00C00000  // map=11 (0F 3A)
+#define DI_FLAG_CMD_VEX_W1                  0x01000000  // W=1
+// operand encoding kind (bits 25-26)
+#define DI_FLAG_CMD_VEX_NDS                 0x02000000  // vvvv = non-destructive source
+#define DI_FLAG_CMD_VEX_NDD                 0x04000000  // vvvv = destination
+#define DI_FLAG_CMD_VEX_DDS                 0x06000000  // vvvv = second source, dest implicit
+
+// VEX field accessors
+#define DI_VEX_GET_PP(flags)   (((flags) >> 20) & 0x3)
+#define DI_VEX_GET_MAP(flags)  (((flags) >> 22) & 0x3)
+#define DI_VEX_GET_NDS(flags)  (((flags) >> 25) & 0x3)
 
 // index fields
 #define DI_INT8           signed char
@@ -448,6 +473,10 @@ typedef struct _dianaContext
     DianaPrefixInfo prefixes[DI_MAX_PREFIXES_COUNT];
     DI_FULL_CHAR prefixesCount;
     int testMode;
+
+    // VEX prefix state (valid when iVexPrefix != 0)
+    DI_CHAR iVexPrefix;    // nonzero if current instruction uses VEX encoding
+    DI_CHAR iVexVVVV;      // vvvv register index (0-15, already un-inverted)
 }DianaContext;
 
 void Diana_FatalBreak();
@@ -473,6 +502,8 @@ int DianaRecognizeCommonReg(DI_CHAR iOpSize,
 int DianaRecognizeMMX(DI_CHAR regId,
                       DianaUnifiedRegister * pOut);
 int DianaRecognizeXMM(DI_CHAR regId,
+                      DianaUnifiedRegister * pOut);
+int DianaRecognizeYMM(DI_CHAR regId,
                       DianaUnifiedRegister * pOut);
 
 typedef int (*Diana_ReadIndexStructure_type)(DianaContext * pContext,

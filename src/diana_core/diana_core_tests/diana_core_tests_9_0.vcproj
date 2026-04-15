@@ -432,6 +432,10 @@
 				RelativePath=".\test_x64_integrated.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\test_avx.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"

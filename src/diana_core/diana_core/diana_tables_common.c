@@ -51,7 +51,12 @@ int Diana_DispatchMod3(DianaLinkedOperand * pInfo,
         pInfo->usedSize = 16;
         return DianaRecognizeXMM(( DI_CHAR )rm, pOut);
     }
-        
+    if (pInfo->pInfo->m_type == diana_orMemoryYMM)
+    {
+        pInfo->usedSize = 32;
+        return DianaRecognizeYMM(( DI_CHAR )rm, pOut);
+    }
+
     switch (iRegSizeInBytes)
     {
     default:

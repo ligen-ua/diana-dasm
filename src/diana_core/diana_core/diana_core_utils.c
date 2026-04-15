@@ -17,12 +17,14 @@ DianaUnifiedRegister g_regs[4][16] =
 };
 
 
-static DianaUnifiedRegister table3[2][16]= 
+static DianaUnifiedRegister table3[3][16]=
 {
-    {reg_MM0, reg_MM1, reg_MM2, reg_MM3, reg_MM4, reg_MM5, reg_MM6, reg_MM7, 
+    {reg_MM0, reg_MM1, reg_MM2, reg_MM3, reg_MM4, reg_MM5, reg_MM6, reg_MM7,
      reg_MM0, reg_MM1, reg_MM2, reg_MM3, reg_MM4, reg_MM5, reg_MM6, reg_MM7},
     {reg_XMM0, reg_XMM1, reg_XMM2, reg_XMM3, reg_XMM4, reg_XMM5, reg_XMM6, reg_XMM7,
-     reg_XMM8, reg_XMM9, reg_XMM10, reg_XMM11, reg_XMM12, reg_XMM13, reg_XMM14, reg_XMM15}
+     reg_XMM8, reg_XMM9, reg_XMM10, reg_XMM11, reg_XMM12, reg_XMM13, reg_XMM14, reg_XMM15},
+    {reg_YMM0, reg_YMM1, reg_YMM2, reg_YMM3, reg_YMM4, reg_YMM5, reg_YMM6, reg_YMM7,
+     reg_YMM8, reg_YMM9, reg_YMM10, reg_YMM11, reg_YMM12, reg_YMM13, reg_YMM14, reg_YMM15}
 };
 
 static DianaCmdInfo g_rexInfo;
@@ -50,12 +52,23 @@ int DianaRecognizeMMX(DI_CHAR regId,
     return DI_ERROR;
 }
 
-int DianaRecognizeXMM(DI_CHAR regId, 
+int DianaRecognizeXMM(DI_CHAR regId,
                       DianaUnifiedRegister * pOut)
 {
     if (regId < sizeof(table3[1])/sizeof(table3[1][0]))
     {
         *pOut = table3[1][regId];
+        return DI_SUCCESS;
+    }
+    return DI_ERROR;
+}
+
+int DianaRecognizeYMM(DI_CHAR regId,
+                      DianaUnifiedRegister * pOut)
+{
+    if (regId < sizeof(table3[2])/sizeof(table3[2][0]))
+    {
+        *pOut = table3[2][regId];
         return DI_SUCCESS;
     }
     return DI_ERROR;
@@ -328,6 +341,114 @@ void Diana_InitUtils()
 
     g_Diana_GS.m_linkedPrefixFnc = Diana_GS;
     g_Diana_GS.m_flags = DI_FLAG_CMD_IS_TRUE_PREFIX;
+}
+
+int Di_ProcessVexPrefix(unsigned char firstByte,
+                        int * pbVexFound,
+                        DianaContext * pContext,
+                        DianaReadStream * readStream)
+{
+    int iResult = 0;
+    unsigned char b2, b3;
+    int R, X, B, W, L, pp, map;
+    unsigned char selectorByte;
+    int cacheIt = pContext->cacheIt;
+    int cacheSize = pContext->cacheSize;
+
+    *pbVexFound = 0;
+
+    if (firstByte == 0xC5)
+    {
+        // 2-byte VEX: need 1 more byte
+        if (cacheSize < 1)
+        {
+            int bytesRead = 0;
+            iResult = readStream->pReadFnc(readStream,
+                                           pContext->cache + cacheIt + cacheSize,
+                                           1, &bytesRead);
+            if (iResult) return iResult;
+            cacheSize += bytesRead;
+        }
+        if (cacheSize < 1) return DI_END_OF_STREAM;
+
+        b2 = pContext->cache[cacheIt];
+        R      = (~b2 >> 7) & 1;
+        pContext->iVexVVVV = (~b2 >> 3) & 0xF;
+        L      = (b2 >> 2) & 1;
+        pp     = b2 & 0x3;
+        map    = 0;  // 0F map
+        W      = 0;
+        X      = 0;
+        B      = 0;
+        ++cacheIt; --cacheSize;
+    }
+    else  /* 0xC4 */
+    {
+        // 3-byte VEX: need 2 more bytes
+        while (cacheSize < 2)
+        {
+            int bytesRead = 0;
+            iResult = readStream->pReadFnc(readStream,
+                                           pContext->cache + cacheIt + cacheSize,
+                                           2 - cacheSize, &bytesRead);
+            if (iResult) return iResult;
+            cacheSize += bytesRead;
+        }
+        if (cacheSize < 2) return DI_END_OF_STREAM;
+
+        b2 = pContext->cache[cacheIt];
+        b3 = pContext->cache[cacheIt + 1];
+
+        R = (~b2 >> 7) & 1;
+        X = (~b2 >> 6) & 1;
+        B = (~b2 >> 5) & 1;
+        {
+            int mmmmm = b2 & 0x1F;
+            switch (mmmmm)
+            {
+            case 1:  map = 0; break;  // 0F
+            case 2:  map = 1; break;  // 0F38
+            case 3:  map = 2; break;  // 0F3A
+            default: map = 0; break;
+            }
+        }
+        W      = (b3 >> 7) & 1;
+        pContext->iVexVVVV = (~b3 >> 3) & 0xF;
+        L      = (b3 >> 2) & 1;
+        pp     = b3 & 0x3;
+
+        cacheIt  += 2;
+        cacheSize -= 2;
+    }
+
+    pContext->iVexPrefix = 1;
+    pContext->iRexPrefix = (DI_CHAR)(0x40 | (W << 3) | (R << 2) | (X << 1) | B);
+    if (W)
+        pContext->iCurrentCmd_opsize = 8;
+
+    // virtual selector byte encodes pp, map, L
+    selectorByte = (unsigned char)((pp << 3) | (map << 1) | L);
+
+    // pack remaining real bytes at cache[2..], then put virtual prefix at [0,1]
+    memmove(pContext->cache + DI_CACHE_RESERVED, pContext->cache + cacheIt, cacheSize);
+    pContext->cache[0] = 0xC5;
+    pContext->cache[1] = selectorByte;
+    pContext->cacheIt  = 0;
+    pContext->cacheSize = cacheSize + DI_CACHE_RESERVED;
+
+    // top up cache from stream
+    if (pContext->cacheIt + pContext->cacheSize < DI_CACHE_SIZE)
+    {
+        int bytesRead = 0;
+        readStream->pReadFnc(readStream,
+                             pContext->cache + pContext->cacheIt + pContext->cacheSize,
+                             DI_CACHE_SIZE - pContext->cacheSize - pContext->cacheIt,
+                             &bytesRead);
+        pContext->cacheSize += bytesRead;
+    }
+
+    *pbVexFound = 1;
+    return DI_SUCCESS;
 }
 
 DI_CHAR Diana_CacheEatOne(DianaContext * pContext)

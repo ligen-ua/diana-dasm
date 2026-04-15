@@ -533,7 +533,12 @@ int Diana_InsertPrefix(DianaContext * pContext,
     return DI_SUCCESS;
 }
 
-int Diana_ParseCmdEx(DianaParseParams * pParseParams)    // OUT
+static int IsVEXPrefix(DI_CHAR data)
+{
+    return (data == 0xC4 || data == 0xC5);
+}
+
+int Diana_ParseCmdEx(DianaParseParams* pParseParams)    // OUT
 {
     int iResult = 0;
     int prefixFound = 0;
@@ -545,6 +550,8 @@ int Diana_ParseCmdEx(DianaParseParams * pParseParams)    // OUT
     pParseParams->pContext->prefixesCount = 0;
 
     Diana_ResetPrefixes(pParseParams->pContext);
+    pParseParams->pContext->iVexPrefix = 0;
+    pParseParams->pContext->iVexVVVV   = 0;
     DIANA_MEMSET(pParseParams->pResult, 0, sizeof(DianaParserResult));
 
     // check prefixes
@@ -624,8 +631,38 @@ int Diana_ParseCmdEx(DianaParseParams * pParseParams)    // OUT
 
     pParseParams->pResult->pInfo = 0;
 
-    // parse cmd 
+    // parse cmd
     iOriginalCacheSize = pParseParams->pContext->cacheSize;
+
+    // VEX prefix interception (AMD64 only, C4/C5 not handled by legacy prefix loop)
+    if (pParseParams->pContext->iAMD64Mode && dataValid && IsVEXPrefix(data))
+    {
+        int vexFound = 0;
+        iResult = Di_ProcessVexPrefix(data, &vexFound, pParseParams->pContext, pParseParams->readStream);
+        if (iResult) return iResult;
+        if (vexFound)
+        {
+            DianaStreamProxy cmdProxy;
+            int newIt = 0;
+            int oldTailSize = 0;
+            iResult = Diana_ParseCmdImpl(pParseParams, &cmdProxy, &newIt);
+            if (iResult) return iResult;
+            if (!(pParseParams->pResult->pInfo->m_flags & DI_FLAG_CMD_VEX_ENCODED))
+            {
+                // Non-VEX instruction (e.g., legacy LDS) matched the virtual VEX cache - reject it
+                return DI_ERROR;
+            }
+            oldTailSize = cmdProxy.tail_size;
+            ApplyPrefixes(pParseParams->pContext, DI_FULL_CHAR_NULL);
+            if (pParseParams->pContext->iSizePrefixes & DIANA_INVALID_STATE) return DI_ERROR;
+            pParseParams->pContext->cacheIt = newIt;
+            iResult = Diana_LinkOperands(pParseParams->pContext, pParseParams->pResult, &cmdProxy.parent);
+            pParseParams->pContext->cacheSize = cmdProxy.tail_size;
+            pParseParams->pContext->cacheIt += oldTailSize - cmdProxy.tail_size;
+            if (!iResult && pParseParams->pContext->cacheIt < DI_CACHE_RESERVED) Diana_FatalBreak();
+            return iResult;
+        }
+    }
 
     if (pParseParams->pContext->lastPrefixBeforeRex != DI_FULL_CHAR_NULL)
     {

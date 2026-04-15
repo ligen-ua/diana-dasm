@@ -9,7 +9,9 @@ typedef enum {diana_orNone, diana_orRegMem, diana_orRegistry,
 
               diana_orRegMMX, diana_orRegXMM, diana_orMemoryXMM, diana_orMemoryMMX, diana_orRegistry32,
               diana_orReg32mem16, diana_orFPU_ST, diana_orFPU_ST0, diana_orFPU_STi,
-              diana_orReg16_32_64_mem16, diana_orRegMem_exact, diana_orMemory_exact
+              diana_orReg16_32_64_mem16, diana_orRegMem_exact, diana_orMemory_exact,
+
+              diana_orRegYMM, diana_orMemoryYMM
 } DianaOperands_type;
 
 typedef enum {diana_reg_none, diana_reg_ES, diana_reg_CS, diana_reg_SS, diana_reg_DS, diana_reg_FS, diana_reg_GS} DianaSreg_type;

@@ -24,15 +24,17 @@ extern "C"
 #include "test_analyze.h"
 #include "test_stack.h"
 #include "test_new.h"
+#include "test_avx.h"
 
 void test_masm1();
 void test_patchers();
 
 int main()
 {
-    Diana_Init();    
+    Diana_Init();
     DianaProcessor_GlobalInit();
     test_new();
+    test_avx();
     test_stack();
     test_analyze();
     test_integrated2();
