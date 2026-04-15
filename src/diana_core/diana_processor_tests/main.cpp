@@ -21,6 +21,7 @@ extern "C"
 #include "test_processor_n.h"
 #include "test_processor_b.h"
 #include "test_processor_m_xmm.h"
+#include "test_common.h"
 
 void di_gen();
 void test_processor_fpu();
@@ -52,5 +53,5 @@ int main()
     test_processor_m_xmm();
     test_processor_fpu();
     test_processor_fpu_integration();
-    return 0;
+    return g_diana_resultCode;
 }

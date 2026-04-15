@@ -24,7 +24,8 @@ struct DianaTestError:public std::runtime_error
 #define DIANA_TEST_ASSERT_IMPL(X, Y)  if (!(X))   {   std::cout<<"[ERROR] \""<<#X<<"\" failed in \""<<__FILE__<<"\" at line "<<__LINE__<<"\n";  Y; }
 #endif
 
-#define DIANA_TEST(X) try{ std::cout<<"[TEST: " #X "]\n"; X; }catch(DianaTestError & ){ std::cout<<"[ERROR] Test failed: "<<#X<<"\n\n"; }catch(const std::exception & e) {std::cout<<"[ERROR] Test failed: "<<#X<<", exception: \""<<e.what()<<"\"\n\n"; }
+extern int g_diana_resultCode;
+#define DIANA_TEST(X) try{ std::cout<<"[TEST: " #X "]\n"; X; }catch(DianaTestError & ){ std::cout<<"[ERROR] Test failed: "<<#X<<"\n\n"; }catch(const std::exception & e) {std::cout<<"[ERROR] Test failed: "<<#X<<", exception: \""<<e.what()<<"\"\n\n"; g_diana_resultCode = 1; }
 #define DIANA_TEST_ASSERT(X)  DIANA_TEST_ASSERT_IMPL(X, throw DianaTestError());
 #define DIANA_TEST_ASSERT_IF(X)  DIANA_TEST_ASSERT_IMPL(X, ;) else
 #define DIANA_TEST_VAR(X) try{ DIANA_TEST_ASSERT(X) }catch(DianaTestError & ){ std::cout<<"[ERROR] Test failed: "<<#X<<"\n\n"; }catch(const std::exception & e) {std::cout<<"[ERROR] Test failed: "<<#X<<", exception: \""<<e.what()<<"\"\n\n"; }

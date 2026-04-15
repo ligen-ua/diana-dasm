@@ -118,5 +118,5 @@ int main(int argc, char * argv[])
     test_vm();
     test_memory_manager();
     test_utils();
-    return 0;
+    return g_diana_resultCode;
 }

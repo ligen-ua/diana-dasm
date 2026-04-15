@@ -421,7 +421,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\test_suxx.cpp"
+				RelativePath=".\test_aesni.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_misc.cpp"
 				>
 			</File>
 			<File
@@ -499,6 +503,22 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_aesni.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_avx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_masm1.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_misc.h"
+				>
+			</File>
+			<File
 				RelativePath=".\test_new.h"
 				>
 			</File>
@@ -507,15 +527,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_patchers.h"
+				>
+			</File>
+			<File
 				RelativePath=".\test_push.h"
 				>
 			</File>
 			<File
 				RelativePath=".\test_stack.h"
-				>
-			</File>
-			<File
-				RelativePath=".\test_suxx.h"
 				>
 			</File>
 			<File

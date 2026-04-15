@@ -25,6 +25,8 @@ static const char * g_registers[] = {
  "MM8",   "MM9",   "MM10",  "MM11",  "MM12",  "MM13",  "MM14",  "MM15",
  "XMM0",  "XMM1",  "XMM2",  "XMM3",  "XMM4",  "XMM5",  "XMM6",  "XMM7",
  "XMM8",  "XMM9",  "XMM10", "XMM11", "XMM12", "XMM13", "XMM14", "XMM15",
+ "YMM0",  "YMM1",  "YMM2",  "YMM3",  "YMM4",  "YMM5",  "YMM6",  "YMM7",
+ "YMM8",  "YMM9",  "YMM10", "YMM11", "YMM12", "YMM13", "YMM14", "YMM15",
  "fpu_ST0", "fpu_ST1", "fpu_ST2", "fpu_ST3", "fpu_ST4", "fpu_ST5", "fpu_ST6", "fpu_ST7",
  "CR8",   "CR9",   "CR10",  "CR11",  "CR12",  "CR13",  "CR14",  "CR15",
  "DR8",   "DR9",   "DR10",  "DR11",  "DR12",  "DR13",  "DR14",  "DR15"};
@@ -119,6 +121,12 @@ static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pL
         break;
     case 8:
         DI_CHECK(DianaTextOutput(pContext, "qword ptr "));
+        break;
+    case 16:
+        DI_CHECK(DianaTextOutput(pContext, "xmmword ptr "));
+        break;
+    case 32:
+        DI_CHECK(DianaTextOutput(pContext, "ymmword ptr "));
         break;
     };
     DI_CHECK(PrintRegister(pContext, pLinkedOp->value.rmIndex.seg_reg));

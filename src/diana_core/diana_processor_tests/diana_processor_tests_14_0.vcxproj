@@ -170,6 +170,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\diana_core_tests\test_common.cpp" />
     <ClCompile Include="gen.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="test_processor.cpp" />

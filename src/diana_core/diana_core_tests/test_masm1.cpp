@@ -64,8 +64,98 @@ static void test_masm1_2()
     STRTEST(32, masmString, call, "call 0FFFFF988h");
 }
 
+// ---- AES-NI legacy (66 0F 38/3A xx) ----------------------------------------
+
+static void test_masm1_aesni()
+{
+    diana::CMasmString masmString;
+
+    // AESIMC xmm1, xmm2
+    static unsigned char aesimc[]          = {0x66, 0x0F, 0x38, 0xDB, 0xCA};
+    // AESENC xmm1, xmm2
+    static unsigned char aesenc[]          = {0x66, 0x0F, 0x38, 0xDC, 0xCA};
+    // AESENCLAST xmm1, xmm2
+    static unsigned char aesenclast[]      = {0x66, 0x0F, 0x38, 0xDD, 0xCA};
+    // AESDEC xmm1, xmm2
+    static unsigned char aesdec[]          = {0x66, 0x0F, 0x38, 0xDE, 0xCA};
+    // AESDECLAST xmm1, xmm2
+    static unsigned char aesdeclast[]      = {0x66, 0x0F, 0x38, 0xDF, 0xCA};
+    // AESKEYGENASSIST xmm1, xmm2, 0x01
+    static unsigned char aeskeygenassist[] = {0x66, 0x0F, 0x3A, 0xDF, 0xCA, 0x01};
+    // PCLMULQDQ xmm1, xmm2, 0x01
+    static unsigned char pclmulqdq[]       = {0x66, 0x0F, 0x3A, 0x44, 0xCA, 0x01};
+
+    STRTEST(64, masmString, aesimc,          "aesimc XMM1, XMM2");
+    STRTEST(64, masmString, aesenc,          "aesenc XMM1, XMM2");
+    STRTEST(64, masmString, aesenclast,      "aesenclast XMM1, XMM2");
+    STRTEST(64, masmString, aesdec,          "aesdec XMM1, XMM2");
+    STRTEST(64, masmString, aesdeclast,      "aesdeclast XMM1, XMM2");
+    STRTEST(64, masmString, aeskeygenassist, "aeskeygenassist XMM1, XMM2, 1");
+    STRTEST(64, masmString, pclmulqdq,       "pclmulqdq XMM1, XMM2, 1");
+
+    // ---- VEX-encoded AES/CLMUL -------------------------------------------
+
+    // VAESIMC xmm1, xmm2  (VEX.128.66.0F38.WIG DB /r)
+    static unsigned char vaesimc[]          = {0xC4, 0xE2, 0x79, 0xDB, 0xCA};
+    // VAESENC xmm1, xmm2, xmm3  (VEX.NDS.128.66.0F38.WIG DC /r)
+    static unsigned char vaesenc[]          = {0xC4, 0xE2, 0x69, 0xDC, 0xCB};
+    // VAESENCLAST xmm1, xmm2, xmm3  (VEX.NDS.128.66.0F38.WIG DD /r)
+    static unsigned char vaesenclast[]      = {0xC4, 0xE2, 0x69, 0xDD, 0xCB};
+    // VAESDEC xmm1, xmm2, xmm3  (VEX.NDS.128.66.0F38.WIG DE /r)
+    static unsigned char vaesdec[]          = {0xC4, 0xE2, 0x69, 0xDE, 0xCB};
+    // VAESDECLAST xmm1, xmm2, xmm3  (VEX.NDS.128.66.0F38.WIG DF /r)
+    static unsigned char vaesdeclast[]      = {0xC4, 0xE2, 0x69, 0xDF, 0xCB};
+    // VAESKEYGENASSIST xmm1, xmm2, 0x01  (VEX.128.66.0F3A.WIG DF /r ib)
+    static unsigned char vaeskeygenassist[] = {0xC4, 0xE3, 0x79, 0xDF, 0xCA, 0x01};
+    // VPCLMULQDQ xmm1, xmm2, xmm3, 0x01  (VEX.NDS.128.66.0F3A.WIG 44 /r ib)
+    static unsigned char vpclmulqdq[]       = {0xC4, 0xE3, 0x69, 0x44, 0xCB, 0x01};
+
+    STRTEST(64, masmString, vaesimc,          "vaesimc XMM1, XMM2");
+    STRTEST(64, masmString, vaesenc,          "vaesenc XMM1, XMM2, XMM3");
+    STRTEST(64, masmString, vaesenclast,      "vaesenclast XMM1, XMM2, XMM3");
+    STRTEST(64, masmString, vaesdec,          "vaesdec XMM1, XMM2, XMM3");
+    STRTEST(64, masmString, vaesdeclast,      "vaesdeclast XMM1, XMM2, XMM3");
+    STRTEST(64, masmString, vaeskeygenassist, "vaeskeygenassist XMM1, XMM2, 1");
+    STRTEST(64, masmString, vpclmulqdq,       "vpclmulqdq XMM1, XMM2, XMM3, 1");
+}
+
+// ---- AVX (VEX-encoded arithmetic/move) --------------------------------------
+
+static void test_masm1_avx()
+{
+    diana::CMasmString masmString;
+
+    // VADDPD xmm1, xmm2, xmm3  (VEX.NDS.128.66.0F.WIG 58 /r)
+    static unsigned char vaddpd_xmm[]  = {0xC5, 0xE9, 0x58, 0xCB};
+    // VADDPD ymm1, ymm2, ymm3  (VEX.NDS.256.66.0F.WIG 58 /r)
+    static unsigned char vaddpd_ymm[]  = {0xC5, 0xED, 0x58, 0xCB};
+    // VMOVAPD xmm0, xmm1  (VEX.128.66.0F.WIG 28 /r)
+    static unsigned char vmovapd_xmm[] = {0xC5, 0xF9, 0x28, 0xC1};
+    // VMOVUPS xmm2, xmm3  (VEX.128.0F.WIG 10 /r)
+    static unsigned char vmovups_xmm[] = {0xC5, 0xF8, 0x10, 0xD3};
+    // VMOVAPD ymm0, ymm1  (VEX.256.66.0F.WIG 28 /r)
+    static unsigned char vmovapd_ymm[] = {0xC5, 0xFD, 0x28, 0xC1};
+    // VMOVUPS ymm2, ymm3  (VEX.256.0F.WIG 10 /r)
+    static unsigned char vmovups_ymm[] = {0xC5, 0xFC, 0x10, 0xD3};
+    // VADDPD xmm1, xmm2, [rax]  (VEX.NDS.128.66.0F.WIG 58 /r, memory source)
+    static unsigned char vaddpd_mem[]      = {0xC5, 0xE9, 0x58, 0x08};
+    // VADDPD ymm1, ymm2, [rax]  (VEX.NDS.256.66.0F.WIG 58 /r, memory source)
+    static unsigned char vaddpd_ymm_mem[]  = {0xC5, 0xED, 0x58, 0x08};
+
+    STRTEST(64, masmString, vaddpd_xmm,     "vaddpd XMM1, XMM2, XMM3");
+    STRTEST(64, masmString, vaddpd_ymm,     "vaddpd YMM1, YMM2, YMM3");
+    STRTEST(64, masmString, vmovapd_xmm,    "vmovapd XMM0, XMM1");
+    STRTEST(64, masmString, vmovapd_ymm,    "vmovapd YMM0, YMM1");
+    STRTEST(64, masmString, vmovups_xmm,    "vmovups XMM2, XMM3");
+    STRTEST(64, masmString, vmovups_ymm,    "vmovups YMM2, YMM3");
+    STRTEST(64, masmString, vaddpd_mem,     "vaddpd XMM1, XMM2, xmmword ptr DS:[RAX]");
+    STRTEST(64, masmString, vaddpd_ymm_mem, "vaddpd YMM1, YMM2, ymmword ptr DS:[RAX]");
+}
+
 void test_masm1()
 {
     test_masm1_1();
     test_masm1_2();
+    test_masm1_aesni();
+    test_masm1_avx();
 }

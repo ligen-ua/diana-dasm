@@ -178,6 +178,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\diana_core\diana_core_tests\test_common.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ot_cache_test.cpp" />
     <ClCompile Include="ot_elf_test.cpp" />

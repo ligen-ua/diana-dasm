@@ -148,6 +148,72 @@ static void test_vmovups_xmm()
     }
 }
 
+// VMOVAPD ymm0, ymm1
+// VEX.256.66.0F.WIG 28 /r  (no NDS)
+// 2-byte VEX: C5 FD 28 C1
+//   byte2 = ~R=1, ~vvvv=0xF(unused), L=1(256-bit), pp=01(66h) => 0xFD
+//   ModRM: mod=11 reg=ymm0=0 rm=ymm1=1 => 0xC1
+static void test_vmovapd_ymm()
+{
+    DianaGroupInfo * pGroupInfo = 0;
+    DianaParserResult result;
+    size_t read;
+    int iRes = 0;
+
+    static unsigned char vmovapd_ymm[] = {0xC5, 0xFD, 0x28, 0xC1};
+    iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE64, vmovapd_ymm, sizeof(vmovapd_ymm), Diana_GetRootLine(), &result, &read);
+    DIANA_TEST_ASSERT_IF(!iRes)
+    {
+        DIANA_TEST_ASSERT(result.iLinkedOpCount == 2);
+        DIANA_TEST_ASSERT(result.pInfo->m_operandCount == 2);
+        DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
+        DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "vmovapd") == 0);
+        DIANA_TEST_ASSERT(result.pInfo->m_flags & DI_FLAG_CMD_VEX_ENCODED);
+        DIANA_TEST_ASSERT(result.pInfo->m_flags & DI_FLAG_CMD_VEX_L1);
+        // operand[0]: dest = ymm0
+        DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_YMM0);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 32);
+        // operand[1]: src = ymm1
+        DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_register);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.recognizedRegister == reg_YMM1);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 32);
+    }
+}
+
+// VMOVUPS ymm2, ymm3
+// VEX.256.0F.WIG 10 /r  (no pp, no NDS)
+// 2-byte VEX: C5 FC 10 D3
+//   byte2 = ~R=1, ~vvvv=0xF(unused), L=1(256-bit), pp=00(none) => 0xFC
+//   ModRM: mod=11 reg=ymm2=2 rm=ymm3=3 => 0xD3
+static void test_vmovups_ymm()
+{
+    DianaGroupInfo * pGroupInfo = 0;
+    DianaParserResult result;
+    size_t read;
+    int iRes = 0;
+
+    static unsigned char vmovups_ymm[] = {0xC5, 0xFC, 0x10, 0xD3};
+    iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE64, vmovups_ymm, sizeof(vmovups_ymm), Diana_GetRootLine(), &result, &read);
+    DIANA_TEST_ASSERT_IF(!iRes)
+    {
+        DIANA_TEST_ASSERT(result.iLinkedOpCount == 2);
+        DIANA_TEST_ASSERT(result.pInfo->m_operandCount == 2);
+        DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
+        DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "vmovups") == 0);
+        DIANA_TEST_ASSERT(result.pInfo->m_flags & DI_FLAG_CMD_VEX_ENCODED);
+        DIANA_TEST_ASSERT(result.pInfo->m_flags & DI_FLAG_CMD_VEX_L1);
+        // operand[0]: dest = ymm2
+        DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_YMM2);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 32);
+        // operand[1]: src = ymm3
+        DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_register);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.recognizedRegister == reg_YMM3);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 32);
+    }
+}
+
 // VADDPD xmm1, xmm2, [rax]
 // VEX.NDS.128.66.0F.WIG 58 /r  (memory source)
 // 2-byte VEX: C5 E9 58 08
@@ -172,11 +238,14 @@ static void test_vaddpd_mem()
         // operand[0]: dest = xmm1 (ModRM.reg)
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_XMM1);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         // operand[1]: src1 = xmm2 (vvvv/NDS)
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_register);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.recognizedRegister == reg_XMM2);
-        // operand[2]: src2 = [rax] (memory)
+        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 16);
+        // operand[2]: src2 = [rax] (memory, 128-bit load for xmm vaddpd)
         DIANA_TEST_ASSERT(result.linkedOperands[2].type == diana_index);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.reg == reg_RAX);
         DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.seg_reg == reg_DS);
         DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.indexed_reg == reg_none);
@@ -186,11 +255,56 @@ static void test_vaddpd_mem()
     }
 }
 
+// VADDPD ymm1, ymm2, [rax]
+// VEX.NDS.256.66.0F.WIG 58 /r  (memory source, 256-bit)
+// 2-byte VEX: C5 ED 58 08
+//   byte2 = ~R=1, ~vvvv=0xD(ymm2), L=1(256-bit), pp=01(66h) => 0xED
+//   ModRM: mod=00 reg=ymm1=1 rm=rax=0 => 0x08
+static void test_vaddpd_ymm_mem()
+{
+    DianaGroupInfo * pGroupInfo = 0;
+    DianaParserResult result;
+    size_t read;
+    int iRes = 0;
+
+    static unsigned char vaddpd_ymm_mem[] = {0xC5, 0xED, 0x58, 0x08};
+    iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE64, vaddpd_ymm_mem, sizeof(vaddpd_ymm_mem), Diana_GetRootLine(), &result, &read);
+    DIANA_TEST_ASSERT_IF(!iRes)
+    {
+        DIANA_TEST_ASSERT(result.iLinkedOpCount == 3);
+        DIANA_TEST_ASSERT(result.pInfo->m_operandCount == 3);
+        DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
+        DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "vaddpd") == 0);
+        DIANA_TEST_ASSERT(result.pInfo->m_flags & DI_FLAG_CMD_VEX_ENCODED);
+        DIANA_TEST_ASSERT(result.pInfo->m_flags & DI_FLAG_CMD_VEX_L1);
+        // operand[0]: dest = ymm1 (ModRM.reg)
+        DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_YMM1);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 32);
+        // operand[1]: src1 = ymm2 (vvvv/NDS)
+        DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_register);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.recognizedRegister == reg_YMM2);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 32);
+        // operand[2]: src2 = [rax] (memory, 256-bit load for ymm vaddpd)
+        DIANA_TEST_ASSERT(result.linkedOperands[2].type == diana_index);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.reg == reg_RAX);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.indexed_reg == reg_none);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.index == 0);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.dispSize == 0);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].value.rmIndex.dispValue == 0);
+        DIANA_TEST_ASSERT(result.linkedOperands[2].usedSize == 32);
+    }
+}
+
 void test_avx()
 {
     DIANA_TEST(test_vaddpd_xmm());
     DIANA_TEST(test_vaddpd_ymm());
     DIANA_TEST(test_vmovapd_xmm());
+    DIANA_TEST(test_vmovapd_ymm());
     DIANA_TEST(test_vmovups_xmm());
+    DIANA_TEST(test_vmovups_ymm());
     DIANA_TEST(test_vaddpd_mem());
+    DIANA_TEST(test_vaddpd_ymm_mem());
 }

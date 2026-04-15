@@ -542,7 +542,23 @@ typedef enum {
     diana_cmd_vpsubb,
     diana_cmd_vpsubw,
     diana_cmd_vpsubd,
-    diana_cmd_vpsubq
+    diana_cmd_vpsubq,
+    // AES-NI (legacy)
+    diana_cmd_aesimc,
+    diana_cmd_aesenc,
+    diana_cmd_aesenclast,
+    diana_cmd_aesdec,
+    diana_cmd_aesdeclast,
+    diana_cmd_aeskeygenassist,
+    diana_cmd_pclmulqdq,
+    // AES-NI (VEX)
+    diana_cmd_vaesimc,
+    diana_cmd_vaesenc,
+    diana_cmd_vaesenclast,
+    diana_cmd_vaesdec,
+    diana_cmd_vaesdeclast,
+    diana_cmd_vaeskeygenassist,
+    diana_cmd_vpclmulqdq
     // add new commands here:
 } DianaCommandId;
 

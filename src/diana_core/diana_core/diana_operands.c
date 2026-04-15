@@ -350,8 +350,16 @@ int Diana_LinkOperands(DianaContext * pContext, //IN
                 if (diana_orReg16_32_64_mem16 == pOperInfo->m_type ||
                     diana_orReg32mem16 == pOperInfo->m_type)
                 {
-                    // special for glorious reg16/32/64/mem16 8C opcode 
+                    // special for glorious reg16/32/64/mem16 8C opcode
                     pLinkedOp->usedSize = 2;
+                }
+                else if (diana_orMemoryXMM == pOperInfo->m_type)
+                {
+                    pLinkedOp->usedSize = 16;
+                }
+                else if (diana_orMemoryYMM == pOperInfo->m_type)
+                {
+                    pLinkedOp->usedSize = 32;
                 }
                 pLinkedOp->value.rmIndex.seg_reg = pContext->currentCmd_sreg;
                 if (pLinkedOp->value.rmIndex.dispSize)

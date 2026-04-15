@@ -5,6 +5,7 @@ include_directories("../diana_core")
 
 set(FILES_LIST 
 main.cpp
+test_aesni.cpp
 test_avx.cpp
 test_add.cpp
 test_analyze.cpp
@@ -26,7 +27,7 @@ test_or.cpp
 test_patchers.cpp
 test_push.cpp
 test_stack.cpp
-test_suxx.cpp
+test_misc.cpp
 test_x64.cpp
 test_x64_integrated.cpp
 )
