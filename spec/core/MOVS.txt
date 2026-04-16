@@ -1,0 +1,3 @@
+MOVS m8,m8 | A4
+MOVS m16,m16 | A5
+MOVS m32,m32 | A5

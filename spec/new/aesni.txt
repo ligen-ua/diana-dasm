@@ -1,0 +1,7 @@
+AESIMC xmm1, xmm2/mem128 | 66 0F 38 DB /r
+AESENC xmm1, xmm2/mem128 | 66 0F 38 DC /r
+AESENCLAST xmm1, xmm2/mem128 | 66 0F 38 DD /r
+AESDEC xmm1, xmm2/mem128 | 66 0F 38 DE /r
+AESDECLAST xmm1, xmm2/mem128 | 66 0F 38 DF /r
+AESKEYGENASSIST xmm1, xmm2/mem128, imm8 | 66 0F 3A DF /r ib
+PCLMULQDQ xmm1, xmm2/mem128, imm8 | 66 0F 3A 44 /r ib

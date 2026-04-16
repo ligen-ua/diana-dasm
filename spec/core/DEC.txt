@@ -1,0 +1,5 @@
+DEC r/m8 | FE /1 /pprefixlock
+DEC r/m16 | FF /1 /pprefixlock
+DEC r/m32 | FF /1 /pprefixlock
+DEC r16 | 48+rw
+DEC r32 | 48+rw

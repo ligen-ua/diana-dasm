@@ -1,0 +1,6 @@
+SHA1NEXTE xmm1, xmm2/mem128 | 0F 38 C8 /r /psha_ext
+SHA1MSG1 xmm1, xmm2/mem128 | 0F 38 C9 /r /psha_ext
+SHA1MSG2 xmm1, xmm2/mem128 | 0F 38 CA /r /psha_ext
+SHA1RNDS4 xmm1, xmm2/mem128, imm8 | 0F 3A CC /r ib /psha_ext
+SHA256MSG1 xmm1, xmm2/mem128 | 0F 38 CB /r /psha_ext
+SHA256MSG2 xmm1, xmm2/mem128 | 0F 38 CD /r /psha_ext

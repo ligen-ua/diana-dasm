@@ -152,10 +152,69 @@ static void test_masm1_avx()
     STRTEST(64, masmString, vaddpd_ymm_mem, "vaddpd YMM1, YMM2, ymmword ptr DS:[RAX]");
 }
 
+// ---- SSE4.1/4.2 --------------------------------------------------------
+
+static void test_masm1_sse4()
+{
+    diana::CMasmString masmString;
+
+    // PMULLD xmm1, xmm2
+    static unsigned char pmulld[] = {0x66, 0x0F, 0x38, 0x40, 0xCA};
+    // PCMPEQQ xmm1, xmm2
+    static unsigned char pcmpeqq[] = {0x66, 0x0F, 0x38, 0x29, 0xCA};
+    // ROUNDPD xmm1, xmm2, 1
+    static unsigned char roundpd[] = {0x66, 0x0F, 0x3A, 0x09, 0xCA, 0x01};
+    // BLENDPS xmm1, xmm2, 0x0F
+    static unsigned char blendps[] = {0x66, 0x0F, 0x3A, 0x0C, 0xCA, 0x0F};
+    // PMAXSB xmm1, xmm2
+    static unsigned char pmaxsb[] = {0x66, 0x0F, 0x38, 0x3C, 0xCA};
+    // PTEST xmm1, xmm2
+    static unsigned char ptest[] = {0x66, 0x0F, 0x38, 0x17, 0xCA};
+    // PCMPGTQ xmm1, xmm2  (SSE4.2)
+    static unsigned char pcmpgtq[] = {0x66, 0x0F, 0x38, 0x37, 0xCA};
+    // PCMPISTRI xmm1, xmm2, 1  (SSE4.2)
+    static unsigned char pcmpistri[] = {0x66, 0x0F, 0x3A, 0x63, 0xCA, 0x01};
+
+    STRTEST(64, masmString, pmulld,    "pmulld XMM1, XMM2");
+    STRTEST(64, masmString, pcmpeqq,   "pcmpeqq XMM1, XMM2");
+    STRTEST(64, masmString, roundpd,   "roundpd XMM1, XMM2, 1");
+    STRTEST(64, masmString, blendps,   "blendps XMM1, XMM2, 0Fh");
+    STRTEST(64, masmString, pmaxsb,    "pmaxsb XMM1, XMM2");
+    STRTEST(64, masmString, ptest,     "ptest XMM1, XMM2");
+    STRTEST(64, masmString, pcmpgtq,   "pcmpgtq XMM1, XMM2");
+    STRTEST(64, masmString, pcmpistri, "pcmpistri XMM1, XMM2, 1");
+}
+
+// ---- BMI1/BMI2 ---------------------------------------------------------
+
+static void test_masm1_bmi()
+{
+    diana::CMasmString masmString;
+
+    // POPCNT eax, ebx  (F3 0F B8 /r)
+    static unsigned char popcnt[] = {0xF3, 0x0F, 0xB8, 0xC3};
+    // LZCNT eax, ebx  (F3 0F BD /r)
+    static unsigned char lzcnt[] = {0xF3, 0x0F, 0xBD, 0xC3};
+    // TZCNT eax, ebx  (F3 0F BC /r)
+    static unsigned char tzcnt[] = {0xF3, 0x0F, 0xBC, 0xC3};
+    // CRC32 eax, ebx  (F2 0F 38 F1 /r)
+    static unsigned char crc32[] = {0xF2, 0x0F, 0x38, 0xF1, 0xC3};
+    // SHA1NEXTE xmm1, xmm2  (0F 38 C8 /r)
+    static unsigned char sha1nexte[] = {0x0F, 0x38, 0xC8, 0xCA};
+
+    STRTEST(32, masmString, popcnt,    "popcnt EAX, EBX");
+    STRTEST(32, masmString, lzcnt,     "lzcnt EAX, EBX");
+    STRTEST(32, masmString, tzcnt,     "tzcnt EAX, EBX");
+    STRTEST(32, masmString, crc32,     "crc32 EAX, EBX");
+    STRTEST(64, masmString, sha1nexte, "sha1nexte XMM1, XMM2");
+}
+
 void test_masm1()
 {
     test_masm1_1();
     test_masm1_2();
     test_masm1_aesni();
     test_masm1_avx();
+    test_masm1_sse4();
+    test_masm1_bmi();
 }

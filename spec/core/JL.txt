@@ -1,0 +1,2 @@
+JL rel8 | 7C  cb
+JL rel16/32 | 0F  8C cw/cd

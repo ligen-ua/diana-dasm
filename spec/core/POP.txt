@@ -1,0 +1,9 @@
+POP r/m16 | 8F   /0
+POP r/m32 | 8F   /0
+POP r16 | 58 + rw
+POP r32 | 58 + rd
+POP DS | 1F
+POP ES | 07
+POP SS | 17
+POP FS | 0F   A1
+POP GS | 0F   A9

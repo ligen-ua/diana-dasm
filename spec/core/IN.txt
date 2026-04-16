@@ -1,0 +1,6 @@
+IN AL,imm8 | E4 /pprivileged ib
+IN AX,imm8 | E5 /pprivileged ib
+IN EAX,imm8 | E5 /pprivileged ib
+IN AL,DX | EC /pprivileged
+IN AX,DX | ED /pprivileged
+IN EAX,DX | ED /pprivileged

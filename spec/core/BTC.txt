@@ -1,0 +1,4 @@
+BTC r/m16,r16 | 0F  BB /r /pprefixlock
+BTC r/m32,r32 | 0F  BB /r /pprefixlock
+BTC r/m16,imm8 | 0F  BA /7 /pprefixlock ib
+BTC r/m32,imm8 | 0F  BA /7 /pprefixlock ib

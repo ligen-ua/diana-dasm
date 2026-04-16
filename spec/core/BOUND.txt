@@ -1,0 +1,2 @@
+BOUND r16,m16 | 62 /r /pprivileged
+BOUND r32,m32 | 62 /r /pprivileged

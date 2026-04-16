@@ -1,0 +1,4 @@
+SHLD r/m16,r16,imm8 | 0F  A4 /r ib
+SHLD r/m32,r32,imm8 | 0F  A4 /r ib
+SHLD r/m16,r16,CL | 0F  A5 /r
+SHLD r/m32,r32,CL | 0F  A5 /r

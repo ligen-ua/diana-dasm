@@ -1,0 +1,9 @@
+ROL r/m8,1 | D0  /0
+ROL r/m8,CL | D2  /0
+ROL r/m8,imm8 | C0  /0 ib
+ROL r/m16,1 | D1  /0
+ROL r/m16,CL | D3  /0
+ROL r/m16,imm8 | C1  /0 ib
+ROL r/m32,1 | D1  /0
+ROL r/m32,CL | D3  /0
+ROL r/m32,imm8 | C1  /0 ib

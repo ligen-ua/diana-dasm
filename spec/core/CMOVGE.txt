@@ -1,0 +1,2 @@
+CMOVGE r16,r/m16 | 0F  4D  /r
+CMOVGE r32,r/m32 | 0F  4D  /r

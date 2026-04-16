@@ -1,0 +1,26 @@
+ANDN r32, r32, r/m32 | VEX.NDS.128.0F38.W0 F2 /r /pbmi1
+ANDN r64, r64, r/m64 | VEX.NDS.128.0F38.W1 F2 /r /pbmi1
+BEXTR r32, r32, r/m32 | VEX.NDS.128.0F38.W0 F7 /r /pbmi1
+BEXTR r64, r64, r/m64 | VEX.NDS.128.0F38.W1 F7 /r /pbmi1
+BLSR r32, r/m32 | VEX.NDD.128.0F38.W0 F3 /1 /pbmi1
+BLSR r64, r/m64 | VEX.NDD.128.0F38.W1 F3 /1 /pbmi1
+BLSMSK r32, r/m32 | VEX.NDD.128.0F38.W0 F3 /2 /pbmi1
+BLSMSK r64, r/m64 | VEX.NDD.128.0F38.W1 F3 /2 /pbmi1
+BLSI r32, r/m32 | VEX.NDD.128.0F38.W0 F3 /3 /pbmi1
+BLSI r64, r/m64 | VEX.NDD.128.0F38.W1 F3 /3 /pbmi1
+BZHI r32, r32, r/m32 | VEX.NDS.128.0F38.W0 F5 /r /pbmi2
+BZHI r64, r64, r/m64 | VEX.NDS.128.0F38.W1 F5 /r /pbmi2
+MULX r32, r32, r/m32 | VEX.NDD.128.F2.0F38.W0 F6 /r /pbmi2
+MULX r64, r64, r/m64 | VEX.NDD.128.F2.0F38.W1 F6 /r /pbmi2
+PDEP r32, r32, r/m32 | VEX.NDS.128.F2.0F38.W0 F5 /r /pbmi2
+PDEP r64, r64, r/m64 | VEX.NDS.128.F2.0F38.W1 F5 /r /pbmi2
+PEXT r32, r32, r/m32 | VEX.NDS.128.F3.0F38.W0 F5 /r /pbmi2
+PEXT r64, r64, r/m64 | VEX.NDS.128.F3.0F38.W1 F5 /r /pbmi2
+RORX r32, r/m32, imm8 | VEX.128.F2.0F3A.W0 F0 /r ib /pbmi2
+RORX r64, r/m64, imm8 | VEX.128.F2.0F3A.W1 F0 /r ib /pbmi2
+SARX r32, r32, r/m32 | VEX.NDS.128.F3.0F38.W0 F7 /r /pbmi2
+SARX r64, r64, r/m64 | VEX.NDS.128.F3.0F38.W1 F7 /r /pbmi2
+SHRX r32, r32, r/m32 | VEX.NDS.128.F2.0F38.W0 F7 /r /pbmi2
+SHRX r64, r64, r/m64 | VEX.NDS.128.F2.0F38.W1 F7 /r /pbmi2
+SHLX r32, r32, r/m32 | VEX.NDS.128.66.0F38.W0 F7 /r /pbmi2
+SHLX r64, r64, r/m64 | VEX.NDS.128.66.0F38.W1 F7 /r /pbmi2

@@ -1,0 +1,2 @@
+JE rel8 | 74  cb
+JE rel16/32 | 0F  84 cw/cd

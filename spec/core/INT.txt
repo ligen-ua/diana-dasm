@@ -1,0 +1,2 @@
+INT 3 | CC /pprivileged
+INT imm8 | CD /pprivileged ib

@@ -1,0 +1,2 @@
+LAR r16,r/m16 | 0F  02 /r /pprivileged
+LAR r32,r/m32 | 0F  02 /r /pprivileged

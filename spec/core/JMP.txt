@@ -1,0 +1,9 @@
+JMP rel8 | EB  cb
+JMP rel16 | E9  cw
+JMP rel32 | E9  cd
+JMP r/m16 | FF  /4
+JMP r/m32 | FF  /4
+JMP ptr16:16 | EA  cd
+JMP ptr16:32 | EA  cp
+JMP m16:16 | FF  /5
+JMP m16:32 | FF  /5

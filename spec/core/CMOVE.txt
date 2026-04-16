@@ -1,0 +1,2 @@
+CMOVE  r16,r/m16 | 0F  44  /r
+CMOVE  r32,r/m32 | 0F  44  /r

@@ -1,0 +1,3 @@
+LODS m8 | AC
+LODS m16 | AD
+LODS m32 | AD

@@ -440,6 +440,12 @@
 				RelativePath=".\test_avx.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\test_bmi.cpp">
+			</File>
+			<File
+				RelativePath=".\test_sse4.cpp">
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"

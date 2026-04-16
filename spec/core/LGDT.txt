@@ -1,0 +1,1 @@
+LGDT m16/32 | 0F  01 /2 /pprivileged

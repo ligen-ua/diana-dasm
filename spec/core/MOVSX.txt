@@ -1,0 +1,4 @@
+MOVSX r16,r/m8 | 0F  BE /r
+MOVSX r32,r/m8 | 0F  BE /r
+MOVSX r16,r/m16_exact | 0F  BF /r
+MOVSX r32,r/m16_exact | 0F  BF /r

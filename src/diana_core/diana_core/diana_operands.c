@@ -280,6 +280,8 @@ int Diana_LinkOperands(DianaContext * pContext, //IN
     }
 
     // read structure
+    {
+    int iVexRegConsumed = 0; /* tracks whether ModRM reg field was consumed for a GPR operand */
     for (i = 0; i < pResult->pInfo->m_operandCount; ++i, ++pResult->iLinkedOpCount)
     {
         DianaLinkedOperand * pLinkedOp = pResult->linkedOperands + pResult->iLinkedOpCount;
@@ -319,11 +321,33 @@ int Diana_LinkOperands(DianaContext * pContext, //IN
         {
         case diana_orRegistry:
             pLinkedOp->type = diana_register;
-            if (DianaRecognizeCommonReg(opSizeUsed, 
-                                        RegCode, 
-                                        &pLinkedOp->value.recognizedRegister,
-                                        pContext->iRexPrefix))
-                return DI_ERROR;
+            {
+                DI_CHAR regToUse = RegCode;
+                if (pContext->iVexPrefix && DI_VEX_GET_NDS(pResult->pInfo->m_flags))
+                {
+                    if (RegCode == DI_CHAR_NULL)
+                    {
+                        /* opcode extension consumes reg field (e.g. BLSR /1);
+                           destination comes from vvvv (NDD) */
+                        regToUse = (DI_CHAR)pContext->iVexVVVV;
+                    }
+                    else if (iVexRegConsumed)
+                    {
+                        /* reg field already consumed by earlier GPR operand;
+                           this operand comes from vvvv (NDS second source) */
+                        regToUse = (DI_CHAR)pContext->iVexVVVV;
+                    }
+                    else
+                    {
+                        iVexRegConsumed = 1;
+                    }
+                }
+                if (DianaRecognizeCommonReg(opSizeUsed,
+                                            regToUse,
+                                            &pLinkedOp->value.recognizedRegister,
+                                            pContext->iRexPrefix))
+                    return DI_ERROR;
+            }
             break;
              
         case diana_orRegMem_exact:
@@ -668,7 +692,8 @@ int Diana_LinkOperands(DianaContext * pContext, //IN
             return DI_ERROR;
         }
     }
-    // read value 
+    } /* iVexRegConsumed scope */
+    // read value
     if (pLinkedDispOp)
     {
         pLinkedDispOpFull->iOffset = iCurOffset;

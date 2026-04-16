@@ -5,7 +5,6 @@ include_directories("../diana_core")
 
 set(FILES_LIST 
 main.cpp
-../diana_core_tests/test_common.cpp
 test_aesni.cpp
 test_avx.cpp
 test_add.cpp
@@ -31,6 +30,8 @@ test_stack.cpp
 test_misc.cpp
 test_x64.cpp
 test_x64_integrated.cpp
+test_bmi.cpp
+test_sse4.cpp
 )
 
 add_executable(${PROJECT_NAME} 

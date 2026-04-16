@@ -1,0 +1,15 @@
+XOR AL,imm8 | 34  ib
+XOR AX,imm16 | 35  iw
+XOR EAX,imm32 | 35  id
+XOR r/m8,imm8 | 80  /6 ib      /pprefixlock
+XOR r/m8,imm8 | 82  /6 /pundoc /pprefixlock /pi386 ib
+XOR r/m16,imm16 | 81  /6 iw      /pprefixlock
+XOR r/m32,imm32 | 81  /6 id      /pprefixlock
+XOR r/m16,imm8 | 83  /6 ib      /pprefixlock
+XOR r/m32,imm8 | 83  /6 ib      /pprefixlock
+XOR r/m8,r8 | 30  /r         /pprefixlock
+XOR r/m16,r16 | 31  /r         /pprefixlock
+XOR r/m32,r32 | 31  /r         /pprefixlock
+XOR r8,r/m8 | 32  /r
+XOR r16,r/m16 | 33  /r
+XOR r32,r/m32 | 33  /r

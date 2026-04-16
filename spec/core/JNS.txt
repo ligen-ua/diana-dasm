@@ -1,0 +1,2 @@
+JNS rel8 | 79  cb
+JNS rel16/32 | 0F  89 cw/cd

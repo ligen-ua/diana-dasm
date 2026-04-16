@@ -1,0 +1,93 @@
+VADDPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 58 /r
+VADDPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 58 /r
+VADDPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 58 /r
+VADDPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 58 /r
+VADDSD xmm1, xmm2, xmm3/mem64 | VEX.NDS.128.F2.0F.WIG 58 /r
+VADDSS xmm1, xmm2, xmm3/mem32 | VEX.NDS.128.F3.0F.WIG 58 /r
+VANDPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 54 /r
+VANDPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 54 /r
+VANDPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 54 /r
+VANDPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 54 /r
+VANDNPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 55 /r
+VANDNPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 55 /r
+VANDNPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 55 /r
+VANDNPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 55 /r
+VDIVPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 5E /r
+VDIVPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 5E /r
+VDIVPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 5E /r
+VDIVPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 5E /r
+VDIVSD xmm1, xmm2, xmm3/mem64 | VEX.NDS.128.F2.0F.WIG 5E /r
+VDIVSS xmm1, xmm2, xmm3/mem32 | VEX.NDS.128.F3.0F.WIG 5E /r
+VMAXPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 5F /r
+VMAXPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 5F /r
+VMAXPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 5F /r
+VMAXPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 5F /r
+VMAXSD xmm1, xmm2, xmm3/mem64 | VEX.NDS.128.F2.0F.WIG 5F /r
+VMAXSS xmm1, xmm2, xmm3/mem32 | VEX.NDS.128.F3.0F.WIG 5F /r
+VMINPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 5D /r
+VMINPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 5D /r
+VMINPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 5D /r
+VMINPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 5D /r
+VMINSD xmm1, xmm2, xmm3/mem64 | VEX.NDS.128.F2.0F.WIG 5D /r
+VMINSS xmm1, xmm2, xmm3/mem32 | VEX.NDS.128.F3.0F.WIG 5D /r
+VMULPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 59 /r
+VMULPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 59 /r
+VMULPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 59 /r
+VMULPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 59 /r
+VMULSD xmm1, xmm2, xmm3/mem64 | VEX.NDS.128.F2.0F.WIG 59 /r
+VMULSS xmm1, xmm2, xmm3/mem32 | VEX.NDS.128.F3.0F.WIG 59 /r
+VORPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 56 /r
+VORPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 56 /r
+VORPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 56 /r
+VORPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 56 /r
+VSUBPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 5C /r
+VSUBPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 5C /r
+VSUBPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 5C /r
+VSUBPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 5C /r
+VSUBSD xmm1, xmm2, xmm3/mem64 | VEX.NDS.128.F2.0F.WIG 5C /r
+VSUBSS xmm1, xmm2, xmm3/mem32 | VEX.NDS.128.F3.0F.WIG 5C /r
+VXORPD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG 57 /r
+VXORPD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG 57 /r
+VXORPS xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.0F.WIG 57 /r
+VXORPS ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.0F.WIG 57 /r
+VMOVAPD xmm1, xmm2/mem128 | VEX.128.66.0F.WIG 28 /r
+VMOVAPD ymm1, ymm2/mem256 | VEX.256.66.0F.WIG 28 /r
+VMOVAPS xmm1, xmm2/mem128 | VEX.128.0F.WIG 28 /r
+VMOVAPS ymm1, ymm2/mem256 | VEX.256.0F.WIG 28 /r
+VMOVUPD xmm1, xmm2/mem128 | VEX.128.66.0F.WIG 10 /r
+VMOVUPD ymm1, ymm2/mem256 | VEX.256.66.0F.WIG 10 /r
+VMOVUPS xmm1, xmm2/mem128 | VEX.128.0F.WIG 10 /r
+VMOVUPS ymm1, ymm2/mem256 | VEX.256.0F.WIG 10 /r
+VMOVDDUP xmm1, xmm2/mem64 | VEX.128.F2.0F.WIG 12 /r
+VMOVDDUP ymm1, ymm2/mem256 | VEX.256.F2.0F.WIG 12 /r
+VPAND xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG DB /r
+VPAND ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG DB /r
+VPANDN xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG DF /r
+VPANDN ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG DF /r
+VPOR xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG EB /r
+VPOR ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG EB /r
+VPXOR xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG EF /r
+VPXOR ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG EF /r
+VPADDB xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG FC /r
+VPADDB ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG FC /r
+VPADDW xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG FD /r
+VPADDW ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG FD /r
+VPADDD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG FE /r
+VPADDD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG FE /r
+VPADDQ xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG D4 /r
+VPADDQ ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG D4 /r
+VPSUBB xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG F8 /r
+VPSUBB ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG F8 /r
+VPSUBW xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG F9 /r
+VPSUBW ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG F9 /r
+VPSUBD xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG FA /r
+VPSUBD ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG FA /r
+VPSUBQ xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F.WIG FB /r
+VPSUBQ ymm1, ymm2, ymm3/mem256 | VEX.NDS.256.66.0F.WIG FB /r
+VAESIMC xmm1, xmm2/mem128 | VEX.128.66.0F38.WIG DB /r
+VAESENC xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F38.WIG DC /r
+VAESENCLAST xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F38.WIG DD /r
+VAESDEC xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F38.WIG DE /r
+VAESDECLAST xmm1, xmm2, xmm3/mem128 | VEX.NDS.128.66.0F38.WIG DF /r
+VAESKEYGENASSIST xmm1, xmm2/mem128, imm8 | VEX.128.66.0F3A.WIG DF /r ib
+VPCLMULQDQ xmm1, xmm2, xmm3/mem128, imm8 | VEX.NDS.128.66.0F3A.WIG 44 /r ib

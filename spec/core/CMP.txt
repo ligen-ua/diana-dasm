@@ -1,0 +1,15 @@
+CMP AL,imm8 | 3C  ib
+CMP AX,imm16 | 3D  iw
+CMP EAX,imm32 | 3D  id
+CMP r/m8,imm8 | 80  /7 ib
+CMP r/m8,imm8 | 82  /7 /pundoc /pi386 ib
+CMP r/m16,imm16 | 81  /7 iw
+CMP r/m32,imm32 | 81  /7 id
+CMP r/m16,imm8 | 83  /7 ib
+CMP r/m32,imm8 | 83  /7 ib
+CMP r/m8,r8 | 38  /r
+CMP r/m16,r16 | 39  /r
+CMP r/m32,r32 | 39  /r
+CMP r8,r/m8 | 3A  /r
+CMP r16,r/m16 | 3B  /r
+CMP r32,r/m32 | 3B  /r

@@ -1,0 +1,46 @@
+PMULLD xmm1, xmm2/mem128 | 66 0F 38 40 /r /psse41
+PMULDQ xmm1, xmm2/mem128 | 66 0F 38 28 /r /psse41
+PCMPEQQ xmm1, xmm2/mem128 | 66 0F 38 29 /r /psse41
+PACKUSDW xmm1, xmm2/mem128 | 66 0F 38 2B /r /psse41
+ROUNDPS xmm1, xmm2/mem128, imm8 | 66 0F 3A 08 /r ib /psse41
+ROUNDPD xmm1, xmm2/mem128, imm8 | 66 0F 3A 09 /r ib /psse41
+ROUNDSS xmm1, xmm2/mem32, imm8 | 66 0F 3A 0A /r ib /psse41
+ROUNDSD xmm1, xmm2/mem64, imm8 | 66 0F 3A 0B /r ib /psse41
+BLENDPS xmm1, xmm2/mem128, imm8 | 66 0F 3A 0C /r ib /psse41
+BLENDPD xmm1, xmm2/mem128, imm8 | 66 0F 3A 0D /r ib /psse41
+PBLENDW xmm1, xmm2/mem128, imm8 | 66 0F 3A 0E /r ib /psse41
+DPPS xmm1, xmm2/mem128, imm8 | 66 0F 3A 40 /r ib /psse41
+DPPD xmm1, xmm2/mem128, imm8 | 66 0F 3A 41 /r ib /psse41
+MPSADBW xmm1, xmm2/mem128, imm8 | 66 0F 3A 42 /r ib /psse41
+PMAXSB xmm1, xmm2/mem128 | 66 0F 38 3C /r /psse41
+PMAXSD xmm1, xmm2/mem128 | 66 0F 38 3D /r /psse41
+PMAXUW xmm1, xmm2/mem128 | 66 0F 38 3E /r /psse41
+PMAXUD xmm1, xmm2/mem128 | 66 0F 38 3F /r /psse41
+PMINSB xmm1, xmm2/mem128 | 66 0F 38 38 /r /psse41
+PMINSD xmm1, xmm2/mem128 | 66 0F 38 39 /r /psse41
+PMINUW xmm1, xmm2/mem128 | 66 0F 38 3A /r /psse41
+PMINUD xmm1, xmm2/mem128 | 66 0F 38 3B /r /psse41
+PHMINPOSUW xmm1, xmm2/mem128 | 66 0F 38 41 /r /psse41
+PMOVSXBW xmm1, xmm2/mem64 | 66 0F 38 20 /r /psse41
+PMOVSXBD xmm1, xmm2/mem32 | 66 0F 38 21 /r /psse41
+PMOVSXWD xmm1, xmm2/mem64 | 66 0F 38 23 /r /psse41
+PMOVSXWQ xmm1, xmm2/mem32 | 66 0F 38 24 /r /psse41
+PMOVSXDQ xmm1, xmm2/mem64 | 66 0F 38 25 /r /psse41
+PMOVZXBW xmm1, xmm2/mem64 | 66 0F 38 30 /r /psse41
+PMOVZXBD xmm1, xmm2/mem32 | 66 0F 38 31 /r /psse41
+PMOVZXWD xmm1, xmm2/mem64 | 66 0F 38 33 /r /psse41
+PMOVZXWQ xmm1, xmm2/mem32 | 66 0F 38 34 /r /psse41
+PMOVZXDQ xmm1, xmm2/mem64 | 66 0F 38 35 /r /psse41
+MOVNTDQA xmm1, xmm2/mem128 | 66 0F 38 2A /r /psse41
+PTEST xmm1, xmm2/mem128 | 66 0F 38 17 /r /psse41
+PINSRB xmm1, r/m8, imm8 | 66 0F 3A 20 /r ib /psse41
+PINSRD xmm1, r/m32, imm8 | 66 0F 3A 22 /r ib /psse41
+PEXTRB r/m8, xmm1, imm8 | 66 0F 3A 14 /r ib /psse41
+PEXTRD r/m32, xmm1, imm8 | 66 0F 3A 16 /r ib /psse41
+INSERTPS xmm1, xmm2/mem32, imm8 | 66 0F 3A 21 /r ib /psse41
+EXTRACTPS r/m32, xmm1, imm8 | 66 0F 3A 17 /r ib /psse41
+PCMPGTQ xmm1, xmm2/mem128 | 66 0F 38 37 /r /psse42
+PCMPISTRM xmm1, xmm2/mem128, imm8 | 66 0F 3A 62 /r ib /psse42
+PCMPISTRI xmm1, xmm2/mem128, imm8 | 66 0F 3A 63 /r ib /psse42
+PCMPESTRM xmm1, xmm2/mem128, imm8 | 66 0F 3A 60 /r ib /psse42
+PCMPESTRI xmm1, xmm2/mem128, imm8 | 66 0F 3A 61 /r ib /psse42

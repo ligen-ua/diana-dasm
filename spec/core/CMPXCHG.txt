@@ -1,0 +1,3 @@
+CMPXCHG r/m8,r8 | 0F B0 /r /pprefixlock
+CMPXCHG r/m16,r16 | 0F B1 /r /pprefixlock
+CMPXCHG r/m32,r32 | 0F B1 /r /pprefixlock

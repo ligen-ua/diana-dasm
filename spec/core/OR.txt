@@ -1,0 +1,15 @@
+OR AL,imm8 | 0C  ib
+OR AX,imm16 | 0D  iw
+OR EAX,imm32 | 0D  id
+OR r/m8,imm8 | 80  /1 ib      /pprefixlock
+OR r/m8,imm8 | 82  /1 /pundoc /pprefixlock /pi386 ib
+OR r/m16,imm16 | 81  /1 iw      /pprefixlock
+OR r/m32,imm32 | 81  /1 id      /pprefixlock
+OR r/m16,imm8 | 83  /1 ib      /pprefixlock
+OR r/m32,imm8 | 83  /1 ib      /pprefixlock
+OR r/m8,r8 | 08  /r         /pprefixlock
+OR r/m16,r16 | 09  /r         /pprefixlock
+OR r/m32,r32 | 09  /r         /pprefixlock
+OR r8,r/m8 | 0A  /r
+OR r16,r/m16 | 0B  /r
+OR r32,r/m32 | 0B  /r

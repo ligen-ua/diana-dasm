@@ -1,0 +1,9 @@
+RCL r/m8,1 | D0  /2
+RCL r/m8,CL | D2  /2
+RCL r/m8,imm8 | C0  /2 ib
+RCL r/m16,1 | D1  /2
+RCL r/m16,CL | D3  /2
+RCL r/m16,imm8 | C1  /2 ib
+RCL r/m32,1 | D1  /2
+RCL r/m32,CL | D3  /2
+RCL r/m32,imm8 | C1  /2 ib

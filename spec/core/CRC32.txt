@@ -1,0 +1,3 @@
+CRC32 r32, r/m8 | F2 0F 38 F0 /r
+CRC32 r32, r/m16 | F2 0F 38 F1 /r
+CRC32 r32, r/m32 | F2 0F 38 F1 /r

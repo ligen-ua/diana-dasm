@@ -1,0 +1,2 @@
+JCXZ CX,rel8 | E3  cb
+JECXZ ECX,rel8 | E3  cb

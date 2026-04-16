@@ -1,0 +1,1 @@
+LIDT m16/32 | 0F  01 /3 /pprivileged /*83

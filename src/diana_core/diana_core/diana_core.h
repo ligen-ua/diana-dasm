@@ -89,6 +89,13 @@ typedef enum
 #define DI_FLAG_CMD_VEX_NDD                 0x04000000  // vvvv = destination
 #define DI_FLAG_CMD_VEX_DDS                 0x06000000  // vvvv = second source, dest implicit
 
+// ISA extension flags (bits 27-31)
+#define DI_FLAG_CMD_SSE41      0x08000000  // SSE4.1 instruction
+#define DI_FLAG_CMD_SSE42      0x10000000  // SSE4.2 instruction
+#define DI_FLAG_CMD_BMI1       0x20000000  // BMI1 instruction
+#define DI_FLAG_CMD_BMI2       0x40000000  // BMI2 instruction
+#define DI_FLAG_CMD_SHA_EXT    0x80000000  // SHA extension instruction
+
 // VEX field accessors
 #define DI_VEX_GET_PP(flags)   (((flags) >> 20) & 0x3)
 #define DI_VEX_GET_MAP(flags)  (((flags) >> 22) & 0x3)

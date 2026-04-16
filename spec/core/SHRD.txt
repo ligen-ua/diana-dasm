@@ -1,0 +1,4 @@
+SHRD r/m16,r16,imm8 | 0F  AC /r ib
+SHRD r/m32,r32,imm8 | 0F  AC /r ib
+SHRD r/m16,r16,CL | 0F  AD /r
+SHRD r/m32,r32,CL | 0F  AD /r

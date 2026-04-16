@@ -1,0 +1,4 @@
+BTS r/m16,r16 | 0F  AB /r /pprefixlock
+BTS r/m32,r32 | 0F  AB /r /pprefixlock
+BTS r/m16,imm8 | 0F  BA /5 /pprefixlock ib
+BTS r/m32,imm8 | 0F  BA /5 /pprefixlock ib

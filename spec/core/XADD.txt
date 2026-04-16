@@ -1,0 +1,3 @@
+XADD r/m8,r8 | 0F C0 /r /pprefixlock
+XADD r/m16,r16 | 0F C1 /r /pprefixlock
+XADD r/m32,r32 | 0F C1 /r /pprefixlock

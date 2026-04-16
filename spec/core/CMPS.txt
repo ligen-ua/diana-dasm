@@ -1,0 +1,3 @@
+CMPS m8,m8 | A6
+CMPS m16,m16 | A7
+CMPS m32,m32 | A7

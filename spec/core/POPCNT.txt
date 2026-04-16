@@ -1,0 +1,2 @@
+POPCNT r16, r/m16 | F3 0F B8 /r
+POPCNT r32, r/m32 | F3 0F B8 /r

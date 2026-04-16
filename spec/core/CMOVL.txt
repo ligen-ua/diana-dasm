@@ -1,0 +1,2 @@
+CMOVL  r16,r/m16 | 0F  4C  /r
+CMOVL  r32,r/m32 | 0F  4C  /r

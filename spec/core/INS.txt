@@ -1,0 +1,3 @@
+INS es_di8,DX | 6C /pprivileged
+INS es_di16,DX | 6D /pprivileged
+INS es_di32,DX | 6D /pprivileged

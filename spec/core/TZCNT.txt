@@ -1,0 +1,2 @@
+TZCNT r16, r/m16 | F3 0F BC /r
+TZCNT r32, r/m32 | F3 0F BC /r

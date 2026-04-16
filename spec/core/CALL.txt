@@ -1,0 +1,24 @@
+CALL rel16 | E8  cw
+CALL r/m16 | FF  /2
+CALL ptr16:16 | 9A  cd /pi386
+CALL ptr16:16 | 9A  cd /pi386
+CALL ptr16:16 | 9A  cd /pi386
+CALL ptr16:16 | 9A  cd /pi386
+CALL ptr16:16 | 9A  cd /pi386
+CALL m16:16 | FF  /3
+CALL m16:16 | FF  /3
+CALL m16:16 | FF  /3
+CALL m16:16 | FF  /3
+CALL m16:16 | FF  /3
+CALL rel32 | E8  cd
+CALL r/m32 | FF  /2
+CALL ptr16:32 | 9A  cp /pi386
+CALL ptr16:32 | 9A  cp /pi386
+CALL ptr16:32 | 9A  cp /pi386
+CALL ptr32:32 | 9A  cp /pi386
+CALL ptr16:32 | 9A  cp /pi386
+CALL m16:32 | FF  /3
+CALL m16:32 | FF  /3
+CALL m16:32 | FF  /3
+CALL m16:32 | FF  /3
+CALL m16:32 | FF  /3

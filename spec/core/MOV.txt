@@ -1,0 +1,26 @@
+MOV r/m8,r8 | 88  /r
+MOV r/m16,r16 | 89  /r
+MOV r/m32,r32 | 89  /r
+MOV r8,r/m8 | 8A  /r
+MOV r16,r/m16 | 8B  /r
+MOV r32,r/m32 | 8B  /r
+MOV r16/32/64/m16,Sreg | 8C  /r
+MOV Sreg, r/m16_exact | 8E  /r
+MOV AL,moffs8 | A0
+MOV AX,moffs16 | A1
+MOV EAX,moffs32 | A1
+MOV moffs8,AL | A2
+MOV moffs16,AX | A3
+MOV moffs32,EAX | A3
+MOV reg8,imm8 | B0 + rb
+MOV reg16,imm16 | B8 + rw /pamd64_imm64
+MOV reg32,imm32 | B8 + rd /pamd64_imm64
+MOV r/m8,imm8 | C6  /r
+MOV r/m16,imm16 | C7  /r /pamd64_sign_extends
+MOV r/m32,imm32 | C7  /r /pamd64_sign_extends
+MOV r/m32,CR0/CR2/CR3 | 0F  20 /r /pop_size_64
+MOV CR0/CR2/CR3,r/m32 | 0F  22 /r /pop_size_64
+MOV r/m32,DR6/DR7 | 0F  21 /r /pop_size_64
+MOV DR6/DR7,r/m32 | 0F  23 /r /pop_size_64
+MOV r/m32,TR6/TR7 | 0F  24 /r /pop_size_64
+MOV TR6/TR7,r/m32 | 0F  26 /r /pop_size_64

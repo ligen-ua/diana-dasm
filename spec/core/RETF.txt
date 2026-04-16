@@ -1,0 +1,2 @@
+RETF | CB /pprivileged
+RETF imm16 | CA  iw /pprivileged

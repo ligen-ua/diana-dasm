@@ -1,0 +1,15 @@
+ADC AL,imm8 | 14 ib
+ADC AX,imm16 | 15 iw
+ADC EAX,imm32 | 15 id
+ADC r/m8,imm8 | 80 /2 ib      /pprefixlock
+ADC r/m8,imm8 | 82 /2 /pundoc /pprefixlock /pi386 ib
+ADC r/m16,imm16 | 81 /2 iw      /pprefixlock
+ADC r/m32,imm32 | 81 /2 id      /pprefixlock
+ADC r/m16,imm8 | 83 /2 ib      /pprefixlock
+ADC r/m32,imm8 | 83 /2 ib      /pprefixlock
+ADC r/m8,r8 | 10 /r         /pprefixlock
+ADC r/m16,r16 | 11 /r         /pprefixlock
+ADC r/m32,r32 | 11 /r         /pprefixlock
+ADC r8,r/m8 | 12 /r
+ADC r16,r/m16 | 13 /r
+ADC r32,r/m32 | 13 /r

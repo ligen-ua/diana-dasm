@@ -1,0 +1,9 @@
+IMUL r/m8 | F6  /5
+IMUL r/m16 | F7  /5
+IMUL r/m32 | F7  /5
+IMUL r16,r/m16 | 0F  AF /r
+IMUL r32,r/m32 | 0F  AF /r
+IMUL r16,r/m16,imm8 | 6B  /r ib
+IMUL r32,r/m32,imm8 | 6B  /r ib
+IMUL r16,r/m16,imm16 | 69  /r iw
+IMUL r32,r/m32,imm32 | 69  /r id

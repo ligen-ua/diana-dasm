@@ -1,0 +1,13 @@
+PUSH r/m16 | FF   /6
+PUSH r/m32 | FF   /6
+PUSH r16 | 50 + rw
+PUSH r32 | 50 + rd
+PUSH imm8 | 6A
+PUSH imm16 | 68 /pamd64_sign_extends
+PUSH imm32 | 68 /pamd64_sign_extends
+PUSH CS | 0E /pi386 /ppush_cs
+PUSH SS | 16 /pi386 /ppush_cs
+PUSH DS | 1E /pi386 /ppush_cs
+PUSH ES | 06 /pi386 /ppush_cs
+PUSH FS | 0F   A0 /ppush_cs
+PUSH GS | 0F   A8 /ppush_cs

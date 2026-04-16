@@ -1,0 +1,4 @@
+BTR r/m16,r16 | 0F  B3 /r /pprefixlock
+BTR r/m32,r32 | 0F  B3 /r /pprefixlock
+BTR r/m16,imm8 | 0F  BA /6 /pprefixlock ib
+BTR r/m32,imm8 | 0F  BA /6 /pprefixlock ib

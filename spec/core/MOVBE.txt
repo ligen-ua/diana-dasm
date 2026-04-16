@@ -1,0 +1,4 @@
+MOVBE r16, m16 | 0F 38 F0 /r
+MOVBE r32, m32 | 0F 38 F0 /r
+MOVBE m16, r16 | 0F 38 F1 /r
+MOVBE m32, r32 | 0F 38 F1 /r

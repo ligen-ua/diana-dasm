@@ -1,0 +1,2 @@
+BSR r16,r/m16 | 0F  BD /r
+BSR r32,r/m32 | 0F  BD /r

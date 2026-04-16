@@ -1,0 +1,3 @@
+IDIV r/m8 | F6 /7
+IDIV r/m16 | F7 /7
+IDIV r/m32 | F7 /7

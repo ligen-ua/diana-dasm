@@ -1,0 +1,15 @@
+SBB AL,imm8 | 1C  ib
+SBB AX,imm16 | 1D  iw
+SBB EAX,imm32 | 1D  id
+SBB r/m8,imm8 | 80  /3 ib      /pprefixlock
+SBB r/m8,imm8 | 82  /3 /pundoc /pprefixlock /pi386 ib
+SBB r/m16,imm16 | 81  /3 iw      /pprefixlock
+SBB r/m32,imm32 | 81  /3 id      /pprefixlock
+SBB r/m16,imm8 | 83  /3 ib      /pprefixlock
+SBB r/m32,imm8 | 83  /3 ib      /pprefixlock
+SBB r/m8,r8 | 18  /r         /pprefixlock
+SBB r/m16,r16 | 19  /r         /pprefixlock
+SBB r/m32,r32 | 19  /r         /pprefixlock
+SBB r8,r/m8 | 1A  /r
+SBB r16,r/m16 | 1B  /r
+SBB r32,r/m32 | 1B  /r

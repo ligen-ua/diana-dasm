@@ -1,0 +1,1 @@
+AAM imm8 | D4 ib

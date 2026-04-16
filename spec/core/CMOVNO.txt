@@ -1,0 +1,2 @@
+CMOVNO  r16,r/m16 | 0F  41  /r
+CMOVNO  r32,r/m32 | 0F  41  /r

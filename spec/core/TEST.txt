@@ -1,0 +1,9 @@
+TEST AL,imm8 | A8   ib
+TEST AX,imm16 | A9   iw
+TEST EAX,imm32 | A9   id
+TEST r/m8,imm8 | F6   /0 ib
+TEST r/m16,imm16 | F7   /0 iw
+TEST r/m32,imm32 | F7   /0 id
+TEST r/m8,r8 | 84   /r
+TEST r/m16,r16 | 85   /r
+TEST r/m32,r32 | 85   /r

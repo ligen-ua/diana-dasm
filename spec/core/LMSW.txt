@@ -1,0 +1,1 @@
+LMSW r/m16 | 0F  01 /6 /pprivileged

@@ -26,6 +26,8 @@ extern "C"
 #include "test_new.h"
 #include "test_avx.h"
 #include "test_aesni.h"
+#include "test_sse4.h"
+#include "test_bmi.h"
 
 #include "test_masm1.h"
 #include "test_patchers.h"
@@ -37,6 +39,8 @@ int main()
     test_new();
     test_avx();
     test_aesni();
+    test_sse4();
+    test_bmi();
     test_stack();
     test_analyze();
     test_integrated2();

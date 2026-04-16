@@ -1,0 +1,6 @@
+OUT imm8,AL | E6 /pprivileged ib
+OUT imm8,AX | E7 /pprivileged ib
+OUT imm8,EAX | E7 /pprivileged ib
+OUT DX,AL | EE /pprivileged
+OUT DX,AX | EF /pprivileged
+OUT DX,EAX | EF /pprivileged

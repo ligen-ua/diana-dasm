@@ -1,0 +1,9 @@
+SHR r/m8,1 | D0   /5
+SHR r/m8,CL | D2   /5
+SHR r/m8,imm8 | C0   /5 ib
+SHR r/m16,1 | D1   /5
+SHR r/m16,CL | D3   /5
+SHR r/m16,imm8 | C1   /5 ib
+SHR r/m32,1 | D1   /5
+SHR r/m32,CL | D3   /5
+SHR r/m32,imm8 | C1   /5 ib

@@ -1,0 +1,2 @@
+JGE rel8 | 7D  cb
+JGE rel16/32 | 0F  8D cw/cd

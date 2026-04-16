@@ -1,0 +1,3 @@
+OUTS DX,esi_ptr8 | 6E /pprivileged
+OUTS DX,esi_ptr16 | 6F /pprivileged
+OUTS DX,esi_ptr32 | 6F /pprivileged

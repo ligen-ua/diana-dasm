@@ -1,0 +1,4 @@
+LEA r16,r/m16 | 8D  /r
+LEA r32,r/m32 | 8D  /r
+LEA r16,r/m16 | 8D  /r
+LEA r32,r/m32 | 8D  /r

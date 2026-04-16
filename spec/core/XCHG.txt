@@ -1,0 +1,5 @@
+XCHG AX,r16 | 90 + rw
+XCHG EAX,r32 | 90 + rw
+XCHG r/m8,r8 | 86  /r  /pprefixlock
+XCHG r/m16,r16 | 87  /r  /pprefixlock
+XCHG r/m32,r32 | 87  /r  /pprefixlock

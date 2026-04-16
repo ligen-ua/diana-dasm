@@ -1,0 +1,2 @@
+JNO rel8 | 71  cb
+JNO rel16/32 | 0F  81 cw/cd

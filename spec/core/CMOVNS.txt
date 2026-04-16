@@ -1,0 +1,2 @@
+CMOVNS r16,r/m16 | 0F  49  /r
+CMOVNS r32,r/m32 | 0F  49  /r

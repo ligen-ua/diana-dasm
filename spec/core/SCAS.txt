@@ -1,0 +1,3 @@
+SCAS m8 | AE
+SCAS m16 | AF
+SCAS m32 | AF

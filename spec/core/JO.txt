@@ -1,0 +1,2 @@
+JO rel8 | 70  cb
+JO rel16/32 | 0F  80 cw/cd

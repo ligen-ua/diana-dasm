@@ -1,0 +1,4 @@
+BT r/m16,r16 | 0F  A3 /r
+BT r/m32,r32 | 0F  A3 /r
+BT r/m16,imm8 | 0F  BA /4 ib
+BT r/m32,imm8 | 0F  BA /4 ib

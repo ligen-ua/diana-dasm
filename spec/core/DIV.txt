@@ -1,0 +1,3 @@
+DIV r/m8 | F6 /6
+DIV r/m16 | F7 /6
+DIV r/m32 | F7 /6

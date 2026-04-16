@@ -1,0 +1,2 @@
+BSF r16,r/m16 | 0F  BC /r
+BSF r32,r/m32 | 0F  BC /r

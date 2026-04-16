@@ -1,0 +1,5 @@
+INC r/m8 | FE  /0  /pprefixlock
+INC r/m16 | FF  /0  /pprefixlock
+INC r/m32 | FF  /0  /pprefixlock
+INC r16 | 40 + rw
+INC r32 | 40 + rd

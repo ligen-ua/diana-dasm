@@ -1,0 +1,4 @@
+MOVZX r16,r/m8 | 0F  B6 /r
+MOVZX r32,r/m8 | 0F  B6 /r
+MOVZX r16,r/m16_exact | 0F  B7 /r
+MOVZX r32,r/m16_exact | 0F  B7 /r

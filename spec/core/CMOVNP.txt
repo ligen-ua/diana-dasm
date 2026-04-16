@@ -1,0 +1,2 @@
+CMOVNP r16,r/m16 | 0F  4B  /r
+CMOVNP r32,r/m32 | 0F  4B  /r
