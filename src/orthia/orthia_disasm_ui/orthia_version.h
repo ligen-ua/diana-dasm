@@ -3,7 +3,7 @@
 #define ORTHIA_UI_VER_MAJOR        1
 #define ORTHIA_UI_VER_MAJOR_STR   "1"
 
-#define ORTHIA_UI_VER_MINOR        0
+#define ORTHIA_UI_VER_MINOR        1
 #define ORTHIA_UI_VER_MINOR_STR   "1"
 
 #define ORTHIA_UI_VER_PATCH        0

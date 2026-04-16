@@ -49,7 +49,7 @@ BEGIN
             VALUE "FileDescription", "Orthia Disassembler" 
             VALUE "FileVersion", ORTHIA_UI_VER_MAJOR_STR ", " ORTHIA_UI_VER_MINOR_STR ", " ORTHIA_UI_VER_PATCH_STR ", " ORTHIA_UI_VER_REVISION_STR
             VALUE "InternalName", "orthia_disasm"
-            VALUE "LegalCopyright", "Copyright (c) 2013-2023, https://github.com/ligen-ua/diana-dasm"
+            VALUE "LegalCopyright", "Copyright (c) 2013-2026, https://github.com/ligen-ua/diana-dasm"
             VALUE "OriginalFilename", "orthia_disasm.exe"
             VALUE "ProductName", "Orthia Disassembler"
             VALUE "ProductVersion", ORTHIA_UI_VER_MAJOR_STR ", " ORTHIA_UI_VER_MINOR_STR ", " ORTHIA_UI_VER_PATCH_STR ", " ORTHIA_UI_VER_REVISION_STR
