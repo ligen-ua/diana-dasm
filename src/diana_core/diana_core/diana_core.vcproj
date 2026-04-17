@@ -146,6 +146,9 @@
 				RelativePath=".\diana_pe_analyzer.c">
 			</File>
 			<File
+				RelativePath=".\diana_elf_analyzer.c">
+			</File>
+			<File
 				RelativePath=".\diana_processor\diana_processor_cmd_a.c">
 			</File>
 			<File

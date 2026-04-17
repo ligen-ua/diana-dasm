@@ -34,6 +34,7 @@ diana_win32.c
 diana_win32_executable_heap.c
 diana_win32_sys_memcpy.c
 diana_elf.c
+diana_elf_analyzer.c
 diana_executable.c
 
 diana_patchers/diana_ultimate_patcher.c

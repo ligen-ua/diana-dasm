@@ -351,6 +351,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\diana_elf_analyzer.c"
+				>
+			</File> 
+			<File
 				RelativePath=".\diana_stack.c"
 				>
 			</File>

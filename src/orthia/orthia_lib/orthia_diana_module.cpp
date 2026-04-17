@@ -6,6 +6,7 @@
 extern "C"
 {
 #include "diana_pe_analyzer.h"
+#include "diana_elf_analyzer.h"
 }
 #include "diana_core_cpp.h"
 #include "orthia_streams.h"
@@ -152,42 +153,51 @@ public:
     virtual int GetDianaMode() const =0; 
 };
 
-class CDianaModuleImpl_PE:public CDianaModuleImpl
+class CDianaModuleImpl_Executable:public CDianaModuleImpl
 {
-    Diana_PeFile m_peFile;
-    diana::Guard<diana::PeFile> m_peFileGuard;
+    DianaExecutable m_executable;
+    diana::Guard<diana::ExecutableFile> m_executableGuard;
 protected:
     void AnalyzeImpl(int analyserFlags)
     {
-        m_cache.Init(m_env.m_moduleStart, 
-                     m_env.m_moduleSize,
-                     m_peFile.pImpl->pCapturedSections,
-                     m_peFile.pImpl->capturedSectionCount); 
-        DI_CHECK_CPP(Diana_PE_AnalyzePE(&m_peFile, 
-                                        &m_env, 
-                                        &m_owner,
-                                        analyserFlags));
+        if (m_executable.type == DIANA_EXECUTABLE_TYPE_PE)
+        {
+            m_cache.Init(m_env.m_moduleStart,
+                         m_env.m_moduleSize,
+                         m_executable.u.peFile.pImpl->pCapturedSections,
+                         m_executable.u.peFile.pImpl->capturedSectionCount);
+            DI_CHECK_CPP(Diana_PE_AnalyzePE(&m_executable.u.peFile,
+                                             &m_env,
+                                             &m_owner,
+                                             analyserFlags));
+        }
+        else  // ELF
+        {
+            m_cache.Init(m_env.m_moduleStart, m_env.m_moduleSize);
+            DI_CHECK_CPP(Diana_ELF_AnalyzeELF(&m_executable.u.elfFile,
+                                               &m_env,
+                                               &m_owner,
+                                               analyserFlags));
+        }
         m_instructionsOwnerGuard.reset(&m_owner);
     }
 public:
-    CDianaModuleImpl_PE(Address_type offset,
-                       IMemoryReader * pMemoryReader)
-           :
+    CDianaModuleImpl_Executable(Address_type offset,
+                                IMemoryReader * pMemoryReader)
+        :
             CDianaModuleImpl(offset, pMemoryReader)
     {
-        DI_CHECK_CPP(DianaPeFile_Init(&m_peFile, 
-                                      &m_env.m_stream.parent, 
-                                      0,
-                                      DIANA_PE_FILE_FLAGS_MODULE_MODE));
-        m_peFileGuard.reset(&m_peFile);
-        InitEnv(m_peFile.pImpl->sizeOfModule, GetPeFile()->pImpl->dianaMode);
+        DI_CHECK_CPP(DianaExecutable_Init(&m_executable,
+                                          &m_env.m_stream.parent,
+                                          0,
+                                          DIANA_EXECUTABLE_FILE_FLAGS_MODULE_MODE));
+        m_executableGuard.reset(&m_executable);
+        InitEnv(m_executable.sizeOfModule, m_executable.dianaMode);
     }
-    ~CDianaModuleImpl_PE()
+    ~CDianaModuleImpl_Executable()
     {
     }
-
-    const Diana_PeFile * GetPeFile() const { return &m_peFile; }
-    int GetDianaMode() const { return GetPeFile()->pImpl->dianaMode; }
+    int GetDianaMode() const { return m_executable.dianaMode; }
 };
 
 class CDianaModuleImpl_Range:public CDianaModuleImpl
@@ -252,7 +262,7 @@ void CDianaModule::Init(Address_type offset,
 {
     m_offset = offset;
     m_pMemoryReader = pMemoryReader;
-    m_impl.reset(new CDianaModuleImpl_PE(offset, pMemoryReader));
+    m_impl.reset(new CDianaModuleImpl_Executable(offset, pMemoryReader));
 }
 
 void CDianaModule::Analyze(int analyserFlags)
