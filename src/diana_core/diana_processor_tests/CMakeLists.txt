@@ -17,6 +17,8 @@ test_processor_flags.cpp
 test_processor_fpu.cpp
 test_processor_fpu_integration.cpp
 test_processor_fpu_sse.cpp
+test_processor_fpu2.cpp
+test_processor_sse2.cpp
 test_processor_i.cpp
 test_processor_j.cpp
 test_processor_l.cpp

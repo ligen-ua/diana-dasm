@@ -153,10 +153,74 @@ int Diana_Call_loopne(struct _dianaContext * pDianaContext,
     SET_REG_RCX2(rcx, pCallContext->m_context.iCurrentCmd_addressSize);
     if (rcx && !GET_FLAG_ZF)
     {
-        return Diana_Call_jcc(pDianaContext, 
+        return Diana_Call_jcc(pDianaContext,
                               pCallContext,
                               1,
                               0);
     }
     DI_PROC_END
+}
+
+static int Diana_Call_lXs_impl(struct _dianaContext * pDianaContext,
+                                DianaProcessor * pCallContext,
+                                DianaUnifiedRegister segRegId)
+{
+    DI_DEF_LOCAL(dest);
+    OPERAND_SIZE selector = 0;
+    OPERAND_SIZE address = 0;
+    OPERAND_SIZE offset_value = 0;
+    OPERAND_SIZE seg_value = 0;
+    DianaUnifiedRegister segReg = reg_DS;
+
+    /* Read dest register to get its size */
+    DI_MEM_GET_DEST(dest);
+    oldDestValue;
+
+    /* Get address of operand 1 (memory source) */
+    DI_CHECK(Diana_QueryAddress(pDianaContext, pCallContext, 1, &selector, &address, &segReg));
+
+    /* Read offset (dest_size bytes) from the far pointer */
+    DI_CHECK(DianaProcessor_GetMemValue(pCallContext, selector, address, dest_size, &offset_value, 0, segReg));
+
+    /* Read 16-bit segment selector immediately after the offset */
+    DI_CHECK(DianaProcessor_GetMemValue(pCallContext, selector, address + dest_size, 2, &seg_value, 0, segReg));
+
+    /* Store offset into destination register */
+    dest = offset_value;
+    DI_MEM_SET_DEST(dest);
+
+    /* Store selector into the appropriate segment register */
+    DianaProcessor_SetValue(pCallContext, segRegId, DianaProcessor_QueryReg(pCallContext, segRegId), seg_value);
+
+    DI_PROC_END
+}
+
+int Diana_Call_lfs(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext)
+{
+    return Diana_Call_lXs_impl(pDianaContext, pCallContext, reg_FS);
+}
+
+int Diana_Call_lgs(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext)
+{
+    return Diana_Call_lXs_impl(pDianaContext, pCallContext, reg_GS);
+}
+
+int Diana_Call_lss(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext)
+{
+    return Diana_Call_lXs_impl(pDianaContext, pCallContext, reg_SS);
+}
+
+int Diana_Call_lds(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext)
+{
+    return Diana_Call_lXs_impl(pDianaContext, pCallContext, reg_DS);
+}
+
+int Diana_Call_les(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext)
+{
+    return Diana_Call_lXs_impl(pDianaContext, pCallContext, reg_ES);
 }

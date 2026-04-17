@@ -184,28 +184,28 @@ struct _dianaCmdKeyLine_line_7_660F3A
     int iKeysCount;
     DianaCmdKey key[1];
 } line_7_660F3A = {{DIANA_BASE_GEN_OBJECT_LINE, DIANA_BASE_GEN_OBJECT_THE_SAME_OPCODE}, 1, {{&line_8_660F3A, 58}}};
-static DianaCmdInfo2 cmd498 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x10, 0x38, 0x0, 135, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+134, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
-static DianaCmdInfo2 cmd499 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x20, 0x38, 0x0, 131, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+130, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
-static DianaCmdInfo2 cmd500 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x30, 0x38, 0x0, 129, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+128, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd498 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x10, 0x38, 0x0, 135, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+134, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd499 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x20, 0x38, 0x0, 131, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+130, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd500 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x30, 0x38, 0x0, 129, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+128, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
 struct _dianaCmdKeyLine_line_7_660F71
 {
     DianaBaseGenObject_type parent;
     int iKeysCount;
     DianaCmdKey key[3];
 } line_7_660F71 = {{DIANA_BASE_GEN_OBJECT_LINE, DIANA_BASE_GEN_OBJECT_THE_SAME_OPCODE}, 3, {{&cmd498, 113}, {&cmd499, 113}, {&cmd500, 113}}};
-static DianaCmdInfo2 cmd501 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x10, 0x38, 0x0, 132, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+131, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
-static DianaCmdInfo2 cmd502 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x20, 0x38, 0x0, 130, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+129, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
-static DianaCmdInfo2 cmd503 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x30, 0x38, 0x0, 126, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+125, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd501 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x10, 0x38, 0x0, 132, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+131, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd502 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x20, 0x38, 0x0, 130, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+129, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd503 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x30, 0x38, 0x0, 126, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+125, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
 struct _dianaCmdKeyLine_line_7_660F72
 {
     DianaBaseGenObject_type parent;
     int iKeysCount;
     DianaCmdKey key[3];
 } line_7_660F72 = {{DIANA_BASE_GEN_OBJECT_LINE, DIANA_BASE_GEN_OBJECT_THE_SAME_OPCODE}, 3, {{&cmd501, 114}, {&cmd502, 114}, {&cmd503, 114}}};
-static DianaCmdInfo2 cmd504 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x10, 0x38, 0x0, 134, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+133, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
-static DianaCmdInfo2 cmd505 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x18, 0x38, 0x0, 133, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+132, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
-static DianaCmdInfo2 cmd506 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x30, 0x38, 0x0, 128, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+127, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
-static DianaCmdInfo2 cmd507 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x38, 0x38, 0x0, 127, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+126, {{  diana_orRegXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd504 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x10, 0x38, 0x0, 134, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+133, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd505 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x18, 0x38, 0x0, 133, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+132, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd506 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x30, 0x38, 0x0, 128, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+127, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
+static DianaCmdInfo2 cmd507 = {{DIANA_BASE_GEN_OBJECT_CMD, 0}, 0x38, 0x38, 0x0, 127, DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64, DI_CHAR_NULL, 1, DI_CHAR_NULL, 2, 0, g_groups+126, {{  diana_orMemoryXMM, 4, 0, DI_CHAR_NULL, DI_CHAR_NULL  }, {  diana_orImmediate, 1, 0, DI_CHAR_NULL, DI_CHAR_NULL  }}};
 struct _dianaCmdKeyLine_line_7_660F73
 {
     DianaBaseGenObject_type parent;

@@ -146,6 +146,11 @@
     </ClCompile>
     <ClCompile Include="diana_elf.c" />
     <ClCompile Include="diana_executable.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_fpu2.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_sse2.c" />
+    <ClCompile Include="diana_processor\softfloat\softfloat_ext.c">
+      <Filter>softfloat</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="diana_allocators.h" />
@@ -313,6 +318,11 @@
     <ClInclude Include="diana_elf.h" />
     <ClInclude Include="diana_elfs_defs.h" />
     <ClInclude Include="diana_executable.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_fpu2.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_sse2.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_fpu_sse.h">
+      <Filter>proc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="diana_custom_config.inc" />

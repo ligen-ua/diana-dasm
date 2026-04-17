@@ -278,6 +278,9 @@
 				RelativePath=".\diana_processor\softfloat\softfloat.c">
 			</File>
 			<File
+				RelativePath=".\diana_processor\softfloat\softfloat_ext.c">
+			</File>
+			<File
 				RelativePath=".\diana_processor\softfloat\softfloat16.c">
 			</File>
 			<File

@@ -374,6 +374,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_processor_fpu2.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_processor_sse2.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_processor_i.cpp"
 				>
 			</File>

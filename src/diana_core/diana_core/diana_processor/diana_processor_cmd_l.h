@@ -24,4 +24,19 @@ int Diana_Call_loope(struct _dianaContext * pDianaContext,
 int Diana_Call_loopne(struct _dianaContext * pDianaContext,
                       DianaProcessor * pCallContext);
 
+int Diana_Call_lfs(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext);
+
+int Diana_Call_lgs(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext);
+
+int Diana_Call_lss(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext);
+
+int Diana_Call_lds(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext);
+
+int Diana_Call_les(struct _dianaContext * pDianaContext,
+                   DianaProcessor * pCallContext);
+
 #endif

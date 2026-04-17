@@ -48,6 +48,8 @@ diana_processor/diana_processor_cmd_d.c
 diana_processor/diana_processor_cmd_fpu.c
 diana_processor/diana_processor_cmd_fpu_internal.c
 diana_processor/diana_processor_cmd_fpu_sse.c
+diana_processor/diana_processor_cmd_fpu2.c
+diana_processor/diana_processor_cmd_sse2.c
 diana_processor/diana_processor_cmd_i.c
 diana_processor/diana_processor_cmd_imul.c
 diana_processor/diana_processor_cmd_internal.c
@@ -76,6 +78,7 @@ diana_processor/softfloat/softfloat-specialize.c
 diana_processor/softfloat/softfloat.c
 diana_processor/softfloat/softfloat16.c
 diana_processor/softfloat/softfloatx80.c
+diana_processor/softfloat/softfloat_ext.c
 
 )
 

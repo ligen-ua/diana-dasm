@@ -123,6 +123,6 @@ void test_processor_l()
     DIANA_TEST(test_processor_lods());
     DIANA_TEST(test_processor_lods2());
     DIANA_TEST(test_processor_lea_64());
-    //test_processor_lfs();
-    //test_processor_lfs2();
+    DIANA_TEST(test_processor_lfs());
+    DIANA_TEST(test_processor_lfs2());
 }

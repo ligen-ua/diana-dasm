@@ -21,6 +21,8 @@ extern "C"
 #include "test_processor_n.h"
 #include "test_processor_b.h"
 #include "test_processor_m_xmm.h"
+#include "test_processor_fpu2.h"
+#include "test_processor_sse2.h"
 #include "test_common.h"
 
 void di_gen();
@@ -34,6 +36,8 @@ int main()
     DianaProcessor_GlobalInit();
 
     test_processor_fpu_sse();
+    test_processor_fpu2();
+    test_processor_sse2();
     test_processor_a();
     test_processor_s();
     test_processor_r();

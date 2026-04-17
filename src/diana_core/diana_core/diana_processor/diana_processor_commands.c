@@ -24,6 +24,8 @@
 
 #include "diana_disable_warnings.h"
 #include "diana_processor_cmd_fpu_sse.h"
+#include "diana_processor_cmd_fpu2.h"
+#include "diana_processor_cmd_sse2.h"
 
 int Diana_Call_xor(struct _dianaContext * pDianaContext,
                    DianaProcessor * pCallContext)
@@ -409,6 +411,11 @@ void DianaProcessor_OnGroup(DianaGroupInfo * p)
     DI_PROC_REGISTER_COMMAND(lea)
     DI_PROC_REGISTER_COMMAND(leave)
     DI_PROC_REGISTER_COMMAND(lods)
+    DI_PROC_REGISTER_COMMAND(lfs)
+    DI_PROC_REGISTER_COMMAND(lgs)
+    DI_PROC_REGISTER_COMMAND(lss)
+    DI_PROC_REGISTER_COMMAND(lds)
+    DI_PROC_REGISTER_COMMAND(les)
 
     DI_PROC_REGISTER_COMMAND(loop)
     DI_PROC_REGISTER_COMMAND(loope)
@@ -541,12 +548,92 @@ void DianaProcessor_OnGroup(DianaGroupInfo * p)
     DI_PROC_REGISTER_COMMAND(fist)
     DI_PROC_REGISTER_COMMAND(fistp)
 
+    DI_PROC_REGISTER_COMMAND(fmulp)
+
     DI_PROC_REGISTER_COMMAND(fdiv)
     DI_PROC_REGISTER_COMMAND(fdivp)
     DI_PROC_REGISTER_COMMAND(fidiv)
     DI_PROC_REGISTER_COMMAND(fdivr)
     DI_PROC_REGISTER_COMMAND(fdivrp)
     DI_PROC_REGISTER_COMMAND(fidivr)
+
+    /* FPU2: exchange, sign/abs, test/examine */
+    DI_PROC_REGISTER_COMMAND(fxch)
+    DI_PROC_REGISTER_COMMAND(fabs)
+    DI_PROC_REGISTER_COMMAND(fchs)
+    DI_PROC_REGISTER_COMMAND(ftst)
+    DI_PROC_REGISTER_COMMAND(fxam)
+
+    /* FPU2: unordered compare */
+    DI_PROC_REGISTER_COMMAND(fucom)
+    DI_PROC_REGISTER_COMMAND(fucomp)
+    DI_PROC_REGISTER_COMMAND(fucompp)
+
+    /* FPU2: compare and set EFLAGS */
+    DI_PROC_REGISTER_COMMAND(fcomi)
+    DI_PROC_REGISTER_COMMAND(fcomip)
+    DI_PROC_REGISTER_COMMAND(fucomi)
+    DI_PROC_REGISTER_COMMAND(fucomip)
+
+    /* FPU2: integer compare */
+    DI_PROC_REGISTER_COMMAND(ficom)
+    DI_PROC_REGISTER_COMMAND(ficomp)
+
+    /* FPU2: load constants */
+    DI_PROC_REGISTER_COMMAND(fld1)
+    DI_PROC_REGISTER_COMMAND(fldz)
+    DI_PROC_REGISTER_COMMAND(fldpi)
+    DI_PROC_REGISTER_COMMAND(fldl2e)
+    DI_PROC_REGISTER_COMMAND(fldl2t)
+    DI_PROC_REGISTER_COMMAND(fldlg2)
+    DI_PROC_REGISTER_COMMAND(fldln2)
+
+    /* FPU2: stack management */
+    DI_PROC_REGISTER_COMMAND(fnop)
+    DI_PROC_REGISTER_COMMAND(fdecstp)
+    DI_PROC_REGISTER_COMMAND(fincstp)
+    DI_PROC_REGISTER_COMMAND(ffree)
+    DI_PROC_REGISTER_COMMAND(ffreep)
+    DI_PROC_REGISTER_COMMAND(fninit)
+
+    /* FPU2: arithmetic */
+    DI_PROC_REGISTER_COMMAND(fimul)
+    DI_PROC_REGISTER_COMMAND(frndint)
+    DI_PROC_REGISTER_COMMAND(fscale)
+    DI_PROC_REGISTER_COMMAND(fxtract)
+    DI_PROC_REGISTER_COMMAND(f2xm1)
+    DI_PROC_REGISTER_COMMAND(fyl2x)
+    DI_PROC_REGISTER_COMMAND(fyl2xp1)
+    DI_PROC_REGISTER_COMMAND(fpatan)
+    DI_PROC_REGISTER_COMMAND(fptan)
+    DI_PROC_REGISTER_COMMAND(fprem)
+    DI_PROC_REGISTER_COMMAND(fprem1)
+    DI_PROC_REGISTER_COMMAND(fsin)
+    DI_PROC_REGISTER_COMMAND(fcos)
+    DI_PROC_REGISTER_COMMAND(fsincos)
+
+    /* FPU2: store integer truncated */
+    DI_PROC_REGISTER_COMMAND(fisttp)
+
+    /* FPU2: conditional float move */
+    DI_PROC_REGISTER_COMMAND(fcmovb)
+    DI_PROC_REGISTER_COMMAND(fcmove)
+    DI_PROC_REGISTER_COMMAND(fcmovbe)
+    DI_PROC_REGISTER_COMMAND(fcmovu)
+    DI_PROC_REGISTER_COMMAND(fcmovnb)
+    DI_PROC_REGISTER_COMMAND(fcmovne)
+    DI_PROC_REGISTER_COMMAND(fcmovnbe)
+    DI_PROC_REGISTER_COMMAND(fcmovnu)
+
+    /* FPU2: complex state */
+    DI_PROC_REGISTER_COMMAND(fbld)
+    DI_PROC_REGISTER_COMMAND(fbstp)
+    DI_PROC_REGISTER_COMMAND(fldenv)
+    DI_PROC_REGISTER_COMMAND(fnstenv)
+    DI_PROC_REGISTER_COMMAND(frstor)
+    DI_PROC_REGISTER_COMMAND(fnsave)
+    DI_PROC_REGISTER_COMMAND(fxsave)
+    DI_PROC_REGISTER_COMMAND(fxrstor)
 
     DI_PROC_REGISTER_COMMAND_EX(prefetchnta, Diana_Call_do_nothing)
     DI_PROC_REGISTER_COMMAND_EX(prefetcht0, Diana_Call_do_nothing)
@@ -583,6 +670,159 @@ void DianaProcessor_OnGroup(DianaGroupInfo * p)
     DI_PROC_REGISTER_COMMAND(xorps)
         
     DI_PROC_REGISTER_COMMAND(movhps)
+
+    /* SSE2: packed integer add */
+    DI_PROC_REGISTER_COMMAND(paddb)
+    DI_PROC_REGISTER_COMMAND(paddw)
+    DI_PROC_REGISTER_COMMAND(paddd)
+    DI_PROC_REGISTER_COMMAND(paddq)
+    DI_PROC_REGISTER_COMMAND(paddsb)
+    DI_PROC_REGISTER_COMMAND(paddsw)
+    DI_PROC_REGISTER_COMMAND(paddusb)
+    DI_PROC_REGISTER_COMMAND(paddusw)
+
+    /* SSE2: packed integer subtract */
+    DI_PROC_REGISTER_COMMAND(psubb)
+    DI_PROC_REGISTER_COMMAND(psubw)
+    DI_PROC_REGISTER_COMMAND(psubd)
+    DI_PROC_REGISTER_COMMAND(psubq)
+    DI_PROC_REGISTER_COMMAND(psubsb)
+    DI_PROC_REGISTER_COMMAND(psubsw)
+    DI_PROC_REGISTER_COMMAND(psubusb)
+    DI_PROC_REGISTER_COMMAND(psubusw)
+
+    /* SSE2: packed compare */
+    DI_PROC_REGISTER_COMMAND(pcmpeqb)
+    DI_PROC_REGISTER_COMMAND(pcmpeqd)
+    DI_PROC_REGISTER_COMMAND(pcmpeqw)
+    DI_PROC_REGISTER_COMMAND(pcmpgtb)
+    DI_PROC_REGISTER_COMMAND(pcmpgtd)
+    DI_PROC_REGISTER_COMMAND(pcmpgtw)
+
+    /* SSE2: packed multiply */
+    DI_PROC_REGISTER_COMMAND(pmullw)
+    DI_PROC_REGISTER_COMMAND(pmulhw)
+    DI_PROC_REGISTER_COMMAND(pmulhuw)
+    DI_PROC_REGISTER_COMMAND(pmuludq)
+    DI_PROC_REGISTER_COMMAND(pmaddwd)
+
+    /* SSE2: packed average/min/max */
+    DI_PROC_REGISTER_COMMAND(pavgb)
+    DI_PROC_REGISTER_COMMAND(pavgw)
+    DI_PROC_REGISTER_COMMAND(pmaxsw)
+    DI_PROC_REGISTER_COMMAND(pmaxub)
+    DI_PROC_REGISTER_COMMAND(pminsw)
+    DI_PROC_REGISTER_COMMAND(pminub)
+    DI_PROC_REGISTER_COMMAND(psadbw)
+
+    /* SSE2: mask / insert / extract */
+    DI_PROC_REGISTER_COMMAND(pmovmskb)
+    DI_PROC_REGISTER_COMMAND(pinsrw)
+    DI_PROC_REGISTER_COMMAND(pextrw)
+
+    /* SSE2: pack */
+    DI_PROC_REGISTER_COMMAND(packssdw)
+    DI_PROC_REGISTER_COMMAND(packsswb)
+    DI_PROC_REGISTER_COMMAND(packuswb)
+
+    /* SSE2: unpack high */
+    DI_PROC_REGISTER_COMMAND(punpckhbw)
+    DI_PROC_REGISTER_COMMAND(punpckhdq)
+    DI_PROC_REGISTER_COMMAND(punpckhqdq)
+    DI_PROC_REGISTER_COMMAND(punpckhwd)
+
+    /* SSE2: shifts */
+    DI_PROC_REGISTER_COMMAND(psllw)
+    DI_PROC_REGISTER_COMMAND(pslld)
+    DI_PROC_REGISTER_COMMAND(psllq)
+    DI_PROC_REGISTER_COMMAND(pslldq)
+    DI_PROC_REGISTER_COMMAND(psrlw)
+    DI_PROC_REGISTER_COMMAND(psrld)
+    DI_PROC_REGISTER_COMMAND(psrlq)
+    DI_PROC_REGISTER_COMMAND(psrldq)
+    DI_PROC_REGISTER_COMMAND(psraw)
+    DI_PROC_REGISTER_COMMAND(psrad)
+
+    /* SSE2: shuffle */
+    DI_PROC_REGISTER_COMMAND(pshufhw)
+    DI_PROC_REGISTER_COMMAND(pshuflw)
+
+    /* SSE2: move quadword */
+    DI_PROC_REGISTER_COMMAND(movq)
+    DI_PROC_REGISTER_COMMAND(movq2dq)
+    DI_PROC_REGISTER_COMMAND(movdq2q)
+
+    /* SSE2: MMX state */
+    DI_PROC_REGISTER_COMMAND(emms)
+    DI_PROC_REGISTER_COMMAND(femms)
+
+    /* SSE: scalar float32 */
+    DI_PROC_REGISTER_COMMAND(addss)
+    DI_PROC_REGISTER_COMMAND(subss)
+    DI_PROC_REGISTER_COMMAND(mulss)
+    DI_PROC_REGISTER_COMMAND(divss)
+    DI_PROC_REGISTER_COMMAND(sqrtss)
+    DI_PROC_REGISTER_COMMAND(comiss)
+    DI_PROC_REGISTER_COMMAND(ucomiss)
+    DI_PROC_REGISTER_COMMAND(cvtsi2ss)
+    DI_PROC_REGISTER_COMMAND(cvtss2sd)
+    DI_PROC_REGISTER_COMMAND(cvtss2si)
+    DI_PROC_REGISTER_COMMAND(cvttss2si)
+    DI_PROC_REGISTER_COMMAND(maxss)
+    DI_PROC_REGISTER_COMMAND(minss)
+
+    /* SSE: packed float32 */
+    DI_PROC_REGISTER_COMMAND(addps)
+    DI_PROC_REGISTER_COMMAND(subps)
+    DI_PROC_REGISTER_COMMAND(mulps)
+    DI_PROC_REGISTER_COMMAND(divps)
+    DI_PROC_REGISTER_COMMAND(sqrtps)
+    DI_PROC_REGISTER_COMMAND(maxps)
+    DI_PROC_REGISTER_COMMAND(minps)
+
+    /* SSE2: packed float64 */
+    DI_PROC_REGISTER_COMMAND(addpd)
+    DI_PROC_REGISTER_COMMAND(subpd)
+    DI_PROC_REGISTER_COMMAND(mulpd)
+    DI_PROC_REGISTER_COMMAND(divpd)
+    DI_PROC_REGISTER_COMMAND(sqrtpd)
+    DI_PROC_REGISTER_COMMAND(maxpd)
+    DI_PROC_REGISTER_COMMAND(minpd)
+
+    /* SSE2: scalar float64 extras */
+    DI_PROC_REGISTER_COMMAND(sqrtsd)
+    DI_PROC_REGISTER_COMMAND(ucomisd)
+    DI_PROC_REGISTER_COMMAND(maxsd)
+    DI_PROC_REGISTER_COMMAND(minsd)
+    DI_PROC_REGISTER_COMMAND(cvtsi2sd)
+    DI_PROC_REGISTER_COMMAND(cvtsd2ss)
+    DI_PROC_REGISTER_COMMAND(cvtsd2si)
+
+    /* SSE3: move with duplication */
+    DI_PROC_REGISTER_COMMAND(movshdup)
+    DI_PROC_REGISTER_COMMAND(movsldup)
+
+    /* SSE: unpack */
+    DI_PROC_REGISTER_COMMAND(unpcklps)
+    DI_PROC_REGISTER_COMMAND(unpckhps)
+    DI_PROC_REGISTER_COMMAND(unpcklpd)
+    DI_PROC_REGISTER_COMMAND(unpckhpd)
+
+    /* SSE: shuffle */
+    DI_PROC_REGISTER_COMMAND(shufps)
+    DI_PROC_REGISTER_COMMAND(shufpd)
+
+    /* SSE: MXCSR */
+    DI_PROC_REGISTER_COMMAND(ldmxcsr)
+
+    /* System */
+    DI_PROC_REGISTER_COMMAND(rdtsc)
+    DI_PROC_REGISTER_COMMAND(rdtscp)
+    DI_PROC_REGISTER_COMMAND(mfence)
+    DI_PROC_REGISTER_COMMAND(lfence)
+    DI_PROC_REGISTER_COMMAND(sfence)
+    DI_PROC_REGISTER_COMMAND(clflush)
+    DI_PROC_REGISTER_COMMAND(ud2)
 
     default:
         break;

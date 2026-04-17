@@ -183,6 +183,8 @@
     <ClCompile Include="test_processor_fpu.cpp" />
     <ClCompile Include="test_processor_fpu_integration.cpp" />
     <ClCompile Include="test_processor_fpu_sse.cpp" />
+    <ClCompile Include="test_processor_fpu2.cpp" />
+    <ClCompile Include="test_processor_sse2.cpp" />
     <ClCompile Include="test_processor_i.cpp" />
     <ClCompile Include="test_processor_j.cpp" />
     <ClCompile Include="test_processor_l.cpp" />
@@ -203,7 +205,9 @@
     <ClInclude Include="test_processor_d.h" />
     <ClInclude Include="test_processor_flags.h" />
     <ClInclude Include="test_processor_i.h" />
+    <ClInclude Include="test_processor_fpu2.h" />
     <ClInclude Include="test_processor_impl.h" />
+    <ClInclude Include="test_processor_sse2.h" />
     <ClInclude Include="test_processor_j.h" />
     <ClInclude Include="test_processor_l.h" />
     <ClInclude Include="test_processor_m.h" />

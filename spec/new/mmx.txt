@@ -177,37 +177,37 @@ PSHUFD xmm1, xmm2/mem128, imm8 | 66 0F 70 /r ib
 PSHUFHW xmm1, xmm2/mem128, imm8 | F3 0F 70 /r ib
 PSLLD xmm1, xmm2/mem128  | 66 0F F2 /r
 PSLLD mmx, mmx/mem64  | 0F F2 /r
-PSLLD xmm, imm8 | 66 0F 72 /6 ib
+PSLLD xmm/mem128, imm8 | 66 0F 72 /6 ib
 PSLLD mmx, imm8 | 0F 72 /6 ib
-PSLLDQ xmm, imm8 | 66 0F 73 /7 ib
+PSLLDQ xmm/mem128, imm8 | 66 0F 73 /7 ib
 PSLLQ xmm1, xmm2/mem128 | 66 0F F3 /r
 PSLLQ mmx, mmx/mem64 | 0F F3 /r
-PSLLQ xmm, imm8 | 66 0F 73 /6 ib
+PSLLQ xmm/mem128, imm8 | 66 0F 73 /6 ib
 PSLLQ mmx, imm8 | 0F 73 /6 ib
 PSLLW xmm1, xmm2/mem128 | 66 0F F1 /r
 PSLLW mmx, mmx/mem64 | 0F F1 /r
-PSLLW xmm, imm8 | 66 0F 71 /6 ib
+PSLLW xmm/mem128, imm8 | 66 0F 71 /6 ib
 PSLLW mmx, imm8 | 0F 71 /6 ib
 PSRAD xmm1, xmm2/mem128 | 66 0F E2 /r
 PSRAD mmx, mmx/mem64 | 0F E2 /r
-PSRAD xmm, imm8 | 66 0F 72 /4 ib
+PSRAD xmm/mem128, imm8 | 66 0F 72 /4 ib
 PSRAD mmx, imm8 | 0F 72 /4 ib
 PSRAW xmm1, xmm2/mem128 | 66 0F E1 /r
 PSRAW mmx, mmx/mem64 | 0F E1 /r
-PSRAW xmm, imm8 | 66 0F 71 /4 ib
+PSRAW xmm/mem128, imm8 | 66 0F 71 /4 ib
 PSRAW mmx, imm8 | 0F 71 /4 ib
 PSRLD xmm1, xmm2/mem128 | 66 0F D2 /r
 PSRLD mmx, mmx/mem64 | 0F D2 /r
-PSRLD xmm, imm8 | 66 0F 72 /2 ib
+PSRLD xmm/mem128, imm8 | 66 0F 72 /2 ib
 PSRLD mmx, imm8 | 0F 72 /2 ib
-PSRLDQ xmm, imm8 | 66 0F 73 /3 ib
+PSRLDQ xmm/mem128, imm8 | 66 0F 73 /3 ib
 PSRLQ xmm1, xmm2/mem128 | 66 0F D3 /r
 PSRLQ mmx, mmx/mem64 | 0F D3 /r
-PSRLQ xmm, imm8 | 66 0F 73 /2 ib
+PSRLQ xmm/mem128, imm8 | 66 0F 73 /2 ib
 PSRLQ mmx, imm8 | 0F 73 /2 ib
 PSRLW xmm1, xmm2/mem128 | 66 0F D1 /r
 PSRLW mmx, mmx/mem64 | 0F D1 /r
-PSRLW xmm, imm8 | 66 0F 71 /2 ib
+PSRLW xmm/mem128, imm8 | 66 0F 71 /2 ib
 PSRLW mmx, imm8 | 0F 71 /2 ib
 PSUBB xmm1, xmm2/mem128 | 66 0F F8 /r
 PSUBB mmx, mmx/mem64 | 0F F8 /r
