@@ -30,6 +30,8 @@ test_stack.cpp
 test_misc.cpp
 test_x64.cpp
 test_x64_integrated.cpp
+test_sse4.cpp
+test_bmi.cpp
 )
 
 add_executable(${PROJECT_NAME} 
