@@ -952,7 +952,7 @@ public:
     }
 };
 
-void* GetCurrentProcessModule(void);
+void* GetCurrentProcessModule(void * hint = 0);
 
 }
 

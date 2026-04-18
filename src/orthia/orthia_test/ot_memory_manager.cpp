@@ -4,7 +4,7 @@
 static void test_mm1()
 {
     OT_TestEnv testEnv;
-    void*  pFile = orthia::GetCurrentProcessModule();
+    void*  pFile = orthia::GetCurrentProcessModule((void*)&test_mm1);
     testEnv.manager.ReloadModule((orthia::Address_type)pFile, &testEnv.reader, true, ORTHIA_TCSTR("test"), 0);
 
     std::vector<orthia::CommonReferenceInfo> references;

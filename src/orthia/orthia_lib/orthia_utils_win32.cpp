@@ -519,7 +519,7 @@ cleanup:
     return pResult;
 }
 
-void* GetCurrentProcessModule(void)
+void* GetCurrentProcessModule(void * hint)
 {
     return GetModuleHandle(0);
 }

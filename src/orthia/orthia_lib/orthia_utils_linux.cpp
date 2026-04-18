@@ -55,11 +55,15 @@ PlatformString_type GetCurrentProcessDir()
     return res;
 }
 
-void* GetCurrentProcessModule(void)
+void* GetCurrentProcessModule(void * hint)
 {
+    if (!hint)
+    {
+        hint = (void*)GetCurrentProcessModule;
+    }
     Dl_info info;
     /* Pass the address of this function itself as a reference point */
-    if (dladdr((void*)&GetCurrentProcessModule, &info) == 0)
+    if (dladdr(hint, &info) == 0)
         return NULL;
 
     /* info.dli_fbase is the load address (base) of the ELF mapping.
