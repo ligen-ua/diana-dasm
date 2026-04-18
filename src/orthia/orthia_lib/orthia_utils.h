@@ -952,6 +952,8 @@ public:
     }
 };
 
+void* GetCurrentProcessModule(void);
+
 }
 
 #endif 

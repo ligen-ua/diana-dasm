@@ -519,4 +519,9 @@ cleanup:
     return pResult;
 }
 
+void* GetCurrentProcessModule(void)
+{
+    return GetModuleHandle(0);
+}
+
 }

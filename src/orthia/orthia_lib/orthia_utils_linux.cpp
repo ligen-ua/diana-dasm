@@ -55,5 +55,16 @@ PlatformString_type GetCurrentProcessDir()
     return res;
 }
 
+void* GetCurrentProcessModule(void)
+{
+    Dl_info info;
+    /* Pass the address of this function itself as a reference point */
+    if (dladdr((void*)&GetCurrentProcessModule, &info) == 0)
+        return NULL;
+
+    /* info.dli_fbase is the load address (base) of the ELF mapping.
+       On Linux this IS the ELF header: it starts with \x7fELF */
+    return info.dli_fbase;
+}
 
 }

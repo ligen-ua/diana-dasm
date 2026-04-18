@@ -208,14 +208,14 @@ int ReadProgramHeaders(Diana_ElfFile_impl* pImpl,
         return DI_SUCCESS;
 
     // Bounds (avoid overflow: phoff + phnum*phentsize <= sizeOfFile)
-    if (phoff >= sizeOfFile)
+    if (sizeOfFile && phoff >= sizeOfFile)
         return DI_INVALID_INPUT;
 
     {
         OPERAND_SIZE tableSize = (OPERAND_SIZE)phnum * (OPERAND_SIZE)phentsize;
         OPERAND_SIZE end = phoff;
         DI_CHECK(Diana_SafeAdd(&end, tableSize));
-        if (end > sizeOfFile)
+        if (sizeOfFile && end > sizeOfFile)
             return DI_INVALID_INPUT;
     }
 
