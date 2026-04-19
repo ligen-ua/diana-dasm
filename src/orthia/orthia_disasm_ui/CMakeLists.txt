@@ -17,6 +17,7 @@ set(SOURCES
     orthia_model.cpp
     orthia_model_interfaces.cpp
     orthia_model_modules.cpp
+    orthia_model_modules_elf.cpp
     orthia_process_adapter.cpp
     oui_disasm_colors.cpp
     oui_goto_dialog.cpp

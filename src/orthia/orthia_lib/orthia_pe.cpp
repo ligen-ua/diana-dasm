@@ -246,4 +246,22 @@ namespace orthia
         return DI_SUCCESS;
     }
 
+    const std::vector<char>& CSimplePeFile::GetMappedFile() const
+    {
+        return m_mappedPeFile;
+    }
+    int CSimplePeFile::GetDianaMode() const
+    {
+        if (!m_dianaContext)
+            return 0;
+        return m_dianaContext->mappedPE.pImpl->dianaMode;
+    }
+    DI_UINT64 CSimplePeFile::GetEntryPoint() const
+    {
+        if (!m_dianaContext)
+            return 0;
+        DI_UINT64 ep = m_imageBase;
+        Diana_SafeAdd(&ep, m_dianaContext->mappedPE.pImpl->addressOfEntryPoint);
+        return ep;
+    }
 }

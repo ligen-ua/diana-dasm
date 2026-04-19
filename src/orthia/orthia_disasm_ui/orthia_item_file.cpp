@@ -1,5 +1,4 @@
 #include "orthia_item_file.h"
-#include "orthia_pe.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
@@ -49,7 +48,7 @@ namespace orthia
             return WorkAddressData();
         }
         // check fast cases
-        if (lastValid < peFile->GetImageBase() ||
+        if (lastValid < file->GetImageBase() ||
             address > moduleLastValidAddress)
         {
             // the entire range is inaccessible
@@ -65,12 +64,12 @@ namespace orthia
             );
         }
 
-        if (address >= peFile->GetImageBase() &&
+        if (address >= file->GetImageBase() &&
             lastValid <= moduleLastValidAddress)
         {
             // the entire range is good
-            auto offset = address - peFile->GetImageBase();
-            auto pBufferStart = peFile->GetMappedPeFile().data() + offset;
+            auto offset = address - file->GetImageBase();
+            auto pBufferStart = file->GetMappedFile().data() + offset;
             auto sharedThis = shared_from_this();
             return WorkAddressData(
                 pBufferStart,
@@ -86,20 +85,20 @@ namespace orthia
         // [startInvalidBytes][module itself][endInvalidBytes]
         Address_type startInvalidBytes = 0;
         Address_type positiveAddress = 0;
-        if (address < peFile->GetImageBase())
+        if (address < file->GetImageBase())
         {
-            startInvalidBytes = peFile->GetImageBase() - address;
+            startInvalidBytes = file->GetImageBase() - address;
         }
         else
         {
-            positiveAddress = address - peFile->GetImageBase();
+            positiveAddress = address - file->GetImageBase();
         }
         Address_type startValidBytes = (size - startInvalidBytes) - positiveAddress;
         Address_type endInvalidBytes = 0;
-        if (startValidBytes > peFile->GetMappedPeFile().size())
+        if (startValidBytes > file->GetMappedFile().size())
         {
-            endInvalidBytes = startValidBytes - peFile->GetMappedPeFile().size();
-            startValidBytes = peFile->GetMappedPeFile().size();
+            endInvalidBytes = startValidBytes - file->GetMappedFile().size();
+            startValidBytes = file->GetMappedFile().size();
         }
         if (startInvalidBytes + startValidBytes + endInvalidBytes != size)
         {
@@ -110,7 +109,7 @@ namespace orthia
         // ok here we go, prepare the final data
         std::vector<char> buffer(size);
         auto* pBufferStart = buffer.data();
-        memcpy(pBufferStart + startInvalidBytes, peFile->GetMappedPeFile().data() + positiveAddress, startValidBytes);
+        memcpy(pBufferStart + startInvalidBytes, file->GetMappedFile().data() + positiveAddress, startValidBytes);
 
         std::vector<char> flags(size);
         auto* pFlagsStart = flags.data();
@@ -130,14 +129,12 @@ namespace orthia
 
     WorkAddressRangeInfo FileWorkplaceItem::GetRangeInfo(Address_type address) const
     {
-        Address_type entryPoint = peFile->GetImageBase();
-        Diana_SafeAdd(&entryPoint, peFile->GetImpl()->mappedPE.pImpl->addressOfEntryPoint);
         return {
-            peFile->GetImageBase(),
+            file->GetImageBase(),
             moduleLastValidAddress,
-            entryPoint,
-            peFile->GetMappedPeFile().size(),
-            peFile->GetImpl()->mappedPE.pImpl->dianaMode
+            file->GetEntryPoint(),
+            file->GetMappedFile().size(),
+            file->GetDianaMode()
         };
     }
 
@@ -250,7 +247,7 @@ namespace orthia
             }
             info.entryPoint = info.address;
             info.size = dbm.size;
-            info.dianaMode = peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+            info.dianaMode = file->GetDianaMode();
             modules.push_back(info);
         }
 
@@ -298,7 +295,7 @@ namespace orthia
     }
     int FileWorkplaceItem::GetDianaMode() const
     {
-        return peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+        return file->GetDianaMode();
     }
     MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address) const
     {
@@ -450,26 +447,25 @@ namespace orthia
     {
         struct DianaReadStreamAdapter
         {
-            std::shared_ptr<orthia::CSimplePeFile> peFile;
+            std::shared_ptr<orthia::ISimpleFile> file;
             ::DianaMemoryStream stream;
 
-            DianaReadStreamAdapter(std::shared_ptr<orthia::CSimplePeFile> peFile_in)
+            DianaReadStreamAdapter(std::shared_ptr<orthia::ISimpleFile> file_in)
                 :
-                peFile(peFile_in)
+                file(file_in)
             {
-
             }
         };
 
-        if (addressStart < peFile->GetImageBase() || addressStart >= peFile->GetImageEnd())
+        if (addressStart < file->GetImageBase() || addressStart >= file->GetImageEnd())
         {
             return nullptr;
         }
 
-        auto streamAdapter = std::make_shared<DianaReadStreamAdapter>(peFile);
-        auto diff = addressStart - peFile->GetImageBase();
+        auto streamAdapter = std::make_shared<DianaReadStreamAdapter>(file);
+        auto diff = addressStart - file->GetImageBase();
 
-        auto& data = peFile->GetMappedPeFile();
+        auto& data = file->GetMappedFile();
         Diana_InitMemoryStreamEx2(&streamAdapter->stream, (char*)data.data()+diff, data.size()-diff, 0, 0);
 
         return std::shared_ptr<::DianaMovableReadStream>(streamAdapter, &streamAdapter->stream.parent.parent);

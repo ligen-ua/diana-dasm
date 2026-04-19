@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_model_interfaces.h"
+#include "orthia_simple_file.h"
 
 namespace orthia
 {
@@ -16,7 +17,7 @@ namespace orthia
 
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, IWorkPlaceItem
     {
-        std::shared_ptr<orthia::CSimplePeFile> peFile;
+        std::shared_ptr<orthia::ISimpleFile> file;
         oui::String fullName, shortName;
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;

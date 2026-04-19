@@ -1,11 +1,14 @@
 #include "orthia_model.h"
 #include "orthia_files.h"
 #include "orthia_pe.h"
+#include "orthia_elf.h"
 #include "orthia_helpers.h"
 #include "orthia_database_module.h"
 #include "orthia_item_process.h"
 #include "orthia_item_file.h"
 #include "orthia_model_modules.h"
+#include "orthia_model_modules_elf.h"
+#include "orthia_log.h"
 
 namespace orthia
 {
@@ -243,6 +246,15 @@ namespace orthia
         // OK
         result.error.native.clear();
     }
+    static bool IsElfFile(const std::vector<char>& data)
+    {
+        return data.size() >= 4 &&
+               (unsigned char)data[0] == 0x7F &&
+               data[1] == 'E' &&
+               data[2] == 'L' &&
+               data[3] == 'F';
+    }
+
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
     {
@@ -276,10 +288,22 @@ namespace orthia
                 return;
             }
 
-            // try map it first
-            auto mappedPE = std::make_shared<orthia::CSimplePeFile>();
+            // detect format and map
+            const bool isElf = IsElfFile(binPeFile);
             orthia::MapFileParameters params;
-            mappedPE->MapFile(binPeFile, params);
+            std::shared_ptr<orthia::ISimpleFile> mappedExe;
+            if (isElf)
+            {
+                auto elfFile = std::make_shared<orthia::CSimpleElfFile>();
+                elfFile->MapFile(binPeFile, params);
+                mappedExe = elfFile;
+            }
+            else
+            {
+                auto mappedPE = std::make_shared<orthia::CSimplePeFile>();
+                mappedPE->MapFile(binPeFile, params);
+                mappedExe = mappedPE;
+            }
 
             // check folder
             auto fileHash = CalcSha1(binPeFile);
@@ -289,7 +313,8 @@ namespace orthia
             auto binFileName = dbFolder + m_config->GetBinFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
             CreateAllDirectoriesForFile(dbFileName);
-
+            ORTHIA_LOG(orthia::LogSeverity::Info, "Database file: ", dbFileName);
+            
             // check binary file
             bool hashIsValid = false;
             int error = 0;
@@ -345,7 +370,7 @@ namespace orthia
             auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
 
             info->fullName = file->GetFullFileName();
-            info->peFile = mappedPE;
+            info->file = mappedExe;
             {
                 oui::String shortName;
                 orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
@@ -366,23 +391,23 @@ namespace orthia
                 }
             }
 
-            const auto& mappedFile = info->peFile->GetMappedPeFile();
+            const auto& mappedFile = info->file->GetMappedFile();
             if (mappedFile.empty())
             {
                 result.error = errorNode->QueryValue(ORTHIA_TCSTR("empty"));
                 return;
             }
             info->moduleLastValidAddress = mappedFile.size() - 1;
-            if (Diana_SafeAdd(&info->moduleLastValidAddress, info->peFile->GetImageBase()))
+            if (Diana_SafeAdd(&info->moduleLastValidAddress, info->file->GetImageBase()))
             {
                 result.error = errorNode->QueryValue(ORTHIA_TCSTR("invalid-image-base"));
                 return;
             }
 
-            CMemoryReaderOnLoadedData reader(info->peFile->GetImageBase(), mappedFile.data(), mappedFile.size());
+            CMemoryReaderOnLoadedData reader(info->file->GetImageBase(), mappedFile.data(), mappedFile.size());
 
             bool firstOpen = false;
-            if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->peFile->GetImageBase()))
+            if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->file->GetImageBase()))
             {
                 firstOpen = true;
                 // first open, warn user it may take quite a time
@@ -391,20 +416,37 @@ namespace orthia
 
             if (firstOpen)
             {
-                // load imports        
-                CImportsLoader importsLoader(completeHandler);
-                importsLoader.LoadModules(file->GetFullFileName(), info->peFile, file->GetFileSystem());
+                if (isElf)
+                {
+                    auto elfFile = std::static_pointer_cast<orthia::CSimpleElfFile>(mappedExe);
+                    CElfImportsLoader elfLoader(completeHandler);
+                    elfLoader.LoadModules(file->GetFullFileName(), elfFile, file->GetFileSystem());
 
-                info->moduleManager->ReloadModule(info->peFile->GetImageBase(),
-                    &reader,
-                    false,
-                    info->shortName.native,
-                    0);
+                    info->moduleManager->ReloadModule(info->file->GetImageBase(),
+                        &reader,
+                        false,
+                        info->shortName.native,
+                        0);
 
-                importsLoader.ReportModules(info->moduleManager);
+                    elfLoader.ReportModules(info->moduleManager);
+                }
+                else
+                {
+                    auto peFile = std::static_pointer_cast<orthia::CSimplePeFile>(mappedExe);
+                    CImportsLoader importsLoader(completeHandler);
+                    importsLoader.LoadModules(file->GetFullFileName(), peFile, file->GetFileSystem());
+
+                    info->moduleManager->ReloadModule(info->file->GetImageBase(),
+                        &reader,
+                        false,
+                        info->shortName.native,
+                        0);
+
+                    importsLoader.ReportModules(info->moduleManager);
+                }
 
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
-                    info->peFile->GetImageBase(),
+                    info->file->GetImageBase(),
                     info->fullName.native);
             }
 

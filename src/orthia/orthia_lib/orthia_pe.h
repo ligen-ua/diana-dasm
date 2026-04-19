@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_utils.h"
+#include "orthia_simple_file.h"
 extern "C"
 {
 #include "diana_pe_analyzer.h"
@@ -23,7 +24,7 @@ namespace orthia
         diana::Guard<diana::PeFile> mappedPE_Guard;
     };
 
-    class CSimplePeFile
+    class CSimplePeFile : public ISimpleFile
     {
         std::vector<char> m_mappedPeFile;
         std::unique_ptr<PeDianaContext> m_dianaContext;
@@ -40,11 +41,16 @@ namespace orthia
         DI_UINT64 GetImageBase() const;
         DI_UINT64 GetImageEnd() const;
 
-        const std::vector<char> & GetMappedPeFile() const;
+        const std::vector<char>& GetMappedPeFile() const;
 
-        int QueryImports(diana::CBasePeLinkImportsObserver* observer);
-        int QueryExports(diana::CBasePeLinkImportsObserver* observer);
+        int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
+        int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryTLSCallbacks(std::vector<OPERAND_SIZE>& callbacks);
+
+        // ISimpleFile overrides
+        const std::vector<char>& GetMappedFile() const override;
+        int GetDianaMode() const override;
+        DI_UINT64 GetEntryPoint() const override;
     };
 
     void ParseForwarderString(const std::string& fwString, std::string& dllName, std::string& functionName, OPERAND_SIZE &operand);

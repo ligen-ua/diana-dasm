@@ -154,6 +154,7 @@ void Diana_InitMemoryStreamEx2(DianaMemoryStream * pStream,
     pStream->bufferSize = bufferSize;
     pStream->curSize = 0;
     pStream->addressDifference = addressDifference;
+    pStream->translateAbsoluteAddress = 0;
 }
 void Diana_InitMemoryStreamEx(DianaMemoryStream* pStream,
     void* pBuffer,

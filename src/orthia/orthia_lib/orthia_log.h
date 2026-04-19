@@ -117,7 +117,7 @@ namespace orthia
         CLogParam(long long value);
         CLogParam(bool value);
         CLogParam(const ORTHIA_TCHAR * pValue);
-  
+
         bool IsSeverity(LogSeverity & severity) const;
         const ORTHIA_TCHAR * GetBegin() const;
         const ORTHIA_TCHAR * GetEnd() const;
@@ -157,6 +157,7 @@ namespace orthia
         CLogParamEx(unsigned long long value, long radix = 10) : CLogParam(value, radix)  {   }
         CLogParamEx(bool value) : CLogParam(value)  {   }
         CLogParamEx(const ORTHIA_TCHAR * pValue) : CLogParam(pValue)  {   }
+        CLogParamEx(int value) : CLogParam((long long)value) {   }
 
 #ifdef WIN32
         CLogParamEx(const std::string & str) : CLogParam(str)  {   }
