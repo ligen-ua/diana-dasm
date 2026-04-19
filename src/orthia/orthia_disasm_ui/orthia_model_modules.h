@@ -4,11 +4,14 @@
 #include "diana_pe_cpp.h"
 #include "oui_filesystem.h"
 #include "orthia_model.h"
+#include "orthia_pe.h"
+#include "orthia_model_modules_elf.h"
+#include "diana_executable.h"
 
 
 namespace orthia
 {
-    class CImportsLoader :public diana::CBasePeLinkImportsObserver
+    class CPEImportsLoader :public diana::CBasePeLinkImportsObserver
     {
         struct ModuleInfo
         {
@@ -47,10 +50,10 @@ namespace orthia
         void LoadImports(ModuleInfo& mod);
         void LoadExports(ModuleInfo& mod);
 
-        CImportsLoader::ModuleIterator LoadModuleImpl(const std::string& dllName);
+        CPEImportsLoader::ModuleIterator LoadModuleImpl(const std::string& dllName);
 
     public:
-        CImportsLoader(std::shared_ptr<oui::BaseOperation> operation = nullptr);
+        CPEImportsLoader(std::shared_ptr<oui::BaseOperation> operation = nullptr);
         void QueryFunctionByOrdinal(const char* pDllName,
             DI_UINT32 ordinal,
             OPERAND_SIZE* pAddress) override;
@@ -60,10 +63,27 @@ namespace orthia
             DI_UINT32 hint,
             OPERAND_SIZE* pAddress) override;
 
-        void LoadModules(const oui::String& fileName, 
+        void LoadModules(const oui::String& fileName,
             std::shared_ptr<orthia::CSimplePeFile> peFile,
             std::shared_ptr<oui::IFileSystem> pFs);
 
         void ReportModules(std::shared_ptr<CModuleManager> moduleManager);
     };
+
+    class CImportsLoader
+    {
+        int m_executableType;
+        std::unique_ptr<CPEImportsLoader> m_peLoader;
+        std::unique_ptr<CElfImportsLoader> m_elfLoader;
+    public:
+        CImportsLoader(int executableType, std::shared_ptr<oui::BaseOperation> operation = nullptr);
+        void LoadModules(const oui::String& fileName,
+            std::shared_ptr<ISimpleFile> file,
+            std::shared_ptr<oui::IFileSystem> pFs);
+        void ReportModules(std::shared_ptr<CModuleManager> moduleManager);
+    };
+
+    std::shared_ptr<ISimpleFile> MakeSimpleFile(int executableType,
+        const std::vector<char>& data,
+        const MapFileParameters& params);
 }

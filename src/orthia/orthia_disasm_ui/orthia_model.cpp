@@ -1,13 +1,10 @@
 #include "orthia_model.h"
 #include "orthia_files.h"
-#include "orthia_pe.h"
-#include "orthia_elf.h"
 #include "orthia_helpers.h"
 #include "orthia_database_module.h"
 #include "orthia_item_process.h"
 #include "orthia_item_file.h"
 #include "orthia_model_modules.h"
-#include "orthia_model_modules_elf.h"
 #include "orthia_log.h"
 
 namespace orthia
@@ -246,15 +243,6 @@ namespace orthia
         // OK
         result.error.native.clear();
     }
-    static bool IsElfFile(const std::vector<char>& data)
-    {
-        return data.size() >= 4 &&
-               (unsigned char)data[0] == 0x7F &&
-               data[1] == 'E' &&
-               data[2] == 'L' &&
-               data[3] == 'F';
-    }
-
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
     {
@@ -289,21 +277,9 @@ namespace orthia
             }
 
             // detect format and map
-            const bool isElf = IsElfFile(binPeFile);
+            const int executableType = DianaExecutable_DetectType(binPeFile.data(), binPeFile.size());
             orthia::MapFileParameters params;
-            std::shared_ptr<orthia::ISimpleFile> mappedExe;
-            if (isElf)
-            {
-                auto elfFile = std::make_shared<orthia::CSimpleElfFile>();
-                elfFile->MapFile(binPeFile, params);
-                mappedExe = elfFile;
-            }
-            else
-            {
-                auto mappedPE = std::make_shared<orthia::CSimplePeFile>();
-                mappedPE->MapFile(binPeFile, params);
-                mappedExe = mappedPE;
-            }
+            auto mappedExe = orthia::MakeSimpleFile(executableType, binPeFile, params);
 
             // check folder
             auto fileHash = CalcSha1(binPeFile);
@@ -416,25 +392,9 @@ namespace orthia
 
             if (firstOpen)
             {
-                if (isElf)
                 {
-                    auto elfFile = std::static_pointer_cast<orthia::CSimpleElfFile>(mappedExe);
-                    CElfImportsLoader elfLoader(completeHandler);
-                    elfLoader.LoadModules(file->GetFullFileName(), elfFile, file->GetFileSystem());
-
-                    info->moduleManager->ReloadModule(info->file->GetImageBase(),
-                        &reader,
-                        false,
-                        info->shortName.native,
-                        0);
-
-                    elfLoader.ReportModules(info->moduleManager);
-                }
-                else
-                {
-                    auto peFile = std::static_pointer_cast<orthia::CSimplePeFile>(mappedExe);
-                    CImportsLoader importsLoader(completeHandler);
-                    importsLoader.LoadModules(file->GetFullFileName(), peFile, file->GetFileSystem());
+                    orthia::CImportsLoader importsLoader(executableType, completeHandler);
+                    importsLoader.LoadModules(file->GetFullFileName(), mappedExe, file->GetFileSystem());
 
                     info->moduleManager->ReloadModule(info->file->GetImageBase(),
                         &reader,

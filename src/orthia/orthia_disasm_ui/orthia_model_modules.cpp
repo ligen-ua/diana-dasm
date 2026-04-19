@@ -1,5 +1,6 @@
 #include "orthia_model_modules.h"
 #include "orthia_pe.h"
+#include "orthia_elf.h"
 #include "diana_pe_cpp.h"
 #include "orthia_streams.h"
 #include "orthia_memory_cache.h"
@@ -9,12 +10,12 @@
 
 namespace orthia
 {
-    CImportsLoader::CImportsLoader(std::shared_ptr<oui::BaseOperation> operation)
+    CPEImportsLoader::CPEImportsLoader(std::shared_ptr<oui::BaseOperation> operation)
         :
         m_operation(operation)
     {
     }
-    void CImportsLoader::CheckCancel()
+    void CPEImportsLoader::CheckCancel()
     {
         if (m_operation && m_operation->IsCancelled())
         {
@@ -22,12 +23,12 @@ namespace orthia
         }
     }
 
-    oui::String CImportsLoader::NormalizeName(const std::string& dllName)
+    oui::String CPEImportsLoader::NormalizeName(const std::string& dllName)
     {
         oui::String str = orthia::Utf8ToPlatformString(dllName);
         return NormalizeName(str);
     }
-    oui::String CImportsLoader::NormalizeName(const oui::String& str)
+    oui::String CPEImportsLoader::NormalizeName(const oui::String& str)
     {
         int platformError = 0;
         oui::String normalName;
@@ -38,7 +39,7 @@ namespace orthia
         }
         return normalName;
     }
-    oui::String CImportsLoader::LocateFile(const oui::String& dllName)
+    oui::String CPEImportsLoader::LocateFile(const oui::String& dllName)
     {
         int platformError = 0;
         oui::String normalName;
@@ -49,7 +50,7 @@ namespace orthia
         }
         return normalName;
     }
-    bool CImportsLoader::CheckConflicts(std::shared_ptr<orthia::CSimplePeFile> peFile)
+    bool CPEImportsLoader::CheckConflicts(std::shared_ptr<orthia::CSimplePeFile> peFile)
     {
         auto modAddress = peFile->GetImageBase();
         auto modEnd = peFile->GetImageEnd();
@@ -97,7 +98,7 @@ namespace orthia
         return newAddress + alignment;
     }
 
-    OPERAND_SIZE CImportsLoader::GetLastPossibleAddress()
+    OPERAND_SIZE CPEImportsLoader::GetLastPossibleAddress()
     {
         OPERAND_SIZE lastPossibleAddress = DI_MAX_OPERAND_SIZE;
         switch (m_dianaMode)
@@ -111,7 +112,7 @@ namespace orthia
         }
         return lastPossibleAddress;
     }
-    void CImportsLoader::RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile)
+    void CPEImportsLoader::RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile)
     {
         // check 
         OPERAND_SIZE lastPossibleAddress = GetLastPossibleAddress();
@@ -128,7 +129,7 @@ namespace orthia
         auto possibleAddress = RoundUp(m_freeSpaceStart, 0x10000);
         peFile->Relocate(possibleAddress);
     }
-    CImportsLoader::ModuleIterator CImportsLoader::LoadModule(const std::string& dllName)
+    CPEImportsLoader::ModuleIterator CPEImportsLoader::LoadModule(const std::string& dllName)
     {
         try
         {
@@ -146,7 +147,7 @@ namespace orthia
             return m_mappedModules.insert({ name.native, info }).first;
         }
     }
-    CImportsLoader::ModuleIterator CImportsLoader::LoadModuleImpl(const std::string& dllName)
+    CPEImportsLoader::ModuleIterator CPEImportsLoader::LoadModuleImpl(const std::string& dllName)
     {
         auto name = NormalizeName(dllName);
         {
@@ -206,20 +207,20 @@ namespace orthia
         return m_mappedModules.insert({ name.native, info }).first;
     }
 
-    void CImportsLoader::QueryFunctionByOrdinal(const char* pDllName,
+    void CPEImportsLoader::QueryFunctionByOrdinal(const char* pDllName,
         DI_UINT32 ordinal,
         OPERAND_SIZE* pAddress)
     {
         QueryFunctionImpl(pDllName, "", ordinal, pAddress);
     }
-    void CImportsLoader::QueryFunctionByName(const char* pDllName,
+    void CPEImportsLoader::QueryFunctionByName(const char* pDllName,
         const char* pFunctionName,
         DI_UINT32 hint,
         OPERAND_SIZE* pAddress)
     {
         QueryFunctionImpl(pDllName, pFunctionName, DI_MAX_OPERAND_SIZE, pAddress);
     }
-    void CImportsLoader::QueryFunctionImpl(const char* pDllName,
+    void CPEImportsLoader::QueryFunctionImpl(const char* pDllName,
         const char* pFunctionName,
         OPERAND_SIZE ordinalIn,
         OPERAND_SIZE* pAddress)
@@ -282,7 +283,7 @@ namespace orthia
         CheckCancel();
     }
 
-    void CImportsLoader::LoadImports(ModuleInfo& mod)
+    void CPEImportsLoader::LoadImports(ModuleInfo& mod)
     {
         if (!mod.peFile->GetImpl())
         {
@@ -320,7 +321,7 @@ namespace orthia
         } collector(mod);
         DI_CHECK_CPP(mod.peFile->QueryImports(&collector));
     }
-    void CImportsLoader::LoadExports(ModuleInfo& mod)
+    void CPEImportsLoader::LoadExports(ModuleInfo& mod)
     {
         if (!mod.peFile->GetImpl())
         {
@@ -374,8 +375,8 @@ namespace orthia
         }
 
     }
-    // CImportsLoader
-    void CImportsLoader::LoadModules(const oui::String & fileName, 
+    // CPEImportsLoader
+    void CPEImportsLoader::LoadModules(const oui::String & fileName, 
         std::shared_ptr<orthia::CSimplePeFile> peFile,
         std::shared_ptr<oui::IFileSystem> pFs)
     {
@@ -438,7 +439,7 @@ namespace orthia
             }
         }
     }
-    void CImportsLoader::InsertNames(std::shared_ptr<CModuleManager> moduleManager, const ModuleInfo& mod)
+    void CPEImportsLoader::InsertNames(std::shared_ptr<CModuleManager> moduleManager, const ModuleInfo& mod)
     {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         for (auto& name : mod.names)
@@ -447,7 +448,7 @@ namespace orthia
         }
     }
 
-    void CImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)
+    void CPEImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)
     {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
@@ -465,7 +466,7 @@ namespace orthia
 
             CAutoRollbackClassicDatabase rollback;
             classicDatabase->StartSaveModule(mod.second.peFile->GetImageBase(),
-                mod.second.peFile->GetMappedPeFile().size(), 
+                mod.second.peFile->GetMappedPeFile().size(),
                 shortName.native,
                 &rollback);
 
@@ -481,5 +482,61 @@ namespace orthia
             // 3. import functions address
             classicDatabase->DoneSave();
         }
+    }
+
+    // CImportsLoader (unified facade)
+    CImportsLoader::CImportsLoader(int executableType, std::shared_ptr<oui::BaseOperation> operation)
+        : m_executableType(executableType)
+    {
+        if (executableType == DIANA_EXECUTABLE_TYPE_ELF)
+        {
+            m_elfLoader = std::make_unique<CElfImportsLoader>(operation);
+        }
+        else
+        {
+            m_peLoader = std::make_unique<CPEImportsLoader>(operation);
+        }
+    }
+
+    void CImportsLoader::LoadModules(const oui::String& fileName,
+        std::shared_ptr<ISimpleFile> file,
+        std::shared_ptr<oui::IFileSystem> pFs)
+    {
+        if (m_elfLoader)
+        {
+            m_elfLoader->LoadModules(fileName, std::static_pointer_cast<CSimpleElfFile>(file), pFs);
+        }
+        else
+        {
+            m_peLoader->LoadModules(fileName, std::static_pointer_cast<CSimplePeFile>(file), pFs);
+        }
+    }
+
+    void CImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)
+    {
+        if (m_elfLoader)
+        {
+            m_elfLoader->ReportModules(moduleManager);
+        }
+        else
+        {
+            m_peLoader->ReportModules(moduleManager);
+        }
+    }
+
+    // MakeSimpleFile factory
+    std::shared_ptr<ISimpleFile> MakeSimpleFile(int executableType,
+        const std::vector<char>& data,
+        const MapFileParameters& params)
+    {
+        if (executableType == DIANA_EXECUTABLE_TYPE_ELF)
+        {
+            auto elfFile = std::make_shared<CSimpleElfFile>();
+            elfFile->MapFile(data, params);
+            return elfFile;
+        }
+        auto peFile = std::make_shared<CSimplePeFile>();
+        peFile->MapFile(data, params);
+        return peFile;
     }
 }

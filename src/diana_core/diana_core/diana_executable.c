@@ -105,3 +105,22 @@ int DianaExecutable_QueryTLSCallbacks(DianaExecutable* pExe,
     if (pAddressOfTLSIndex) *pAddressOfTLSIndex = 0;
     return DI_SUCCESS;
 }
+
+int DianaExecutable_DetectType(const char* pData, OPERAND_SIZE size)
+{
+    if (size >= 4 &&
+        (unsigned char)pData[0] == 0x7F &&
+        pData[1] == 'E' &&
+        pData[2] == 'L' &&
+        pData[3] == 'F')
+    {
+        return DIANA_EXECUTABLE_TYPE_ELF;
+    }
+    if (size >= 2 &&
+        (unsigned char)pData[0] == 'M' &&
+        (unsigned char)pData[1] == 'Z')
+    {
+        return DIANA_EXECUTABLE_TYPE_PE;
+    }
+    return DIANA_EXECUTABLE_TYPE_NONE;
+}

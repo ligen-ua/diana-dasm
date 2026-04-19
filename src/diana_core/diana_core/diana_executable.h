@@ -60,6 +60,9 @@ int DianaExecutable_QueryTLSCallbacks(DianaExecutable* pExe,
     OPERAND_SIZE* pAddressOfTLSIndex,
     int streamFlags);
 
+/* Detect executable type from raw bytes; returns DIANA_EXECUTABLE_TYPE_* */
+int DianaExecutable_DetectType(const char* pData, OPERAND_SIZE size);
+
 #ifdef __cplusplus
 }
 #endif
