@@ -40,7 +40,7 @@ namespace orthia
         {
             imageBase = params.imageBase;
         }
-        else if (dianaElfFile.pImpl->elfHeader.e_type == DIANA_ET_EXEC)
+        else
         {
             for (int i = 0; i < dianaElfFile.pImpl->capturedSegmentCount; ++i)
             {
