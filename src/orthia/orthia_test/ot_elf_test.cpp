@@ -55,19 +55,20 @@ static void test_elf1()
 {
     std::vector<char> data = LoadElfTestFile(ORTHIA_TCSTR("ls.bin"));
 
-    DianaMovableReadStreamOverMemory dianaElfFileStream;
-    DianaMovableReadStreamOverMemory_Init(&dianaElfFileStream, &data.front(), data.size());
+    DianaMemoryStream dianaElfFileStream;
+    Diana_InitMemoryStream(&dianaElfFileStream, &data.front(), data.size());
+    dianaElfFileStream.translateAbsoluteAddress = TranslateAbsoluteAddress;
 
     Diana_ElfFile dianaElfFile;
     DI_CHECK_CPP(DianaElfFile_Init(&dianaElfFile,
-        &dianaElfFileStream.stream,
+        &dianaElfFileStream.parent.parent,
         data.size(),
         0));
     diana::Guard<diana::ElfFile> peFileGuard(&dianaElfFile);
 
     OPERAND_SIZE symbolAddress = 0;
     DI_CHECK_CPP(DianaElfFile_GetProcAddress(&dianaElfFile,
-        &dianaElfFileStream.stream,
+        &dianaElfFileStream.parent.parent,
         "_obstack_begin",
         &symbolAddress));
 

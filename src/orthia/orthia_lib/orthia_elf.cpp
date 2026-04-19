@@ -137,29 +137,41 @@ namespace orthia
             return m_imageBase + e_entry;
         return e_entry;
     }
+    struct SimpleElfFileStreamWithContext : public ::DianaMemoryStream
+    {
+        CSimpleElfFile* elf;
+    };
     DI_UINT64 CSimpleElfFile::DiGetProcAddress(const char* pFunctionName, OPERAND_SIZE* pForwardOffset, DI_UINT16 ordinal)
     {
         if (m_mappedElfFile.empty() || !m_dianaContext)
             return 0;
-        DianaMovableReadStreamOverMemory stream;
-        DianaMovableReadStreamOverMemory_Init(&stream, m_mappedElfFile.data(), m_mappedElfFile.size());
+        // Must use SimpleElfFileStreamWithContext so translateAbsoluteAddress is
+        // available for the DIANA_ANALYZE_RANDOM_READ_ABSOLUTE reads inside
+        // DianaElfFile_GetSymbolAddress_Memory (gnuHashAddr, symtabAddr, strtabAddr …)
+        SimpleElfFileStreamWithContext stream;
+        Diana_InitMemoryStreamEx2(&stream, m_mappedElfFile.data(), m_mappedElfFile.size(), 0, 0);
+        stream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+        stream.elf = this;
         OPERAND_SIZE result = 0;
         int err = DianaElfFile_GetProcAddress(&m_dianaContext->mappedElf,
-            &stream.stream,
+            &stream.parent.parent,
             pFunctionName,
             &result);
         if (err)
             return 0;
         return result;
     }
+
     int CSimpleElfFile::QueryImports(diana::CBasePeLinkImportsObserver* observer)
     {
         if (m_mappedElfFile.empty() || !m_dianaContext)
             return DI_ERROR;
 
         std::vector<char> page(4096);
-        ::DianaMemoryStream rwStream;
-        Diana_InitMemoryStreamEx2(&rwStream, m_mappedElfFile.data(), m_mappedElfFile.size(), 0, 0);
+        SimpleElfFileStreamWithContext rwStream;
+        Diana_InitMemoryStreamEx2(&rwStream, m_mappedElfFile.data(), m_mappedElfFile.size(), 1, 0);
+        rwStream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+        rwStream.elf = this;
 
         return DianaElfFile_QueryImports(&m_dianaContext->mappedElf,
             0,
@@ -170,15 +182,54 @@ namespace orthia
             0,
             0);
     }
+    int CSimpleElfFile::TranslateAbsoluteAddress(struct _dianaMemoryStream* pThis, OPERAND_SIZE* address)
+    {
+        CSimpleElfFile* elf = ((SimpleElfFileStreamWithContext*)pThis)->elf;
+        if (*address < elf->m_imageBase || *address > elf->m_imageBase + elf->GetImpl()->mappedElf.pImpl->sizeOfModule)
+        {
+            return DI_ERROR;
+        }
+        *address -= elf->m_imageBase;
+        return DI_SUCCESS;
+    }
+    std::vector<std::string> CSimpleElfFile::GetNeededLibraries() const
+    {
+        if (m_mappedElfFile.empty() || !m_dianaContext)
+            return {};
+
+        // Use the same stream setup as QueryImports/QueryExports so that
+        // translateAbsoluteAddress is available for DT_STRTAB VA reads.
+        SimpleElfFileStreamWithContext stream;
+        Diana_InitMemoryStreamEx2(&stream,
+            const_cast<char*>(m_mappedElfFile.data()),
+            m_mappedElfFile.size(),
+            0,
+            0);
+        stream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+        stream.elf = const_cast<CSimpleElfFile*>(this);
+
+        std::vector<std::string> result;
+        DianaElfFile_GetNeededLibraries(
+            const_cast<Diana_ElfFile*>(&m_dianaContext->mappedElf),
+            &stream.parent.parent,
+            [](void* ctx, const char* name) -> int {
+                static_cast<std::vector<std::string>*>(ctx)->emplace_back(name);
+                return DI_SUCCESS;
+            },
+            &result,
+            0);
+        return result;
+    }
     int CSimpleElfFile::QueryExports(diana::CBasePeLinkImportsObserver* observer)
     {
         if (m_mappedElfFile.empty() || !m_dianaContext)
             return DI_ERROR;
 
         std::vector<char> page(4096);
-        ::DianaMemoryStream rwStream;
+        SimpleElfFileStreamWithContext rwStream;
         Diana_InitMemoryStreamEx2(&rwStream, m_mappedElfFile.data(), m_mappedElfFile.size(), 0, 0);
-
+        rwStream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+        rwStream.elf = this;
         return DianaElfFile_QueryExports(&m_dianaContext->mappedElf,
             &rwStream.parent.parent,
             page.data(),

@@ -91,4 +91,13 @@ int DianaElfFile_MapEx(/* in */  Diana_ElfFile* pElfFile,
     /* in */  int                          pageSize,
     /* in */  int                          flags);
 
+
+typedef int (*DianaElfFile_NeededLibrary_Callback)(void* pContext, const char* libName);
+
+int DianaElfFile_GetNeededLibraries(/* in */ Diana_ElfFile* pElfFile,
+    /* in */ DianaMovableReadStream* pStream,
+    /* in */ DianaElfFile_NeededLibrary_Callback callback,
+    /* in */ void* pContext,
+    /* in */ int streamFlags);
+
 #endif

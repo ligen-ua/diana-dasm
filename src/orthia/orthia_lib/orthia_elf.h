@@ -23,6 +23,8 @@ namespace orthia
         std::vector<char> m_originalElfFile;
         std::unique_ptr<ElfDianaContext> m_dianaContext;
         DI_UINT64 m_imageBase = 0;
+
+        static int TranslateAbsoluteAddress(struct _dianaMemoryStream* pThis, OPERAND_SIZE* address);
     public:
         CSimpleElfFile();
         ~CSimpleElfFile();
@@ -42,5 +44,6 @@ namespace orthia
         DI_UINT64 GetEntryPoint() const override;
         int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
+        std::vector<std::string> GetNeededLibraries() const;
     };
 }
