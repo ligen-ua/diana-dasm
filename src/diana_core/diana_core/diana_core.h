@@ -554,6 +554,9 @@ int Diana_OnError(int code);
 int Diana_ConvertOpSizeToSizeT(const OPERAND_SIZE * pOpSize, DIANA_SIZE_T * pSizeT);
 int Diana_SafeAdd(OPERAND_SIZE * pResult, OPERAND_SIZE arg);
 
+/* Ceiling for any single allocation derived from file-supplied sizes (512 MB) */
+#define DIANA_MAX_SAFE_ALLOC_SIZE  0x20000000ULL
+
 // returns 0 if code is unknown
 const char * Diana_QueryErrorText_Silent(int value);
 

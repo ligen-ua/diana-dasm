@@ -51,7 +51,12 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
         DIANA_ELF_SECTION_HEADER* pStrTabSection =
             &pSectionHeader[pImpl->elfHeader.e_shstrndx].header;
 
-        char* pStringTable = DIANA_MALLOC(pStrTabSection->sh_size);
+        if (pStrTabSection->sh_size == 0 || pStrTabSection->sh_size > DIANA_MAX_SAFE_ALLOC_SIZE)
+            return DI_INVALID_INPUT;
+        OPERAND_SIZE strTabOpSize = pStrTabSection->sh_size;
+        DIANA_SIZE_T strTabAllocSize;
+        DI_CHECK(Diana_ConvertOpSizeToSizeT(&strTabOpSize, &strTabAllocSize));
+        char* pStringTable = DIANA_MALLOC(strTabAllocSize);
         DI_CHECK_ALLOC(pStringTable);
 
         // Read the string table
@@ -70,7 +75,9 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
                 const char* pName = &pStringTable[nameOffset];
                 int nameLen = 0;
 
-                while (nameLen < 63 && pName[nameLen] != '\0')
+                while (nameLen < 63 &&
+                       (nameOffset + (uint32_t)nameLen) < pStrTabSection->sh_size &&
+                       pName[nameLen] != '\0')
                     nameLen++;
 
                 DIANA_MEMSET(pSection->sh_name_str, 0, sizeof(pSection->sh_name_str));
@@ -623,13 +630,17 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     OPERAND_SIZE dynAddr = pImpl->dynamicAddress;
 
     DI_UINT64 dynSize = pImpl->dynamicSize;
-    if (dynSize == 0 || dynSize > 0x1000000) // sanity
+    if (dynSize == 0 || dynSize > DIANA_MAX_SAFE_ALLOC_SIZE) // sanity
         return DI_INVALID_INPUT;
 
     // Read dynamic array into temp (still treated as Elf64_Dyn-like,
     // but d_tag/d_val are read via rdXX in your initializer)
-    pDyn = (DI_ELF_DYN64*)DIANA_MALLOC((DIANA_SIZE_T)dynSize);
-    DI_CHECK_ALLOC_GOTO(pDyn);
+    {
+        DIANA_SIZE_T dynAllocSize;
+        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynSize, &dynAllocSize));
+        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize);
+        DI_CHECK_ALLOC_GOTO(pDyn);
+    }
 
     DI_CHECK_GOTO(pStream->pRandomRead(pStream,
         dynAddr,
@@ -710,7 +721,7 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
         // DI_UINT32 bloomshift = header[3]; // not needed in this impl
 
         OPERAND_SIZE bloomAddr = gnuHashAddr + sizeof(header);
-        if (bloomsize > 0x10000) {
+        if ((OPERAND_SIZE)bloomsize * sizeof(DI_UINT64) > DIANA_MAX_SAFE_ALLOC_SIZE) {
             DI_CHECK_GOTO(DI_OUT_OF_MEMORY);
         }
         bloom = (DI_UINT64*)DIANA_MALLOC((DIANA_SIZE_T)(bloomsize * sizeof(DI_UINT64)));
@@ -728,6 +739,9 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
         }
 
         OPERAND_SIZE bucketsAddr = bloomAddr + bloomsize * sizeof(DI_UINT64);
+        if ((OPERAND_SIZE)nbuckets * sizeof(DI_UINT32) > DIANA_MAX_SAFE_ALLOC_SIZE) {
+            DI_CHECK_GOTO(DI_INVALID_INPUT);
+        }
         buckets = (DI_UINT32*)DIANA_MALLOC((DIANA_SIZE_T)(nbuckets * sizeof(DI_UINT32)));
         DI_CHECK_ALLOC_GOTO(buckets);
 
@@ -981,11 +995,20 @@ int DianaElfFile_GetSymbolAddress_File(Diana_ElfFile* pElfFile,
         return DI_INVALID_INPUT;
 
     int status = DI_NOT_FOUND;
+    char* strings = NULL;
     DI_UINT64 numSymbols = pDynsym->sh_size / symEntSize;
 
-    // Read entire string table (as before)
-    char* strings = (char*)DIANA_MALLOC((DIANA_SIZE_T)pDynstr->sh_size);
-    DI_CHECK_ALLOC(strings);
+    if (pDynstr->sh_size == 0 || pDynstr->sh_size > DIANA_MAX_SAFE_ALLOC_SIZE)
+        return DI_INVALID_INPUT;
+
+    // Read entire string table
+    {
+        OPERAND_SIZE dynstrOpSize = pDynstr->sh_size;
+        DIANA_SIZE_T dynstrAllocSize;
+        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynstrOpSize, &dynstrAllocSize));
+        strings = (char*)DIANA_MALLOC(dynstrAllocSize);
+        DI_CHECK_ALLOC_GOTO(strings);
+    }
 
     DI_CHECK_GOTO(pStream->pMoveTo(pStream, pDynstr->sh_offset));
     DI_CHECK_GOTO(DianaExactReadSafe(&pStream->parent, strings, pDynstr->sh_size));
@@ -1002,6 +1025,9 @@ int DianaElfFile_GetSymbolAddress_File(Diana_ElfFile* pElfFile,
             isLE,
             &sym,
             0));
+
+        if (sym.st_name >= pDynstr->sh_size)
+            continue;
 
         const char* name = &strings[sym.st_name];
 
@@ -1082,11 +1108,15 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
     DI_CHECK_GOTO(Diana_SafeAdd(&dynAddr, pImpl->dynamicAddress));
 
     DI_UINT64 dynSize = pImpl->dynamicSize;
-    if (dynSize == 0 || dynSize > 0x1000000)
+    if (dynSize == 0 || dynSize > DIANA_MAX_SAFE_ALLOC_SIZE)
         return DI_INVALID_INPUT;
 
-    pDyn = (DI_ELF_DYN64*)DIANA_MALLOC((DIANA_SIZE_T)dynSize);
-    DI_CHECK_ALLOC_GOTO(pDyn);
+    {
+        DIANA_SIZE_T dynAllocSize;
+        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynSize, &dynAllocSize));
+        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize);
+        DI_CHECK_ALLOC_GOTO(pDyn);
+    }
 
     DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
         dynAddr,
@@ -1331,11 +1361,15 @@ int DianaElfFile_GetNeededLibraries(Diana_ElfFile* pElfFile,
     if (!pImpl || !callback)
         return DI_INVALID_INPUT;
 
-    if (pImpl->dynamicSize == 0 || pImpl->dynamicSize > 0x1000000)
+    if (pImpl->dynamicSize == 0 || pImpl->dynamicSize > DIANA_MAX_SAFE_ALLOC_SIZE)
         return DI_SUCCESS;
 
-    pDyn = (DI_ELF_DYN64*)DIANA_MALLOC((DIANA_SIZE_T)pImpl->dynamicSize);
-    DI_CHECK_ALLOC_GOTO(pDyn);
+    {
+        DIANA_SIZE_T dynAllocSize;
+        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&pImpl->dynamicSize, &dynAllocSize));
+        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize);
+        DI_CHECK_ALLOC_GOTO(pDyn);
+    }
 
     DI_CHECK_GOTO(pStream->pRandomRead(pStream,
         pImpl->dynamicAddress,

@@ -2,6 +2,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_files.h"
 #include "orthia_streams.h"
+#include "orthia_elf.h"
 
 extern "C"
 {
@@ -43,6 +44,21 @@ public:
         DI_UINT32 hint,
         OPERAND_SIZE* pAddress)
     {
+    }
+};
+
+class CollectingImportsObserver : public diana::CBasePeLinkImportsObserver
+{
+public:
+    std::vector<std::string> imports;
+
+    void QueryFunctionByOrdinal(const char* pDllName, DI_UINT32 ordinal, OPERAND_SIZE* pAddress)
+    {
+    }
+    void QueryFunctionByName(const char* pDllName, const char* pFunctionName, DI_UINT32 hint, OPERAND_SIZE* pAddress)
+    {
+        if (pFunctionName)
+            imports.push_back(pFunctionName);
     }
 };
 
@@ -94,7 +110,64 @@ static void test_elf1()
         0));
 }
 
+static void test_simple_elf_map()
+{
+    std::vector<char> data = LoadElfTestFile(ORTHIA_TCSTR("dmesg"));
+
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    elf.MapFile(data, params);
+
+    DIANA_TEST_ASSERT(!elf.GetMappedFile().empty());
+    DIANA_TEST_ASSERT(elf.GetImageEnd() > elf.GetImageBase());
+    DIANA_TEST_ASSERT(elf.GetDianaMode() != 0);
+    DIANA_TEST_ASSERT(elf.GetEntryPoint() != 0);
+}
+
+static void test_simple_elf_needed_libs()
+{
+    std::vector<char> data = LoadElfTestFile(ORTHIA_TCSTR("dmesg"));
+
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    elf.MapFile(data, params);
+
+    auto libs = elf.GetNeededLibraries();
+    DIANA_TEST_ASSERT(!libs.empty());
+}
+
+static void test_simple_elf_imports()
+{
+    std::vector<char> data = LoadElfTestFile(ORTHIA_TCSTR("dmesg"));
+
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    elf.MapFile(data, params);
+
+    CollectingImportsObserver observer;
+    elf.QueryImports(&observer);
+    DIANA_TEST_ASSERT(!observer.imports.empty());
+}
+
+static void test_simple_elf_relocate()
+{
+    std::vector<char> data = LoadElfTestFile(ORTHIA_TCSTR("dmesg"));
+
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    elf.MapFile(data, params);
+
+    const DI_UINT64 newBase = 0x500000;
+    elf.Relocate(newBase);
+    DIANA_TEST_ASSERT(elf.GetImageBase() == newBase);
+    DIANA_TEST_ASSERT(elf.GetImageEnd() > newBase);
+}
+
 void test_elf()
 {
     DIANA_TEST(test_elf1());
+    DIANA_TEST(test_simple_elf_map());
+    DIANA_TEST(test_simple_elf_needed_libs());
+    DIANA_TEST(test_simple_elf_imports());
+    DIANA_TEST(test_simple_elf_relocate());
 }

@@ -357,6 +357,8 @@ int DianaPeFile_FixRelocs(/* in */ Diana_PeFile * pPeFile,
     {
         return DI_SUCCESS;
     }
+    if (pRelocationDirectory->Size > DIANA_MAX_SAFE_ALLOC_SIZE)
+        return DI_INVALID_INPUT;
     pCapturedRelocs = DIANA_MALLOC(pRelocationDirectory->Size);
     if (!pCapturedRelocs)
     {
@@ -884,6 +886,8 @@ int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
         return DI_SUCCESS;
     }
 
+    if (pDebugDirectory->Size > DIANA_MAX_SAFE_ALLOC_SIZE)
+        return DI_INVALID_INPUT;
     pCapturedSection = DIANA_MALLOC(pDebugDirectory->Size);
     if (!pCapturedSection)
     {
@@ -966,6 +970,8 @@ int DianaPeFile_LinkImportsEx(/* in */ Diana_PeFile * pPeFile,
         return DI_SUCCESS;
     }
 
+    if (pImportDirectory->Size > DIANA_MAX_SAFE_ALLOC_SIZE)
+        return DI_INVALID_INPUT;
     pCapturedImports = DIANA_MALLOC(pImportDirectory->Size);
     if (!pCapturedImports)
     {
