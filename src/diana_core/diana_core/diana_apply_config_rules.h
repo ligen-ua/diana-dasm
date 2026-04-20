@@ -55,8 +55,6 @@
 #endif
 #endif
 
-#endif
-
 #ifdef _WIN32
 
 #define DIANA_CDECL __cdecl
@@ -83,6 +81,8 @@
 #ifndef DIANA_HAS_CPP11
 #define DIANA_HAS_CPP11
 #endif
+#endif
+
 
 
 #if defined(__has_include) && __has_include(<stdint.h>)
@@ -147,6 +147,5 @@
 #define DI_FULL_CHAR_NULL       ((uint32_t)(-1))
 
 #endif
-
 
 #endif
