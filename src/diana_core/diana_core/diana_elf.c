@@ -6,9 +6,11 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
     DianaMovableReadStream* pStream,
     OPERAND_SIZE sizeOfFile)
 {
+    char* pStringTable = 0;
     Diana_ElfSectionWithInfo* pSectionHeader = 0;
     int i;
     OPERAND_SIZE shAddress = 0;
+    int status = 0;
 
     if (pImpl->elfHeader.e_shnum == 0)
         return DI_SUCCESS;
@@ -28,13 +30,13 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
     for (i = 0; i < pImpl->elfHeader.e_shnum; ++i)
     {
         DIANA_ELF_SECTION_HEADER * pHeader = &pSectionHeader[i].header;
-        DI_CHECK(pStream->pMoveTo(pStream, shAddress));
+        DI_CHECK_GOTO(pStream->pMoveTo(pStream, shAddress));
 
-        DI_CHECK(DianaExactRead(&pStream->parent,
+        DI_CHECK_GOTO(DianaExactRead(&pStream->parent,
             pHeader,
             sizeof(DIANA_ELF_SECTION_HEADER)));
 
-        DI_CHECK(Diana_SafeAdd(&shAddress, pImpl->elfHeader.e_shentsize));
+        DI_CHECK_GOTO(Diana_SafeAdd(&shAddress, pImpl->elfHeader.e_shentsize));
     }
 
     pImpl->capturedSectionCount = pImpl->elfHeader.e_shnum;
@@ -48,20 +50,23 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
 
     if (pImpl->elfHeader.e_shstrndx > 0 && pImpl->elfHeader.e_shstrndx < pImpl->elfHeader.e_shnum)
     {
+        DIANA_SIZE_T strTabAllocSize = 0;
+        OPERAND_SIZE strTabOpSize = 0;
         DIANA_ELF_SECTION_HEADER* pStrTabSection =
             &pSectionHeader[pImpl->elfHeader.e_shstrndx].header;
 
         if (pStrTabSection->sh_size == 0 || pStrTabSection->sh_size > DIANA_MAX_SAFE_ALLOC_SIZE)
             return DI_INVALID_INPUT;
-        OPERAND_SIZE strTabOpSize = pStrTabSection->sh_size;
-        DIANA_SIZE_T strTabAllocSize;
-        DI_CHECK(Diana_ConvertOpSizeToSizeT(&strTabOpSize, &strTabAllocSize));
-        char* pStringTable = DIANA_MALLOC(strTabAllocSize);
+
+        strTabOpSize = pStrTabSection->sh_size;
+        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&strTabOpSize, &strTabAllocSize));
+        
+        pStringTable = DIANA_MALLOC(strTabAllocSize);
         DI_CHECK_ALLOC(pStringTable);
 
         // Read the string table
-        DI_CHECK(pStream->pMoveTo(pStream, pStrTabSection->sh_offset));
-        DI_CHECK(DianaExactReadSafe(&pStream->parent, pStringTable, pStrTabSection->sh_size));
+        DI_CHECK_GOTO(pStream->pMoveTo(pStream, pStrTabSection->sh_offset));
+        DI_CHECK_GOTO(DianaExactReadSafe(&pStream->parent, pStringTable, pStrTabSection->sh_size));
 
         // Now fill in section names from the string table
         for (i = 0; i < pImpl->capturedSectionCount; ++i)
@@ -84,11 +89,13 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
                 DIANA_MEMCPY(pSection->sh_name_str, pName, nameLen);
             }
         }
-
-        DIANA_FREE(pStringTable);
     }
 
-    return DI_SUCCESS;
+cleanup:
+    if (pStringTable)
+        DIANA_FREE(pStringTable);
+
+    return status;
 }
 
 static
@@ -210,6 +217,8 @@ int ReadProgramHeaders(Diana_ElfFile_impl* pImpl,
     const DI_UINT16 phnum = pImpl->elfHeader.e_phnum;
     const OPERAND_SIZE phoff = pImpl->elfHeader.e_phoff;
     const DI_UINT16 phentsize = pImpl->elfHeader.e_phentsize;
+    int status = DI_SUCCESS;
+    unsigned char* tmp = 0;
 
     if (phnum == 0)
         return DI_SUCCESS;
@@ -238,8 +247,7 @@ int ReadProgramHeaders(Diana_ElfFile_impl* pImpl,
     DI_CHECK(pStream->pMoveTo(pStream, phoff));
 
     // temp buffer sized exactly as on disk
-    int status = DI_SUCCESS;
-    unsigned char* tmp = (unsigned char*)DIANA_MALLOC(phentsize);
+    tmp = (unsigned char*)DIANA_MALLOC(phentsize);
     DI_CHECK_ALLOC_GOTO(tmp);
 
     for (i = 0; i < (int)phnum; ++i)
@@ -305,6 +313,9 @@ int Diana_ReadElfHeader(Diana_ElfFile_impl * elfImpl,
     uint8_t cls = identHeader[DIANA_EI_CLASS];
     uint8_t data = identHeader[DIANA_EI_DATA];
     uint8_t tmpHeader[64];
+    int ehdrSize = 0;
+    int is64 = 0;
+    int isLE = 0;
 
     DIANA_ELF_HEADER* elfHeader = &elfImpl->elfHeader;
     if (cls != DIANA_ELFCLASS32 && cls != DIANA_ELFCLASS64)
@@ -315,8 +326,8 @@ int Diana_ReadElfHeader(Diana_ElfFile_impl * elfImpl,
     {
         return DI_UNSUPPORTED;
     }
-    int is64 = (cls == DIANA_ELFCLASS64);
-    int isLE = (data == DIANA_ELFDATA2LSB);
+    is64 = (cls == DIANA_ELFCLASS64);
+    isLE = (data == DIANA_ELFDATA2LSB);
 
     if (isLE)
     {
@@ -324,7 +335,7 @@ int Diana_ReadElfHeader(Diana_ElfFile_impl * elfImpl,
     }
 
     // Check that full ELF header is present
-    int ehdrSize = is64 ? 64u : 52u;
+    ehdrSize = is64 ? 64u : 52u;
 
     DI_CHECK(pStream->pMoveTo(pStream, 0));
 
@@ -378,6 +389,7 @@ int Diana_InitElfFileImpl(Diana_ElfFile* pElfFile,
     int mode = 0;
     Diana_ElfFile_impl* pImpl = 0;
     int i;
+    OPERAND_SIZE maxSize = 0;
 
     pElfFile->flags = flags;
 
@@ -418,7 +430,6 @@ int Diana_InitElfFileImpl(Diana_ElfFile* pElfFile,
     pElfFile->dianaMode = mode;
 
     // Calculate module size based on segments
-    OPERAND_SIZE maxSize = 0;
     for (i = 0; i < pImpl->capturedSegmentCount; ++i)
     {
         DIANA_ELF_PROGRAM_HEADER* pHeader = pImpl->pCapturedSegments + i;
@@ -617,19 +628,29 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     DI_ELF_DYN64* pDyn = 0;
     Diana_ElfFile_impl* pImpl = pElfFile->pImpl;
     OPERAND_SIZE readBytes = 0;
+    OPERAND_SIZE dynAddr = 0;
+    DI_UINT64 dynSize = 0;
+    int is64bit = 0;
+    int isLE = 0;
+    OPERAND_SIZE symtabAddr = 0;
+    OPERAND_SIZE strtabAddr = 0;
+    OPERAND_SIZE gnuHashAddr = 0;
+    OPERAND_SIZE hashAddr = 0;
+    DI_ELF_DYN64* pEntry = 0;
+    DI_ELF_DYN64* pDynEnd = 0;
 
     if (!pImpl || !symbolName || !pSymbolAddress)
         return DI_INVALID_INPUT;
 
     *pSymbolAddress = 0;
 
-    const int is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
-    const int isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
+    is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
+    isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
 
     // Dynamic array is at baseAddress + p_impl->dynamicAddress
-    OPERAND_SIZE dynAddr = pImpl->dynamicAddress;
+    dynAddr = pImpl->dynamicAddress;
 
-    DI_UINT64 dynSize = pImpl->dynamicSize;
+    dynSize = pImpl->dynamicSize;
     if (dynSize == 0 || dynSize > DIANA_MAX_SAFE_ALLOC_SIZE) // sanity
         return DI_INVALID_INPUT;
 
@@ -654,13 +675,8 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     }
 
     // Walk dynamic entries
-    OPERAND_SIZE symtabAddr = 0;
-    OPERAND_SIZE strtabAddr = 0;
-    OPERAND_SIZE gnuHashAddr = 0;
-    OPERAND_SIZE hashAddr = 0;
-
-    DI_ELF_DYN64* pEntry = pDyn;
-    DI_ELF_DYN64* pDynEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + readBytes);
+    pEntry = pDyn;
+    pDynEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + readBytes);
 
     for (; pEntry < pDynEnd && pEntry->d_tag != DI_ELF_DT_NULL; ++pEntry)
     {
@@ -698,6 +714,17 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     {
         unsigned char hdrRaw[16]; // 4x uint32
         DI_UINT32 header[4];
+        DI_UINT32 nbuckets = 0;
+        DI_UINT32 symoffset = 0;
+        DI_UINT32 bloomsize = 0;
+        OPERAND_SIZE bloomAddr = 0;
+        OPERAND_SIZE bucketsAddr = 0;
+        OPERAND_SIZE chainBaseAddr = 0;
+        DI_UINT32 h = 0;
+        // Bloom check
+        DI_UINT64 bloomWord = 0;
+        DI_UINT64 mask = 0;
+        DI_UINT32 idx = 0;
 
         DI_CHECK_GOTO(pStream->pRandomRead(pStream,
             gnuHashAddr,
@@ -715,12 +742,12 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
         header[2] = DianaElf_rd32(hdrRaw + 8, isLE);
         header[3] = DianaElf_rd32(hdrRaw + 12, isLE);
 
-        DI_UINT32 nbuckets = header[0];
-        DI_UINT32 symoffset = header[1];
-        DI_UINT32 bloomsize = header[2];
+        nbuckets = header[0];
+        symoffset = header[1];
+        bloomsize = header[2];
         // DI_UINT32 bloomshift = header[3]; // not needed in this impl
 
-        OPERAND_SIZE bloomAddr = gnuHashAddr + sizeof(header);
+        bloomAddr = gnuHashAddr + sizeof(header);
         if ((OPERAND_SIZE)bloomsize * sizeof(DI_UINT64) > DIANA_MAX_SAFE_ALLOC_SIZE) {
             DI_CHECK_GOTO(DI_OUT_OF_MEMORY);
         }
@@ -738,7 +765,7 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
             DI_CHECK_GOTO(DI_ERROR);
         }
 
-        OPERAND_SIZE bucketsAddr = bloomAddr + bloomsize * sizeof(DI_UINT64);
+        bucketsAddr = bloomAddr + bloomsize * sizeof(DI_UINT64);
         if ((OPERAND_SIZE)nbuckets * sizeof(DI_UINT32) > DIANA_MAX_SAFE_ALLOC_SIZE) {
             DI_CHECK_GOTO(DI_INVALID_INPUT);
         }
@@ -756,19 +783,19 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
             DI_CHECK_GOTO(DI_ERROR);
         }
 
-        OPERAND_SIZE chainBaseAddr = bucketsAddr + nbuckets * sizeof(DI_UINT32);
+        chainBaseAddr = bucketsAddr + nbuckets * sizeof(DI_UINT32);
 
-        DI_UINT32 h = DianaElf_GnuHash((const unsigned char*)symbolName);
+        h = DianaElf_GnuHash((const unsigned char*)symbolName);
 
         // Bloom check
-        DI_UINT64 bloomWord = bloom[(h / 64) % bloomsize];
-        DI_UINT64 mask = (DI_UINT64)1 << (h % 64);
+        bloomWord = bloom[(h / 64) % bloomsize];
+        mask = (DI_UINT64)1 << (h % 64);
         if (!(bloomWord & mask))
         {
             DI_CHECK_GOTO(DI_NOT_FOUND);
         }
 
-        DI_UINT32 idx = buckets[h % nbuckets];
+        idx = buckets[h % nbuckets];
         if (idx < symoffset)
         {
             DI_CHECK_GOTO(DI_NOT_FOUND);
@@ -780,6 +807,9 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
             DI_UINT32 chainValLE;
             DI_UINT32 chainVal;
             OPERAND_SIZE chainEntryAddr = chainBaseAddr + (OPERAND_SIZE)idx * sizeof(DI_UINT32);
+            DI_ELF_SYM64 sym;
+            OPERAND_SIZE symEntryAddr;
+            OPERAND_SIZE nameAddr;
 
             DI_CHECK_GOTO(pStream->pRandomRead(pStream,
                 chainEntryAddr,
@@ -793,8 +823,7 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
             }
             chainVal = DianaElf_rd32((unsigned char*)&chainValLE, isLE);
 
-            DI_ELF_SYM64 sym;
-            OPERAND_SIZE symEntryAddr = symtabAddr + (OPERAND_SIZE)idx *
+            symEntryAddr = symtabAddr + (OPERAND_SIZE)idx *
                 (is64bit ? sizeof(DI_ELF_SYM64) : 16 /* Elf32_Sym */);
 
             DI_CHECK_GOTO(DianaElf_ReadSymNormalized(pStream,
@@ -804,7 +833,7 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
                 &sym,
                 DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
 
-            OPERAND_SIZE nameAddr = strtabAddr + sym.st_name;
+            nameAddr = strtabAddr + sym.st_name;
             DI_CHECK_GOTO(pStream->pRandomRead(pStream,
                 nameAddr,
                 nameBuf,
@@ -853,6 +882,10 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     {
         unsigned char hdrRaw[8];
         DI_UINT32 nbuckets, nchains;
+        OPERAND_SIZE bucketsAddr = 0;
+        OPERAND_SIZE chainsAddr = 0;
+        DI_UINT32 h = 0;
+        DI_UINT32 idx = 0;
 
         DI_CHECK_GOTO(pStream->pRandomRead(pStream,
             hashAddr,
@@ -868,8 +901,8 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
         nbuckets = DianaElf_rd32(hdrRaw + 0, isLE);
         nchains = DianaElf_rd32(hdrRaw + 4, isLE);
 
-        OPERAND_SIZE bucketsAddr = hashAddr + sizeof(hdrRaw);
-        OPERAND_SIZE chainsAddr = bucketsAddr + nbuckets * sizeof(DI_UINT32);
+        bucketsAddr = hashAddr + sizeof(hdrRaw);
+        chainsAddr = bucketsAddr + nbuckets * sizeof(DI_UINT32);
 
         buckets = (DI_UINT32*)DIANA_MALLOC(nbuckets * sizeof(DI_UINT32));
         DI_CHECK_ALLOC_GOTO(buckets);
@@ -885,14 +918,18 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
             DI_CHECK_GOTO(DI_ERROR);
         }
 
-        DI_UINT32 h = DianaElf_SysVHash((const unsigned char*)symbolName);
-        DI_UINT32 idx = buckets[h % nbuckets];
+        h = DianaElf_SysVHash((const unsigned char*)symbolName);
+        idx = buckets[h % nbuckets];
 
         while (idx != DIANA_STN_UNDEF && idx < nchains)
         {
             DI_ELF_SYM64 sym;
             OPERAND_SIZE symEntryAddr = symtabAddr + (OPERAND_SIZE)idx *
                 (is64bit ? sizeof(DI_ELF_SYM64) : 16);
+
+            OPERAND_SIZE nameAddr = 0;
+            DI_UINT32 nextIdxRaw = 0;
+            OPERAND_SIZE chainEntryAddr = 0;
 
             DI_CHECK_GOTO(DianaElf_ReadSymNormalized(pStream,
                 symEntryAddr,
@@ -901,7 +938,7 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
                 &sym,
                 DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
 
-            OPERAND_SIZE nameAddr = strtabAddr + sym.st_name;
+            nameAddr = strtabAddr + sym.st_name;
             DI_CHECK_GOTO(pStream->pRandomRead(pStream,
                 nameAddr,
                 nameBuf,
@@ -929,8 +966,7 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
                 }
             }
 
-            DI_UINT32 nextIdxRaw = 0;
-            OPERAND_SIZE chainEntryAddr = chainsAddr + (OPERAND_SIZE)idx * sizeof(DI_UINT32);
+            chainEntryAddr = chainsAddr + (OPERAND_SIZE)idx * sizeof(DI_UINT32);
             DI_CHECK_GOTO(pStream->pRandomRead(pStream,
                 chainEntryAddr,
                 &nextIdxRaw,
@@ -982,21 +1018,23 @@ int DianaElfFile_GetSymbolAddress_File(Diana_ElfFile* pElfFile,
     // Get dynamic symbol / string table sections
     DIANA_ELF_SECTION_HEADER* pDynsym = &pImpl->pDynamicSymbolTableSection->header;
     DIANA_ELF_SECTION_HEADER* pDynstr = &pImpl->pDynamicStringTableSection->header;
+    DI_UINT64 symEntSize = 0;
+    int status = DI_NOT_FOUND;
+    char* strings = NULL;
+    DI_UINT64 numSymbols = 0;
 
     if (!pDynsym || !pDynstr)
         return DI_ERROR;  // No dynamic symbols
 
     // Number of entries depends on class
-    DI_UINT64 symEntSize = is64bit ? 24 : 16;
+    symEntSize = is64bit ? 24 : 16;
     if (pDynsym->sh_entsize != 0)
         symEntSize = pDynsym->sh_entsize; // respect file if set
 
     if (symEntSize == 0)
         return DI_INVALID_INPUT;
 
-    int status = DI_NOT_FOUND;
-    char* strings = NULL;
-    DI_UINT64 numSymbols = pDynsym->sh_size / symEntSize;
+    numSymbols = pDynsym->sh_size / symEntSize;
 
     if (pDynstr->sh_size == 0 || pDynstr->sh_size > DIANA_MAX_SAFE_ALLOC_SIZE)
         return DI_INVALID_INPUT;
@@ -1017,6 +1055,8 @@ int DianaElfFile_GetSymbolAddress_File(Diana_ElfFile* pElfFile,
     for (DI_UINT64 i = 0; i < numSymbols; ++i)
     {
         DI_ELF_SYM64 sym;
+        const char* name = 0;
+
         OPERAND_SIZE symOffset = pDynsym->sh_offset + (OPERAND_SIZE)(i * symEntSize);
 
         DI_CHECK_GOTO(DianaElf_ReadSymNormalized(pStream,
@@ -1029,7 +1069,7 @@ int DianaElfFile_GetSymbolAddress_File(Diana_ElfFile* pElfFile,
         if (sym.st_name >= pDynstr->sh_size)
             continue;
 
-        const char* name = &strings[sym.st_name];
+        name = &strings[sym.st_name];
 
         if (DIANA_STRNCMP(name, symbolName, 255) == 0)
         {
@@ -1093,6 +1133,20 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
     OPERAND_SIZE readBytes = 0;
     DI_ELF_DYN64* pDyn = 0;
     int status = DI_ERROR;
+    int is64bit = 0;
+    int isLE = 0;
+    OPERAND_SIZE dynAddr = 0;
+    DI_UINT64 dynSize = 0;
+
+    OPERAND_SIZE symtabAddr = 0;
+    OPERAND_SIZE strtabAddr = 0;
+    OPERAND_SIZE jmprelAddr = 0;
+    DI_UINT64    jmprelSize = 0;
+    DI_UINT64    relaEntSize = 0;
+    DI_UINT64    pltRelType = 0; // DT_PLTREL: REL or RELA
+    DI_ELF_DYN64* pEntry = 0;
+    DI_ELF_DYN64* pDynEnd = 0;
+
 
     if (!pImpl || !pObserver || !pObserver->queryFunctionByName)
         return DI_INVALID_INPUT;
@@ -1100,14 +1154,14 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
     if (pElfFile->flags & DIANA_ELF_FILE_FLAGS_FILE_MODE)
         return DI_UNSUPPORTED;
 
-    const int is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
-    const int isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
+    is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
+    isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
 
     // 1) Read dynamic section
-    OPERAND_SIZE dynAddr = baseAddress;
+    dynAddr = baseAddress;
     DI_CHECK_GOTO(Diana_SafeAdd(&dynAddr, pImpl->dynamicAddress));
 
-    DI_UINT64 dynSize = pImpl->dynamicSize;
+    dynSize = pImpl->dynamicSize;
     if (dynSize == 0 || dynSize > DIANA_MAX_SAFE_ALLOC_SIZE)
         return DI_INVALID_INPUT;
 
@@ -1128,15 +1182,15 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
         DI_CHECK_GOTO(DI_ERROR);
 
     // 2) Parse dynamic entries
-    OPERAND_SIZE symtabAddr = 0;
-    OPERAND_SIZE strtabAddr = 0;
-    OPERAND_SIZE jmprelAddr = 0;
-    DI_UINT64    jmprelSize = 0;
-    DI_UINT64    relaEntSize = 0;
-    DI_UINT64    pltRelType = 0; // DT_PLTREL: REL or RELA
+    symtabAddr = 0;
+    strtabAddr = 0;
+    jmprelAddr = 0;
+    jmprelSize = 0;
+    relaEntSize = 0;
+    pltRelType = 0; // DT_PLTREL: REL or RELA
 
-    DI_ELF_DYN64* pEntry = pDyn;
-    DI_ELF_DYN64* pDynEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + readBytes);
+    pEntry = pDyn;
+    pDynEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + readBytes);
 
     for (; pEntry < pDynEnd && pEntry->d_tag != DI_ELF_DT_NULL; ++pEntry)
     {
@@ -1184,11 +1238,16 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
     {
         DI_UINT64 count = jmprelSize / relaEntSize;
         DI_UINT64 idx;
+        DI_ELF_SYM64 sym;
 
         for (idx = 0; idx < count; ++idx)
         {
             unsigned char relBuf[32];
             DI_UINT64 thisRelOffset = jmprelAddr + idx * relaEntSize;
+            DI_UINT64 r_offset = 0;
+            DI_UINT64 r_info = 0;
+            DI_UINT32 symIndex;
+            OPERAND_SIZE symEntryAddr = 0;
 
             DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
                 thisRelOffset,
@@ -1199,8 +1258,6 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
             if (readBytes != relaEntSize)
                 DI_CHECK_GOTO(DI_ERROR);
 
-            DI_UINT64 r_offset = 0;
-            DI_UINT64 r_info = 0;
 
             if (pltRelType == DI_ELF_DT_RELA)
             {
@@ -1229,14 +1286,12 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                 }
             }
 
-            DI_UINT32 symIndex;
             if (is64bit)
                 symIndex = (DI_UINT32)(r_info >> 32); // ELF64_R_SYM
             else
                 symIndex = (DI_UINT32)(r_info >> 8);   // ELF32_R_SYM
 
-            DI_ELF_SYM64 sym;
-            OPERAND_SIZE symEntryAddr = symtabAddr +
+            symEntryAddr = symtabAddr +
                 (OPERAND_SIZE)symIndex *
                 (is64bit ? 24 : 16);
 
@@ -1259,6 +1314,11 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
             }
 
             {
+                char funcName[256];
+                OPERAND_SIZE symNameAddr = 0;
+                const char* dllName = 0;
+                OPERAND_SIZE stValue = 0;
+                OPERAND_SIZE gotSlotAddr = 0;
                 int bind = DI_ELF_ST_BIND(sym.st_info);
                 int type = DI_ELF_ST_TYPE(sym.st_info);
                 if ((bind != DIANA_STB_GLOBAL && bind != DIANA_STB_WEAK) ||
@@ -1267,8 +1327,7 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                     continue;
                 }
 
-                char funcName[256];
-                OPERAND_SIZE symNameAddr = strtabAddr + sym.st_name;
+                symNameAddr = strtabAddr + sym.st_name;
                 if (pObserver->reportInfo_fnc)
                 {
                     DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, symNameAddr));
@@ -1283,12 +1342,10 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                     DI_CHECK_GOTO(DI_ERROR);
                 funcName[sizeof(funcName) - 1] = 0;
 
-                // We don't have exact DLL name mapping here; pass NULL or a generic name
-                const char* dllName = 0;
-                OPERAND_SIZE stValue = sym.st_value;
+                stValue = sym.st_value;
 
                 /* GOT slot address for write-back (only used when stValue==0, i.e. external import) */
-                OPERAND_SIZE gotSlotAddr = 0;
+                gotSlotAddr = 0;
                 if (!stValue && bImports)
                 {
                     gotSlotAddr = r_offset;
@@ -1312,9 +1369,13 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                     if (pRwStream->pRandomWrite)
                     {
                         if (is64bit)
-                            { DI_CHECK_GOTO(DianaElf_Write64(pRwStream, gotSlotAddr, stValue, isLE)); }
+                        { 
+                            DI_CHECK_GOTO(DianaElf_Write64(pRwStream, gotSlotAddr, stValue, isLE)); 
+                        }
                         else
-                            { DI_CHECK_GOTO(DianaElf_Write32(pRwStream, gotSlotAddr, (DI_UINT32)stValue, isLE)); }
+                        { 
+                            DI_CHECK_GOTO(DianaElf_Write32(pRwStream, gotSlotAddr, (DI_UINT32)stValue, isLE)); 
+                        }
                     }
                 }
             }
@@ -1357,6 +1418,9 @@ int DianaElfFile_GetNeededLibraries(Diana_ElfFile* pElfFile,
     DI_ELF_DYN64* pDyn = 0;
     int status = DI_ERROR;
     OPERAND_SIZE readBytes = 0;
+    DI_ELF_DYN64* pEntry = 0;
+    DI_ELF_DYN64* pDynEnd = 0;
+    OPERAND_SIZE strtabAddr = 0;
 
     if (!pImpl || !callback)
         return DI_INVALID_INPUT;
@@ -1378,13 +1442,14 @@ int DianaElfFile_GetNeededLibraries(Diana_ElfFile* pElfFile,
         &readBytes,
         streamFlags));
     if (readBytes < sizeof(DI_ELF_DYN64))
+    {
         DI_CHECK_GOTO(DI_ERROR);
-
-    DI_ELF_DYN64* pEntry = pDyn;
-    DI_ELF_DYN64* pDynEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + readBytes);
+    }
+    pEntry = pDyn;
+    pDynEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + readBytes);
 
     /* First pass: locate DT_STRTAB */
-    OPERAND_SIZE strtabAddr = 0;
+    strtabAddr = 0;
     for (pEntry = pDyn; pEntry < pDynEnd && pEntry->d_tag != DI_ELF_DT_NULL; ++pEntry)
     {
         if (pEntry->d_tag == DI_ELF_DT_STRTAB)
@@ -1405,12 +1470,16 @@ int DianaElfFile_GetNeededLibraries(Diana_ElfFile* pElfFile,
        so that translateAbsoluteAddress can subtract the image base. */
     for (pEntry = pDyn; pEntry < pDynEnd && pEntry->d_tag != DI_ELF_DT_NULL; ++pEntry)
     {
+        char libName[256];
+        OPERAND_SIZE nameAddr = 0;
+        OPERAND_SIZE nameRead = 0;
+
         if (pEntry->d_tag != DI_ELF_DT_NEEDED)
             continue;
 
-        char libName[256];
-        OPERAND_SIZE nameAddr = strtabAddr + (OPERAND_SIZE)pEntry->d_val;
-        OPERAND_SIZE nameRead = 0;
+        nameAddr = strtabAddr + (OPERAND_SIZE)pEntry->d_val;
+        nameRead = 0;
+
         DI_CHECK_GOTO(pStream->pRandomRead(pStream,
             nameAddr,
             libName,
@@ -1566,25 +1635,31 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
 
         case DIANA_R_X86_64_64:
         {
+            unsigned char cur[8];
+            DI_UINT64 oldVal = 0;
+            DI_UINT64 newVal = 0;
+
             if (pEntry->r_sym != 0) return DI_SUCCESS; /* needs symbol � skip */
             /* *patchVA += B + A */
-            unsigned char cur[8];
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
             if (rb != sizeof(cur)) return DI_ERROR;
-            DI_UINT64 oldVal = DianaElf_rd64(cur, isLE);
-            DI_UINT64 newVal = oldVal + (DI_UINT64)loadBias + (DI_UINT64)pEntry->r_addend;
+            oldVal = DianaElf_rd64(cur, isLE);
+            newVal = oldVal + (DI_UINT64)loadBias + (DI_UINT64)pEntry->r_addend;
             DI_CHECK(DianaElf_Write64(pOut, patchVA, newVal, isLE));
             return DI_SUCCESS;
         }
 
         case DIANA_R_X86_64_32:
         {
-            if (pEntry->r_sym != 0) return DI_SUCCESS;
             unsigned char cur[4];
+            DI_UINT32 oldVal = 0;
+            DI_UINT32 newVal = 0;
+
+            if (pEntry->r_sym != 0) return DI_SUCCESS;
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
             if (rb != sizeof(cur)) return DI_ERROR;
-            DI_UINT32 oldVal = DianaElf_rd32(cur, isLE);
-            DI_UINT32 newVal = oldVal + (DI_UINT32)loadBias + (DI_UINT32)pEntry->r_addend;
+            oldVal = DianaElf_rd32(cur, isLE);
+            newVal = oldVal + (DI_UINT32)loadBias + (DI_UINT32)pEntry->r_addend;
             DI_CHECK(DianaElf_Write32(pOut, patchVA, newVal, isLE));
             return DI_SUCCESS;
         }
@@ -1611,25 +1686,32 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
         {
             /* REL style: addend is read from the patch location itself */
             unsigned char cur[4];
+            DI_UINT32 implicit = 0;
+            DI_INT64  addend = 0;
+            DI_UINT32 newVal = 0;
+
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
             if (rb != sizeof(cur)) return DI_ERROR;
-            DI_UINT32 implicit = DianaElf_rd32(cur, isLE);
-            DI_INT64  addend = pEntry->r_addend != 0
+            implicit = DianaElf_rd32(cur, isLE);
+            addend = pEntry->r_addend != 0
                 ? pEntry->r_addend
                 : (DI_INT64)(DI_INT32)implicit;
-            DI_UINT32 newVal = (DI_UINT32)((DI_INT64)loadBias + addend);
+            newVal = (DI_UINT32)((DI_INT64)loadBias + addend);
             DI_CHECK(DianaElf_Write32(pOut, patchVA, newVal, isLE));
             return DI_SUCCESS;
         }
 
         case DIANA_R_386_32:
         {
-            if (pEntry->r_sym != 0) return DI_SUCCESS;
             unsigned char cur[4];
+            DI_UINT32 oldVal = 0;
+            DI_UINT32 newVal = 0;
+
+            if (pEntry->r_sym != 0) return DI_SUCCESS;
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
             if (rb != sizeof(cur)) return DI_ERROR;
-            DI_UINT32 oldVal = DianaElf_rd32(cur, isLE);
-            DI_UINT32 newVal = oldVal + (DI_UINT32)loadBias;
+            oldVal = DianaElf_rd32(cur, isLE);
+            newVal = oldVal + (DI_UINT32)loadBias;
             DI_CHECK(DianaElf_Write32(pOut, patchVA, newVal, isLE));
             return DI_SUCCESS;
         }
@@ -1659,13 +1741,16 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
         }
 
         case DIANA_R_AARCH64_ABS64:
-        {
-            if (pEntry->r_sym != 0) return DI_SUCCESS;
+        {            
             unsigned char cur[8];
+            DI_UINT64 oldVal = 0;
+            DI_UINT64 newVal = 0;
+
+            if (pEntry->r_sym != 0) return DI_SUCCESS;
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
             if (rb != sizeof(cur)) return DI_ERROR;
-            DI_UINT64 oldVal = DianaElf_rd64(cur, isLE);
-            DI_UINT64 newVal = oldVal + (DI_UINT64)loadBias + (DI_UINT64)pEntry->r_addend;
+            oldVal = DianaElf_rd64(cur, isLE);
+            newVal = oldVal + (DI_UINT64)loadBias + (DI_UINT64)pEntry->r_addend;
             DI_CHECK(DianaElf_Write64(pOut, patchVA, newVal, isLE));
             return DI_SUCCESS;
         }
@@ -1690,25 +1775,32 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
         case DIANA_R_ARM_RELATIVE:
         {
             unsigned char cur[4];
+            DI_UINT32 implicit = 0;
+            DI_INT64  addend = 0;
+            DI_UINT32 newVal = 0;
+
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
             if (rb != sizeof(cur)) return DI_ERROR;
-            DI_UINT32 implicit = DianaElf_rd32(cur, isLE);
-            DI_INT64  addend = pEntry->r_addend != 0
+            implicit = DianaElf_rd32(cur, isLE);
+            addend = pEntry->r_addend != 0
                 ? pEntry->r_addend
                 : (DI_INT64)(DI_INT32)implicit;
-            DI_UINT32 newVal = (DI_UINT32)((DI_INT64)loadBias + addend);
+            newVal = (DI_UINT32)((DI_INT64)loadBias + addend);
             DI_CHECK(DianaElf_Write32(pOut, patchVA, newVal, isLE));
             return DI_SUCCESS;
         }
 
         case DIANA_R_ARM_ABS32:
         {
-            if (pEntry->r_sym != 0) return DI_SUCCESS;
             unsigned char cur[4];
+            DI_UINT32 oldVal = 0;
+            DI_UINT32 newVal = 0;
+
+            if (pEntry->r_sym != 0) return DI_SUCCESS;
             DI_CHECK(pOut->parent.pRandomRead(pOut, patchVA, cur, sizeof(cur), &rb, 0));
             if (rb != sizeof(cur)) return DI_ERROR;
-            DI_UINT32 oldVal = DianaElf_rd32(cur, isLE);
-            DI_UINT32 newVal = oldVal + (DI_UINT32)loadBias;
+            oldVal = DianaElf_rd32(cur, isLE);
+            newVal = oldVal + (DI_UINT32)loadBias;
             DI_CHECK(DianaElf_Write32(pOut, patchVA, newVal, isLE));
             return DI_SUCCESS;
         }
@@ -1739,10 +1831,11 @@ static int DianaElf_ReadRel(DianaReadWriteRandomStream* pOut,
     if (is64)
     {
         unsigned char buf[16];
+        DI_UINT64 info = 0;
         DI_CHECK(pOut->parent.pRandomRead(pOut, addr, buf, sizeof(buf), &rb, 0));
         if (rb != sizeof(buf)) return DI_ERROR;
         out->r_offset = (OPERAND_SIZE)DianaElf_rd64(buf + 0, isLE);
-        DI_UINT64 info = DianaElf_rd64(buf + 8, isLE);
+        info = DianaElf_rd64(buf + 8, isLE);
         out->r_sym = (DI_UINT32)DIANA_ELF_R_SYM(info);
         out->r_type = (DI_UINT32)DIANA_ELF_R_TYPE(info);
         out->r_addend = 0;
@@ -1750,10 +1843,11 @@ static int DianaElf_ReadRel(DianaReadWriteRandomStream* pOut,
     else
     {
         unsigned char buf[8];
+        DI_UINT32 info = 0;
         DI_CHECK(pOut->parent.pRandomRead(pOut, addr, buf, sizeof(buf), &rb, 0));
         if (rb != sizeof(buf)) return DI_ERROR;
         out->r_offset = (OPERAND_SIZE)DianaElf_rd32(buf + 0, isLE);
-        DI_UINT32 info = DianaElf_rd32(buf + 4, isLE);
+        info = DianaElf_rd32(buf + 4, isLE);
         out->r_sym = (DI_UINT32)DIANA_ELF_R_SYM_32(info);
         out->r_type = (DI_UINT32)DIANA_ELF_R_TYPE_32(info);
         out->r_addend = 0;
@@ -1772,10 +1866,11 @@ static int DianaElf_ReadRela(DianaReadWriteRandomStream* pOut,
     if (is64)
     {
         unsigned char buf[24];
+        DI_UINT64 info = 0;
         DI_CHECK(pOut->parent.pRandomRead(pOut, addr, buf, sizeof(buf), &rb, 0));
         if (rb != sizeof(buf)) return DI_ERROR;
         out->r_offset = (OPERAND_SIZE)DianaElf_rd64(buf + 0, isLE);
-        DI_UINT64 info = DianaElf_rd64(buf + 8, isLE);
+        info = DianaElf_rd64(buf + 8, isLE);
         out->r_sym = (DI_UINT32)DIANA_ELF_R_SYM(info);
         out->r_type = (DI_UINT32)DIANA_ELF_R_TYPE(info);
         out->r_addend = (DI_INT64)DianaElf_rd64(buf + 16, isLE);
@@ -1783,10 +1878,11 @@ static int DianaElf_ReadRela(DianaReadWriteRandomStream* pOut,
     else
     {
         unsigned char buf[12];
+        DI_UINT32 info = 0;
         DI_CHECK(pOut->parent.pRandomRead(pOut, addr, buf, sizeof(buf), &rb, 0));
         if (rb != sizeof(buf)) return DI_ERROR;
         out->r_offset = (OPERAND_SIZE)DianaElf_rd32(buf + 0, isLE);
-        DI_UINT32 info = DianaElf_rd32(buf + 4, isLE);
+        info = DianaElf_rd32(buf + 4, isLE);
         out->r_sym = (DI_UINT32)DIANA_ELF_R_SYM_32(info);
         out->r_type = (DI_UINT32)DIANA_ELF_R_TYPE_32(info);
         out->r_addend = (DI_INT64)(DI_INT32)DianaElf_rd32(buf + 8, isLE);
@@ -1813,12 +1909,13 @@ static int DianaElf_ProcessRelocTable(DianaReadWriteRandomStream* pOut,
     OPERAND_SIZE entSize = isRela
         ? (is64 ? 24u : 12u)   /* sizeof Elf64_Rela / Elf32_Rela */
         : (is64 ? 16u : 8u);  /* sizeof Elf64_Rel  / Elf32_Rel  */
+    OPERAND_SIZE count = 0;
+    OPERAND_SIZE i;
 
     if (entSize == 0 || tableSize == 0)
         return DI_SUCCESS;
 
-    OPERAND_SIZE count = tableSize / entSize;
-    OPERAND_SIZE i;
+    count = tableSize / entSize;
 
     for (i = 0; i < count; ++i)
     {
@@ -1874,140 +1971,146 @@ int DianaElfFile_Relocate(/* in */    Diana_ElfFile* pElfFile,
     if (pImpl->dynamicSize == 0)
         return DI_SUCCESS;  /* no dynamic segment � nothing to do */
 
-    /* Dynamic segment VA in the mapped image = preferred VA + loadBias */
-    OPERAND_SIZE dynVA = (OPERAND_SIZE)pImpl->dynamicAddress + loadBias;
-    OPERAND_SIZE dynSize = (OPERAND_SIZE)pImpl->dynamicSize;
-
-    /* Entry size on disk: 16 bytes (32-bit) or 24 bytes (64-bit).        */
-    /* We read raw bytes and decode, so we are endian-safe.               */
-    OPERAND_SIZE dynEntSize = is64 ? 16u : 8u;  /* d_tag + d_val         */
-    OPERAND_SIZE dynCount = dynSize / dynEntSize;
-
-    /* ---- Collect DT_ values we need ---- */
-    OPERAND_SIZE relaVA = 0, relaSz = 0;
-    OPERAND_SIZE relVA = 0, relSz = 0;
-    OPERAND_SIZE jmprelVA = 0, jmprelSz = 0;
-    int          pltRelType = DIANA_DT_RELA;   /* default; overridden by DT_PLTREL */
-
-    OPERAND_SIZE i;
-    for (i = 0; i < dynCount; ++i)
     {
-        OPERAND_SIZE entVA = dynVA + i * dynEntSize;
-        OPERAND_SIZE rb = 0;
-        DI_INT64     d_tag = 0;
-        DI_UINT64    d_val = 0;
+        /* Dynamic segment VA in the mapped image = preferred VA + loadBias */
+        OPERAND_SIZE dynVA = (OPERAND_SIZE)pImpl->dynamicAddress + loadBias;
+        OPERAND_SIZE dynSize = (OPERAND_SIZE)pImpl->dynamicSize;
 
-        if (is64)
-        {
-            unsigned char buf[16];
-            DI_CHECK(pOutStream->parent.pRandomRead(pOutStream, entVA,
-                buf, sizeof(buf), &rb, 0));
-            if (rb != sizeof(buf)) return DI_ERROR;
-            d_tag = (DI_INT64)DianaElf_rd64(buf + 0, isLE);
-            d_val = DianaElf_rd64(buf + 8, isLE);
-        }
-        else
-        {
-            unsigned char buf[8];
-            DI_CHECK(pOutStream->parent.pRandomRead(pOutStream, entVA,
-                buf, sizeof(buf), &rb, 0));
-            if (rb != sizeof(buf)) return DI_ERROR;
-            d_tag = (DI_INT64)(DI_INT32)DianaElf_rd32(buf + 0, isLE);
-            d_val = (DI_UINT64)DianaElf_rd32(buf + 4, isLE);
-        }
+        /* Entry size on disk: 16 bytes (32-bit) or 24 bytes (64-bit).        */
+        /* We read raw bytes and decode, so we are endian-safe.               */
+        OPERAND_SIZE dynEntSize = is64 ? 16u : 8u;  /* d_tag + d_val         */
+        OPERAND_SIZE dynCount = dynSize / dynEntSize;
 
-        if (d_tag == DIANA_DT_NULL)
-            break;
+        /* ---- Collect DT_ values we need ---- */
+        OPERAND_SIZE relaVA = 0, relaSz = 0;
+        OPERAND_SIZE relVA = 0, relSz = 0;
+        OPERAND_SIZE jmprelVA = 0, jmprelSz = 0;
+        int          pltRelType = DIANA_DT_RELA;   /* default; overridden by DT_PLTREL */
 
-        switch ((int)d_tag)
+        OPERAND_SIZE i;
+        for (i = 0; i < dynCount; ++i)
         {
-        case DIANA_DT_RELA:    relaVA = (OPERAND_SIZE)d_val + loadBias; break;
-        case DIANA_DT_RELASZ:  relaSz = (OPERAND_SIZE)d_val;            break;
-        case DIANA_DT_REL:     relVA = (OPERAND_SIZE)d_val + loadBias; break;
-        case DIANA_DT_RELSZ:   relSz = (OPERAND_SIZE)d_val;            break;
-        case DIANA_DT_JMPREL:  jmprelVA = (OPERAND_SIZE)d_val + loadBias; break;
-        case DIANA_DT_PLTRELSZ:jmprelSz = (OPERAND_SIZE)d_val;            break;
-        case DIANA_DT_PLTREL:  pltRelType = (int)d_val;                   break;
-        default: break;
-        }
+            OPERAND_SIZE entVA = dynVA + i * dynEntSize;
+            OPERAND_SIZE rb = 0;
+            DI_INT64     d_tag = 0;
+            DI_UINT64    d_val = 0;
 
-        /* Patch pointer-type DT entries with loadBias, mirroring what the
-           Linux loader does so that QueryImports/QueryExports can use the
-           mapped image without knowing the original load address. */
-        if (loadBias != 0)
-        {
-            int isPtrTag = 0;
+            if (is64)
+            {
+                unsigned char buf[16];
+                DI_CHECK(pOutStream->parent.pRandomRead(pOutStream, entVA,
+                    buf, sizeof(buf), &rb, 0));
+                if (rb != sizeof(buf)) return DI_ERROR;
+                d_tag = (DI_INT64)DianaElf_rd64(buf + 0, isLE);
+                d_val = DianaElf_rd64(buf + 8, isLE);
+            }
+            else
+            {
+                unsigned char buf[8];
+                DI_CHECK(pOutStream->parent.pRandomRead(pOutStream, entVA,
+                    buf, sizeof(buf), &rb, 0));
+                if (rb != sizeof(buf)) return DI_ERROR;
+                d_tag = (DI_INT64)(DI_INT32)DianaElf_rd32(buf + 0, isLE);
+                d_val = (DI_UINT64)DianaElf_rd32(buf + 4, isLE);
+            }
+
+            if (d_tag == DIANA_DT_NULL)
+                break;
+
             switch ((int)d_tag)
             {
-            case DI_ELF_DT_PLTGOT:
-            case DI_ELF_DT_HASH:
-            case DI_ELF_DT_STRTAB:
-            case DI_ELF_DT_SYMTAB:
-            case DI_ELF_DT_RELA:
-            case DI_ELF_DT_INIT:
-            case DI_ELF_DT_FINI:
-            case DI_ELF_DT_REL:
-            case DI_ELF_DT_JMPREL:
-            case DI_ELF_DT_INIT_ARRAY:
-            case DI_ELF_DT_FINI_ARRAY:
-                isPtrTag = 1;
-                break;
-            default:
-                if ((DI_UINT64)d_tag == DI_ELF_DT_GNU_HASH)
-                    isPtrTag = 1;
-                break;
+            case DIANA_DT_RELA:    relaVA = (OPERAND_SIZE)d_val + loadBias; break;
+            case DIANA_DT_RELASZ:  relaSz = (OPERAND_SIZE)d_val;            break;
+            case DIANA_DT_REL:     relVA = (OPERAND_SIZE)d_val + loadBias; break;
+            case DIANA_DT_RELSZ:   relSz = (OPERAND_SIZE)d_val;            break;
+            case DIANA_DT_JMPREL:  jmprelVA = (OPERAND_SIZE)d_val + loadBias; break;
+            case DIANA_DT_PLTRELSZ:jmprelSz = (OPERAND_SIZE)d_val;            break;
+            case DIANA_DT_PLTREL:  pltRelType = (int)d_val;                   break;
+            default: break;
             }
-            if (isPtrTag)
+
+            /* Patch pointer-type DT entries with loadBias, mirroring what the
+               Linux loader does so that QueryImports/QueryExports can use the
+               mapped image without knowing the original load address. */
+            if (loadBias != 0)
             {
-                DI_UINT64 newVal = d_val + (DI_UINT64)loadBias;
-                OPERAND_SIZE valVA = entVA + (OPERAND_SIZE)(is64 ? 8 : 4);
-                if (is64)
-                    { DI_CHECK(DianaElf_Write64(pOutStream, valVA, newVal, isLE)); }
-                else
-                    { DI_CHECK(DianaElf_Write32(pOutStream, valVA, (DI_UINT32)newVal, isLE)); }
+                int isPtrTag = 0;
+                switch ((int)d_tag)
+                {
+                case DI_ELF_DT_PLTGOT:
+                case DI_ELF_DT_HASH:
+                case DI_ELF_DT_STRTAB:
+                case DI_ELF_DT_SYMTAB:
+                case DI_ELF_DT_RELA:
+                case DI_ELF_DT_INIT:
+                case DI_ELF_DT_FINI:
+                case DI_ELF_DT_REL:
+                case DI_ELF_DT_JMPREL:
+                case DI_ELF_DT_INIT_ARRAY:
+                case DI_ELF_DT_FINI_ARRAY:
+                    isPtrTag = 1;
+                    break;
+                default:
+                    if ((DI_UINT64)d_tag == DI_ELF_DT_GNU_HASH)
+                        isPtrTag = 1;
+                    break;
+                }
+                if (isPtrTag)
+                {
+                    DI_UINT64 newVal = d_val + (DI_UINT64)loadBias;
+                    OPERAND_SIZE valVA = entVA + (OPERAND_SIZE)(is64 ? 8 : 4);
+                    if (is64)
+                    {
+                        DI_CHECK(DianaElf_Write64(pOutStream, valVA, newVal, isLE));
+                    }
+                    else
+                    {
+                        DI_CHECK(DianaElf_Write32(pOutStream, valVA, (DI_UINT32)newVal, isLE));
+                    }
+                }
             }
         }
-    }
 
-    /* ----------------------------------------------------------------
-     * Process RELA table (.rela.dyn)
-     * ---------------------------------------------------------------- */
-    if (relaVA != 0 && relaSz != 0)
-    {
-        DI_CHECK(DianaElf_ProcessRelocTable(pOutStream,
-            relaVA, relaSz,
-            loadBias, machine,
-            is64, isLE,
-            1 /* isRela */));
-    }
 
-    /* ----------------------------------------------------------------
-     * Process REL table (.rel.dyn)
-     * ---------------------------------------------------------------- */
-    if (relVA != 0 && relSz != 0)
-    {
-        DI_CHECK(DianaElf_ProcessRelocTable(pOutStream,
-            relVA, relSz,
-            loadBias, machine,
-            is64, isLE,
-            0 /* isRel */));
-    }
+        /* ----------------------------------------------------------------
+         * Process RELA table (.rela.dyn)
+         * ---------------------------------------------------------------- */
+        if (relaVA != 0 && relaSz != 0)
+        {
+            DI_CHECK(DianaElf_ProcessRelocTable(pOutStream,
+                relaVA, relaSz,
+                loadBias, machine,
+                is64, isLE,
+                1 /* isRela */));
+        }
 
-    /* ----------------------------------------------------------------
-     * Process PLT relocations (.rela.plt / .rel.plt)
-     * Only RELATIVE-class entries are handled here; JUMP_SLOTs are
-     * skipped inside DianaElf_ApplyReloc and resolved by QueryImports.
-     * ---------------------------------------------------------------- */
-    if (jmprelVA != 0 && jmprelSz != 0)
-    {
-        int isRelaForPlt = (pltRelType == DIANA_DT_RELA) ? 1 : 0;
-        DI_CHECK(DianaElf_ProcessRelocTable(pOutStream,
-            jmprelVA, jmprelSz,
-            loadBias, machine,
-            is64, isLE,
-            isRelaForPlt));
-    }
+        /* ----------------------------------------------------------------
+         * Process REL table (.rel.dyn)
+         * ---------------------------------------------------------------- */
+        if (relVA != 0 && relSz != 0)
+        {
+            DI_CHECK(DianaElf_ProcessRelocTable(pOutStream,
+                relVA, relSz,
+                loadBias, machine,
+                is64, isLE,
+                0 /* isRel */));
+        }
 
+        /* ----------------------------------------------------------------
+         * Process PLT relocations (.rela.plt / .rel.plt)
+         * Only RELATIVE-class entries are handled here; JUMP_SLOTs are
+         * skipped inside DianaElf_ApplyReloc and resolved by QueryImports.
+         * ---------------------------------------------------------------- */
+        if (jmprelVA != 0 && jmprelSz != 0)
+        {
+            int isRelaForPlt = (pltRelType == DIANA_DT_RELA) ? 1 : 0;
+            DI_CHECK(DianaElf_ProcessRelocTable(pOutStream,
+                jmprelVA, jmprelSz,
+                loadBias, machine,
+                is64, isLE,
+                isRelaForPlt));
+        }
+    }
     return DI_SUCCESS;
 }
 
