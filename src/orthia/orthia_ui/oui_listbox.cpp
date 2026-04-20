@@ -363,6 +363,7 @@ namespace oui
         auto popup = parent->AddChild_t(std::make_shared<CMenuPopup>(std::move(items)));
         popup->Init(parent->GetPtr());
         popup->Dock(pointToUse);
+        popup->SetFocus();
         SkipNextMouseEvent();
     }
     bool CListBox::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)

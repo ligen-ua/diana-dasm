@@ -135,7 +135,7 @@ namespace oui
     }
     CMenuPopup::CMenuPopup(std::vector<PopupItem>&& items, std::shared_ptr<MenuColorProfile> menuColorProfile)
         :
-        Parent_type(true),
+        Parent_type(false),
         m_items(std::move(items)),
         m_menuColorProfile(menuColorProfile)
     {
