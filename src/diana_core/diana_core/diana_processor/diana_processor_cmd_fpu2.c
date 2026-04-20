@@ -345,11 +345,13 @@ static int Diana_Call_ficom_common(struct _dianaContext * pDianaContext,
     DI_FPU_START
     {
         floatx80_t st0, arg;
+        float_status_t status;
+        int result;
+        
         DI_DEF_LOCAL_1(src)
         DI_MEM_GET_DEST(src)
-        float_status_t status = FPU_pre_exception_handling(pCallContext);
-        int result;
-
+        status = FPU_pre_exception_handling(pCallContext);
+        
         DianaProcessor_FPU_GetSTRegister_80(pCallContext, reg_fpu_ST0, &st0);
         arg = int64_to_floatx80((DI_INT64)src);
 
@@ -581,9 +583,10 @@ int Diana_Call_fimul(struct _dianaContext * pDianaContext, DianaProcessor * pCal
     DI_FPU_START
     {
         floatx80_t st0, arg, result;
+        float_status_t status;
         DI_DEF_LOCAL_1(src)
         DI_MEM_GET_DEST(src)
-        float_status_t status = FPU_pre_exception_handling(pCallContext);
+        status = FPU_pre_exception_handling(pCallContext);
 
         DianaProcessor_FPU_GetSTRegister_80(pCallContext, reg_fpu_ST0, &st0);
         arg = int64_to_floatx80((DI_INT64)src);

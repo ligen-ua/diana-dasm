@@ -200,6 +200,8 @@ int Diana_AnalyzeJumps(DianaParserResult* pResult,
     int* pAbsoluteAddress,
     int* pLinksToData)
 {
+    Diana_LinkedAdditionalGroupInfo* pLinkedInfo = 0;
+
     *pNewOffset = 0;
     *pAbsoluteAddress = 0;
     *pLinksToData = 0;
@@ -207,7 +209,7 @@ int Diana_AnalyzeJumps(DianaParserResult* pResult,
     {
         return DI_NOT_FOUND;
     }
-    Diana_LinkedAdditionalGroupInfo* pLinkedInfo = pResult->pInfo->m_pGroupInfo->m_pLinkedInfo;
+    pLinkedInfo = pResult->pInfo->m_pGroupInfo->m_pLinkedInfo;
     if (!pLinkedInfo)
     {
         return DI_NOT_FOUND;

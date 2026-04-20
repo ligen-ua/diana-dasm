@@ -165,12 +165,13 @@ static int Diana_Call_lXs_impl(struct _dianaContext * pDianaContext,
                                 DianaProcessor * pCallContext,
                                 DianaUnifiedRegister segRegId)
 {
-    DI_DEF_LOCAL(dest);
     OPERAND_SIZE selector = 0;
     OPERAND_SIZE address = 0;
     OPERAND_SIZE offset_value = 0;
     OPERAND_SIZE seg_value = 0;
     DianaUnifiedRegister segReg = reg_DS;
+
+    DI_DEF_LOCAL(dest);
 
     /* Read dest register to get its size */
     DI_MEM_GET_DEST(dest);

@@ -1,7 +1,7 @@
 #ifndef DIANA_ELF_DEFS_H
 #define DIANA_ELF_DEFS_H
 
-#include <stdint.h>
+#include "diana_core.h"
 
 // ELF magic and identification
 #define DIANA_ELFMAG0     0x7f
@@ -148,115 +148,115 @@
 // ELF Header (64-bit - unions both 32 and 64 bit fields)
 typedef struct
 {
-    uint8_t  e_ident[16];           // ELF identification
-    uint16_t e_type;                // Object file type
-    uint16_t e_machine;             // Machine type
-    uint32_t e_version;             // Object file version
-    uint64_t e_entry;               // Entry point address (64-bit)
-    uint64_t e_phoff;               // Program header offset (64-bit)
-    uint64_t e_shoff;               // Section header offset (64-bit)
-    uint32_t e_flags;               // Processor-specific flags
-    uint16_t e_ehsize;              // ELF header size
-    uint16_t e_phentsize;           // Program header entry size
-    uint16_t e_phnum;               // Program header entry count
-    uint16_t e_shentsize;           // Section header entry size
-    uint16_t e_shnum;               // Section header entry count
-    uint16_t e_shstrndx;            // Section name string table index
+    DI_UINT8  e_ident[16];           // ELF identification
+    DI_UINT16 e_type;                // Object file type
+    DI_UINT16 e_machine;             // Machine type
+    DI_UINT32 e_version;             // Object file version
+    DI_UINT64 e_entry;               // Entry point address (64-bit)
+    DI_UINT64 e_phoff;               // Program header offset (64-bit)
+    DI_UINT64 e_shoff;               // Section header offset (64-bit)
+    DI_UINT32 e_flags;               // Processor-specific flags
+    DI_UINT16 e_ehsize;              // ELF header size
+    DI_UINT16 e_phentsize;           // Program header entry size
+    DI_UINT16 e_phnum;               // Program header entry count
+    DI_UINT16 e_shentsize;           // Section header entry size
+    DI_UINT16 e_shnum;               // Section header entry count
+    DI_UINT16 e_shstrndx;            // Section name string table index
 
 } DIANA_ELF_HEADER;
 
 // Program Header (64-bit)
 typedef struct
 {
-    uint32_t p_type;                // Segment type
-    uint32_t p_flags;               // Segment flags
-    uint64_t p_offset;              // Segment offset in file
-    uint64_t p_vaddr;               // Virtual address
-    uint64_t p_paddr;               // Physical address (often same as vaddr)
-    uint64_t p_filesz;              // Size in file
-    uint64_t p_memsz;               // Size in memory
-    uint64_t p_align;               // Alignment
+    DI_UINT32 p_type;                // Segment type
+    DI_UINT32 p_flags;               // Segment flags
+    DI_UINT64 p_offset;              // Segment offset in file
+    DI_UINT64 p_vaddr;               // Virtual address
+    DI_UINT64 p_paddr;               // Physical address (often same as vaddr)
+    DI_UINT64 p_filesz;              // Size in file
+    DI_UINT64 p_memsz;               // Size in memory
+    DI_UINT64 p_align;               // Alignment
 
 } DIANA_ELF_PROGRAM_HEADER;
 
 // 32-bit structures
 typedef struct {
-    uint8_t  e_ident[16];
-    uint16_t e_type;
-    uint16_t e_machine;
-    uint32_t e_version;
-    uint32_t e_entry;
-    uint32_t e_phoff;
-    uint32_t e_shoff;
-    uint32_t e_flags;
-    uint16_t e_ehsize;
-    uint16_t e_phentsize;
-    uint16_t e_phnum;
-    uint16_t e_shentsize;
-    uint16_t e_shnum;
-    uint16_t e_shstrndx;
+    DI_UINT8  e_ident[16];
+    DI_UINT16 e_type;
+    DI_UINT16 e_machine;
+    DI_UINT32 e_version;
+    DI_UINT32 e_entry;
+    DI_UINT32 e_phoff;
+    DI_UINT32 e_shoff;
+    DI_UINT32 e_flags;
+    DI_UINT16 e_ehsize;
+    DI_UINT16 e_phentsize;
+    DI_UINT16 e_phnum;
+    DI_UINT16 e_shentsize;
+    DI_UINT16 e_shnum;
+    DI_UINT16 e_shstrndx;
 } Elf32_Ehdr;
 
 typedef struct {
-    uint32_t p_type;
-    uint32_t p_offset;
-    uint32_t p_vaddr;
-    uint32_t p_paddr;
-    uint32_t p_filesz;
-    uint32_t p_memsz;
-    uint32_t p_flags;
-    uint32_t p_align;
+    DI_UINT32 p_type;
+    DI_UINT32 p_offset;
+    DI_UINT32 p_vaddr;
+    DI_UINT32 p_paddr;
+    DI_UINT32 p_filesz;
+    DI_UINT32 p_memsz;
+    DI_UINT32 p_flags;
+    DI_UINT32 p_align;
 } Elf32_Phdr;
 
 // Section Header (64-bit)
 typedef struct
 {
-    uint32_t sh_name;               // Section name offset in string table (offset 0)
-    uint32_t sh_type;               // Section type (offset 4)
-    uint64_t sh_flags;              // Section flags (offset 8)
-    uint64_t sh_addr;               // Section address (offset 16)
-    uint64_t sh_offset;             // Section offset in file (offset 24)
-    uint64_t sh_size;               // Section size (offset 32)
-    uint32_t sh_link;               // Link to another section (offset 40)
-    uint32_t sh_info;               // Extra section information (offset 44)
-    uint64_t sh_addralign;          // Section address alignment (offset 48)
-    uint64_t sh_entsize;            // Entry size if section holds table (offset 56)
+    DI_UINT32 sh_name;               // Section name offset in string table (offset 0)
+    DI_UINT32 sh_type;               // Section type (offset 4)
+    DI_UINT64 sh_flags;              // Section flags (offset 8)
+    DI_UINT64 sh_addr;               // Section address (offset 16)
+    DI_UINT64 sh_offset;             // Section offset in file (offset 24)
+    DI_UINT64 sh_size;               // Section size (offset 32)
+    DI_UINT32 sh_link;               // Link to another section (offset 40)
+    DI_UINT32 sh_info;               // Extra section information (offset 44)
+    DI_UINT64 sh_addralign;          // Section address alignment (offset 48)
+    DI_UINT64 sh_entsize;            // Entry size if section holds table (offset 56)
 } DIANA_ELF_SECTION_HEADER;
 
 // Symbol Entry (64-bit)
 typedef struct
 {
-    uint32_t st_name;               // Symbol name offset in string table
-    uint8_t  st_info;               // Symbol binding and type
-    uint8_t  st_other;              // Symbol visibility
-    uint16_t st_shndx;              // Section index
-    uint64_t st_value;              // Symbol value
-    uint64_t st_size;               // Symbol size
+    DI_UINT32 st_name;               // Symbol name offset in string table
+    DI_UINT8  st_info;               // Symbol binding and type
+    DI_UINT8  st_other;              // Symbol visibility
+    DI_UINT16 st_shndx;              // Section index
+    DI_UINT64 st_value;              // Symbol value
+    DI_UINT64 st_size;               // Symbol size
 
 } DIANA_ELF_SYMBOL;
 
 // Relocation Entry (without addend)
 typedef struct
 {
-    uint64_t r_offset;              // Relocation offset
-    uint64_t r_info;                // Relocation type and symbol index
+    DI_UINT64 r_offset;              // Relocation offset
+    DI_UINT64 r_info;                // Relocation type and symbol index
 
 } DIANA_ELF_REL;
 
 // Relocation Entry (with addend)
 typedef struct
 {
-    uint64_t r_offset;              // Relocation offset
-    uint64_t r_info;                // Relocation type and symbol index
-    int64_t  r_addend;              // Relocation addend
+    DI_UINT64 r_offset;              // Relocation offset
+    DI_UINT64 r_info;                // Relocation type and symbol index
+    DI_INT64  r_addend;              // Relocation addend
 
 } DIANA_ELF_RELA;
 
 // Dynamic Entry
 typedef struct
 {
-    int64_t  d_tag;                 // Dynamic entry type
-    uint64_t d_un;                  // Value
+    DI_INT64  d_tag;                 // Dynamic entry type
+    DI_UINT64 d_un;                  // Value
 
 } DIANA_ELF_DYN;
 

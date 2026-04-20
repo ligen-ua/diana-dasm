@@ -43,9 +43,9 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
 
     // Now read the section name string table (.shstrtab)
     // It's at index e_shstrndx
-    if (pImpl->elfHeader.e_shstrndx == ((uint16_t)0xffff))
+    if (pImpl->elfHeader.e_shstrndx == ((DI_UINT16)0xffff))
     {
-        pImpl->elfHeader.e_shstrndx = (uint16_t)pSectionHeader[0].header.sh_link;
+        pImpl->elfHeader.e_shstrndx = (DI_UINT16)pSectionHeader[0].header.sh_link;
     }
 
     if (pImpl->elfHeader.e_shstrndx > 0 && pImpl->elfHeader.e_shstrndx < pImpl->elfHeader.e_shnum)
@@ -72,7 +72,7 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
         for (i = 0; i < pImpl->capturedSectionCount; ++i)
         {
             Diana_ElfSectionWithInfo* pSection = &pImpl->pCapturedSections[i];
-            uint32_t nameOffset = pSection->header.sh_name;
+            DI_UINT32 nameOffset = pSection->header.sh_name;
 
             if (nameOffset < pStrTabSection->sh_size)
             {
@@ -81,7 +81,7 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
                 int nameLen = 0;
 
                 while (nameLen < 63 &&
-                       (nameOffset + (uint32_t)nameLen) < pStrTabSection->sh_size &&
+                       (nameOffset + (DI_UINT32)nameLen) < pStrTabSection->sh_size &&
                        pName[nameLen] != '\0')
                     nameLen++;
 
@@ -310,9 +310,9 @@ int Diana_ReadElfHeader(Diana_ElfFile_impl * elfImpl,
     DianaMovableReadStream* pStream,
     DI_CHAR identHeader[DIANA_EI_NIDENT])
 {
-    uint8_t cls = identHeader[DIANA_EI_CLASS];
-    uint8_t data = identHeader[DIANA_EI_DATA];
-    uint8_t tmpHeader[64];
+    DI_UINT8 cls = identHeader[DIANA_EI_CLASS];
+    DI_UINT8 data = identHeader[DIANA_EI_DATA];
+    DI_UINT8 tmpHeader[64];
     int ehdrSize = 0;
     int is64 = 0;
     int isLE = 0;
@@ -364,9 +364,9 @@ int Diana_ReadElfHeader(Diana_ElfFile_impl * elfImpl,
     else
     {
         // ELF32: e_entry/e_phoff/e_shoff are 32-bit
-        elfHeader->e_entry = (uint64_t)DianaElf_rd32(tmpHeader + 0x18, isLE);
-        elfHeader->e_phoff = (uint64_t)DianaElf_rd32(tmpHeader + 0x1C, isLE);
-        elfHeader->e_shoff = (uint64_t)DianaElf_rd32(tmpHeader + 0x20, isLE);
+        elfHeader->e_entry = (DI_UINT64)DianaElf_rd32(tmpHeader + 0x18, isLE);
+        elfHeader->e_phoff = (DI_UINT64)DianaElf_rd32(tmpHeader + 0x1C, isLE);
+        elfHeader->e_shoff = (DI_UINT64)DianaElf_rd32(tmpHeader + 0x20, isLE);
         elfHeader->e_flags = DianaElf_rd32(tmpHeader + 0x24, isLE);
         elfHeader->e_ehsize = DianaElf_rd16(tmpHeader + 0x28, isLE);
         elfHeader->e_phentsize = DianaElf_rd16(tmpHeader + 0x2A, isLE);
@@ -1011,87 +1011,90 @@ int DianaElfFile_GetSymbolAddress_File(Diana_ElfFile* pElfFile,
 
     *pSymbolAddress = 0;
 
-    const int is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
-    const int isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
-
-
-    // Get dynamic symbol / string table sections
-    DIANA_ELF_SECTION_HEADER* pDynsym = &pImpl->pDynamicSymbolTableSection->header;
-    DIANA_ELF_SECTION_HEADER* pDynstr = &pImpl->pDynamicStringTableSection->header;
-    DI_UINT64 symEntSize = 0;
-    int status = DI_NOT_FOUND;
-    char* strings = NULL;
-    DI_UINT64 numSymbols = 0;
-
-    if (!pDynsym || !pDynstr)
-        return DI_ERROR;  // No dynamic symbols
-
-    // Number of entries depends on class
-    symEntSize = is64bit ? 24 : 16;
-    if (pDynsym->sh_entsize != 0)
-        symEntSize = pDynsym->sh_entsize; // respect file if set
-
-    if (symEntSize == 0)
-        return DI_INVALID_INPUT;
-
-    numSymbols = pDynsym->sh_size / symEntSize;
-
-    if (pDynstr->sh_size == 0 || pDynstr->sh_size > DIANA_MAX_SAFE_ALLOC_SIZE)
-        return DI_INVALID_INPUT;
-
-    // Read entire string table
     {
-        OPERAND_SIZE dynstrOpSize = pDynstr->sh_size;
-        DIANA_SIZE_T dynstrAllocSize;
-        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynstrOpSize, &dynstrAllocSize));
-        strings = (char*)DIANA_MALLOC(dynstrAllocSize);
-        DI_CHECK_ALLOC_GOTO(strings);
-    }
+        const int is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
+        const int isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
 
-    DI_CHECK_GOTO(pStream->pMoveTo(pStream, pDynstr->sh_offset));
-    DI_CHECK_GOTO(DianaExactReadSafe(&pStream->parent, strings, pDynstr->sh_size));
 
-    // Linear search over symbols (normalized per entry)
-    for (DI_UINT64 i = 0; i < numSymbols; ++i)
-    {
-        DI_ELF_SYM64 sym;
-        const char* name = 0;
+        // Get dynamic symbol / string table sections
+        DIANA_ELF_SECTION_HEADER* pDynsym = &pImpl->pDynamicSymbolTableSection->header;
+        DIANA_ELF_SECTION_HEADER* pDynstr = &pImpl->pDynamicStringTableSection->header;
+        DI_UINT64 symEntSize = 0;
+        int status = DI_NOT_FOUND;
+        char* strings = NULL;
+        DI_UINT64 numSymbols = 0;
+        DI_UINT64 i = 0;
 
-        OPERAND_SIZE symOffset = pDynsym->sh_offset + (OPERAND_SIZE)(i * symEntSize);
+        if (!pDynsym || !pDynstr)
+            return DI_ERROR;  // No dynamic symbols
 
-        DI_CHECK_GOTO(DianaElf_ReadSymNormalized(pStream,
-            symOffset,
-            is64bit,
-            isLE,
-            &sym,
-            0));
+        // Number of entries depends on class
+        symEntSize = is64bit ? 24 : 16;
+        if (pDynsym->sh_entsize != 0)
+            symEntSize = pDynsym->sh_entsize; // respect file if set
 
-        if (sym.st_name >= pDynstr->sh_size)
-            continue;
+        if (symEntSize == 0)
+            return DI_INVALID_INPUT;
 
-        name = &strings[sym.st_name];
+        numSymbols = pDynsym->sh_size / symEntSize;
 
-        if (DIANA_STRNCMP(name, symbolName, 255) == 0)
+        if (pDynstr->sh_size == 0 || pDynstr->sh_size > DIANA_MAX_SAFE_ALLOC_SIZE)
+            return DI_INVALID_INPUT;
+
+        // Read entire string table
         {
-            int binding = DI_ELF_ST_BIND(sym.st_info);
-            int type = DI_ELF_ST_TYPE(sym.st_info);
+            OPERAND_SIZE dynstrOpSize = pDynstr->sh_size;
+            DIANA_SIZE_T dynstrAllocSize;
+            DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynstrOpSize, &dynstrAllocSize));
+            strings = (char*)DIANA_MALLOC(dynstrAllocSize);
+            DI_CHECK_ALLOC_GOTO(strings);
+        }
 
-            if ((binding == DIANA_STB_GLOBAL || binding == DIANA_STB_WEAK) &&
-                (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT))
+        DI_CHECK_GOTO(pStream->pMoveTo(pStream, pDynstr->sh_offset));
+        DI_CHECK_GOTO(DianaExactReadSafe(&pStream->parent, strings, pDynstr->sh_size));
+
+        // Linear search over symbols (normalized per entry)
+        for (i = 0; i < numSymbols; ++i)
+        {
+            DI_ELF_SYM64 sym;
+            const char* name = 0;
+
+            OPERAND_SIZE symOffset = pDynsym->sh_offset + (OPERAND_SIZE)(i * symEntSize);
+
+            DI_CHECK_GOTO(DianaElf_ReadSymNormalized(pStream,
+                symOffset,
+                is64bit,
+                isLE,
+                &sym,
+                0));
+
+            if (sym.st_name >= pDynstr->sh_size)
+                continue;
+
+            name = &strings[sym.st_name];
+
+            if (DIANA_STRNCMP(name, symbolName, 255) == 0)
             {
-                *pSymbolAddress = sym.st_value;
-                status = DI_SUCCESS;
-                break;
+                int binding = DI_ELF_ST_BIND(sym.st_info);
+                int type = DI_ELF_ST_TYPE(sym.st_info);
+
+                if ((binding == DIANA_STB_GLOBAL || binding == DIANA_STB_WEAK) &&
+                    (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT))
+                {
+                    *pSymbolAddress = sym.st_value;
+                    status = DI_SUCCESS;
+                    break;
+                }
             }
         }
-    }
-cleanup:
+    cleanup:
 
-    if (strings)
-    {
-        DIANA_FREE(strings);
+        if (strings)
+        {
+            DIANA_FREE(strings);
+        }
+        return status;
     }
-    return status;
 }
 
 int DianaElfFile_GetProcAddress(Diana_ElfFile* pElfFile,

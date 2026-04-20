@@ -102,31 +102,6 @@ typedef enum
 #define DI_VEX_GET_NDS(flags)  (((flags) >> 25) & 0x3)
 
 // index fields
-#define DI_INT8           signed char
-#define DI_INT16          short
-#define DI_INT32          int
-#define DI_INT64          long long
-
-#define DI_UINT8          unsigned char
-#define DI_UINT16         unsigned short
-#define DI_UINT32         unsigned int
-#define DI_UINT64         unsigned long long
-
-#define DI_CHAR           unsigned char
-#define DI_SIGNED_CHAR    char
-#define DI_CHAR_NULL      ((unsigned char)(-1))
-
-#define OPERAND_SIZE         unsigned long long
-#define OPERAND_SIZE_SIGNED  long long
-
-#define DI_OPERAND_SIZE         unsigned long long
-#define DI_OPERAND_SIZE_SIGNED  long long
-
-#define DI_MAX_OPERAND_SIZE         ((unsigned long long)(-1))
-
-
-#define DI_FULL_CHAR           unsigned int
-#define DI_FULL_CHAR_NULL      ((unsigned int)(-1))
 #define DI_MAX_INT             (0x7FFFFFFF)
 #define DI_MAX_OPERANDS_COUNT  (4)
 #define DI_MAX_OPCODE_COUNT    (4)

@@ -30,8 +30,8 @@ typedef struct _diana_ElfFile_impl
     Diana_ElfSectionWithInfo* pDynamicStringTableSection;
 
     OPERAND_SIZE sizeOfModule;
-    uint64_t dynamicAddress;
-    uint64_t dynamicSize;
+    DI_UINT64 dynamicAddress;
+    DI_UINT64 dynamicSize;
     int internalFlags;
 }Diana_ElfFile_impl;
 typedef struct _diana_ElfFile
