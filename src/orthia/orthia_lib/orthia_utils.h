@@ -239,6 +239,8 @@ void ToStringAsHex(unsigned long long id, std::basic_string<Type, Traits<Type>, 
         throw std::runtime_error("Cannot convert");
 }
 
+#ifndef DIANA_HAS_WIN32
+
 template<template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex(int64_t id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
 {
@@ -279,8 +281,6 @@ void ToStringAsHex(uint64_t id, std::basic_string<Type, Traits<Type>, AllocatorT
         throw std::runtime_error("Cannot convert");
 }
 
-
-// ansi
 inline std::string ToAnsiStringAsHex(int64_t id)
 {
     std::string res;
@@ -294,6 +294,9 @@ inline std::string ToAnsiStringAsHex(uint64_t id)
     return res;
 }
 
+#endif // !DIANA_HAS_WIN32
+
+// ansi
 inline std::string ToAnsiStringAsHex(long long id)
 {
     std::string res;
@@ -344,12 +347,15 @@ inline PlatformString_type ToWideStringAsHex(unsigned long long id)
     ToStringAsHex(id, &res);
     return res;
 }
+
+#ifndef DIANA_HAS_WIN32
 inline PlatformString_type ToWideStringAsHex(uint64_t id)
 {
     PlatformString_type res;
     ToStringAsHex(id, &res);
     return res;
 }
+#endif
 inline PlatformString_type ToWideStringAsHex(short id)
 {
     PlatformString_type res;
@@ -416,6 +422,7 @@ void ToStringAsHex_Short(unsigned long long id, std::basic_string<Type, Traits<T
 }
 
 
+#ifndef DIANA_HAS_WIN32
 template<template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex_Short(uint64_t id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
 {
@@ -442,6 +449,7 @@ inline PlatformString_type ToWideStringAsHex_Short(uint64_t id)
     ToStringAsHex_Short(id, &res);
     return res;
 }
+#endif
 
 inline PlatformString_type ToWideStringAsHex_Short(long long id)
 {

@@ -66,12 +66,16 @@ void CCommonFormatBuilder::AddMetadata(const std::string& name, unsigned long lo
     orthia::ToStringAsHex_Short(value, &text);
     AddMetadata(name, text);
 }
+
+#ifndef DIANA_HAS_WIN32
 void CCommonFormatBuilder::AddMetadata(const std::string& name, uint64_t value)
 {
     std::string text;
     orthia::ToStringAsHex_Short(value, &text);
     AddMetadata(name, text);
 }
+#endif
+
 void CCommonFormatBuilder::AddMetadata(const std::string& name, int value)
 {
     std::string text;
@@ -258,6 +262,7 @@ bool CCommonFormatParser::QueryMetadata(const std::string & name, unsigned long 
     }
     return HexStringToObject_Silent(value, pValue);
 }
+#ifndef DIANA_HAS_WIN32
 bool CCommonFormatParser::QueryMetadata(const std::string & name, uint64_t * pValue) const
 {
     std::string value;
@@ -268,6 +273,7 @@ bool CCommonFormatParser::QueryMetadata(const std::string & name, uint64_t * pVa
     }
     return HexStringToObject_Silent(value, pValue);
 }
+#endif
 bool CCommonFormatParser::QueryMetadata(const std::string & name, long long * pValue) const
 {
     std::string value;

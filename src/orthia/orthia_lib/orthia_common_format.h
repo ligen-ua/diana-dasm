@@ -32,7 +32,10 @@ public:
     void AddMetadata(const std::string & name, long long value);
     void AddMetadata(const std::string& name, unsigned long long value);
     void AddMetadata(const std::string& name, int value);
+
+#ifndef DIANA_HAS_WIN32
     void AddMetadata(const std::string& name, uint64_t value);
+#endif
 
 #ifdef WIN32
     void AddMetadata(const orthia::PlatformString_type& name, const orthia::PlatformString_type & value);
@@ -81,7 +84,10 @@ public:
     bool QueryMetadata(const std::string & name, std::string * pValue) const;
     bool QueryMetadata(const std::string & name, long long * pValue) const;
     bool QueryMetadata(const std::string & name, unsigned long long * pValue) const;
+
+#ifndef DIANA_HAS_WIN32
     bool QueryMetadata(const std::string & name, uint64_t * pValue) const;
+#endif
 
 #ifdef WIN32
     bool QueryMetadata(const std::string & name, orthia::PlatformString_type * pValue) const;
