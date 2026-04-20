@@ -66,6 +66,12 @@ void CCommonFormatBuilder::AddMetadata(const std::string& name, unsigned long lo
     orthia::ToStringAsHex_Short(value, &text);
     AddMetadata(name, text);
 }
+void CCommonFormatBuilder::AddMetadata(const std::string& name, uint64_t value)
+{
+    std::string text;
+    orthia::ToStringAsHex_Short(value, &text);
+    AddMetadata(name, text);
+}
 void CCommonFormatBuilder::AddMetadata(const std::string& name, int value)
 {
     std::string text;
@@ -243,6 +249,16 @@ bool CCommonFormatParser::QueryMetadata(const std::string & name, std::string * 
     return orthia::QueryAttribute_Silent_Utf8(m_pRoot, name, pValue);
 }
 bool CCommonFormatParser::QueryMetadata(const std::string & name, unsigned long long * pValue) const
+{
+    std::string value;
+    bool res = QueryMetadata(name, &value);
+    if (!res)
+    {
+        return false;
+    }
+    return HexStringToObject_Silent(value, pValue);
+}
+bool CCommonFormatParser::QueryMetadata(const std::string & name, uint64_t * pValue) const
 {
     std::string value;
     bool res = QueryMetadata(name, &value);

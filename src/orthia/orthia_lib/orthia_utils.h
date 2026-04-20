@@ -239,7 +239,61 @@ void ToStringAsHex(unsigned long long id, std::basic_string<Type, Traits<Type>, 
         throw std::runtime_error("Cannot convert");
 }
 
+template<template<class> class Traits, template<class> class AllocatorType, class Type>
+void ToStringAsHex(int64_t id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
+{
+    orthia::UnsignedLargeInteger_type li;
+    li.QuadPart = id;
+    typedef std::basic_string<Type, Traits<Type>, AllocatorType<Type> > StringType;
+
+    std::basic_stringstream<Type> stream;
+    std::hex(stream);
+
+    stream << std::setw( sizeof(li.HighPart)*2) << std::setfill( CharTraits<Type>::zero );
+    stream << li.HighPart;   
+
+    stream << std::setw(sizeof(li.HighPart)*2) << std::setfill(CharTraits<Type>::zero);
+    stream << li.LowPart;
+    stream >> *pStr;
+    if (stream.fail() || stream.bad() || !stream.eof())
+        throw std::runtime_error("Cannot convert");
+}
+
+template<template<class> class Traits, template<class> class AllocatorType, class Type>
+void ToStringAsHex(uint64_t id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
+{
+    orthia::UnsignedLargeInteger_type li;
+    li.QuadPart = id;
+    typedef std::basic_string<Type, Traits<Type>, AllocatorType<Type> > StringType;
+
+    std::basic_stringstream<Type> stream;
+    std::hex(stream);
+
+    stream << std::setw( sizeof(li.HighPart)*2) << std::setfill( CharTraits<Type>::zero );
+    stream << li.HighPart;   
+
+    stream << std::setw(sizeof(li.HighPart)*2) << std::setfill(CharTraits<Type>::zero);
+    stream << li.LowPart;
+    stream >> *pStr;
+    if (stream.fail() || stream.bad() || !stream.eof())
+        throw std::runtime_error("Cannot convert");
+}
+
+
 // ansi
+inline std::string ToAnsiStringAsHex(int64_t id)
+{
+    std::string res;
+    ToStringAsHex(id, &res);
+    return res;
+}
+inline std::string ToAnsiStringAsHex(uint64_t id)
+{
+    std::string res;
+    ToStringAsHex(id, &res);
+    return res;
+}
+
 inline std::string ToAnsiStringAsHex(long long id)
 {
     std::string res;
@@ -290,6 +344,12 @@ inline PlatformString_type ToWideStringAsHex(unsigned long long id)
     ToStringAsHex(id, &res);
     return res;
 }
+inline PlatformString_type ToWideStringAsHex(uint64_t id)
+{
+    PlatformString_type res;
+    ToStringAsHex(id, &res);
+    return res;
+}
 inline PlatformString_type ToWideStringAsHex(short id)
 {
     PlatformString_type res;
@@ -334,6 +394,7 @@ void ToStringAsHex_Short(long long id, std::basic_string<Type, Traits<Type>, All
     if (stream.fail() || stream.bad() || !stream.eof())
         throw std::runtime_error("Cannot convert");
 }
+
 template<template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex_Short(unsigned long long id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
 {
@@ -352,6 +413,34 @@ void ToStringAsHex_Short(unsigned long long id, std::basic_string<Type, Traits<T
     stream >> *pStr;
     if (stream.fail() || stream.bad() || !stream.eof())
         throw std::runtime_error("Cannot convert");
+}
+
+
+template<template<class> class Traits, template<class> class AllocatorType, class Type>
+void ToStringAsHex_Short(uint64_t id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
+{
+    orthia::UnsignedLargeInteger_type li;
+    li.QuadPart = id;
+    typedef std::basic_string<Type, Traits<Type>, AllocatorType<Type> > StringType;
+
+    std::basic_stringstream<Type> stream;
+    std::hex(stream);
+    if (li.HighPart)
+    {
+        stream << li.HighPart;
+        stream << std::setw( sizeof(li.HighPart)*2 ) << std::setfill( CharTraits<Type>::zero );
+    }
+    stream << li.LowPart;
+    stream >> *pStr;
+    if (stream.fail() || stream.bad() || !stream.eof())
+        throw std::runtime_error("Cannot convert");
+}
+
+inline PlatformString_type ToWideStringAsHex_Short(uint64_t id)
+{
+    PlatformString_type res;
+    ToStringAsHex_Short(id, &res);
+    return res;
 }
 
 inline PlatformString_type ToWideStringAsHex_Short(long long id)

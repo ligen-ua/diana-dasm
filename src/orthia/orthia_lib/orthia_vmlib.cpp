@@ -592,7 +592,7 @@ void DoCommand_vm_mod_write(orthia::intrusive_ptr<CDatabaseManager> pDatabaseMan
 int DoCommand_vm_mod_load(orthia::intrusive_ptr<CDatabaseManager> pDatabaseManager, 
                            long long vmId,
                            long long moduleId,
-                           unsigned long long moduleAddress,
+                           Address_type moduleAddress,
                            const std::vector<char> & buffer,
 
                            IMemoryReader * pReader,
