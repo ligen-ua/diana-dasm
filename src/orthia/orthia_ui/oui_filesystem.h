@@ -74,6 +74,7 @@ namespace oui
         virtual std::tuple<int, String> SyncLocateFile(const String& fileName, int dianaMode) = 0;
         virtual std::tuple<int, std::shared_ptr<IFile2>> SyncOpenFile(const FileUnifiedId& fileId) = 0;
         virtual std::tuple<int, String> SyncNormalizeName(const String& fileName, bool expectDll) = 0;
+        virtual String SyncSanitizeName(const String& fileName) = 0;
 
         virtual void AsyncOpenFile(ThreadPtr_type targetThread, 
             const FileUnifiedId& fileId, 
@@ -103,6 +104,7 @@ namespace oui
         std::tuple<int, std::shared_ptr<IFile2>> SyncOpenFile(const FileUnifiedId& fileId) override;
         std::tuple<int, String> SyncLocateFile(const String& fileName, int dianaMode) override;
         std::tuple<int, String> SyncNormalizeName(const String& fileName, bool expectDll) override;
+        String SyncSanitizeName(const String& fileName) override;
 
         // id-based stuff
         void AsyncOpenFile(ThreadPtr_type targetThread, 

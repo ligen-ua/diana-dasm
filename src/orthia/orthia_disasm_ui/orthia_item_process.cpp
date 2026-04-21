@@ -20,7 +20,12 @@ namespace orthia
         m_persistentStorage(persistentStorage)
     {
     }
-
+    void CProcessWorkplaceItem::Init(std::shared_ptr<CModuleManager> moduleManager,
+        std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage)
+    {
+        m_moduleManager = moduleManager;
+        m_persistentStorage = persistentItemStorage;
+    }
     WorkAddressData CProcessWorkplaceItem::ReadData(Address_type address, Address_type size)
     {
         return m_proc->ReadExactEx(address, (size_t)size);

@@ -244,4 +244,15 @@ namespace orthia
     const static int g_database_type_fnc_Export = 3;
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
+
+    // CFilePersistentItemStorage
+    class CDatabaseManager;
+    class CFilePersistentItemStorage :public CPersistentItemStorage
+    {
+        orthia::intrusive_ptr<CDatabaseManager> m_databaseManager;
+    public:
+        CFilePersistentItemStorage();
+        void Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager);
+        oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment);
+    };
 }

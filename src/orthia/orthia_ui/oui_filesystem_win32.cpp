@@ -299,6 +299,19 @@ namespace oui
             m_knownExtensions[L"CPL"] = FileInfo::flag_any_executable;
             m_knownExtensions[L"SCR"] = FileInfo::flag_any_executable;
         }
+        String SyncSanitizeName(const String& fileName)
+        {
+            // Characters forbidden in Windows file names
+            const std::wstring invalid = L"\\/:*?\"<>|";
+            std::wstring result = fileName.native;
+            std::replace_if(result.begin(), result.end(),
+                [&invalid](wchar_t c) {
+                return invalid.find(c) != std::wstring::npos
+                    || c < 32; // control characters
+            },
+                L'_');
+            return result;
+        }
 
         std::tuple<int, String> SyncLocateFile(const String& fileName, int dianaMode)
         {

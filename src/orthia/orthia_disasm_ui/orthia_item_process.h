@@ -1,7 +1,5 @@
 #pragma once
-
 #include "oui_processes.h"
-
 
 namespace orthia
 {
@@ -17,6 +15,7 @@ namespace orthia
         orthia::flat_map<orthia::Address_type, oui::String> m_exports;
 
         Address_type m_processModuleAddress = 0;
+        std::shared_ptr<CModuleManager> m_moduleManager;
         mutable std::shared_ptr<IPeristentItemStorage> m_persistentStorage;
 
         void QueryNamesEx(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names, int* totalCount) const;
@@ -26,6 +25,9 @@ namespace orthia
             const oui::String& shortName,
             int dianaMode,
             std::shared_ptr<IPeristentItemStorage> persistentStorage);
+
+        void Init(std::shared_ptr<CModuleManager> moduleManager,
+            std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage);
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;

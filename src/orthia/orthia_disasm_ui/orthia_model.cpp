@@ -205,6 +205,57 @@ namespace orthia
             }
         });
     }
+
+
+    void CProgramModel::CreateProcItemFS(std::shared_ptr<oui::IProcess> proc,
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+        intrusive_ptr<CTextNode> mainNode,
+        intrusive_ptr<CTextNode> errorNode,
+        std::shared_ptr<CProcessWorkplaceItem> info)
+    {
+        try
+        {
+            auto folderName = GetFileSystem()->SyncSanitizeName(proc->GetFullFileNameForUI());
+            auto dbFolder = m_config->GetProcDBFolder() + AddSlash2(folderName.native);
+            auto dbFileName = dbFolder + m_config->GetDBFileName();
+            auto binFileName = dbFolder + m_config->GetBinFileName();
+            auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
+            CreateAllDirectoriesForFile(dbFileName);
+
+            // save readme file 
+            orthia::CFile readmeFile;
+            readmeFile.Open(readmeFileName, g_desired_write, g_share_read, g_create_always);
+
+            auto readmeHeader = mainNode->QueryValue(ORTHIA_TCSTR("readme-header"));
+            auto originalName = oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("original-name")),
+                proc->GetFullFileNameForUI());
+
+            std::stringstream textInfo;
+            textInfo << PlatformStringToUtf8(readmeHeader) << "\n";
+            textInfo << PlatformStringToUtf8(originalName.native) << "\n";
+            auto str = textInfo.str();
+            readmeFile.WriteToFile_Silent(str.c_str(), str.size());
+
+            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
+                dbFileName));
+
+            // done readme, create db
+            auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
+            auto moduleManager = std::make_shared<CModuleManager>();
+            moduleManager->Reinit(dbFileName, false);
+
+            persistentItemStorage->Init(moduleManager->QueryDatabaseManager());
+
+            info->Init(moduleManager, persistentItemStorage);
+        }
+        catch (std::exception& e)
+        {
+            WriteLog(completeHandler->GetThread(), oui::PassParameter1(errorNode->QueryValue(ORTHIA_TCSTR("cant-create-fs")),
+                proc->GetFullFileNameForUI()));
+
+            WriteLog(completeHandler->GetThread(), oui::String(orthia::Utf8ToPlatformString(e.what())));
+        }
+    }
     void CProgramModel::AddProcess(std::shared_ptr<oui::IProcess> proc,
         oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler)
     {
@@ -230,6 +281,8 @@ namespace orthia
         auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
         info->ReloadModules();
+
+        CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
         if (auto address = info->GerProcessModuleAddress())
         {
@@ -289,8 +342,9 @@ namespace orthia
             auto binFileName = dbFolder + m_config->GetBinFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
             CreateAllDirectoriesForFile(dbFileName);
-            ORTHIA_LOG(orthia::LogSeverity::Info, "Database file: ", dbFileName);
-            
+            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
+                dbFileName));
+
             // check binary file
             bool hashIsValid = false;
             int error = 0;
@@ -326,7 +380,7 @@ namespace orthia
 
                 // save readme file 
                 orthia::CFile readmeFile;
-                readmeFile.Open_Silent(readmeFileName, g_desired_write, g_share_read, g_create_always);
+                error = readmeFile.Open_Silent(readmeFileName, g_desired_write, g_share_read, g_create_always);
                 if (!error)
                 {
                     auto readmeHeader = mainNode->QueryValue(ORTHIA_TCSTR("readme-header"));
@@ -419,5 +473,16 @@ namespace orthia
             result.error.native = orthia::Utf8ToPlatformString(e.what());
         }
     }
+    void CProgramModel::LoadSymbols(std::shared_ptr<IWorkPlaceItem> workItem,
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
+    {
+        auto folders = m_config->GetSymbolsFolders();
 
+        std::vector<orthia::ModuleInfo> modules;
+        workItem->GetModules(modules);
+
+        for (auto& mod : modules)
+        {
+        }
+    }
 }

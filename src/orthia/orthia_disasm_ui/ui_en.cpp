@@ -104,6 +104,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("readme-header"), ORTHIA_TCSTR("Orthia Disasm Database Folder"))
         << textManager->RegisterValue(ORTHIA_TCSTR("original-name"), ORTHIA_TCSTR("Original Name: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("database-file"), ORTHIA_TCSTR("Database file: \"%1\""))
         ;
 
     // model
@@ -116,6 +117,8 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("no-app-dir"), ORTHIA_TCSTR("Can't locate application folder"))
         << textManager->RegisterValue(ORTHIA_TCSTR("cant-open-file"), ORTHIA_TCSTR("Can't open file"))
         << textManager->RegisterValue(ORTHIA_TCSTR("invalid-image-base"), ORTHIA_TCSTR("ImageBase is invalid"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("cant-create-fs"), ORTHIA_TCSTR("Can't create folder: %1"))
+
 
 
         ;

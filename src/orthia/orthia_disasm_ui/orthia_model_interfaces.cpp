@@ -1,4 +1,5 @@
 #include "orthia_model_interfaces.h"
+#include "orthia_database_module.h"
 
 namespace orthia
 {
@@ -148,6 +149,33 @@ namespace orthia
         }
         result.native += addressStr.native;
         result.native += OUI_TCSTR("h");
+        return result;
+    }
+
+    // CFilePersistentItemStorage
+    CFilePersistentItemStorage::CFilePersistentItemStorage()
+    {
+    }
+    void CFilePersistentItemStorage::Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager)
+    {
+        m_databaseManager = databaseManager;
+        m_databaseManager->GetClassicDatabase()->QueryAllComments([=](Address_type address, const std::string& text) {
+            CPersistentItemStorage::SyncWriteComment(address, orthia::Utf8ToPlatformString(text));
+            return true;
+        });
+    }
+    oui::fsui::OpenResult CFilePersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
+    {
+        oui::fsui::OpenResult result;
+        try
+        {
+            CPersistentItemStorage::SyncWriteComment(address, comment);
+            m_databaseManager->GetClassicDatabase()->InsertComment(address, orthia::PlatformStringToUtf8(comment.native));
+        }
+        catch (std::exception& e)
+        {
+            result.error = orthia::Utf8ToPlatformString(e.what());
+        }
         return result;
     }
 }

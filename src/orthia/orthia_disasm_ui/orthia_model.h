@@ -36,6 +36,7 @@ namespace orthia
         virtual void OnPreWorkspaceItemChange(int itemId) = 0;
         virtual void OnWorkspaceItemChanged(int itemId) = 0;
     };
+    class CProcessWorkplaceItem;
     class CProgramModel
     {
         std::shared_ptr<oui::CFileSystem> m_fileSystem;
@@ -53,6 +54,11 @@ namespace orthia
         std::set<std::shared_ptr<IUIEventHandler>> m_handlers;
 
         void WriteLog(std::shared_ptr<oui::CWindowThread> thread, const oui::String& line);
+        void CreateProcItemFS(std::shared_ptr<oui::IProcess> proc,
+            oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+            intrusive_ptr<CTextNode> mainNode,
+            intrusive_ptr<CTextNode> errorNode,
+            std::shared_ptr<CProcessWorkplaceItem> info);
 
         int RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive);
     public:
@@ -81,6 +87,8 @@ namespace orthia
         void AddExecutable(std::shared_ptr<oui::IFile2> file,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
+        void LoadSymbols(std::shared_ptr<IWorkPlaceItem> workItem,
+            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
     };
     oui::String ReadFileToVector(std::shared_ptr<oui::IFile> file, std::vector<char>& data, std::shared_ptr<oui::BaseOperation> operation = nullptr, intrusive_ptr<CTextNode> errorNode = nullptr);
 

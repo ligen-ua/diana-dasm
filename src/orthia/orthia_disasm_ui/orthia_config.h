@@ -9,7 +9,7 @@ namespace orthia
         PlatformString_type m_appDir;
         PlatformString_type m_dbDir;
         PlatformString_type m_binDir;
-
+        PlatformString_type m_procDBDir;
     public:
         void Init();
         PlatformString_type GetBinFileName() const;
@@ -17,7 +17,7 @@ namespace orthia
         PlatformString_type GetDBFolder() const;
         PlatformString_type GetReadmeFileName() const;
         PlatformString_type GetBinFolder() const;
-
-
+        PlatformString_type GetProcDBFolder() const;
+        std::vector<PlatformString_type> GetSymbolsFolders() const;
     };
 }
