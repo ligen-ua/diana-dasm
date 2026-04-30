@@ -4,6 +4,8 @@
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
 #include "orthia_log.h"
+#include "orthia_common_print.h"
+#include "orthia_module_manager.h"
 
 namespace orthia
 {
@@ -57,7 +59,7 @@ namespace orthia
 
     const std::shared_ptr<CModuleManager> CProcessWorkplaceItem::GetModuleManager() const
     {
-        return nullptr;
+        return m_moduleManager;
     }
     oui::String CProcessWorkplaceItem::GetShortName() const
     {
@@ -467,29 +469,62 @@ namespace orthia
 
     MarkupRangeInfo CProcessWorkplaceItem::QueryMarkupRange(Address_type address) const
     {
-        auto it = m_exports.find(address);
-        if (it == m_exports.end())
-        {
-            return MarkupRangeInfo();
-        }
         MarkupRangeInfo res;
-        res.sizeInLines = 1;
+        auto it = m_exports.find(address);
+        if (it != m_exports.end())
+        {
+            res.sizeInLines = 1;
+        }
+
+        if (m_moduleManager)
+        {
+            std::vector<CommonReferenceInfo> refs;
+            m_moduleManager->QueryReferencesToInstruction(address, &refs);
+            if (!refs.empty())
+            {
+                ++res.sizeInLines;
+            }
+        }
         return res;
     }
     void CProcessWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const
     {
         range.lines.clear();
-        if (index || count == 0)
+        if (count == 0)
         {
-            // returning just a single line currently
             return;
         }
+        std::vector<oui::String> allLines;
+
         auto it = m_exports.find(address);
-        if (it == m_exports.end())
+        if (it != m_exports.end())
         {
-            return;
+            allLines.push_back(it->second);
         }
-        range.lines.push_back(it->second.native);
+
+        if (m_moduleManager)
+        {
+            std::vector<CommonReferenceInfo> refs;
+            m_moduleManager->QueryReferencesToInstruction(address, &refs);
+            if (!refs.empty())
+            {
+                PlatformString_type xrefText = OUI_STR("  <-----  ");
+                xrefText += orthia::AddressToString(refs[0].address, GetDianaMode());
+                if (refs.size() > 1)
+                {
+                    xrefText += OUI_STR(" [.....]");
+                }
+                xrefText += OUI_STR("    -----  ");
+                oui::String xrefLine;
+                xrefLine.native = xrefText;
+                allLines.push_back(xrefLine);
+            }
+        }
+
+        for (int i = index; i < (int)allLines.size() && (int)range.lines.size() < count; ++i)
+        {
+            range.lines.push_back(allLines[i]);
+        }
     }
     bool CProcessWorkplaceItem::QueryAddressModule(Address_type address, orthia::ModuleInfo & result) const
     {

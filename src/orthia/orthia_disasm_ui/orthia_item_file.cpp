@@ -2,6 +2,7 @@
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
+#include "orthia_common_print.h"
 
 namespace orthia
 {
@@ -283,16 +284,25 @@ namespace orthia
             result.sizeInLines = 1;
             return false;
         });
+
+        std::vector<CommonReferenceInfo> refs;
+        moduleManager->QueryReferencesToInstruction(address, &refs);
+        if (!refs.empty())
+        {
+            ++result.sizeInLines;
+        }
         return result;
     }
     void FileWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const
     {
-        if (index || count == 0)
+        range.lines.clear();
+        if (count == 0)
         {
             return;
         }
-        range.lines.clear();
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        std::vector<oui::String> allLines;
+
         Address_type capturedModuleAddress = 0;
         classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export,
             address,
@@ -307,20 +317,41 @@ namespace orthia
             parser.QueryMetadata("address", &target);
             parser.QueryMetadata("name", &name);
 
-            range.lines.push_back(orthia::Utf8ToPlatformString(name));
+            allLines.push_back(orthia::Utf8ToPlatformString(name));
             return false;
         });
 
-        if (!range.lines.empty())
+        if (!allLines.empty())
         {
             CommonModuleInfo info;
             if (classicDatabase->QueryModule(capturedModuleAddress, &info))
             {
-                for (auto& line : range.lines)
+                for (auto& line : allLines)
                 {
                     line.native = info.name + OUI_TCSTR("!") + line.native;
                 }
             }
+        }
+
+        std::vector<CommonReferenceInfo> refs;
+        moduleManager->QueryReferencesToInstruction(address, &refs);
+        if (!refs.empty())
+        {
+            PlatformString_type xrefText = OUI_TCSTR("  <-----  ");
+            xrefText += orthia::AddressToString(refs[0].address, GetDianaMode());
+            if (refs.size() > 1)
+            {
+                xrefText += OUI_TCSTR(" [.....]");
+            }
+            xrefText += OUI_TCSTR("    -----  ");
+            oui::String xrefLine;
+            xrefLine.native = xrefText;
+            allLines.push_back(xrefLine);
+        }
+
+        for (int i = index; i < (int)allLines.size() && (int)range.lines.size() < count; ++i)
+        {
+            range.lines.push_back(allLines[i]);
         }
     }
     oui::String FileWorkplaceItem::QueryAddressName(Address_type address) const
