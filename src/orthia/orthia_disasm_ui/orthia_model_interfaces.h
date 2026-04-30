@@ -183,6 +183,8 @@ namespace orthia
         virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr;  }
     };
 
+    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<oui::String>& allLines);
+
     template<class PtrType>
     oui::String QueryAddressNameDef(PtrType ptr, Address_type address, int dianaMode)
     {

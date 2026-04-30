@@ -511,33 +511,7 @@ namespace orthia
             allLines.push_back(it->second);
         }
 
-        if (m_moduleManager)
-        {
-            const CommonReferenceInfoArray_type* refsPtr = nullptr;
-            std::vector<CommonReferenceInfo> refsStorage;
-            if (!cache)
-            {
-                m_moduleManager->QueryReferencesToInstruction(address, &refsStorage);
-                refsPtr = &refsStorage;
-            }
-            else
-            {
-                cache->QueryReferences(address, &refsPtr);
-            }
-            if (refsPtr && !refsPtr->empty())
-            {
-                PlatformString_type xrefText = OUI_STR("  <-----  ");
-                xrefText += orthia::AddressToString((*refsPtr)[0].address, GetDianaMode());
-                if (refsPtr->size() > 1)
-                {
-                    xrefText += OUI_STR(" [.....]");
-                }
-                xrefText += OUI_STR("    -----  ");
-                oui::String xrefLine;
-                xrefLine.native = xrefText;
-                allLines.push_back(xrefLine);
-            }
-        }
+        AppendXrefLine(address, cache, m_moduleManager.get(), GetDianaMode(), allLines);
 
         for (int i = index; i < (int)allLines.size() && (int)range.lines.size() < count; ++i)
         {

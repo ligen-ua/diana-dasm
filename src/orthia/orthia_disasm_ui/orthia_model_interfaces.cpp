@@ -1,5 +1,6 @@
 #include "orthia_model_interfaces.h"
 #include "orthia_database_module.h"
+#include "orthia_module_manager.h"
 
 namespace orthia
 {
@@ -114,6 +115,36 @@ namespace orthia
 
         m_comments[address].text = comment;
         return oui::fsui::OpenResult();
+    }
+
+    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<oui::String>& allLines)
+    {
+        if (!moduleManager)
+            return;
+        const CommonReferenceInfoArray_type* refsPtr = nullptr;
+        std::vector<CommonReferenceInfo> refsStorage;
+        if (!cache)
+        {
+            moduleManager->QueryReferencesToInstruction(address, &refsStorage);
+            refsPtr = &refsStorage;
+        }
+        else
+        {
+            cache->QueryReferences(address, &refsPtr);
+        }
+        if (refsPtr && !refsPtr->empty())
+        {
+            PlatformString_type xrefText = OUI_TCSTR("  <-----  ");
+            xrefText += orthia::AddressToString((*refsPtr)[0].address, dianaMode);
+            if (refsPtr->size() > 1)
+            {
+                xrefText += OUI_TCSTR(" [.....]");
+            }
+            xrefText += OUI_TCSTR("    -----  ");
+            oui::String xrefLine;
+            xrefLine.native = xrefText;
+            allLines.push_back(xrefLine);
+        }
     }
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address)
