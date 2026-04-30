@@ -277,7 +277,7 @@ namespace orthia
         MarkupRangeInfo result;
 
         const ExportLineInfo* exportPtr = nullptr;
-        if (!cache || !cache->QueryExportInfo(address, &exportPtr))
+        if (!cache)
         {
             auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
             classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export,
@@ -288,19 +288,25 @@ namespace orthia
                 return false;
             });
         }
-        else if (exportPtr)
+        else
         {
-            result.sizeInLines = 1;
+            cache->QueryExportInfo(address, &exportPtr);
+            if (exportPtr)
+                result.sizeInLines = 1;
         }
 
         const CommonReferenceInfoArray_type* refsPtr = nullptr;
         std::vector<CommonReferenceInfo> refsStorage;
-        if (!cache || !cache->QueryReferences(address, &refsPtr))
+        if (!cache)
         {
             moduleManager->QueryReferencesToInstruction(address, &refsStorage);
             refsPtr = &refsStorage;
         }
-        if (!refsPtr->empty())
+        else
+        {
+            cache->QueryReferences(address, &refsPtr);
+        }
+        if (refsPtr && !refsPtr->empty())
         {
             ++result.sizeInLines;
         }
@@ -316,7 +322,7 @@ namespace orthia
         std::vector<oui::String> allLines;
 
         const ExportLineInfo* exportPtr = nullptr;
-        if (!cache || !cache->QueryExportInfo(address, &exportPtr))
+        if (!cache)
         {
             auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
             Address_type capturedModuleAddress = 0;
@@ -349,19 +355,25 @@ namespace orthia
                 }
             }
         }
-        else if (exportPtr)
+        else
         {
-            allLines.push_back(exportPtr->displayName);
+            cache->QueryExportInfo(address, &exportPtr);
+            if (exportPtr)
+                allLines.push_back(exportPtr->displayName);
         }
 
         const CommonReferenceInfoArray_type* refsPtr = nullptr;
         std::vector<CommonReferenceInfo> refsStorage;
-        if (!cache || !cache->QueryReferences(address, &refsPtr))
+        if (!cache)
         {
             moduleManager->QueryReferencesToInstruction(address, &refsStorage);
             refsPtr = &refsStorage;
         }
-        if (!refsPtr->empty())
+        else
+        {
+            cache->QueryReferences(address, &refsPtr);
+        }
+        if (refsPtr && !refsPtr->empty())
         {
             PlatformString_type xrefText = OUI_TCSTR("  <-----  ");
             xrefText += orthia::AddressToString((*refsPtr)[0].address, GetDianaMode());

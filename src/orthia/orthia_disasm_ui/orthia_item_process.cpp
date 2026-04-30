@@ -480,12 +480,16 @@ namespace orthia
         {
             const CommonReferenceInfoArray_type* refsPtr = nullptr;
             std::vector<CommonReferenceInfo> refsStorage;
-            if (!cache || !cache->QueryReferences(address, &refsPtr))
+            if (!cache)
             {
                 m_moduleManager->QueryReferencesToInstruction(address, &refsStorage);
                 refsPtr = &refsStorage;
             }
-            if (!refsPtr->empty())
+            else
+            {
+                cache->QueryReferences(address, &refsPtr);
+            }
+            if (refsPtr && !refsPtr->empty())
             {
                 ++res.sizeInLines;
             }
@@ -511,12 +515,16 @@ namespace orthia
         {
             const CommonReferenceInfoArray_type* refsPtr = nullptr;
             std::vector<CommonReferenceInfo> refsStorage;
-            if (!cache || !cache->QueryReferences(address, &refsPtr))
+            if (!cache)
             {
                 m_moduleManager->QueryReferencesToInstruction(address, &refsStorage);
                 refsPtr = &refsStorage;
             }
-            if (!refsPtr->empty())
+            else
+            {
+                cache->QueryReferences(address, &refsPtr);
+            }
+            if (refsPtr && !refsPtr->empty())
             {
                 PlatformString_type xrefText = OUI_STR("  <-----  ");
                 xrefText += orthia::AddressToString((*refsPtr)[0].address, GetDianaMode());
