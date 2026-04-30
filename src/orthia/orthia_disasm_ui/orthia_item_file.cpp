@@ -272,18 +272,26 @@ namespace orthia
     {
         return file->GetDianaMode();
     }
-    MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address, IReferencesCache* cache) const
+    MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address, IMarkupCache* cache) const
     {
         MarkupRangeInfo result;
-        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
-        classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export,
-            address,
-            [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+        const ExportLineInfo* exportPtr = nullptr;
+        if (!cache || !cache->QueryExportInfo(address, &exportPtr))
+        {
+            auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export,
+                address,
+                [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+            {
+                result.sizeInLines = 1;
+                return false;
+            });
+        }
+        else if (exportPtr)
         {
             result.sizeInLines = 1;
-            return false;
-        });
+        }
 
         const CommonReferenceInfoArray_type* refsPtr = nullptr;
         std::vector<CommonReferenceInfo> refsStorage;
@@ -298,44 +306,52 @@ namespace orthia
         }
         return result;
     }
-    void FileWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IReferencesCache* cache) const
+    void FileWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache) const
     {
         range.lines.clear();
         if (count == 0)
         {
             return;
         }
-        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         std::vector<oui::String> allLines;
 
-        Address_type capturedModuleAddress = 0;
-        classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export,
-            address,
-            [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+        const ExportLineInfo* exportPtr = nullptr;
+        if (!cache || !cache->QueryExportInfo(address, &exportPtr))
         {
-            capturedModuleAddress = moduleAddress;
-
-            std::string name;
-            Address_type target = 0;
-            CCommonFormatParser parser;
-            parser.Parse(text);
-            parser.QueryMetadata("address", &target);
-            parser.QueryMetadata("name", &name);
-
-            allLines.push_back(orthia::Utf8ToPlatformString(name));
-            return false;
-        });
-
-        if (!allLines.empty())
-        {
-            CommonModuleInfo info;
-            if (classicDatabase->QueryModule(capturedModuleAddress, &info))
+            auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            Address_type capturedModuleAddress = 0;
+            classicDatabase->QueryMetaInfoByAddress(g_database_type_fnc_Export,
+                address,
+                [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
             {
-                for (auto& line : allLines)
+                capturedModuleAddress = moduleAddress;
+
+                std::string name;
+                Address_type target = 0;
+                CCommonFormatParser parser;
+                parser.Parse(text);
+                parser.QueryMetadata("address", &target);
+                parser.QueryMetadata("name", &name);
+
+                allLines.push_back(orthia::Utf8ToPlatformString(name));
+                return false;
+            });
+
+            if (!allLines.empty())
+            {
+                CommonModuleInfo info;
+                if (classicDatabase->QueryModule(capturedModuleAddress, &info))
                 {
-                    line.native = info.name + OUI_TCSTR("!") + line.native;
+                    for (auto& line : allLines)
+                    {
+                        line.native = info.name + OUI_TCSTR("!") + line.native;
+                    }
                 }
             }
+        }
+        else if (exportPtr)
+        {
+            allLines.push_back(exportPtr->displayName);
         }
 
         const CommonReferenceInfoArray_type* refsPtr = nullptr;

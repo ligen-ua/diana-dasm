@@ -110,27 +110,50 @@ namespace orthia
         std::vector<oui::String> lines;
     };
 
-    struct IReferencesCache
+    struct ExportLineInfo
     {
-        virtual ~IReferencesCache() {}
-        virtual bool QueryReferences(Address_type address,
-            const CommonReferenceInfoArray_type** refs) const = 0;
+        oui::String displayName; // pre-computed "moduleName!exportName"
     };
 
-    struct ReferencesRangeCache : IReferencesCache
+    struct IMarkupCache
     {
-        const std::vector<CommonRangeInfo>& m_data;
-        explicit ReferencesRangeCache(const std::vector<CommonRangeInfo>& data)
-            : m_data(data) {}
+        virtual ~IMarkupCache() {}
+        virtual bool QueryReferences(Address_type address,
+            const CommonReferenceInfoArray_type** refs) const = 0;
+        virtual bool QueryExportInfo(Address_type address,
+            const ExportLineInfo** info) const = 0;
+    };
+
+    struct MarkupRangeCache : IMarkupCache
+    {
+        const std::vector<CommonRangeInfo>& m_refs;
+        std::vector<std::pair<Address_type, ExportLineInfo>> m_exports; // sorted by address
+
+        MarkupRangeCache(const std::vector<CommonRangeInfo>& refs,
+                         std::vector<std::pair<Address_type, ExportLineInfo>> exports)
+            : m_refs(refs), m_exports(std::move(exports)) {}
 
         bool QueryReferences(Address_type address,
             const CommonReferenceInfoArray_type** refs) const override
         {
-            auto it = std::lower_bound(m_data.begin(), m_data.end(), address,
+            auto it = std::lower_bound(m_refs.begin(), m_refs.end(), address,
                 [](const CommonRangeInfo& r, Address_type a) { return r.address < a; });
-            if (it != m_data.end() && it->address == address)
+            if (it != m_refs.end() && it->address == address)
             {
                 *refs = &it->references;
+                return true;
+            }
+            return false;
+        }
+
+        bool QueryExportInfo(Address_type address,
+            const ExportLineInfo** info) const override
+        {
+            auto it = std::lower_bound(m_exports.begin(), m_exports.end(), address,
+                [](const std::pair<Address_type, ExportLineInfo>& e, Address_type a) { return e.first < a; });
+            if (it != m_exports.end() && it->first == address)
+            {
+                *info = &it->second;
                 return true;
             }
             return false;
@@ -152,8 +175,8 @@ namespace orthia
         virtual int GetDianaMode() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo> & names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
-        virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IReferencesCache* cache = nullptr) const = 0;
-        virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IReferencesCache* cache = nullptr) const = 0;
+        virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const = 0;
+        virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const = 0;
         virtual oui::String QueryAddressName(Address_type address) const = 0;
         virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
         virtual Address_type QueryAddressByName(const oui::String & text, Address_type defValue) const = 0;

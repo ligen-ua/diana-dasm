@@ -51,6 +51,7 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtSelectMetainfo_Module2_Count;
     CSQLStatement m_stmtSelectMetainfo_Address;
     CSQLStatement m_stmtSelectMetainfo_NearestAddress;
+    CSQLStatement m_stmtSelectMetainfo_AddressRange;
 
     CSQLStatement m_stmtSelectAllComments;
     CSQLStatement m_stmtWriteComment;
@@ -81,6 +82,7 @@ public:
     int QueryMetaInfoModule2_Count(Address_type moduleAddress, int metaType1, int metaType2);
     void QueryMetaInfoByAddress(int metaType, Address_type metaAddress, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
     void QueryMetaInfoByNearestAddress(int metaType, Address_type address, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
+    void QueryMetaInfoByAddressRange(int metaType, Address_type addr1, Address_type addr2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
 
     // queries
     Address_type QueryRouteStart(Address_type offset);

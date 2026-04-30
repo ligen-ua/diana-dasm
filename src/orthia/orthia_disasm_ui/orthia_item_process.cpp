@@ -467,7 +467,7 @@ namespace orthia
         return totalCount;
     }
 
-    MarkupRangeInfo CProcessWorkplaceItem::QueryMarkupRange(Address_type address, IReferencesCache* cache) const
+    MarkupRangeInfo CProcessWorkplaceItem::QueryMarkupRange(Address_type address, IMarkupCache* cache) const
     {
         MarkupRangeInfo res;
         auto it = m_exports.find(address);
@@ -492,7 +492,7 @@ namespace orthia
         }
         return res;
     }
-    void CProcessWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IReferencesCache* cache) const
+    void CProcessWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache) const
     {
         range.lines.clear();
         if (count == 0)

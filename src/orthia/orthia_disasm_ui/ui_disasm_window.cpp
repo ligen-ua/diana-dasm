@@ -3,6 +3,9 @@
 #include "orthia_pe.h"
 #include "oui_goto_dialog.h"
 #include "oui_disasm_colors.h"
+#include "orthia_common_format.h"
+#include "orthia_database_module.h"
+#include <unordered_map>
 
 const int CDisasmWindow::field_peAddress_index;
 const int CDisasmWindow::field_peAddress_subIndex;
@@ -111,9 +114,38 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
 
     // query metadata
     std::vector<orthia::CommonRangeInfo> rangeInfoVec;
+    std::vector<std::pair<orthia::Address_type, orthia::ExportLineInfo>> exportInfoVec;
     if (auto moduleManager = item->GetModuleManager())
     {
         moduleManager->QueryReferencesToInstructionsRange(routeStart, routeStart + maxSizeToUse, &rangeInfoVec);
+
+        if (auto classicDb = moduleManager->QueryDatabaseManager()->GetClassicDatabase())
+        {
+            std::vector<orthia::CommonModuleInfo> allModules;
+            classicDb->QueryModules(&allModules);
+            std::unordered_map<orthia::Address_type, std::wstring> moduleNames;
+            for (auto& m : allModules)
+                moduleNames[m.address] = m.name;
+
+            classicDb->QueryMetaInfoByAddressRange(
+                orthia::g_database_type_fnc_Export, routeStart, routeStart + maxSizeToUse,
+                [&](orthia::Address_type moduleAddress, int, const std::string& text, orthia::Address_type metaAddress)
+            {
+                std::string name;
+                orthia::CCommonFormatParser parser;
+                parser.Parse(text);
+                parser.QueryMetadata("name", &name);
+
+                orthia::ExportLineInfo eli;
+                auto namePlatform = orthia::Utf8ToPlatformString(name);
+                auto it = moduleNames.find(moduleAddress);
+                eli.displayName.native = (it != moduleNames.end() && !it->second.empty())
+                    ? it->second + OUI_TCSTR("!") + namePlatform
+                    : namePlatform;
+                exportInfoVec.push_back({ metaAddress, std::move(eli) });
+                return true;
+            });
+        }
     }
     // query data
     auto data = item->ReadData(routeStart, maxSizeToUse);
@@ -132,8 +164,8 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     {
         vmRangeInfo.flags = 0;
     }
-    orthia::ReferencesRangeCache referencesCache(rangeInfoVec);
-    printer.SetReferencesCache(&referencesCache);
+    orthia::MarkupRangeCache markupCache(rangeInfoVec, std::move(exportInfoVec));
+    printer.SetReferencesCache(&markupCache);
     printer.SetFlags(data.pDataFlags, routeStart);
     printer.OnRange(vmRangeInfo, data.pDataStart);
 
