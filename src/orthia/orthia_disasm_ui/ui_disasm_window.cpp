@@ -132,6 +132,8 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     {
         vmRangeInfo.flags = 0;
     }
+    orthia::ReferencesRangeCache referencesCache(rangeInfoVec);
+    printer.SetReferencesCache(&referencesCache);
     printer.SetFlags(data.pDataFlags, routeStart);
     printer.OnRange(vmRangeInfo, data.pDataStart);
 

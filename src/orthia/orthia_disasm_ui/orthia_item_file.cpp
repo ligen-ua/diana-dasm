@@ -272,7 +272,7 @@ namespace orthia
     {
         return file->GetDianaMode();
     }
-    MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address) const
+    MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address, IReferencesCache* cache) const
     {
         MarkupRangeInfo result;
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
@@ -285,15 +285,20 @@ namespace orthia
             return false;
         });
 
-        std::vector<CommonReferenceInfo> refs;
-        moduleManager->QueryReferencesToInstruction(address, &refs);
-        if (!refs.empty())
+        const CommonReferenceInfoArray_type* refsPtr = nullptr;
+        std::vector<CommonReferenceInfo> refsStorage;
+        if (!cache || !cache->QueryReferences(address, &refsPtr))
+        {
+            moduleManager->QueryReferencesToInstruction(address, &refsStorage);
+            refsPtr = &refsStorage;
+        }
+        if (!refsPtr->empty())
         {
             ++result.sizeInLines;
         }
         return result;
     }
-    void FileWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const
+    void FileWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IReferencesCache* cache) const
     {
         range.lines.clear();
         if (count == 0)
@@ -333,13 +338,18 @@ namespace orthia
             }
         }
 
-        std::vector<CommonReferenceInfo> refs;
-        moduleManager->QueryReferencesToInstruction(address, &refs);
-        if (!refs.empty())
+        const CommonReferenceInfoArray_type* refsPtr = nullptr;
+        std::vector<CommonReferenceInfo> refsStorage;
+        if (!cache || !cache->QueryReferences(address, &refsPtr))
+        {
+            moduleManager->QueryReferencesToInstruction(address, &refsStorage);
+            refsPtr = &refsStorage;
+        }
+        if (!refsPtr->empty())
         {
             PlatformString_type xrefText = OUI_TCSTR("  <-----  ");
-            xrefText += orthia::AddressToString(refs[0].address, GetDianaMode());
-            if (refs.size() > 1)
+            xrefText += orthia::AddressToString((*refsPtr)[0].address, GetDianaMode());
+            if (refsPtr->size() > 1)
             {
                 xrefText += OUI_TCSTR(" [.....]");
             }

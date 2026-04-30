@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_utils.h"
+#include "orthia_interfaces.h"
 #include "oui_string.h"
 #include "oui_window_thread.h"
 #include "oui_filesystem.h"
@@ -109,6 +110,33 @@ namespace orthia
         std::vector<oui::String> lines;
     };
 
+    struct IReferencesCache
+    {
+        virtual ~IReferencesCache() {}
+        virtual bool QueryReferences(Address_type address,
+            const CommonReferenceInfoArray_type** refs) const = 0;
+    };
+
+    struct ReferencesRangeCache : IReferencesCache
+    {
+        const std::vector<CommonRangeInfo>& m_data;
+        explicit ReferencesRangeCache(const std::vector<CommonRangeInfo>& data)
+            : m_data(data) {}
+
+        bool QueryReferences(Address_type address,
+            const CommonReferenceInfoArray_type** refs) const override
+        {
+            auto it = std::lower_bound(m_data.begin(), m_data.end(), address,
+                [](const CommonRangeInfo& r, Address_type a) { return r.address < a; });
+            if (it != m_data.end() && it->address == address)
+            {
+                *refs = &it->references;
+                return true;
+            }
+            return false;
+        }
+    };
+
     struct IPeristentItemStorage;
     struct IWorkPlaceItem
     {
@@ -124,8 +152,8 @@ namespace orthia
         virtual int GetDianaMode() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo> & names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
-        virtual MarkupRangeInfo QueryMarkupRange(Address_type address) const = 0;
-        virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const = 0;
+        virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IReferencesCache* cache = nullptr) const = 0;
+        virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IReferencesCache* cache = nullptr) const = 0;
         virtual oui::String QueryAddressName(Address_type address) const = 0;
         virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
         virtual Address_type QueryAddressByName(const oui::String & text, Address_type defValue) const = 0;

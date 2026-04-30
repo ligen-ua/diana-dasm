@@ -48,6 +48,7 @@ namespace oui
         oui::LineIndex m_startAddress;
         oui::LineIndex m_endAddress;
         bool m_haveEndAddress = false;
+        orthia::IReferencesCache* m_referencesCache = nullptr;
 
         void PackCommand(const orthia::PlatformString_type& command, std::shared_ptr<DisasmLineContextTag> tag);
         Diana_LinkedAdditionalGroupInfo* GetLinkedInfo();
@@ -59,6 +60,7 @@ namespace oui
             std::shared_ptr<orthia::IWorkPlaceItem> workspaceItem);
 
         void SetEndAddress(const oui::LineIndex& endAddress);
+        void SetReferencesCache(orthia::IReferencesCache* cache) { m_referencesCache = cache; }
         void AddOperandPointer(OPERAND_SIZE operand, size_t offset, int size);
         void OnRange(const orthia::VmMemoryRangeInfo& vmRange, const char* pDataStart);
         void OnStream(DianaPrintContext* pDianaPrintContext, oui::LineIndex virtualOffset, bool reportNoData);

@@ -333,7 +333,7 @@ namespace oui
             if (!(virtualOffset < m_startAddress))
             {
                 auto commandsToDeliver = m_sizeInCommands - m_currentCommand;
-                m_workspaceItem->QueryMarkupRange(virtualOffset.GetIndex(), virtualOffset.GetSubIndex(), (int)commandsToDeliver, markupRange);
+                m_workspaceItem->QueryMarkupRange(virtualOffset.GetIndex(), virtualOffset.GetSubIndex(), (int)commandsToDeliver, markupRange, m_referencesCache);
                 for (auto& line : markupRange.lines)
                 {
                     PrintMetaInfo(virtualOffset, line.native);
