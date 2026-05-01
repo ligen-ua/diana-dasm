@@ -121,8 +121,8 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
 
         if (auto classicDb = moduleManager->QueryDatabaseManager()->GetClassicDatabase())
         {
-            std::vector<orthia::CommonModuleInfo> allModules;
-            classicDb->QueryModules(&allModules);
+            std::vector<orthia::ModuleInfo> allModules;
+            item->GetModules(allModules);
             std::unordered_map<orthia::Address_type, std::wstring> moduleNames;
             for (auto& m : allModules)
                 moduleNames[m.address] = m.name;
