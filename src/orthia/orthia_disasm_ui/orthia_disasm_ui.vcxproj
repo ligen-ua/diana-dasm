@@ -211,6 +211,7 @@
     <ClCompile Include="orthia_model_interfaces.cpp" />
     <ClCompile Include="orthia_model_modules.cpp" />
     <ClCompile Include="orthia_model_modules_elf.cpp" />
+    <ClCompile Include="orthia_module_analyzer.cpp" />
     <ClCompile Include="orthia_process_adapter.cpp" />
     <ClCompile Include="oui_disasm_colors.cpp" />
     <ClCompile Include="oui_goto_dialog.cpp" />
@@ -240,6 +241,7 @@
     <ClInclude Include="orthia_model_interfaces.h" />
     <ClInclude Include="orthia_model_modules.h" />
     <ClInclude Include="orthia_model_modules_elf.h" />
+    <ClInclude Include="orthia_module_analyzer.h" />
     <ClInclude Include="orthia_process_adapter.h" />
     <ClInclude Include="orthia_version.h" />
     <ClInclude Include="oui_disasm_colors.h" />

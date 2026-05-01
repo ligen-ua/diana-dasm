@@ -291,10 +291,34 @@ namespace orthia
             result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(addressToStart);
         }
 
-        result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
+        auto workspaceId = RegisterItem(info, false);
+        result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
 
         // OK
         result.error.native.clear();
+
+        auto uiThread = completeHandler->GetThread();
+        auto mainAddr = info->GerProcessModuleAddress();
+        auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
+
+        m_analyzer.Enqueue(workspaceId, info, bgOp, mainAddr,
+            [this, uiThread, workspaceId]() {
+                std::vector<std::shared_ptr<IUIEventHandler>> handlers;
+                {
+                    std::unique_lock<std::mutex> lock(m_lock);
+                    handlers.assign(m_handlers.begin(), m_handlers.end());
+                }
+                uiThread->AddTask(
+                    [handlers = std::move(handlers), workspaceId, uiLog = m_uiLog]() {
+                        if (auto log = uiLog.lock())
+                        {
+                            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                            log->WriteLog(node->QueryValue(ORTHIA_TCSTR("analysis-complete")));
+                        }
+                        for (auto& h : handlers)
+                            h->OnWorkspaceItemChanged(workspaceId);
+                    });
+            });
     }
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)

@@ -8,6 +8,7 @@
 #include "oui_processes.h"
 #include <optional>
 #include "orthia_commands.h"
+#include "orthia_module_analyzer.h"
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -89,6 +90,9 @@ namespace orthia
 
         void LoadSymbols(std::shared_ptr<IWorkPlaceItem> workItem,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+
+    private:
+        CModuleAnalyzer m_analyzer;
     };
     oui::String ReadFileToVector(std::shared_ptr<oui::IFile> file, std::vector<char>& data, std::shared_ptr<oui::BaseOperation> operation = nullptr, intrusive_ptr<CTextNode> errorNode = nullptr);
 
