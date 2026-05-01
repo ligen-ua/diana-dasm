@@ -248,41 +248,49 @@ void CDisasmWindow::OnEnter()
     }
 
     auto lineItem = m_view->GetCurrentItem();
-    if (lineItem.interfaceTag)
+    auto range = m_view->GetCurrentItemRange();
+    switch (range.id)
     {
-        auto tag = GetDisasmTag(lineItem);
-        if (tag && tag->newOffset)
+        // got to operand or address from tag
+    case oui::g_region_id_address:
+    case oui::g_region_id_operand:
+        if (lineItem.interfaceTag)
         {
-            auto gotoAddress = tag->newOffset;
-            if (tag->linksToData)
+            auto tag = GetDisasmTag(lineItem);
+            if (tag && tag->newOffset)
             {
-                // dereference
-                auto data = item->ReadData(tag->newOffset, item->GetDianaMode());
-                if (data.pDataStart && data.dataSize == item->GetDianaMode())
+                auto gotoAddress = tag->newOffset;
+                if (tag->linksToData)
                 {
-                    gotoAddress = Diana_ReadValue(data.pDataStart, item->GetDianaMode());
+                    // dereference
+                    auto data = item->ReadData(tag->newOffset, item->GetDianaMode());
+                    if (data.pDataStart && data.dataSize == item->GetDianaMode())
+                    {
+                        gotoAddress = Diana_ReadValue(data.pDataStart, item->GetDianaMode());
+                    }
                 }
+
+
+                if (auto storage = item->GetPersistentStorage())
+                {
+                    auto operation = std::make_shared<oui::Operation<orthia::GotoCompleteHandler_type>>(
+                        this->GetThread(),
+                        [](orthia::Address_type address, int error) {
+                        return oui::fsui::OpenResult();
+                    });
+
+                    AsyncRememberCurrentPosition(operation);
+
+                    storage->AsyncUpdateGotoInfo(this->GetThread(),
+                        operation,
+                        gotoAddress,
+                        0,
+                        0);
+                }
+                DoGoto(gotoAddress, 0, false);
             }
-
-
-            if (auto storage = item->GetPersistentStorage())
-            {
-                auto operation = std::make_shared<oui::Operation<orthia::GotoCompleteHandler_type>>(
-                    this->GetThread(),
-                    [](orthia::Address_type address, int error) {
-                    return oui::fsui::OpenResult();
-                });
-
-                AsyncRememberCurrentPosition(operation);
-
-                storage->AsyncUpdateGotoInfo(this->GetThread(),
-                    operation,
-                    gotoAddress,
-                    0,
-                    0);
-            }
-            DoGoto(gotoAddress, 0, false);
         }
+        break;
     }
 }
 bool CDisasmWindow::SelectAll()
