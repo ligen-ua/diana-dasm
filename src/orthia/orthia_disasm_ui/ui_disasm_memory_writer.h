@@ -66,7 +66,7 @@ namespace oui
         void OnStream(DianaPrintContext* pDianaPrintContext, oui::LineIndex virtualOffset, bool reportNoData);
 
         void PrintMetaInfo(const oui::LineIndex& address,
-            const orthia::PlatformString_type& text);
+            const orthia::MarkupLine& line);
         void PrintCommand(unsigned long long address,
             const orthia::PlatformString_type& bytes,
             const orthia::PlatformString_type& command) override;

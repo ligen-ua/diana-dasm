@@ -503,12 +503,12 @@ namespace orthia
         {
             return;
         }
-        std::vector<oui::String> allLines;
+        std::vector<MarkupLine> allLines;
 
         auto it = m_exports.find(address);
         if (it != m_exports.end())
         {
-            allLines.push_back(it->second);
+            allLines.push_back(MarkupLine(it->second));
         }
 
         AppendXrefLine(address, cache, m_moduleManager.get(), GetDianaMode(), allLines);

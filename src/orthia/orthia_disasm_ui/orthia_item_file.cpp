@@ -319,7 +319,7 @@ namespace orthia
         {
             return;
         }
-        std::vector<oui::String> allLines;
+        std::vector<MarkupLine> allLines;
 
         const ExportLineInfo* exportPtr = nullptr;
         if (!cache)
@@ -339,7 +339,7 @@ namespace orthia
                 parser.QueryMetadata("address", &target);
                 parser.QueryMetadata("name", &name);
 
-                allLines.push_back(orthia::Utf8ToPlatformString(name));
+                allLines.push_back(MarkupLine(orthia::Utf8ToPlatformString(name)));
                 return false;
             });
 
@@ -350,7 +350,7 @@ namespace orthia
                 {
                     for (auto& line : allLines)
                     {
-                        line.native = info.name + OUI_TCSTR("!") + line.native;
+                        line.text.native = info.name + OUI_TCSTR("!") + line.text.native;
                     }
                 }
             }
@@ -359,7 +359,7 @@ namespace orthia
         {
             cache->QueryExportInfo(address, &exportPtr);
             if (exportPtr)
-                allLines.push_back(exportPtr->displayName);
+                allLines.push_back(MarkupLine(exportPtr->displayName));
         }
 
         AppendXrefLine(address, cache, moduleManager.get(), GetDianaMode(), allLines);

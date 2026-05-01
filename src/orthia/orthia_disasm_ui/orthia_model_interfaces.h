@@ -3,6 +3,7 @@
 #include "orthia_utils.h"
 #include "orthia_interfaces.h"
 #include "oui_string.h"
+#include "oui_text_markup.h"
 #include "oui_window_thread.h"
 #include "oui_filesystem.h"
 #include "orthia_common_time.h"
@@ -105,9 +106,20 @@ namespace orthia
         int sizeInLines = 0;
     };
 
+    struct MarkupLine
+    {
+        oui::String text;
+        oui::TextMarkup markup;
+        bool hasMarkup = false;
+
+        MarkupLine() = default;
+        explicit MarkupLine(const oui::String& t) : text(t) {}
+        explicit MarkupLine(oui::String&& t) : text(std::move(t)) {}
+    };
+
     struct MarkupRange
     {
-        std::vector<oui::String> lines;
+        std::vector<MarkupLine> lines;
     };
 
     struct ExportLineInfo
@@ -183,7 +195,7 @@ namespace orthia
         virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr;  }
     };
 
-    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<oui::String>& allLines);
+    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);
 
     template<class PtrType>
     oui::String QueryAddressNameDef(PtrType ptr, Address_type address, int dianaMode)

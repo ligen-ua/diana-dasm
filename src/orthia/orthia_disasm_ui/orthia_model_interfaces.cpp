@@ -1,6 +1,7 @@
 #include "orthia_model_interfaces.h"
 #include "orthia_database_module.h"
 #include "orthia_module_manager.h"
+#include "oui_disasm_colors.h"
 
 namespace orthia
 {
@@ -117,7 +118,7 @@ namespace orthia
         return oui::fsui::OpenResult();
     }
 
-    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<oui::String>& allLines)
+    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines)
     {
         if (!moduleManager)
             return;
@@ -134,16 +135,57 @@ namespace orthia
         }
         if (refsPtr && !refsPtr->empty())
         {
-            PlatformString_type xrefText = OUI_TCSTR("  <-----  ");
-            xrefText += orthia::AddressToString((*refsPtr)[0].address, dianaMode);
-            if (refsPtr->size() > 1)
+            oui::DisasmColorsProfile colors;
+            oui::QueryDefaultColorProfile(colors);
+            oui::CTextMarkupBuilder builder;
+
+            PlatformString_type xrefText;
+
+            const PlatformString_type prefix = OUI_TCSTR(" <-- ");
+            xrefText += prefix;
+            builder.AddNextRange(prefix.size(), colors.bytes);
+
+            const int itemsToWrite = 1;
+            for (int i = 0; ; )
             {
-                xrefText += OUI_TCSTR(" [.....]");
+                if (i >= refsPtr->size())
+                {
+                    break;
+                }
+                const auto addrStr = orthia::AddressToString((*refsPtr)[i].address, dianaMode);
+                xrefText += addrStr;
+                builder.AddNextRange(addrStr.size(), colors.bytes);
+
+                if (i + 1 >= refsPtr->size())
+                {
+                    break;
+                }
+                ++i;
+                if (i >= itemsToWrite)
+                {
+                    break;
+                }
+                const PlatformString_type separator = OUI_TCSTR(", ");
+                xrefText += separator;
+                builder.AddNextRange(separator.size(), colors.bytes);
             }
-            xrefText += OUI_TCSTR("    -----  ");
-            oui::String xrefLine;
-            xrefLine.native = xrefText;
-            allLines.push_back(xrefLine);
+
+            if (refsPtr->size() > itemsToWrite)
+            {
+                const PlatformString_type bracket = OUI_TCSTR(" [...]");
+                xrefText += bracket;
+                builder.AddNextRange(bracket.size(), colors.bytes);
+            }
+
+            const PlatformString_type suffix = OUI_TCSTR(" --");
+            xrefText += suffix;
+            builder.AddNextRange(suffix.size(), colors.bytes);
+
+            MarkupLine line;
+            line.text.native = xrefText;
+            line.markup = builder.Build();
+            line.hasMarkup = true;
+            allLines.push_back(std::move(line));
         }
     }
 

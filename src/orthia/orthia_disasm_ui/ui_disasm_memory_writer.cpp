@@ -88,7 +88,7 @@ namespace oui
         PrintCommandEx(address.GetIndex(), bytes, command, tag);
     }
     void MemoryPrinter::PrintMetaInfo(const oui::LineIndex& address,
-        const orthia::PlatformString_type& text)
+        const orthia::MarkupLine& line)
     {
         std::shared_ptr<DisasmLineContextTag> tag = std::make_shared<DisasmLineContextTag>();
         tag->index = address;
@@ -102,14 +102,23 @@ namespace oui
         m_currentBlock.append(m_countOfSpacesAfterAddress, ORTHIA_TCSTR(' '));
         m_textMarkupBuilder.AddNextRange(m_countOfSpacesAfterAddress, m_colors.spaces);
 
-        // pack spaces
+        // pack "; "
         m_currentBlock.append(ORTHIA_TCSTR("; "));
         m_textMarkupBuilder.AddNextRange(2, m_colors.bytes);
 
-        // pack command
-        auto oldSize = m_currentBlock.size();
-        m_currentBlock.append(text);
-        m_textMarkupBuilder.AddNextRange(m_currentBlock.size() - oldSize, m_colors.generalMeta);
+        // pack text
+        m_currentBlock.append(line.text.native);
+        if (line.hasMarkup)
+        {
+            for (const auto& range : line.markup.ranges)
+            {
+                m_textMarkupBuilder.AddNextRange(range.sizeInTChars, range.colorProfile, range.id, range.flags);
+            }
+        }
+        else
+        {
+            m_textMarkupBuilder.AddNextRange(line.text.native.size(), m_colors.generalMeta);
+        }
 
         m_pTextPrinter->PrintLine(m_currentBlock, m_textMarkupBuilder.Build(), tag);
 
@@ -336,7 +345,7 @@ namespace oui
                 m_workspaceItem->QueryMarkupRange(virtualOffset.GetIndex(), virtualOffset.GetSubIndex(), (int)commandsToDeliver, markupRange, m_referencesCache);
                 for (auto& line : markupRange.lines)
                 {
-                    PrintMetaInfo(virtualOffset, line.native);
+                    PrintMetaInfo(virtualOffset, line);
                     virtualOffset.IncSubIndex();
                     ++m_currentCommand;
                 }
