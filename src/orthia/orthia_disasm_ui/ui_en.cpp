@@ -85,6 +85,9 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.goto"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Goto Address"))
         ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.xrefs"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("References"))
+        ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.goto.columns"))
         << textManager->RegisterValue(ORTHIA_TCSTR("address"), ORTHIA_TCSTR("Address"))
         << textManager->RegisterValue(ORTHIA_TCSTR("comment"), ORTHIA_TCSTR("Comment"))

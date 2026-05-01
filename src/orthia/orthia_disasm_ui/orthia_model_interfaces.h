@@ -324,6 +324,29 @@ namespace orthia
         oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment);
     };
 
+    class CXrefItemStorage : public IPeristentItemStorage
+    {
+        std::shared_ptr<CModuleManager> m_moduleManager;
+        Address_type m_targetAddress;
+    public:
+        CXrefItemStorage(std::shared_ptr<CModuleManager> moduleManager, Address_type targetAddress);
+
+        void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+            const oui::String& filter,
+            oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
+            int flags) override;
+
+        void AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
+            Address_type address, int flags, Address_type pageAddress) override;
+
+        void AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler) override;
+
+        oui::String SyncReadComment(Address_type address) override;
+        oui::fsui::OpenResult SyncWriteComment(Address_type address, const oui::String& comment) override;
+    };
+
 }
 
 namespace oui {

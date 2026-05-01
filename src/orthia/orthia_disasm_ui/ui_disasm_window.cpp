@@ -273,7 +273,8 @@ void CDisasmWindow::OnEnter()
         gotoAddress = tag->xrefs[xrefNum].address;
         handled = true;
     }
-    else {
+    else 
+    {
         switch (range.id)
         {
             // got to operand or address from tag
@@ -295,7 +296,12 @@ void CDisasmWindow::OnEnter()
             }
             handled = true;
             break;
+        
+        case oui::g_region_id_xref_dialog:
+            Event_XrefDialog(tag->index.GetIndex());
+            return;
         }
+
     }
     if (!handled)
     {
@@ -611,6 +617,30 @@ void CDisasmWindow::Event_Goto(int scanFlags)
         activeItem->GetPersistentStorage(),
         activeItem,
         scanFlags));
+    dialog->Dock();
+}
+void CDisasmWindow::Event_XrefDialog(orthia::Address_type targetAddress)
+{
+    oui::CommonDialogStrings dialogStrings;
+    GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.xrefs"), dialogStrings);
+
+    auto activeItem = m_model->GetActiveItem();
+    if (!activeItem)
+        return;
+    auto moduleManager = activeItem->GetModuleManager();
+    if (!moduleManager)
+        return;
+
+    auto xrefStorage = std::make_shared<orthia::CXrefItemStorage>(moduleManager, targetAddress);
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::CGotoDialog>(
+        dialogStrings,
+        [=](orthia::Address_type address, int error) {
+            if (!error)
+                DoGotoRequest(address);
+            return oui::fsui::OpenResult();
+        },
+        xrefStorage,
+        activeItem));
     dialog->Dock();
 }
 void CDisasmWindow::MakeComment()

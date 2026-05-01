@@ -118,6 +118,59 @@ namespace orthia
         return oui::fsui::OpenResult();
     }
 
+    CXrefItemStorage::CXrefItemStorage(std::shared_ptr<CModuleManager> moduleManager, Address_type targetAddress)
+        : m_moduleManager(moduleManager), m_targetAddress(targetAddress)
+    {
+    }
+
+    void CXrefItemStorage::AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+        const oui::String& filter,
+        oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
+        int flags)
+    {
+        std::vector<CommonReferenceInfo> refs;
+        m_moduleManager->QueryReferencesToInstruction(m_targetAddress, &refs);
+
+        auto filterLowercase = orthia::Downcase(filter.native);
+        std::vector<GotoItem> items;
+        for (auto& ref : refs)
+        {
+            if (ref.external)
+                continue;
+            if (!filterLowercase.empty())
+            {
+                auto text = orthia::Downcase(orthia::ToWideStringAsHex(ref.address));
+                if (text.find(filterLowercase.c_str(), 0) == text.npos)
+                    continue;
+            }
+            items.push_back(GotoItem(ref.address, 0));
+        }
+        filterHandler->Reply(filterHandler, filter, items, 0);
+    }
+
+    void CXrefItemStorage::AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+        oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
+        Address_type address, int flags, Address_type pageAddress)
+    {
+        gotoHandler->ReplyWithRetain(gotoHandler, address, 0);
+    }
+
+    void CXrefItemStorage::AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+        oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler)
+    {
+        gotoHandler->ReplyWithRetain(gotoHandler, 0, DI_NOT_FOUND, 0);
+    }
+
+    oui::String CXrefItemStorage::SyncReadComment(Address_type address)
+    {
+        return oui::String();
+    }
+
+    oui::fsui::OpenResult CXrefItemStorage::SyncWriteComment(Address_type address, const oui::String& comment)
+    {
+        return oui::fsui::OpenResult();
+    }
+
     void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines)
     {
         if (!moduleManager)
