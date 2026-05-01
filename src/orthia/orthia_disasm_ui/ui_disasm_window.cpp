@@ -240,6 +240,7 @@ void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1_in, const oui:
 
 void CDisasmWindow::OnEnter()
 {
+    // this method handles Enter and Cltr+Click
     auto item = m_model->GetItem(m_itemUid);
     if (!item)
     {
