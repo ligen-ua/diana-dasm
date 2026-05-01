@@ -634,16 +634,16 @@ namespace oui
             SetTextImpl(newText);
         }
     }
-    void CEditBox::ProcessBackpace()
+    bool CEditBox::ProcessBackpace()
     {
         if (IsReadOnly())
         {
-            return;
+            return false;
         }
         if (SelectionIsActive())
         {
             ExtractSelected(true);
-            return;
+            return true;
         }
         if (m_cursorIterator > 0 && m_cursorIterator <= (int)m_symbols.size())
         {
@@ -652,6 +652,7 @@ namespace oui
             SetTextImpl(newText);
             --m_cursorIterator;
         }
+        return true;
     }
 
     bool CEditBox::ProcessEvent(oui::InputEvent& evt, WindowEventContext& evtContext)
@@ -725,8 +726,7 @@ namespace oui
                 handled = true;
                 break;
             case oui::VirtualKey::Backspace:
-                ProcessBackpace();
-                handled = true;
+                handled = ProcessBackpace();
                 break;
 
             case oui::VirtualKey::Left:
