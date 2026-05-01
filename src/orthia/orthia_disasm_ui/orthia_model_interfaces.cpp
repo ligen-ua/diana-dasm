@@ -154,7 +154,7 @@ namespace orthia
                 }
                 const auto addrStr = orthia::AddressToString((*refsPtr)[i].address, dianaMode);
                 xrefText += addrStr;
-                builder.AddNextRange(addrStr.size(), colors.xref, oui::g_region_id_xref);
+                builder.AddNextRange(addrStr.size(), colors.xref, oui::g_region_id_xref_0 + i);
 
                 if (i + 1 >= refsPtr->size())
                 {
@@ -189,6 +189,7 @@ namespace orthia
             line.text.native = xrefText;
             line.markup = builder.Build();
             line.hasMarkup = true;
+            line.flags |= MarkupLine::flags_HasXRefs;
             allLines.push_back(std::move(line));
         }
     }

@@ -108,9 +108,12 @@ namespace orthia
 
     struct MarkupLine
     {
+        static const int flags_HasXRefs = 1;
+
         oui::String text;
         oui::TextMarkup markup;
         bool hasMarkup = false;
+        int flags = 0;
 
         MarkupLine() = default;
         explicit MarkupLine(const oui::String& t) : text(t) {}
@@ -324,9 +327,13 @@ namespace orthia
 }
 
 namespace oui {
+    static const int kMaxXrefs = 64;
+
     // MARKUP fields aka markup regions
     const std::uint32_t g_region_id_address     = oui::g_id_user_range + 1;
     const std::uint32_t g_region_id_operand     = oui::g_id_user_range + 2;
-    const std::uint32_t g_region_id_xref        = oui::g_id_user_range + 3;
-    const std::uint32_t g_region_id_xref_dialog = oui::g_id_user_range + 4;
+    const std::uint32_t g_region_id_xref_dialog = oui::g_id_user_range + 3;
+    const std::uint32_t g_region_id_xref_0      = oui::g_id_user_range + 4;
+    const std::uint32_t g_region_id_xref_last   = g_region_id_xref_0 + kMaxXrefs - 1;
+
 }

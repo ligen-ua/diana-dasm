@@ -120,6 +120,17 @@ namespace oui
             m_textMarkupBuilder.AddNextRange(line.text.native.size(), m_colors.generalMeta);
         }
 
+        if (line.flags & orthia::MarkupLine::flags_HasXRefs)
+        {
+            if (m_referencesCache)
+            {
+                const orthia::CommonReferenceInfoArray_type* refs = nullptr;
+                if (m_referencesCache->QueryReferences(address.GetIndex(), &refs) && refs)
+                {
+                    tag->xrefs = *refs;
+                }
+            }
+        }
         m_pTextPrinter->PrintLine(m_currentBlock, m_textMarkupBuilder.Build(), tag);
 
         m_operands.clear();

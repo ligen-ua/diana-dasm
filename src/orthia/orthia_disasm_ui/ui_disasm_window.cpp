@@ -131,6 +131,9 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
                 orthia::g_database_type_fnc_Export, routeStart, routeStart + maxSizeToUse,
                 [&](orthia::Address_type moduleAddress, int, const std::string& text, orthia::Address_type metaAddress)
             {
+                if (exportInfoVec.size() >= oui::kMaxXrefs) {
+                    return false;
+                }
                 std::string name;
                 orthia::CCommonFormatParser parser;
                 parser.Parse(text);
@@ -249,52 +252,90 @@ void CDisasmWindow::OnEnter()
 
     auto lineItem = m_view->GetCurrentItem();
     auto range = m_view->GetCurrentItemRange();
-    switch (range.id)
+    if (!lineItem.interfaceTag)
     {
-        // got to operand or address from tag
-    case oui::g_region_id_address:
-    case oui::g_region_id_operand:
-        if (lineItem.interfaceTag)
-        {
-            auto tag = GetDisasmTag(lineItem);
-            if (tag && tag->newOffset)
-            {
-                auto gotoAddress = tag->newOffset;
-                if (tag->linksToData)
-                {
-                    // dereference
-                    auto data = item->ReadData(tag->newOffset, item->GetDianaMode());
-                    if (data.pDataStart && data.dataSize == item->GetDianaMode())
-                    {
-                        gotoAddress = Diana_ReadValue(data.pDataStart, item->GetDianaMode());
-                    }
-                }
-
-
-                if (auto storage = item->GetPersistentStorage())
-                {
-                    auto operation = std::make_shared<oui::Operation<orthia::GotoCompleteHandler_type>>(
-                        this->GetThread(),
-                        [](orthia::Address_type address, int error) {
-                        return oui::fsui::OpenResult();
-                    });
-
-                    AsyncRememberCurrentPosition(operation);
-
-                    storage->AsyncUpdateGotoInfo(this->GetThread(),
-                        operation,
-                        gotoAddress,
-                        0,
-                        0);
-                }
-                DoGoto(gotoAddress, 0, false);
-            }
-        }
-        break;
+        return;
     }
+    auto tag = GetDisasmTag(lineItem);
+    OPERAND_SIZE gotoAddress = 0;
+    bool handled = false;
+    if (range.id >= oui::g_region_id_xref_0 && range.id <= oui::g_region_id_xref_last)
+    {
+        auto xrefNum = range.id - oui::g_region_id_xref_0;
+        if (xrefNum >= tag->xrefs.size())
+        {
+            return;
+        }
+        if (tag->xrefs[xrefNum].external)
+        {
+            return;
+        }
+        gotoAddress = tag->xrefs[xrefNum].address;
+        handled = true;
+    }
+    else {
+        switch (range.id)
+        {
+            // got to operand or address from tag
+        case oui::g_region_id_address:
+        case oui::g_region_id_operand:
+            if (!tag->newOffset)
+            {
+                return;
+            }
+            gotoAddress = tag->newOffset;
+            if (tag->linksToData)
+            {
+                // dereference
+                auto data = item->ReadData(tag->newOffset, item->GetDianaMode());
+                if (data.pDataStart && data.dataSize == item->GetDianaMode())
+                {
+                    gotoAddress = Diana_ReadValue(data.pDataStart, item->GetDianaMode());
+                }
+            }
+            handled = true;
+            break;
+        }
+    }
+    if (!handled)
+    {
+        return;
+    }
+    if (auto storage = item->GetPersistentStorage())
+    {
+        auto operation = std::make_shared<oui::Operation<orthia::GotoCompleteHandler_type>>(
+            this->GetThread(),
+            [](orthia::Address_type address, int error) {
+            return oui::fsui::OpenResult();
+        });
+
+        AsyncRememberCurrentPosition(operation);
+
+        storage->AsyncUpdateGotoInfo(this->GetThread(),
+            operation,
+            gotoAddress,
+            0,
+            0);
+    }
+    DoGoto(gotoAddress, 0, false);
 }
 bool CDisasmWindow::SelectAll()
 {
+    return false;
+}
+static bool HasXref(std::vector<orthia::CommonReferenceInfo>& xrefs, OPERAND_SIZE newOffset)
+{
+    for (auto& ref : xrefs)
+    {
+        if (ref.external)
+        {
+            continue;
+        }
+        if (ref.address == newOffset)
+        {
+            return true;
+        }
+    }
     return false;
 }
 void CDisasmWindow::OnPaintStart(std::shared_ptr<oui::CEditBox> editBox)
@@ -319,7 +360,7 @@ void CDisasmWindow::OnPaintStart(std::shared_ptr<oui::CEditBox> editBox)
         auto pair = m_view->GetItem(r.offsetInPage);
         auto tag = GetDisasmTag(pair.first);
 
-        if (tag && tag->newOffset == index.GetIndex())
+        if (tag && (tag->newOffset == index.GetIndex() || HasXref(tag->xrefs, index.GetIndex())))
         {
             // highlight it
             editBox->HighlightRegion(oui::g_region_id_address);

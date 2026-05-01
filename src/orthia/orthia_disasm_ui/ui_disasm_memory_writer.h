@@ -20,6 +20,7 @@ namespace oui
         OPERAND_SIZE newOffset = 0;
         int absoluteAddress = 0;
         int linksToData = 0;
+        std::vector<orthia::CommonReferenceInfo> xrefs;
     };
     struct MemoryPrinterOperandInfo
     {
