@@ -154,7 +154,7 @@ namespace orthia
                 }
                 const auto addrStr = orthia::AddressToString((*refsPtr)[i].address, dianaMode);
                 xrefText += addrStr;
-                builder.AddNextRange(addrStr.size(), colors.bytes);
+                builder.AddNextRange(addrStr.size(), colors.xref, oui::g_region_id_xref);
 
                 if (i + 1 >= refsPtr->size())
                 {
@@ -172,9 +172,13 @@ namespace orthia
 
             if (refsPtr->size() > itemsToWrite)
             {
-                const PlatformString_type bracket = OUI_TCSTR(" [...]");
+                const PlatformString_type spaces = OUI_TCSTR(" ");
+                xrefText += spaces;
+                builder.AddNextRange(spaces.size(), colors.bytes);
+
+                const PlatformString_type bracket = OUI_TCSTR("[...]");
                 xrefText += bracket;
-                builder.AddNextRange(bracket.size(), colors.bytes);
+                builder.AddNextRange(bracket.size(), colors.xref, oui::g_region_id_xref_dialog);
             }
 
             const PlatformString_type suffix = OUI_TCSTR(" --");

@@ -299,6 +299,7 @@ bool CDisasmWindow::SelectAll()
 }
 void CDisasmWindow::OnPaintStart(std::shared_ptr<oui::CEditBox> editBox)
 {
+    // this method handles dynamical regions highlights
     auto& ranges = m_view->GetPrevSelectedRanges();
     if (ranges.empty())
     {

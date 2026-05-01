@@ -6,9 +6,6 @@
 
 namespace oui
 {
-    const std::uint32_t g_region_id_address = oui::g_id_user_range + 1;
-    const std::uint32_t g_region_id_operand = oui::g_id_user_range + 2;
-
     struct DisasmWriter :orthia::ITextPrinter
     {
         std::vector<oui::MultiLineViewItem> items;
