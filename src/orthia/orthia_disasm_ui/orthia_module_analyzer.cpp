@@ -71,27 +71,32 @@ namespace orthia
 
             auto mainIt = std::find_if(modules.begin(), modules.end(),
                 [mainModuleAddr](const auto& m) { return m.IsInRange(mainModuleAddr); });
-            if (mainIt != modules.end() && mainIt != modules.begin())
-                std::iter_swap(modules.begin(), mainIt);
-
+            if (mainIt == modules.end())
+            {
+                return;
+            }
             ProcessReaderAdapter reader(proc.get());
             auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
-            for (auto& module : modules)
+            if (op->IsCancelled())
+                return;
+            try
             {
-                if (op->IsCancelled())
-                    break;
-                try
+                if (!db->IsModuleExists(mainIt->address))
                 {
-                    if (!db->IsModuleExists(module.address))
-                        moduleManager->ReloadModule(module.address, &reader, false, module.name, 0);
+                    moduleManager->ReloadModule(mainIt->address, &reader, false, mainIt->name, 0);
                 }
-                catch (const std::exception&) {}
+            }
+            catch (const std::exception& e)
+            {
+                oui::LogOutput(oui::LogFlags::Error, e.what());
             }
 
             Cleanup(workspaceId);
             if (!op->IsCancelled())
+            {
                 onComplete();
+            }
         });
     }
 }
