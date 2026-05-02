@@ -1,5 +1,46 @@
 #include "orthia_config.h"
 #include "orthia_model.h"
+#include <filesystem>
+#include <chrono>
+
+namespace fs = std::filesystem;
+
+static void CleanupOldProcFolders(const orthia::PlatformString_type& procFolderWithSlash)
+{
+    const auto threshold = std::chrono::hours(48);
+    const auto now = fs::file_time_type::clock::now();
+
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(fs::path(procFolderWithSlash), ec))
+    {
+        std::error_code ec2;
+        if (!entry.is_directory(ec2))
+            continue;
+
+        auto newestTime = fs::file_time_type::min();
+        std::error_code ec3;
+        for (const auto& fileEntry : fs::directory_iterator(entry.path(), ec3))
+        {
+            std::error_code ec4;
+            auto wt = fs::last_write_time(fileEntry, ec4);
+            if (!ec4 && wt > newestTime)
+                newestTime = wt;
+        }
+
+        if (newestTime == fs::file_time_type::min())
+        {
+            newestTime = fs::last_write_time(entry, ec2);
+            if (ec2)
+                continue;
+        }
+
+        if (newestTime < now && ((now - newestTime) > threshold))
+        {
+            std::error_code ec5;
+            fs::remove_all(entry.path(), ec5);
+        }
+    }
+}
 
 namespace orthia
 {
@@ -26,6 +67,7 @@ namespace orthia
         orthia::CreateAllDirectoriesForFile(m_dbDir);
         orthia::CreateAllDirectoriesForFile(m_binDir);
         orthia::CreateAllDirectoriesForFile(m_procDBDir);
+        CleanupOldProcFolders(m_procDBDir);
     }
     PlatformString_type CConfigOptionsStorage::GetReadmeFileName() const
     {
