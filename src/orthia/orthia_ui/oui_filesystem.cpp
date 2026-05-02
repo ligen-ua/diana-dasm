@@ -21,6 +21,10 @@ namespace oui
     {
         return m_fsImpl->SyncNormalizeName(fileName, expectDll);
     }
+    String CFileSystem::SyncSanitizeName(const String& fileName)
+    {
+        return m_fsImpl->SyncSanitizeName(fileName);
+    }
     // id-based stuff
     void CFileSystem::AsyncOpenFile(ThreadPtr_type targetThread, 
         const FileUnifiedId& fileId,

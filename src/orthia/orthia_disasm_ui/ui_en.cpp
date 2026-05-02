@@ -85,6 +85,9 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.goto"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Goto Address"))
         ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.xrefs"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("References"))
+        ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.goto.columns"))
         << textManager->RegisterValue(ORTHIA_TCSTR("address"), ORTHIA_TCSTR("Address"))
         << textManager->RegisterValue(ORTHIA_TCSTR("comment"), ORTHIA_TCSTR("Comment"))
@@ -99,11 +102,13 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Orthia Disassembler"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption-file"), ORTHIA_TCSTR("Orthia File: %1"))
         << textManager->RegisterValue(ORTHIA_TCSTR("analyzing-file"), ORTHIA_TCSTR("Analyzing...."))
+        << textManager->RegisterValue(ORTHIA_TCSTR("analysis-complete"), ORTHIA_TCSTR("Background analysis complete"))
         << textManager->RegisterValue(ORTHIA_TCSTR("done-opened"), ORTHIA_TCSTR("Opened Successfully"))
         << textManager->RegisterValue(ORTHIA_TCSTR("module-sha1"), ORTHIA_TCSTR("SHA1: %1"))
         << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("readme-header"), ORTHIA_TCSTR("Orthia Disasm Database Folder"))
         << textManager->RegisterValue(ORTHIA_TCSTR("original-name"), ORTHIA_TCSTR("Original Name: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("database-file"), ORTHIA_TCSTR("Database file: \"%1\""))
         ;
 
     // model
@@ -116,6 +121,8 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("no-app-dir"), ORTHIA_TCSTR("Can't locate application folder"))
         << textManager->RegisterValue(ORTHIA_TCSTR("cant-open-file"), ORTHIA_TCSTR("Can't open file"))
         << textManager->RegisterValue(ORTHIA_TCSTR("invalid-image-base"), ORTHIA_TCSTR("ImageBase is invalid"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("cant-create-fs"), ORTHIA_TCSTR("Can't create folder: %1"))
+
 
 
         ;

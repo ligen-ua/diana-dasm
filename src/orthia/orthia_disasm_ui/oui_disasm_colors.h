@@ -13,6 +13,7 @@ namespace oui
         LabelColorProfile spaces;
         LabelColorProfile operand;
         LabelColorProfile generalMeta;
+        LabelColorProfile xref;
     };
     void QueryDefaultColorProfile(DisasmColorsProfile& profile);
 

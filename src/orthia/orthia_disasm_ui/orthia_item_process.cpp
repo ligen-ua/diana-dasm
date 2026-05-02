@@ -4,6 +4,8 @@
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
 #include "orthia_log.h"
+#include "orthia_common_print.h"
+#include "orthia_module_manager.h"
 
 namespace orthia
 {
@@ -20,7 +22,12 @@ namespace orthia
         m_persistentStorage(persistentStorage)
     {
     }
-
+    void CProcessWorkplaceItem::Init(std::shared_ptr<CModuleManager> moduleManager,
+        std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage)
+    {
+        m_moduleManager = moduleManager;
+        m_persistentStorage = persistentItemStorage;
+    }
     WorkAddressData CProcessWorkplaceItem::ReadData(Address_type address, Address_type size)
     {
         return m_proc->ReadExactEx(address, (size_t)size);
@@ -52,7 +59,7 @@ namespace orthia
 
     const std::shared_ptr<CModuleManager> CProcessWorkplaceItem::GetModuleManager() const
     {
-        return nullptr;
+        return m_moduleManager;
     }
     oui::String CProcessWorkplaceItem::GetShortName() const
     {
@@ -460,31 +467,56 @@ namespace orthia
         return totalCount;
     }
 
-    MarkupRangeInfo CProcessWorkplaceItem::QueryMarkupRange(Address_type address) const
+    MarkupRangeInfo CProcessWorkplaceItem::QueryMarkupRange(Address_type address, IMarkupCache* cache) const
     {
-        auto it = m_exports.find(address);
-        if (it == m_exports.end())
-        {
-            return MarkupRangeInfo();
-        }
         MarkupRangeInfo res;
-        res.sizeInLines = 1;
+        auto it = m_exports.find(address);
+        if (it != m_exports.end())
+        {
+            res.sizeInLines = 1;
+        }
+
+        if (m_moduleManager)
+        {
+            const CommonReferenceInfoArray_type* refsPtr = nullptr;
+            std::vector<CommonReferenceInfo> refsStorage;
+            if (!cache)
+            {
+                m_moduleManager->QueryReferencesToInstruction(address, &refsStorage);
+                refsPtr = &refsStorage;
+            }
+            else
+            {
+                cache->QueryReferences(address, &refsPtr);
+            }
+            if (refsPtr && !refsPtr->empty())
+            {
+                ++res.sizeInLines;
+            }
+        }
         return res;
     }
-    void CProcessWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const
+    void CProcessWorkplaceItem::QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache) const
     {
         range.lines.clear();
-        if (index || count == 0)
+        if (count == 0)
         {
-            // returning just a single line currently
             return;
         }
+        std::vector<MarkupLine> allLines;
+
         auto it = m_exports.find(address);
-        if (it == m_exports.end())
+        if (it != m_exports.end())
         {
-            return;
+            allLines.push_back(MarkupLine(it->second));
         }
-        range.lines.push_back(it->second.native);
+
+        AppendXrefLine(address, cache, m_moduleManager.get(), GetDianaMode(), allLines);
+
+        for (int i = index; i < (int)allLines.size() && (int)range.lines.size() < count; ++i)
+        {
+            range.lines.push_back(allLines[i]);
+        }
     }
     bool CProcessWorkplaceItem::QueryAddressModule(Address_type address, orthia::ModuleInfo & result) const
     {

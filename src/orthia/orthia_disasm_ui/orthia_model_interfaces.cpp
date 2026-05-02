@@ -1,4 +1,7 @@
 #include "orthia_model_interfaces.h"
+#include "orthia_database_module.h"
+#include "orthia_module_manager.h"
+#include "oui_disasm_colors.h"
 
 namespace orthia
 {
@@ -115,6 +118,135 @@ namespace orthia
         return oui::fsui::OpenResult();
     }
 
+    CXrefItemStorage::CXrefItemStorage(std::shared_ptr<CModuleManager> moduleManager, Address_type targetAddress)
+        : m_moduleManager(moduleManager), m_targetAddress(targetAddress)
+    {
+    }
+
+    void CXrefItemStorage::AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+        const oui::String& filter,
+        oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
+        int flags)
+    {
+        std::vector<CommonReferenceInfo> refs;
+        m_moduleManager->QueryReferencesToInstruction(m_targetAddress, &refs);
+
+        auto filterLowercase = orthia::Downcase(filter.native);
+        std::vector<GotoItem> items;
+        for (auto& ref : refs)
+        {
+            if (ref.external)
+                continue;
+            if (!filterLowercase.empty())
+            {
+                auto text = orthia::Downcase(orthia::ToWideStringAsHex(ref.address));
+                if (text.find(filterLowercase.c_str(), 0) == text.npos)
+                    continue;
+            }
+            items.push_back(GotoItem(ref.address, 0));
+        }
+        filterHandler->Reply(filterHandler, filter, items, 0);
+    }
+
+    void CXrefItemStorage::AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+        oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
+        Address_type address, int flags, Address_type pageAddress)
+    {
+        gotoHandler->ReplyWithRetain(gotoHandler, address, 0);
+    }
+
+    void CXrefItemStorage::AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+        oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler)
+    {
+        gotoHandler->ReplyWithRetain(gotoHandler, 0, DI_NOT_FOUND, 0);
+    }
+
+    oui::String CXrefItemStorage::SyncReadComment(Address_type address)
+    {
+        return oui::String();
+    }
+
+    oui::fsui::OpenResult CXrefItemStorage::SyncWriteComment(Address_type address, const oui::String& comment)
+    {
+        return oui::fsui::OpenResult();
+    }
+
+    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines)
+    {
+        if (!moduleManager)
+            return;
+        const CommonReferenceInfoArray_type* refsPtr = nullptr;
+        std::vector<CommonReferenceInfo> refsStorage;
+        if (!cache)
+        {
+            moduleManager->QueryReferencesToInstruction(address, &refsStorage);
+            refsPtr = &refsStorage;
+        }
+        else
+        {
+            cache->QueryReferences(address, &refsPtr);
+        }
+        if (refsPtr && !refsPtr->empty())
+        {
+            oui::DisasmColorsProfile colors;
+            oui::QueryDefaultColorProfile(colors);
+            oui::CTextMarkupBuilder builder;
+
+            PlatformString_type xrefText;
+
+            const PlatformString_type prefix = OUI_TCSTR(" <-- ");
+            xrefText += prefix;
+            builder.AddNextRange(prefix.size(), colors.bytes);
+
+            const int itemsToWrite = 1;
+            for (int i = 0; ; )
+            {
+                if (i >= refsPtr->size())
+                {
+                    break;
+                }
+                const auto addrStr = orthia::AddressToString((*refsPtr)[i].address, dianaMode);
+                xrefText += addrStr;
+                builder.AddNextRange(addrStr.size(), colors.xref, oui::g_region_id_xref_0 + i);
+
+                if (i + 1 >= refsPtr->size())
+                {
+                    break;
+                }
+                ++i;
+                if (i >= itemsToWrite)
+                {
+                    break;
+                }
+                const PlatformString_type separator = OUI_TCSTR(", ");
+                xrefText += separator;
+                builder.AddNextRange(separator.size(), colors.bytes);
+            }
+
+            if (refsPtr->size() > itemsToWrite)
+            {
+                const PlatformString_type spaces = OUI_TCSTR(" ");
+                xrefText += spaces;
+                builder.AddNextRange(spaces.size(), colors.bytes);
+
+                const PlatformString_type bracket = OUI_TCSTR("[...]");
+                xrefText += bracket;
+                builder.AddNextRange(bracket.size(), colors.xref, oui::g_region_id_xref_dialog);
+            }
+
+            const PlatformString_type suffix = OUI_TCSTR(" --");
+            xrefText += suffix;
+            builder.AddNextRange(suffix.size(), colors.bytes);
+
+            MarkupLine line;
+            line.text.native = xrefText;
+            line.markup = builder.Build();
+            line.hasMarkup = true;
+            line.flags |= MarkupLine::flags_HasXRefs;
+            allLines.push_back(std::move(line));
+        }
+    }
+
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address)
     {
         Address_type diff = address - nameAddress;
@@ -148,6 +280,33 @@ namespace orthia
         }
         result.native += addressStr.native;
         result.native += OUI_TCSTR("h");
+        return result;
+    }
+
+    // CFilePersistentItemStorage
+    CFilePersistentItemStorage::CFilePersistentItemStorage()
+    {
+    }
+    void CFilePersistentItemStorage::Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager)
+    {
+        m_databaseManager = databaseManager;
+        m_databaseManager->GetClassicDatabase()->QueryAllComments([=](Address_type address, const std::string& text) {
+            CPersistentItemStorage::SyncWriteComment(address, orthia::Utf8ToPlatformString(text));
+            return true;
+        });
+    }
+    oui::fsui::OpenResult CFilePersistentItemStorage::SyncWriteComment(orthia::Address_type address, const oui::String& comment)
+    {
+        oui::fsui::OpenResult result;
+        try
+        {
+            CPersistentItemStorage::SyncWriteComment(address, comment);
+            m_databaseManager->GetClassicDatabase()->InsertComment(address, orthia::PlatformStringToUtf8(comment.native));
+        }
+        catch (std::exception& e)
+        {
+            result.error = orthia::Utf8ToPlatformString(e.what());
+        }
         return result;
     }
 }

@@ -5,16 +5,6 @@
 
 namespace orthia
 {
-    class CDatabaseManager;
-    class CFilePersistentItemStorage :public CPersistentItemStorage
-    {
-        orthia::intrusive_ptr<CDatabaseManager> m_databaseManager;
-    public:
-        CFilePersistentItemStorage();
-        void Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager);
-        oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment);
-    };
-
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, IWorkPlaceItem
     {
         std::shared_ptr<orthia::ISimpleFile> file;
@@ -39,8 +29,8 @@ namespace orthia
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
 
         int GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const;
-        MarkupRangeInfo QueryMarkupRange(Address_type address) const override;
-        void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const override;
+        MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const override;
+        void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const override;
         oui::String QueryAddressName(Address_type address) const override;
         std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) override;
         Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;

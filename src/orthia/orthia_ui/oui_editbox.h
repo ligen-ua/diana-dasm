@@ -54,7 +54,7 @@ namespace oui
         void MoveToNextWordRight();
         void MoveToNextWordLeft();
         void ProcessDelete();
-        void ProcessBackpace();
+        bool ProcessBackpace();
         int GetSymOffset(int symbol) const;
         void DoPaintMarkupText(DrawParameters& parameters, 
             std::vector<TextMarkup::Range>::const_iterator& it,

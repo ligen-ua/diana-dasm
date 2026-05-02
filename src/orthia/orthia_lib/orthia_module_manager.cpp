@@ -77,21 +77,21 @@ void CModuleManager::ReloadModule(Address_type offset,
                                   const orthia::PlatformString_type & name,
                                   int analyserFlags)
 {
-    CAutoCriticalSection guard(m_lock);
     CDianaModule module;
     module.Init(offset, pMemoryReader);
 
-    if (!m_pDatabaseManager)
-        throw std::runtime_error("The profile is not initialized");
+    auto dbManager = QueryDatabaseManager();
     
     // build full path name
-    if (bForce || !m_pDatabaseManager->GetClassicDatabase()->IsModuleExists(offset))
+    if (bForce || !dbManager->GetClassicDatabase()->IsModuleExists(offset))
     {
         module.Analyze(analyserFlags);
-        m_pDatabaseManager->GetClassicDatabase()->UnloadModule(offset, true);
+
+        CAutoCriticalSection guard(m_lock);
+        dbManager->GetClassicDatabase()->UnloadModule(offset, true);
         
         CDatabaseSaver fileSaver;
-        fileSaver.Save(module, *m_pDatabaseManager, name);
+        fileSaver.Save(module, *dbManager, name);
     }
 }
 

@@ -68,6 +68,11 @@ namespace oui
         }
     }
 
+    void CThreadPool::Stop()
+    {
+        NotifyStop();
+        JoinAll();
+    }
     void CThreadPool::NotifyStop()
     {
         m_stopped.store(true);

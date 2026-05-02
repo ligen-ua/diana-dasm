@@ -71,6 +71,17 @@ namespace oui
                 ColorBrightYellow(),      // text
                 ColorBlack(),          // background
             }
+        },
+        // xref
+        {
+            {
+                ColorGray(),      // text
+                ColorBlack(),     // background
+            },
+            {
+                ColorBrightGreen(),      // text
+                ColorBlack(),     // background
+            }
         }
     };
     void QueryDefaultColorProfile(DisasmColorsProfile& profile)

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "orthia_utils.h"
+#include "orthia_interfaces.h"
 #include "oui_string.h"
+#include "oui_text_markup.h"
 #include "oui_window_thread.h"
 #include "oui_filesystem.h"
 #include "orthia_common_time.h"
@@ -30,11 +32,11 @@ namespace orthia
         }
     };
 
-    struct ModuleInfo:WorkAddressRangeInfo
+    struct ModuleInfo :WorkAddressRangeInfo
     {
-        static const int flags_analyzeDone   = 1;
+        static const int flags_analyzeDone = 1;
         static const int flags_symbolsLoaded = 2;
-        
+
         PlatformString_type fullName;
         int flags = 0;
         PlatformString_type name;
@@ -55,7 +57,7 @@ namespace orthia
 
         WorkAddressData()
             :
-                rangeFlags(flags_FullInvalid)
+            rangeFlags(flags_FullInvalid)
         {
         }
         ~WorkAddressData()
@@ -90,7 +92,7 @@ namespace orthia
         oui::String name;
         int flags = 0;
     };
-    struct NameSelectionKey 
+    struct NameSelectionKey
     {
         static const int flags_ContinueFrom = 1;
         Address_type address;
@@ -104,9 +106,73 @@ namespace orthia
         int sizeInLines = 0;
     };
 
+    struct MarkupLine
+    {
+        static const int flags_HasXRefs = 1;
+
+        oui::String text;
+        oui::TextMarkup markup;
+        bool hasMarkup = false;
+        int flags = 0;
+
+        MarkupLine() = default;
+        explicit MarkupLine(const oui::String& t) : text(t) {}
+        explicit MarkupLine(oui::String&& t) : text(std::move(t)) {}
+    };
+
     struct MarkupRange
     {
-        std::vector<oui::String> lines;
+        std::vector<MarkupLine> lines;
+    };
+
+    struct ExportLineInfo
+    {
+        oui::String displayName; // pre-computed "moduleName!exportName"
+    };
+
+    struct IMarkupCache
+    {
+        virtual ~IMarkupCache() {}
+        virtual bool QueryReferences(Address_type address,
+            const CommonReferenceInfoArray_type** refs) const = 0;
+        virtual bool QueryExportInfo(Address_type address,
+            const ExportLineInfo** info) const = 0;
+    };
+
+    struct MarkupRangeCache : IMarkupCache
+    {
+        const std::vector<CommonRangeInfo>& m_refs;
+        std::vector<std::pair<Address_type, ExportLineInfo>> m_exports; // sorted by address
+
+        MarkupRangeCache(const std::vector<CommonRangeInfo>& refs,
+            std::vector<std::pair<Address_type, ExportLineInfo>> exports)
+            : m_refs(refs), m_exports(std::move(exports)) {}
+
+        bool QueryReferences(Address_type address,
+            const CommonReferenceInfoArray_type** refs) const override
+        {
+            auto it = std::lower_bound(m_refs.begin(), m_refs.end(), address,
+                [](const CommonRangeInfo& r, Address_type a) { return r.address < a; });
+            if (it != m_refs.end() && it->address == address)
+            {
+                *refs = &it->references;
+                return true;
+            }
+            return false;
+        }
+
+        bool QueryExportInfo(Address_type address,
+            const ExportLineInfo** info) const override
+        {
+            auto it = std::lower_bound(m_exports.begin(), m_exports.end(), address,
+                [](const std::pair<Address_type, ExportLineInfo>& e, Address_type a) { return e.first < a; });
+            if (it != m_exports.end() && it->first == address)
+            {
+                *info = &it->second;
+                return true;
+            }
+            return false;
+        }
     };
 
     struct IPeristentItemStorage;
@@ -122,15 +188,17 @@ namespace orthia
         virtual int GetModulesCount() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
         virtual int GetDianaMode() const = 0;
-        virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo> & names) const = 0;
+        virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
-        virtual MarkupRangeInfo QueryMarkupRange(Address_type address) const = 0;
-        virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range) const = 0;
+        virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const = 0;
+        virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const = 0;
         virtual oui::String QueryAddressName(Address_type address) const = 0;
         virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
-        virtual Address_type QueryAddressByName(const oui::String & text, Address_type defValue) const = 0;
-        virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr;  }
+        virtual Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const = 0;
+        virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr; }
     };
+
+    void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);
 
     template<class PtrType>
     oui::String QueryAddressNameDef(PtrType ptr, Address_type address, int dianaMode)
@@ -154,7 +222,7 @@ namespace orthia
         {
 
         }
-        GotoItem(const orthia::Address_type & address_in, int flags_in)
+        GotoItem(const orthia::Address_type& address_in, int flags_in)
             :
             address(address_in), flags(flags_in)
         {
@@ -168,7 +236,7 @@ namespace orthia
         int error)>;
     using GotoCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error)>;
     using FetchCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error, orthia::Address_type pageAddress)>;
-    using AsyncCommentCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error, const oui::String & comment)>;
+    using AsyncCommentCompleteHandler_type = std::function<oui::fsui::OpenResult(orthia::Address_type address, int error, const oui::String& comment)>;
 
     struct IPeristentItemStorage
     {
@@ -179,7 +247,7 @@ namespace orthia
             const oui::String& filter,
             oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
             int flags) = 0;
-        
+
         virtual void AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
             oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
             orthia::Address_type address,
@@ -190,7 +258,7 @@ namespace orthia
             oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler) = 0;
 
         virtual oui::String SyncReadComment(orthia::Address_type address) = 0;
-        virtual oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String & comment) = 0;
+        virtual oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment) = 0;
     };
 
 
@@ -244,4 +312,51 @@ namespace orthia
     const static int g_database_type_fnc_Export = 3;
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
+
+    // CFilePersistentItemStorage
+    class CDatabaseManager;
+    class CFilePersistentItemStorage :public CPersistentItemStorage
+    {
+        orthia::intrusive_ptr<CDatabaseManager> m_databaseManager;
+    public:
+        CFilePersistentItemStorage();
+        void Init(orthia::intrusive_ptr<CDatabaseManager> databaseManager);
+        oui::fsui::OpenResult SyncWriteComment(orthia::Address_type address, const oui::String& comment);
+    };
+
+    class CXrefItemStorage : public IPeristentItemStorage
+    {
+        std::shared_ptr<CModuleManager> m_moduleManager;
+        Address_type m_targetAddress;
+    public:
+        CXrefItemStorage(std::shared_ptr<CModuleManager> moduleManager, Address_type targetAddress);
+
+        void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
+            const oui::String& filter,
+            oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
+            int flags) override;
+
+        void AsyncUpdateGotoInfo(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<GotoCompleteHandler_type> gotoHandler,
+            Address_type address, int flags, Address_type pageAddress) override;
+
+        void AsyncFetchPrevHistory(ThreadPtr_type targetThread,
+            oui::OperationPtr_type<FetchCompleteHandler_type> gotoHandler) override;
+
+        oui::String SyncReadComment(Address_type address) override;
+        oui::fsui::OpenResult SyncWriteComment(Address_type address, const oui::String& comment) override;
+    };
+
+}
+
+namespace oui {
+    static const int kMaxXrefs = 64;
+
+    // MARKUP fields aka markup regions
+    const std::uint32_t g_region_id_address     = oui::g_id_user_range + 1;
+    const std::uint32_t g_region_id_operand     = oui::g_id_user_range + 2;
+    const std::uint32_t g_region_id_xref_dialog = oui::g_id_user_range + 3;
+    const std::uint32_t g_region_id_xref_0      = oui::g_id_user_range + 4;
+    const std::uint32_t g_region_id_xref_last   = g_region_id_xref_0 + kMaxXrefs - 1;
+
 }

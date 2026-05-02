@@ -27,6 +27,7 @@ namespace oui
         void Start(size_t threadCount);
         void AddThread();
         void AddTask(std::function<void()> task);
+        void Stop();
         int GetTasksCount() const;
     };
 }

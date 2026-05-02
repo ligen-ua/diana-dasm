@@ -166,6 +166,21 @@ public:
         return std::make_tuple(errno, String());
     }
 
+    String SyncSanitizeName(const String& fileName)
+    {
+        // On POSIX only '/' and '\0' are truly forbidden,
+        // but also strip common problematic characters.
+        const std::string invalid = "/\\:*?\"<>|";
+        std::string result = fileName.native;
+        std::replace_if(result.begin(), result.end(),
+            [&invalid](unsigned char c) {
+                return invalid.find(static_cast<char>(c)) != std::string::npos
+                    || c < 32; // control characters
+            },
+            '_');
+        return result;
+    }
+
     std::tuple<int, String> SyncNormalizeName(const String& fileName, bool expectSo) override
     {
         String result = fileName;

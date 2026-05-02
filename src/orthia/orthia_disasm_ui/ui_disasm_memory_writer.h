@@ -6,9 +6,6 @@
 
 namespace oui
 {
-    const std::uint32_t g_region_id_address = oui::g_id_user_range + 1;
-    const std::uint32_t g_region_id_operand = oui::g_id_user_range + 2;
-
     struct DisasmWriter :orthia::ITextPrinter
     {
         std::vector<oui::MultiLineViewItem> items;
@@ -23,6 +20,7 @@ namespace oui
         OPERAND_SIZE newOffset = 0;
         int absoluteAddress = 0;
         int linksToData = 0;
+        std::vector<orthia::CommonReferenceInfo> xrefs;
     };
     struct MemoryPrinterOperandInfo
     {
@@ -48,6 +46,7 @@ namespace oui
         oui::LineIndex m_startAddress;
         oui::LineIndex m_endAddress;
         bool m_haveEndAddress = false;
+        orthia::IMarkupCache* m_referencesCache = nullptr;
 
         void PackCommand(const orthia::PlatformString_type& command, std::shared_ptr<DisasmLineContextTag> tag);
         Diana_LinkedAdditionalGroupInfo* GetLinkedInfo();
@@ -59,12 +58,13 @@ namespace oui
             std::shared_ptr<orthia::IWorkPlaceItem> workspaceItem);
 
         void SetEndAddress(const oui::LineIndex& endAddress);
+        void SetReferencesCache(orthia::IMarkupCache* cache) { m_referencesCache = cache; }
         void AddOperandPointer(OPERAND_SIZE operand, size_t offset, int size);
         void OnRange(const orthia::VmMemoryRangeInfo& vmRange, const char* pDataStart);
         void OnStream(DianaPrintContext* pDianaPrintContext, oui::LineIndex virtualOffset, bool reportNoData);
 
         void PrintMetaInfo(const oui::LineIndex& address,
-            const orthia::PlatformString_type& text);
+            const orthia::MarkupLine& line);
         void PrintCommand(unsigned long long address,
             const orthia::PlatformString_type& bytes,
             const orthia::PlatformString_type& command) override;
