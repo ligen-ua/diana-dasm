@@ -224,7 +224,7 @@ namespace orthia
 
             // save readme file 
             orthia::CFile readmeFile;
-            readmeFile.Open(readmeFileName, g_desired_write, g_share_read, g_create_always);
+            readmeFile.Open_Silent(readmeFileName, g_desired_write, g_share_read, g_create_always);
 
             auto readmeHeader = mainNode->QueryValue(ORTHIA_TCSTR("readme-header"));
             auto originalName = oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("original-name")),

@@ -123,7 +123,7 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
         {
             std::vector<orthia::ModuleInfo> allModules;
             item->GetModules(allModules);
-            std::unordered_map<orthia::Address_type, std::wstring> moduleNames;
+            std::unordered_map<orthia::Address_type, orthia::PlatformString_type> moduleNames;
             for (auto& m : allModules)
                 moduleNames[m.address] = m.name;
 
