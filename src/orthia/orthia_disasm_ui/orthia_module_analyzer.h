@@ -2,6 +2,7 @@
 #include "oui_threadpool.h"
 #include "oui_window_thread.h"
 #include "orthia_model_interfaces.h"
+#include "orthia_config.h"
 #include <map>
 #include <memory>
 #include <functional>
@@ -19,6 +20,7 @@ namespace orthia
 
         std::shared_ptr<oui::CWindowThread> m_uiThread;
         std::weak_ptr<IUILogInterface> m_uiLog;
+        std::shared_ptr<CConfigOptionsStorage> m_config;
 
         void Cleanup(int workspaceId);
         void WriteLog(const oui::String& line);
@@ -26,13 +28,21 @@ namespace orthia
     public:
         ~CModuleAnalyzer();
 
-        void Init(std::weak_ptr<IUILogInterface> uiLog);
+        void Init(std::weak_ptr<IUILogInterface> uiLog,
+                  std::shared_ptr<CConfigOptionsStorage> config);
 
         void Enqueue(int workspaceId,
                      std::shared_ptr<CProcessWorkplaceItem> item,
                      std::shared_ptr<oui::BaseOperation> op,
                      Address_type mainModuleAddr,
                      std::function<void()> onComplete);
+
+        // singleModuleName: if non-empty, load symbols only for the named module.
+        void EnqueueLoadSymbols(int workspaceId,
+                                std::shared_ptr<IWorkPlaceItem> item,
+                                std::shared_ptr<oui::BaseOperation> op,
+                                std::function<void()> onComplete,
+                                const PlatformString_type& singleModuleName = {});
 
         void Cancel(int workspaceId);
         void CancelAll();

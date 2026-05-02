@@ -3,6 +3,7 @@
 #include "orthia_process_adapter.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
+#include "orthia_external_symbols.h"
 
 namespace orthia
 {
@@ -12,9 +13,11 @@ namespace orthia
         m_pool.Stop();
     }
 
-    void CModuleAnalyzer::Init(std::weak_ptr<IUILogInterface> uiLog)
+    void CModuleAnalyzer::Init(std::weak_ptr<IUILogInterface> uiLog,
+                               std::shared_ptr<CConfigOptionsStorage> config)
     {
         m_uiLog = std::move(uiLog);
+        m_config = std::move(config);
     }
 
     void CModuleAnalyzer::WriteLog(const oui::String& line)
@@ -109,6 +112,74 @@ namespace orthia
             catch (const std::exception& e)
             {
                 oui::LogOutput(oui::LogFlags::Error, e.what());
+            }
+
+            Cleanup(workspaceId);
+            if (!op->IsCancelled())
+            {
+                onComplete();
+            }
+        });
+    }
+
+    void CModuleAnalyzer::EnqueueLoadSymbols(int workspaceId,
+        std::shared_ptr<IWorkPlaceItem> item,
+        std::shared_ptr<oui::BaseOperation> op,
+        std::function<void()> onComplete,
+        const PlatformString_type& singleModuleName)
+    {
+        {
+            std::unique_lock<std::mutex> lock(m_opsLock);
+            m_ops[workspaceId] = op;
+            if (!m_uiThread)
+                m_uiThread = op->GetThread();
+        }
+
+        m_pool.AddTask([this,
+            weakItem = std::weak_ptr<IWorkPlaceItem>(item),
+            op,
+            workspaceId,
+            singleModuleName,
+            onComplete = std::move(onComplete)]() mutable
+        {
+            auto item = weakItem.lock();
+            if (!item || op->IsCancelled())
+            {
+                Cleanup(workspaceId);
+                return;
+            }
+
+            auto moduleManager = item->GetModuleManager();
+            if (!moduleManager)
+            {
+                Cleanup(workspaceId);
+                return;
+            }
+
+            std::vector<orthia::ModuleInfo> modules;
+            item->GetModules(modules);
+
+            auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            auto loader = CreateExternalSymbolsLoader(m_config->GetSymbolsFolders());
+
+            for (auto& mod : modules)
+            {
+                if (op->IsCancelled())
+                    break;
+
+                if (!singleModuleName.empty() && mod.name.native != singleModuleName)
+                    continue;
+
+                try
+                {
+                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("loading-symbols")), mod.name));
+                    loader->Load(mod, db);
+                }
+                catch (const std::exception& e)
+                {
+                    oui::LogOutput(oui::LogFlags::Error, e.what());
+                }
             }
 
             Cleanup(workspaceId);

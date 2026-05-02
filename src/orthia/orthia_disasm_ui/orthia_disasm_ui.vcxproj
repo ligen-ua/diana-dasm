@@ -205,6 +205,7 @@
     <ClCompile Include="orthia_commands_display.cpp" />
     <ClCompile Include="orthia_config.cpp" />
     <ClCompile Include="orthia_helpers.cpp" />
+    <ClCompile Include="orthia_external_symbols.cpp" />
     <ClCompile Include="orthia_item_file.cpp" />
     <ClCompile Include="orthia_item_process.cpp" />
     <ClCompile Include="orthia_model.cpp" />
@@ -235,6 +236,7 @@
     <ClInclude Include="orthia_commands.h" />
     <ClInclude Include="orthia_config.h" />
     <ClInclude Include="orthia_helpers.h" />
+    <ClInclude Include="orthia_external_symbols.h" />
     <ClInclude Include="orthia_item_file.h" />
     <ClInclude Include="orthia_item_process.h" />
     <ClInclude Include="orthia_model.h" />

@@ -79,8 +79,7 @@ namespace orthia
         void AddExecutable(std::shared_ptr<oui::IFile2> file,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
-        void LoadSymbols(std::shared_ptr<IWorkPlaceItem> workItem,
-            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+        CModuleAnalyzer& GetAnalyzer() { return m_analyzer; }
 
     private:
         CModuleAnalyzer m_analyzer;

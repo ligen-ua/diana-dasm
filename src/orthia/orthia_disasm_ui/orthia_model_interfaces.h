@@ -91,6 +91,7 @@ namespace orthia
         static const int flags_Function = 1;
         static const int flags_Import = 2;
         static const int flags_Export = 4;
+        static const int flags_PrivateSymbol = 8;
         Address_type address;
         oui::String name;
         int flags = 0;
@@ -319,6 +320,7 @@ namespace orthia
     const static int g_database_type_moduleMetaInfo = 1;
     const static int g_database_type_fnc_Import = 2;
     const static int g_database_type_fnc_Export = 3;
+    const static int g_database_type_fnc_PrivateSymbol = 4;
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
 

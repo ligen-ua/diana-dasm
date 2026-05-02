@@ -71,7 +71,7 @@ namespace orthia
     void CProgramModel::SetUILog(std::shared_ptr<IUILogInterface> uiLog)
     {
         m_uiLog = uiLog;
-        m_analyzer.Init(uiLog);
+        m_analyzer.Init(uiLog, m_config);
     }
     std::shared_ptr<oui::CFileSystem> CProgramModel::GetFileSystem()
     {
@@ -496,18 +496,6 @@ namespace orthia
         catch (std::exception& e)
         {
             result.error.native = orthia::Utf8ToPlatformString(e.what());
-        }
-    }
-    void CProgramModel::LoadSymbols(std::shared_ptr<IWorkPlaceItem> workItem,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
-    {
-        auto folders = m_config->GetSymbolsFolders();
-
-        std::vector<orthia::ModuleInfo> modules;
-        workItem->GetModules(modules);
-
-        for (auto& mod : modules)
-        {
         }
     }
 }

@@ -152,9 +152,13 @@ namespace orthia
             {
                 info.flags = NameInfo::flags_Import;
             }
-            if (metaType == g_database_type_fnc_Export)
+            else if (metaType == g_database_type_fnc_Export)
             {
                 info.flags = NameInfo::flags_Export;
+            }
+            else if (metaType == g_database_type_fnc_PrivateSymbol)
+            {
+                info.flags = NameInfo::flags_PrivateSymbol;
             }
             if (nameFilter.flags & nameFilter.flags_ContinueFrom)
             {
@@ -188,11 +192,15 @@ namespace orthia
                 g_database_type_fnc_Import, g_database_type_fnc_Export,
                 handler);
         }
+        classicDatabase->QueryMetaInfoModule2(moduleAddress,
+            g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol,
+            handler);
     }
     int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-        return classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export);
+        return classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export)
+             + classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol);
     }
     int FileWorkplaceItem::GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const
     {
@@ -517,6 +525,11 @@ namespace orthia
         if (info.flags & orthia::NameInfo::flags_Import)
         {
             database->InsertMetaInfo(moduleAddress, g_database_type_fnc_Import, metaInfo, moduleAddress);
+            return;
+        }
+        if (info.flags & orthia::NameInfo::flags_PrivateSymbol)
+        {
+            database->InsertMetaInfo(moduleAddress, g_database_type_fnc_PrivateSymbol, metaInfo, metaInfoAddres);
         }
     }
 

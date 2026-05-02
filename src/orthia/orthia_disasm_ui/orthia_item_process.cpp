@@ -5,7 +5,9 @@
 #include "orthia_process_adapter.h"
 #include "orthia_log.h"
 #include "orthia_common_print.h"
+#include "orthia_common_format.h"
 #include "orthia_module_manager.h"
+#include "orthia_database_module.h"
 
 namespace orthia
 {
@@ -452,6 +454,34 @@ namespace orthia
                 *totalCount += exportsCount;
             }
             maxCount -= exportsCollector.GetDeliveredCount();
+        }
+
+        // Also include private symbols from the database (e.g., loaded from PDB).
+        if (m_moduleManager)
+        {
+            auto classicDatabase = m_moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol,
+                [&](Address_type, int, const std::string& text, Address_type) -> bool {
+                    if (totalCount)
+                    {
+                        ++(*totalCount);
+                        return true;
+                    }
+                    std::string nameStr;
+                    Address_type target = 0;
+                    CCommonFormatParser parser;
+                    parser.Parse(text);
+                    parser.QueryMetadata("address", &target);
+                    parser.QueryMetadata("name", &nameStr);
+
+                    NameInfo info;
+                    info.name = Utf8ToPlatformString(nameStr);
+                    info.address = target;
+                    info.flags = NameInfo::flags_PrivateSymbol;
+                    names.push_back(info);
+                    return !count || (int)names.size() < count;
+                });
         }
     }
     void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names)const
