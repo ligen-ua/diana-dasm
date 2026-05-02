@@ -10,7 +10,8 @@ CModuleManager::CModuleManager()
 void CModuleManager::Reinit(const orthia::PlatformString_type & fullFileName,
                             bool bForce)
 {
-    CAutoCriticalSection guard(m_lock);
+    CAutoCriticalSection guard(m_writeLock);
+    CAutoCriticalSection guard2(m_dbLock);
     orthia::intrusive_ptr<CDatabaseManager> pDatabaseManager(new CDatabaseManager());
     if (bForce || (!orthia::IsFileExist(fullFileName)) || !orthia::GetSizeOfFile(fullFileName))
     {
@@ -23,9 +24,9 @@ void CModuleManager::Reinit(const orthia::PlatformString_type & fullFileName,
     m_pDatabaseManager = pDatabaseManager;
     m_fullFileName = fullFileName;
 }
-orthia::intrusive_ptr<CDatabaseManager> CModuleManager::QueryDatabaseManager()
+orthia::intrusive_ptr<CDatabaseManager> CModuleManager::QueryDatabaseManager() const
 {
-    CAutoCriticalSection guard(m_lock);
+    CAutoCriticalSection guard(m_dbLock);
     if (!m_pDatabaseManager)
     {
         throw std::runtime_error("The profile is not initialized");
@@ -39,8 +40,8 @@ orthia::PlatformString_type CModuleManager::GetDatabaseName() const
 
 void CModuleManager::UnloadModule(Address_type offset)
 {
-    CAutoCriticalSection guard(m_lock);
-    m_pDatabaseManager->GetClassicDatabase()->UnloadModule(offset, false);
+    CAutoCriticalSection guard(m_writeLock);
+    QueryDatabaseManager()->GetClassicDatabase()->UnloadModule(offset, false);
 }
 
 void CModuleManager::ReloadRange(Address_type offset,
@@ -49,7 +50,7 @@ void CModuleManager::ReloadRange(Address_type offset,
                                  int mode,
                                  int analyserFlags)
 {
-    CAutoCriticalSection guard(m_lock);
+    CAutoCriticalSection guard(m_writeLock);
     orthia::PlatformStringStream_type regionName;
     std::hex(regionName);
     regionName<<ORTHIA_TCSTR("region_")<<offset<<ORTHIA_TCSTR("_")<<size;
@@ -57,7 +58,7 @@ void CModuleManager::ReloadRange(Address_type offset,
     CDianaModule module;
     module.InitRaw(offset, size, pMemoryReader, mode);
 
-    if (m_pDatabaseManager->GetClassicDatabase()->IsModuleExists(offset))
+    if (QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(offset))
     {
         std::stringstream errorStream;
         std::hex(errorStream);
@@ -68,7 +69,7 @@ void CModuleManager::ReloadRange(Address_type offset,
     module.Analyze(analyserFlags);
 
     CDatabaseSaver fileSaver;
-    fileSaver.Save(module, *m_pDatabaseManager, regionName.str());
+    fileSaver.Save(module, *QueryDatabaseManager(), regionName.str());
 }
 
 void CModuleManager::ReloadModule(Address_type offset,
@@ -77,6 +78,8 @@ void CModuleManager::ReloadModule(Address_type offset,
                                   const orthia::PlatformString_type & name,
                                   int analyserFlags)
 {
+    CAutoCriticalSection guard(m_writeLock);
+
     CDianaModule module;
     module.Init(offset, pMemoryReader);
 
@@ -87,7 +90,6 @@ void CModuleManager::ReloadModule(Address_type offset,
     {
         module.Analyze(analyserFlags);
 
-        CAutoCriticalSection guard(m_lock);
         dbManager->GetClassicDatabase()->UnloadModule(offset, true);
         
         CDatabaseSaver fileSaver;
@@ -98,40 +100,34 @@ void CModuleManager::ReloadModule(Address_type offset,
 // module info
 void CModuleManager::QueryLoadedModules(std::vector<CommonModuleInfo> * pResult) const
 {
-    CAutoCriticalSection guard(m_lock);
     m_pDatabaseManager->GetClassicDatabase()->QueryModules(pResult);
 }
 // references
 Address_type CModuleManager::QueryRouteStart(Address_type offset)
 {
-    CAutoCriticalSection guard(m_lock);
     return m_pDatabaseManager->GetClassicDatabase()->QueryRouteStart(offset);
 }
 void CModuleManager::QueryReferencesToInstruction(Address_type offset, 
                                                  std::vector<CommonReferenceInfo> * pResult) const
 {
-    CAutoCriticalSection guard(m_lock);
-    m_pDatabaseManager->GetClassicDatabase()->QueryReferencesToInstruction(offset, pResult);
+    QueryDatabaseManager()->GetClassicDatabase()->QueryReferencesToInstruction(offset, pResult);
 }
 void CModuleManager::QueryReferencesFromInstruction(Address_type offset, 
                                                  std::vector<CommonReferenceInfo> * pResult) const
 {
-    CAutoCriticalSection guard(m_lock);
-    m_pDatabaseManager->GetClassicDatabase()->QueryReferencesFromInstruction(offset, pResult);
+    QueryDatabaseManager()->GetClassicDatabase()->QueryReferencesFromInstruction(offset, pResult);
 }
 void CModuleManager::QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult) const
 {
-    CAutoCriticalSection guard(m_lock);
     if (address1 > address2)
     {
         throw std::runtime_error("Invalid arguments");
     }
-    m_pDatabaseManager->GetClassicDatabase()->QueryReferencesToInstructionsRange(address1, address2, pResult);
+    QueryDatabaseManager()->GetClassicDatabase()->QueryReferencesToInstructionsRange(address1, address2, pResult);
 }
 void CModuleManager::QueryReferencesFromInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult) const
 {
-    CAutoCriticalSection guard(m_lock);
-    m_pDatabaseManager->GetClassicDatabase()->QueryReferencesFromInstructionsRange(address1, address2, pResult);
+    QueryDatabaseManager()->GetClassicDatabase()->QueryReferencesFromInstructionsRange(address1, address2, pResult);
 }
 
 }

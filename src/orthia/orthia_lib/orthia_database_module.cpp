@@ -183,17 +183,23 @@ void CDatabaseManager::CreateNew(const orthia::PlatformString_type & fullFileNam
 {
     orthia::intrusive_ptr<CDatabase> database(new CDatabase());
     database->CreateNew(fullFileName);
+
+    CAutoCriticalSection guard(m_createLock);
     m_database = database;
 }
 void CDatabaseManager::OpenExisting(const orthia::PlatformString_type & fullFileName)
 {
     orthia::intrusive_ptr<CDatabase> database(new CDatabase());
     database->OpenExisting(fullFileName);
+
+    CAutoCriticalSection guard(m_createLock);
     m_database = database;
 }
 
 orthia::intrusive_ptr<CDatabase> CDatabaseManager::GetDatabase()
 {
+    CAutoCriticalSection guard(m_createLock);
+
     if (!m_database)
         throw std::runtime_error("No database initialized");
     return m_database;

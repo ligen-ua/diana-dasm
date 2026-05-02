@@ -302,6 +302,10 @@ namespace orthia
         auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
 
         m_analyzer.Enqueue(workspaceId, info, bgOp, mainAddr,
+            [this, uiThread]() {
+                auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                WriteLog(uiThread, node->QueryValue(ORTHIA_TCSTR("updating-database")));
+            },
             [this, uiThread, workspaceId]() {
                 std::vector<std::shared_ptr<IUIEventHandler>> handlers;
                 {

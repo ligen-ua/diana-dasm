@@ -37,6 +37,7 @@ namespace orthia
         std::shared_ptr<CProcessWorkplaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
+        std::function<void()> writeLog,
         std::function<void()> onComplete)
     {
         {
@@ -49,6 +50,7 @@ namespace orthia
             op,
             workspaceId,
             mainModuleAddr,
+            writeLog = std::move(writeLog),
             onComplete = std::move(onComplete)]() mutable
         {
             auto item = weakItem.lock();
@@ -84,6 +86,7 @@ namespace orthia
             {
                 if (!db->IsModuleExists(mainIt->address))
                 {
+                    writeLog();
                     moduleManager->ReloadModule(mainIt->address, &reader, false, mainIt->name, 0);
                 }
             }

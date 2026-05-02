@@ -65,6 +65,8 @@ public:
     CClassicDatabase(intrusive_ptr<CSQLDatabase2> pDatabase);
     ~CClassicDatabase();
 
+    orthia::CCriticalSection& GetLock() { return m_lock; }
+
     // module loading process:
     void StartSaveModule(Address_type baseAddress, 
                          Address_type size, 

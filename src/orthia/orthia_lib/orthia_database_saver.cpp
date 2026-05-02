@@ -14,6 +14,9 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
 {
     orthia::intrusive_ptr<CDatabase> databaseModule = databaseManager.GetDatabase();
     orthia::intrusive_ptr<CClassicDatabase> classicDatabase = databaseModule->GetClassicDatabase();
+    
+    CAutoCriticalSection guard(classicDatabase->GetLock());
+    
     Address_type baseAddress = dianaModule.GetModuleAddress();
     std::vector<CommonReferenceInfo> references;
     CDianaInstructionIterator iterator;
@@ -22,8 +25,8 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
     CClassicDatabaseModuleCleaner cleaner(classicDatabase.get());
     CAutoRollbackClassicDatabase rollback;
     classicDatabase->StartSaveModule(baseAddress, dianaModule.GetModuleSize(), moduleName, &rollback);
-
-    while(!iterator.IsEmpty())
+ 
+    for(int i = 0; !iterator.IsEmpty(); ++i)
     {
         Address_type offset = iterator.GetInstructionOffset();
         iterator.QueryRefsToCurrentInstuction(&references);
@@ -46,6 +49,11 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
             classicDatabase->InsertReferencesFromInstruction(offset+baseAddress, references);    
         }
         iterator.MoveToNext();
+        if (!(i % 10))
+        {
+            classicDatabase->GetLock().Unlock();
+            classicDatabase->GetLock().Lock();
+        }
     }
     classicDatabase->DoneSave();
     rollback.Reset();

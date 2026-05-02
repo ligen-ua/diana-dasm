@@ -57,6 +57,8 @@ class CDatabaseManager:public orthia::RefCountedBase
     CDatabaseManager(const CDatabaseManager &);
     CDatabaseManager & operator =(const CDatabaseManager &);
 
+    CCriticalSection m_createLock;
+
     orthia::intrusive_ptr<CDatabase> m_database;
 public:
     CDatabaseManager();

@@ -26,6 +26,7 @@ namespace orthia
                      std::shared_ptr<CProcessWorkplaceItem> item,
                      std::shared_ptr<oui::BaseOperation> op,
                      Address_type mainModuleAddr,
+                     std::function<void()> writeLog,
                      std::function<void()> onComplete);
 
         void Cancel(int workspaceId);

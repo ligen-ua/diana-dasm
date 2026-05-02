@@ -15,14 +15,15 @@ class CModuleManager
     CModuleManager(const CModuleManager&);
     CModuleManager&operator = (const CModuleManager&);
 
-    mutable CCriticalSection m_lock;
+    mutable CCriticalSection m_dbLock;
+    mutable CCriticalSection m_writeLock;
     mutable orthia::intrusive_ptr<CDatabaseManager> m_pDatabaseManager;
     orthia::PlatformString_type m_fullFileName;
 public:
     CModuleManager();
     void Reinit(const orthia::PlatformString_type & fullFileName, bool bForce);
     orthia::PlatformString_type GetDatabaseName() const;
-    orthia::intrusive_ptr<CDatabaseManager> QueryDatabaseManager(); 
+    orthia::intrusive_ptr<CDatabaseManager> QueryDatabaseManager() const; 
 
     void UnloadModule(Address_type offset);
     void ReloadModule(Address_type offset,
