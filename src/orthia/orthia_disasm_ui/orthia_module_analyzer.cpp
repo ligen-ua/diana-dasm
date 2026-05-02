@@ -12,6 +12,21 @@ namespace orthia
         m_pool.Stop();
     }
 
+    void CModuleAnalyzer::Init(std::weak_ptr<IUILogInterface> uiLog)
+    {
+        m_uiLog = std::move(uiLog);
+    }
+
+    void CModuleAnalyzer::WriteLog(const oui::String& line)
+    {
+        if (!m_uiThread)
+            return;
+        m_uiThread->AddTask([uiLog = m_uiLog, line]() {
+            if (auto log = uiLog.lock())
+                log->WriteLog(line);
+        });
+    }
+
     void CModuleAnalyzer::CancelAll()
     {
         std::unique_lock<std::mutex> lock(m_opsLock);
@@ -37,12 +52,13 @@ namespace orthia
         std::shared_ptr<CProcessWorkplaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
-        std::function<void()> writeLog,
         std::function<void()> onComplete)
     {
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
             m_ops[workspaceId] = op;
+            if (!m_uiThread)
+                m_uiThread = op->GetThread();
         }
 
         m_pool.AddTask([this,
@@ -50,7 +66,6 @@ namespace orthia
             op,
             workspaceId,
             mainModuleAddr,
-            writeLog = std::move(writeLog),
             onComplete = std::move(onComplete)]() mutable
         {
             auto item = weakItem.lock();
@@ -86,7 +101,8 @@ namespace orthia
             {
                 if (!db->IsModuleExists(mainIt->address))
                 {
-                    writeLog();
+                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
                     moduleManager->ReloadModule(mainIt->address, &reader, false, mainIt->name, 0);
                 }
             }

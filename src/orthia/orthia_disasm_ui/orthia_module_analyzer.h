@@ -17,16 +17,21 @@ namespace orthia
         std::map<int, std::shared_ptr<oui::BaseOperation>> m_ops;
         oui::CThreadPool m_pool{1};
 
+        std::shared_ptr<oui::CWindowThread> m_uiThread;
+        std::weak_ptr<IUILogInterface> m_uiLog;
+
         void Cleanup(int workspaceId);
+        void WriteLog(const oui::String& line);
 
     public:
         ~CModuleAnalyzer();
+
+        void Init(std::weak_ptr<IUILogInterface> uiLog);
 
         void Enqueue(int workspaceId,
                      std::shared_ptr<CProcessWorkplaceItem> item,
                      std::shared_ptr<oui::BaseOperation> op,
                      Address_type mainModuleAddr,
-                     std::function<void()> writeLog,
                      std::function<void()> onComplete);
 
         void Cancel(int workspaceId);

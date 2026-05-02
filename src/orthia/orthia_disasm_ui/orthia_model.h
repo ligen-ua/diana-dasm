@@ -2,15 +2,12 @@
 
 #include "orthia_model_interfaces.h"
 #include "oui_filesystem.h"
-#include "orthia_text_manager.h"
 #include "orthia_config.h"
 #include "orthia_module_manager.h"
 #include "oui_processes.h"
 #include <optional>
 #include "orthia_commands.h"
 #include "orthia_module_analyzer.h"
-
-extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
 namespace orthia
 {
@@ -21,12 +18,6 @@ namespace orthia
         int uid = 0;
         oui::String name;
     };
-    struct IUILogInterface
-    {
-        virtual ~IUILogInterface() {}
-        virtual void WriteLog(const oui::String& line) = 0;
-    };
-
     // OpenResult extra fields
     const int model_OpenResult_extraInfo_InitalAddress = 1;
     const int model_OpenResult_extraInfo_WorkspaceId = 2;

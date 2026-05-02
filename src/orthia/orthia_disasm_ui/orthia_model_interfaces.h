@@ -2,12 +2,15 @@
 
 #include "orthia_utils.h"
 #include "orthia_interfaces.h"
+#include "orthia_text_manager.h"
 #include "oui_string.h"
 #include "oui_text_markup.h"
 #include "oui_window_thread.h"
 #include "oui_filesystem.h"
 #include "orthia_common_time.h"
 #include "orthia_common_print.h"
+
+extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
 namespace oui
 {
@@ -173,6 +176,12 @@ namespace orthia
             }
             return false;
         }
+    };
+
+    struct IUILogInterface
+    {
+        virtual ~IUILogInterface() {}
+        virtual void WriteLog(const oui::String& line) = 0;
     };
 
     struct IPeristentItemStorage;
