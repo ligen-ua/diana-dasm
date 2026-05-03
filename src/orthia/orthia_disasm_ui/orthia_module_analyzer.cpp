@@ -160,7 +160,8 @@ namespace orthia
             item->GetModules(modules);
 
             auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-            auto loader = CreateExternalSymbolsLoader(m_config->GetSymbolsFolders());
+            auto logger = std::make_shared<CLoaderUILogger>(m_uiThread, m_uiLog);
+            auto loader = CreateExternalSymbolsLoader(m_config->GetSymbolsFolders(), logger);
 
             for (auto& mod : modules)
             {
@@ -172,8 +173,6 @@ namespace orthia
 
                 try
                 {
-                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("loading-symbols")), mod.name));
                     loader->Load(mod, db);
                 }
                 catch (const std::exception& e)

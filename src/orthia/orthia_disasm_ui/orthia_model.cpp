@@ -300,26 +300,43 @@ namespace orthia
 
         auto uiThread = completeHandler->GetThread();
         auto mainAddr = info->GerProcessModuleAddress();
-        auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
+        {
+            auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
 
-        m_analyzer.Enqueue(workspaceId, info, bgOp, mainAddr,
-            [this, uiThread, workspaceId]() {
-                std::vector<std::shared_ptr<IUIEventHandler>> handlers;
-                {
-                    std::unique_lock<std::mutex> lock(m_lock);
-                    handlers.assign(m_handlers.begin(), m_handlers.end());
-                }
-                uiThread->AddTask(
-                    [handlers = std::move(handlers), workspaceId, uiLog = m_uiLog]() {
-                        if (auto log = uiLog.lock())
+            m_analyzer.Enqueue(workspaceId, info, bgOp, mainAddr,
+                [this, uiThread, workspaceId, info]() {
+                    std::vector<std::shared_ptr<IUIEventHandler>> handlers;
+                    {
+                        std::unique_lock<std::mutex> lock(m_lock);
+                        handlers.assign(m_handlers.begin(), m_handlers.end());
+                    }
+                    uiThread->AddTask(
+                        [handlers = std::move(handlers), workspaceId, uiLog = m_uiLog]() {
+                            if (auto log = uiLog.lock())
+                            {
+                                auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                                log->WriteLog(node->QueryValue(ORTHIA_TCSTR("analysis-complete")));
+                            }
+                        });
+                });
+            }
+
+            {
+                auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
+                m_analyzer.EnqueueLoadSymbols(workspaceId, info, symOp,
+                    [this, uiThread, workspaceId]() {
+                        std::vector<std::shared_ptr<IUIEventHandler>> handlers;
                         {
-                            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-                            log->WriteLog(node->QueryValue(ORTHIA_TCSTR("analysis-complete")));
+                            std::unique_lock<std::mutex> lock(m_lock);
+                            handlers.assign(m_handlers.begin(), m_handlers.end());
                         }
-                        for (auto& h : handlers)
-                            h->OnWorkspaceItemChanged(workspaceId);
+                        uiThread->AddTask(
+                            [handlers = std::move(handlers), workspaceId]() {
+                                for (auto& h : handlers)
+                                    h->OnWorkspaceItemChanged(workspaceId);
+                            });
                     });
-            });
+            }
     }
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)

@@ -75,9 +75,12 @@ PlatformString_type FindPdbFile(const ModuleInfo& mod,
 class CPdbExternalSymbolsLoader : public IExternalSymbolsLoader
 {
     std::vector<PlatformString_type> m_symbolFolders;
+    std::shared_ptr<CLoaderUILogger> m_logger;
 public:
-    explicit CPdbExternalSymbolsLoader(std::vector<PlatformString_type> symbolFolders)
+    CPdbExternalSymbolsLoader(std::vector<PlatformString_type> symbolFolders,
+                              std::shared_ptr<CLoaderUILogger> logger)
         : m_symbolFolders(std::move(symbolFolders))
+        , m_logger(std::move(logger))
     {
     }
 
@@ -98,8 +101,21 @@ public:
         if (LoadFileToVector_Silent(pdbPath, pdbData) != 0 || pdbData.empty())
             return;
 
+        if (m_logger)
+        {
+            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+            m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("loading-symbols")), mod.name));
+        }
+
         if (!pdb_sig_match(pdbData.data(), pdbData.size()))
+        {
+            if (m_logger)
+            {
+                auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("symbols-mismatch")), pdbPath));
+            }
             return;
+        }
 
         void* ctx = pdb_create_context(nullptr, nullptr);
         if (!ctx)
@@ -203,10 +219,11 @@ public:
 } // anonymous namespace
 
 std::unique_ptr<IExternalSymbolsLoader> CreateExternalSymbolsLoader(
-    const std::vector<PlatformString_type>& symbolFolders)
+    const std::vector<PlatformString_type>& symbolFolders,
+    std::shared_ptr<CLoaderUILogger> logger)
 {
     auto composite = std::make_unique<CCompositeExternalSymbolsLoader>();
-    composite->Add(std::make_unique<CPdbExternalSymbolsLoader>(symbolFolders));
+    composite->Add(std::make_unique<CPdbExternalSymbolsLoader>(symbolFolders, std::move(logger)));
     composite->Add(std::make_unique<CElfExternalSymbolsLoader>());
     return composite;
 }
