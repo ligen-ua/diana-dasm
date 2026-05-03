@@ -141,56 +141,86 @@ public:
             void* ctx = pdb_create_context(nullptr, nullptr);
             if (!ctx)
                 continue;
-
+            oui::ScopedGuard pdbContextGuard([&]() {
+                pdb_destroy_context(ctx);
+            });
             if (pdb_load(ctx, pdbData.data(), pdbData.size()) < 0)
             {
-                pdb_destroy_context(ctx);
                 continue;
             }
 
             uint32_t nrSections = pdb_get_nr_sections(ctx);
 
             uint32_t nrSymbols = 0;
-            if (pdb_get_nr_public_symbols(ctx, &nrSymbols) < 0 || nrSymbols == 0)
+            if (pdb_get_nr_symbols(ctx, &nrSymbols) < 0 || nrSymbols == 0)
             {
-                pdb_destroy_context(ctx);
                 continue;
             }
 
-            std::vector<const PUBSYM32*> syms(nrSymbols);
-            if (pdb_get_public_symbols(ctx, syms.data()) < 0)
+            std::vector<const SYMTYPE*> syms(nrSymbols);
+            if (pdb_get_symbols(ctx, syms.data()) < 0)
             {
-                pdb_destroy_context(ctx);
                 continue;
             }
 
             for (uint32_t i = 0; i < nrSymbols; ++i)
             {
-                const PUBSYM32* sym = syms[i];
-                if (!sym || sym->seg == 0)
+                const SYMTYPE* sym = syms[i];
+                if (!sym)
+                    continue;
+
+                unsigned short seg = 0;
+                unsigned long off = 0;
+                const unsigned char* name = nullptr;
+
+                switch (sym->rectyp)
+                {
+                case S_PUB32:
+                case S_GDATA32:
+                case S_LDATA32:
+                {
+                    // PUBSYM32 and DATASYM32 share identical off/seg/name layout
+                    auto* d = reinterpret_cast<const DATASYM32*>(sym);
+                    seg = d->seg;
+                    off = d->off;
+                    name = d->name;
+                    break;
+                }
+                case S_GPROC32:
+                case S_LPROC32:
+                {
+                    auto* p = reinterpret_cast<const PROCSYM32*>(sym);
+                    seg = p->seg;
+                    off = p->off;
+                    name = p->name;
+                    break;
+                }
+                default:
+                    continue;
+                }
+
+                if (seg == 0)
                     continue;
 
                 // Dynamic symbols (seg - 1 == nrSections) carry a raw offset instead of RVA.
                 uint32_t rva = 0;
-                if ((uint32_t)(sym->seg - 1) == nrSections)
+                if ((uint32_t)(seg - 1) == nrSections)
                 {
-                    rva = sym->off;
+                    rva = off;
                 }
                 else
                 {
-                    if (pdb_convert_section_offset_to_rva(ctx, sym->seg, sym->off, &rva) < 0)
+                    if (pdb_convert_section_offset_to_rva(ctx, seg, off, &rva) < 0)
                         continue;
                 }
 
                 NameInfo info;
                 info.address = mod.address + rva;
                 info.flags = NameInfo::flags_PrivateSymbol;
-                info.name = Utf8ToPlatformString(reinterpret_cast<const char*>(sym->name));
+                info.name = Utf8ToPlatformString(reinterpret_cast<const char*>(name));
 
                 InsertName(db, mod.address, info, info.address);
             }
-
-            pdb_destroy_context(ctx);
             return;
         }
     }
@@ -228,14 +258,25 @@ public:
     bool CanLoad(const ModuleInfo& mod) const override
     {
         for (const auto& l : m_loaders)
-            if (l->CanLoad(mod)) return true;
+        {
+            if (l->CanLoad(mod))
+            {
+                return true;
+            }
+        }
         return false;
     }
 
     void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db) override
     {
         for (const auto& l : m_loaders)
-            if (l->CanLoad(mod)) { l->Load(mod, db); return; }
+        {
+            if (l->CanLoad(mod)) 
+            { 
+                l->Load(mod, db); 
+                return; 
+            }
+        }
     }
 };
 
