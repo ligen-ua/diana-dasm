@@ -240,6 +240,7 @@ void CModulesWindow::UpdateVisibleItems()
             orthia::NameSelectionKey key;
             key.flags = key.flags_ContinueFrom;
             key.address = m_cachedNamesPage.back().address;
+            key.continueMarkNameFlag = m_cachedNamesPage.back().flags;
 
             std::vector<orthia::NameInfo> newPage;
             activeItem->QueryNames(m_selectedModuleAddress, key, g_nameCacheSize, newPage);

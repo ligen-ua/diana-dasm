@@ -1,8 +1,13 @@
 #include "orthia_external_symbols.h"
 #include "orthia_item_file.h"
+
+extern "C"
+{
 #include "diana_pdb.h"
+}
 #include "orthia_files.h"
 #include "orthia_utils.h"
+#include "orthia_database_impl_classic.h"
 
 namespace orthia
 {
@@ -13,7 +18,7 @@ namespace
 bool IsPeModule(const ModuleInfo& mod)
 {
     PlatformString_type ext;
-    GetExtensionOfFile(mod.fullName.native, &ext);
+    GetExtensionOfFile(mod.fullName, &ext);
     return ext == ORTHIA_TCSTR("dll")
         || ext == ORTHIA_TCSTR("exe")
         || ext == ORTHIA_TCSTR("sys");
@@ -23,7 +28,7 @@ bool IsPeModule(const ModuleInfo& mod)
 PlatformString_type GetPdbStem(const ModuleInfo& mod)
 {
     PlatformString_type fileName;
-    UnparseFileNameFromFullFileName(mod.fullName.native, &fileName);
+    UnparseFileNameFromFullFileName(mod.fullName, &fileName);
     PlatformString_type ext;
     GetExtensionOfFile(fileName, &ext);
     if (!ext.empty())
@@ -50,12 +55,12 @@ PlatformString_type FindPdbFile(const ModuleInfo& mod,
 
     // Try the directory that contains the module itself.
     PlatformString_type modExt;
-    GetExtensionOfFile(mod.fullName.native, &modExt);
+    GetExtensionOfFile(mod.fullName, &modExt);
     PlatformString_type modPdb;
     if (!modExt.empty())
-        modPdb = mod.fullName.native.substr(0, mod.fullName.native.size() - modExt.size()) + ORTHIA_TCSTR("pdb");
+        modPdb = mod.fullName.substr(0, mod.fullName.size() - modExt.size()) + ORTHIA_TCSTR("pdb");
     else
-        modPdb = mod.fullName.native + ORTHIA_TCSTR(".pdb");
+        modPdb = mod.fullName + ORTHIA_TCSTR(".pdb");
 
     std::vector<char> buf;
     if (LoadFileToVector_Silent(modPdb, buf) == 0)

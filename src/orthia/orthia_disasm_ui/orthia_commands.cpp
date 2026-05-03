@@ -208,6 +208,7 @@ namespace orthia
                     }
                     key.flags |= key.flags_ContinueFrom;
                     key.address = names.back().address;
+                    key.continueMarkNameFlag = names.back().flags;
                 }
             }
         }

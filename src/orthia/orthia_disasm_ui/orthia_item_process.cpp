@@ -201,8 +201,9 @@ namespace orthia
         int m_deliveredCount = 0;
         const NameSelectionKey& m_nameFilter;
         bool m_found = false;
+        bool m_skipAll = false;
     public:
-        CImportsCollector(const NameSelectionKey& nameFilter, 
+        CImportsCollector(const NameSelectionKey& nameFilter,
             std::vector<NameInfo>& names,
             std::function<oui::String (OPERAND_SIZE address)> getName,
             int maxCount,
@@ -214,6 +215,14 @@ namespace orthia
             m_totalCount(totalCount),
             m_nameFilter(nameFilter)
         {
+            if ((m_nameFilter.flags & m_nameFilter.flags_ContinueFrom) &&
+                m_nameFilter.continueMarkNameFlag != 0 &&
+                m_nameFilter.continueMarkNameFlag != NameInfo::flags_Import)
+            {
+                m_skipAll = true;
+                // m_found intentionally left false so IsMarkFound() returns false
+                // and SetFound(false) is passed to the exports collector
+            }
         }
         bool IsMarkFound() const
         {
@@ -232,6 +241,7 @@ namespace orthia
             OPERAND_SIZE* pAddress)
         {
             ++m_totalCount;
+            if (m_skipAll) return;
 
             if (!m_found)
             {
@@ -304,6 +314,10 @@ namespace orthia
         void SetFound(bool markFound)
         {
             m_found = markFound;
+        }
+        bool IsMarkFound() const
+        {
+            return m_found;
         }
         void QueryFunctionByOrdinal(const char* pDllName,
             DI_UINT32 ordinal,
@@ -426,6 +440,7 @@ namespace orthia
         }
 
         int maxCount = count - importsCollector.GetDeliveredCount();
+        bool markFound = importsCollector.IsMarkFound();
         if (maxCount || totalCount)
         {
             int exportsCount = 0;
@@ -454,6 +469,7 @@ namespace orthia
                 *totalCount += exportsCount;
             }
             maxCount -= exportsCollector.GetDeliveredCount();
+            markFound = exportsCollector.IsMarkFound();
         }
 
         // Also include private symbols from the database (e.g., loaded from PDB).
@@ -462,7 +478,7 @@ namespace orthia
             auto classicDatabase = m_moduleManager->QueryDatabaseManager()->GetClassicDatabase();
             classicDatabase->QueryMetaInfoModule2(moduleAddress,
                 g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol,
-                [&](Address_type, int, const std::string& text, Address_type) -> bool {
+                [&, markFound](Address_type, int, const std::string& text, Address_type) mutable -> bool {
                     if (totalCount)
                     {
                         ++(*totalCount);
@@ -474,6 +490,15 @@ namespace orthia
                     parser.Parse(text);
                     parser.QueryMetadata("address", &target);
                     parser.QueryMetadata("name", &nameStr);
+
+                    if (!markFound)
+                    {
+                        if (target == nameFilter.address)
+                        {
+                            markFound = true;
+                        }
+                        return true;
+                    }
 
                     NameInfo info;
                     info.name = Utf8ToPlatformString(nameStr);

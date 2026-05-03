@@ -180,17 +180,22 @@ namespace orthia
             return true;
         };
 
-        if (nameFilter.excludeImports)
+        bool continueFromPrivate = (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
+                                   nameFilter.continueMarkNameFlag == NameInfo::flags_PrivateSymbol;
+        if (!continueFromPrivate)
         {
-            classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                g_database_type_fnc_Export, -1,
-                handler);
-        }
-        else
-        {
-            classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                g_database_type_fnc_Import, g_database_type_fnc_Export,
-                handler);
+            if (nameFilter.excludeImports)
+            {
+                classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                    g_database_type_fnc_Export, -1,
+                    handler);
+            }
+            else
+            {
+                classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                    g_database_type_fnc_Import, g_database_type_fnc_Export,
+                    handler);
+            }
         }
         classicDatabase->QueryMetaInfoModule2(moduleAddress,
             g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol,

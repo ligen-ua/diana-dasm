@@ -167,7 +167,7 @@ namespace orthia
                 if (op->IsCancelled())
                     break;
 
-                if (!singleModuleName.empty() && mod.name.native != singleModuleName)
+                if (!singleModuleName.empty() && mod.name != singleModuleName)
                     continue;
 
                 try
