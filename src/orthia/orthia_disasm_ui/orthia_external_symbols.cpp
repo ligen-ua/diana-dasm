@@ -36,38 +36,57 @@ PlatformString_type GetPdbStem(const ModuleInfo& mod)
     return fileName;
 }
 
-// Search symbol folders and the module's own directory for <stem>.pdb.
-// Returns the path of the first file found, or empty string.
-PlatformString_type FindPdbFile(const ModuleInfo& mod,
-    const std::vector<PlatformString_type>& symbolFolders)
+// Iterates over all candidate PDB paths for a module: explicit symbol folders
+// first, then the module's own directory. Call FindNextPdb() until it returns
+// false; Current() holds the last successfully located path.
+class CPdbFileFinder
 {
-    PlatformString_type stem = GetPdbStem(mod);
-    PlatformString_type pdbName = stem + ORTHIA_TCSTR(".pdb");
-
-    // Search explicit symbol folders first.
-    for (const auto& folder : symbolFolders)
+    PlatformString_type m_pdbName;
+    const std::vector<PlatformString_type>& m_symbolFolders;
+    PlatformString_type m_modPdb;
+    size_t m_folderIndex = 0;
+    bool m_triedModDir = false;
+    PlatformString_type m_current;
+public:
+    CPdbFileFinder(const ModuleInfo& mod, const std::vector<PlatformString_type>& symbolFolders)
+        : m_symbolFolders(symbolFolders)
     {
-        PlatformString_type candidate = folder + ORTHIA_STR_PLATFORM_SLASH + pdbName;
-        std::vector<char> buf;
-        if (LoadFileToVector_Silent(candidate, buf) == 0)
-            return candidate;
+        m_pdbName = GetPdbStem(mod) + ORTHIA_TCSTR(".pdb");
+        PlatformString_type modExt;
+        GetExtensionOfFile(mod.fullName, &modExt);
+        if (!modExt.empty())
+            m_modPdb = mod.fullName.substr(0, mod.fullName.size() - modExt.size()) + ORTHIA_TCSTR("pdb");
+        else
+            m_modPdb = mod.fullName + ORTHIA_TCSTR(".pdb");
     }
 
-    // Try the directory that contains the module itself.
-    PlatformString_type modExt;
-    GetExtensionOfFile(mod.fullName, &modExt);
-    PlatformString_type modPdb;
-    if (!modExt.empty())
-        modPdb = mod.fullName.substr(0, mod.fullName.size() - modExt.size()) + ORTHIA_TCSTR("pdb");
-    else
-        modPdb = mod.fullName + ORTHIA_TCSTR(".pdb");
+    bool FindNextPdb()
+    {
+        std::vector<char> buf;
+        while (m_folderIndex < m_symbolFolders.size())
+        {
+            PlatformString_type candidate = m_symbolFolders[m_folderIndex] + ORTHIA_STR_PLATFORM_SLASH + m_pdbName;
+            ++m_folderIndex;
+            if (LoadFileToVector_Silent(candidate, buf) == 0)
+            {
+                m_current = std::move(candidate);
+                return true;
+            }
+        }
+        if (!m_triedModDir)
+        {
+            m_triedModDir = true;
+            if (LoadFileToVector_Silent(m_modPdb, buf) == 0)
+            {
+                m_current = m_modPdb;
+                return true;
+            }
+        }
+        return false;
+    }
 
-    std::vector<char> buf;
-    if (LoadFileToVector_Silent(modPdb, buf) == 0)
-        return modPdb;
-
-    return {};
-}
+    const PlatformString_type& Current() const { return m_current; }
+};
 
 // -----------------------------------------------------------------------
 // PDB loader
@@ -88,88 +107,92 @@ public:
     {
         if (!IsPeModule(mod))
             return false;
-        return !FindPdbFile(mod, m_symbolFolders).empty();
+        CPdbFileFinder finder(mod, m_symbolFolders);
+        return finder.FindNextPdb();
     }
 
     void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db) override
     {
-        PlatformString_type pdbPath = FindPdbFile(mod, m_symbolFolders);
-        if (pdbPath.empty())
-            return;
-
-        std::vector<char> pdbData;
-        if (LoadFileToVector_Silent(pdbPath, pdbData) != 0 || pdbData.empty())
-            return;
-
-        if (m_logger)
+        CPdbFileFinder finder(mod, m_symbolFolders);
+        while (finder.FindNextPdb())
         {
-            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-            m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("loading-symbols")), mod.name));
-        }
+            const PlatformString_type& pdbPath = finder.Current();
 
-        if (!pdb_sig_match(pdbData.data(), pdbData.size()))
-        {
+            std::vector<char> pdbData;
+            if (LoadFileToVector_Silent(pdbPath, pdbData) != 0 || pdbData.empty())
+                continue;
+
             if (m_logger)
             {
                 auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-                m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("symbols-mismatch")), pdbPath));
+                m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("loading-symbols")), mod.name));
             }
-            return;
-        }
 
-        void* ctx = pdb_create_context(nullptr, nullptr);
-        if (!ctx)
-            return;
+            if (!pdb_sig_match(pdbData.data(), pdbData.size()))
+            {
+                if (m_logger)
+                {
+                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                    m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("symbols-mismatch")), pdbPath));
+                }
+                continue;
+            }
 
-        if (pdb_load(ctx, pdbData.data(), pdbData.size()) < 0)
-        {
-            pdb_destroy_context(ctx);
-            return;
-        }
-
-        uint32_t nrSections = pdb_get_nr_sections(ctx);
-
-        uint32_t nrSymbols = 0;
-        if (pdb_get_nr_public_symbols(ctx, &nrSymbols) < 0 || nrSymbols == 0)
-        {
-            pdb_destroy_context(ctx);
-            return;
-        }
-
-        std::vector<const PUBSYM32*> syms(nrSymbols);
-        if (pdb_get_public_symbols(ctx, syms.data()) < 0)
-        {
-            pdb_destroy_context(ctx);
-            return;
-        }
-
-        for (uint32_t i = 0; i < nrSymbols; ++i)
-        {
-            const PUBSYM32* sym = syms[i];
-            if (!sym || sym->seg == 0)
+            void* ctx = pdb_create_context(nullptr, nullptr);
+            if (!ctx)
                 continue;
 
-            // Dynamic symbols (seg - 1 == nrSections) carry a raw offset instead of RVA.
-            uint32_t rva = 0;
-            if ((uint32_t)(sym->seg - 1) == nrSections)
+            if (pdb_load(ctx, pdbData.data(), pdbData.size()) < 0)
             {
-                rva = sym->off;
+                pdb_destroy_context(ctx);
+                continue;
             }
-            else
+
+            uint32_t nrSections = pdb_get_nr_sections(ctx);
+
+            uint32_t nrSymbols = 0;
+            if (pdb_get_nr_public_symbols(ctx, &nrSymbols) < 0 || nrSymbols == 0)
             {
-                if (pdb_convert_section_offset_to_rva(ctx, sym->seg, sym->off, &rva) < 0)
+                pdb_destroy_context(ctx);
+                continue;
+            }
+
+            std::vector<const PUBSYM32*> syms(nrSymbols);
+            if (pdb_get_public_symbols(ctx, syms.data()) < 0)
+            {
+                pdb_destroy_context(ctx);
+                continue;
+            }
+
+            for (uint32_t i = 0; i < nrSymbols; ++i)
+            {
+                const PUBSYM32* sym = syms[i];
+                if (!sym || sym->seg == 0)
                     continue;
+
+                // Dynamic symbols (seg - 1 == nrSections) carry a raw offset instead of RVA.
+                uint32_t rva = 0;
+                if ((uint32_t)(sym->seg - 1) == nrSections)
+                {
+                    rva = sym->off;
+                }
+                else
+                {
+                    if (pdb_convert_section_offset_to_rva(ctx, sym->seg, sym->off, &rva) < 0)
+                        continue;
+                }
+
+                NameInfo info;
+                info.address = mod.address + rva;
+                info.flags = NameInfo::flags_PrivateSymbol;
+                info.name = Utf8ToPlatformString(reinterpret_cast<const char*>(sym->name));
+
+                InsertName(db, mod.address, info, info.address);
             }
 
-            NameInfo info;
-            info.address = mod.address + rva;
-            info.flags = NameInfo::flags_PrivateSymbol;
-            info.name = Utf8ToPlatformString(reinterpret_cast<const char*>(sym->name));
-
-            InsertName(db, mod.address, info, info.address);
+            pdb_destroy_context(ctx);
+            return;
         }
-
-        pdb_destroy_context(ctx);
     }
 };
 
