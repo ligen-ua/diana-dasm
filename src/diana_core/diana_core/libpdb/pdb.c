@@ -11,6 +11,16 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#include <io.h>
+#else
+#include <strings.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
 
 #include <signal.h>
 #include <stdio.h>
@@ -18,7 +28,6 @@
 #ifdef PDB_ENABLE_ASSERTIONS
 #include <assert.h>
 #endif  // PDB_ENABLE_ASSERTIONS
-#include "diana_core.h"
 
 #define PDB_SIGNATURE "Microsoft C/C++ MSF 7.00\r\n\x1a\x44\x53\x00\x00\x00"
 
@@ -53,7 +62,7 @@ extern __INLINE char *NextType(const char *pType);
 #define PDB_ASSERT_CTX_NOT_NULL(ctx, retval) \
     do {                                     \
         if ((ctx) == NULL) {                 \
-            return (retval);                 \
+            return retval;                   \
         }                                    \
     } while (0)
 
@@ -61,7 +70,7 @@ extern __INLINE char *NextType(const char *pType);
     do {                                       \
         if (!(ctx)->pdb_loaded) {              \
             (ctx)->error = EPDB_NO_PDB_LOADED; \
-            return (retval);                   \
+            return retval;                     \
         }                                      \
     } while (0)
 
@@ -69,31 +78,7 @@ extern __INLINE char *NextType(const char *pType);
     do {                                           \
         if (!(expr)) {                             \
             (ctx)->error = EPDB_INVALID_PARAMETER; \
-            return (retval);                       \
-        }                                          \
-    } while (0)
-
- /* MSVC doesn't understand no return */
-#define PDB_ASSERT_CTX_NOT_NULL_NR(ctx, retval) \
-    do {                                     \
-        if ((ctx) == NULL) {                 \
-            return;                 \
-        }                                    \
-    } while (0)
-
-#define PDB_ASSERT_PDB_LOADED_NR(ctx, retval)     \
-    do {                                       \
-        if (!(ctx)->pdb_loaded) {              \
-            (ctx)->error = EPDB_NO_PDB_LOADED; \
-            return;                   \
-        }                                      \
-    } while (0)
-
-#define PDB_ASSERT_PARAMETER_NR(ctx, retval, expr)    \
-    do {                                           \
-        if (!(expr)) {                             \
-            (ctx)->error = EPDB_INVALID_PARAMETER; \
-            return;                       \
+            return retval;                         \
         }                                          \
     } while (0)
 
@@ -193,7 +178,7 @@ static void cleanup_pdb_context(struct pdb_context *ctx)
 static size_t nr_blocks(size_t count, size_t block_size)
 {
     PDB_ASSERT(block_size != 0);
-    if (count == 0) {
+    if (count == 0 || count == (uint32_t)-1) {
         return 0;
     }
     return 1 + ((count - 1) / block_size);
@@ -524,7 +509,7 @@ static size_t nr_bits_set(const unsigned char *bitvector, size_t bitvector_size)
     static uint8_t table[256] = {0};
 
     if (!table_computed) {
-        for (uint8_t i = 0; i < UINT8_MAX; i++) {
+        for (uint16_t i = 0; i <= UINT8_MAX; i++) {
             uint8_t val = 0;
             uint8_t c = i;
             for (int j = 0; j < 8 && c != 0; j++) {
@@ -588,8 +573,8 @@ static int parse_pubsym_hashtable(struct pdb_context *ctx, const struct gsi_hash
         }
 
         uint32_t sym_offset = hr[i].offset - 1;
-        if (sym_offset + (uint32_t)sizeof(SYMTYPE) > symrec_stream->size ||
-            sym_offset + (uint32_t)sizeof(SYMTYPE) < sym_offset) {
+        if (sym_offset + sizeof(SYMTYPE) > symrec_stream->size ||
+            sym_offset + sizeof(SYMTYPE) < sym_offset) {
             /* Malformed PDB - invalid hash record offset */
             goto err_pdb_corrupt;
         }
@@ -1014,9 +999,9 @@ void pdb_get_header(
 {
     struct pdb_context *ctx = (struct pdb_context *)context;
 
-    PDB_ASSERT_CTX_NOT_NULL_NR(ctx, /* no-retval */);
-    PDB_ASSERT_PDB_LOADED_NR(ctx, /* no-retval */);
-    PDB_ASSERT_PARAMETER_NR(
+    PDB_ASSERT_CTX_NOT_NULL(ctx, /* no-retval */);
+    PDB_ASSERT_PDB_LOADED(ctx, /* no-retval */);
+    PDB_ASSERT_PARAMETER(
         ctx, /* no-retval */,
         block_size != NULL && nr_blocks != NULL && guid != NULL && age != NULL &&
             nr_streams != NULL);
@@ -1194,7 +1179,7 @@ const PUBSYM32 *pdb_lookup_public_symbol(void *context, const char *name, bool c
     }
 
     int (*strcmp_fn)(const char *, const char *);
-    strcmp_fn = case_sensitive ? strcmp : DIANA_STRICMP;
+    strcmp_fn = case_sensitive ? strcmp : strcasecmp;
 
     /* Hash the symbol and get its bucket from the hashtable */
     uint16_t hash = hash_mod((unsigned char *)name, strlen(name), NR_HASH_BUCKETS);
@@ -1263,7 +1248,7 @@ const char *pdb_strerror(void *context)
     PDB_ASSERT(ctx->error < ARRAY_SIZE(errstrings));
 
     if (ctx->error == EPDB_SYSTEM_ERROR) {
-        return "System error";
+        return strerror(errno);
     }
 
     return errstrings[ctx->error];
