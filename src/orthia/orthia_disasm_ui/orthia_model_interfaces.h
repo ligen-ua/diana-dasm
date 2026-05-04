@@ -95,6 +95,7 @@ namespace orthia
         Address_type address;
         oui::String name;
         oui::String privateSymbol;
+        oui::String comment;
         int flags = 0;
     };
     struct NameSelectionKey

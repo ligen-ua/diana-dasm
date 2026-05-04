@@ -575,7 +575,6 @@ namespace orthia
             return;
         }
         std::vector<MarkupLine> allLines;
-
         auto it = m_exports.find(address);
         if (it != m_exports.end())
         {
@@ -665,16 +664,28 @@ namespace orthia
     NameInfo CProcessWorkplaceItem::QueryAddressName(Address_type address) const
     {
         orthia::CAutoCriticalSection guard(m_lock);
+        return QueryAddressNameNoLock(address);
+    }
+    NameInfo CProcessWorkplaceItem::QueryAddressNameNoLock(Address_type address) const
+    {
+        orthia::ModuleInfo moduleInfo;
+        auto nameInfo = QueryAddressNameImpl(address, moduleInfo);
         if (m_persistentStorage)
         {
             auto comment = m_persistentStorage->SyncReadComment(address);
             if (!comment.native.empty())
             {
-                NameInfo r;
-                r.name = comment;
-                return r;
+                nameInfo.comment = comment;
             }
         }
+        if (moduleInfo.flags & ModuleInfo::flags_symbolsLoaded)
+        {
+            // TODO: check private symbol
+        }
+        return nameInfo;
+    }
+    NameInfo CProcessWorkplaceItem::QueryAddressNameImpl(Address_type address, orthia::ModuleInfo & moduleInfo) const
+    {
         orthia::Address_type capturedAddress = 0;
         NameInfo capturedInfo;
         {
@@ -698,7 +709,6 @@ namespace orthia
         {
             return capturedInfo;
         }
-        orthia::ModuleInfo moduleInfo;
         if (QueryAddressModule(address, moduleInfo))
         {
             if (moduleInfo.address > capturedAddress)

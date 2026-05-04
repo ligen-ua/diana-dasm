@@ -19,6 +19,8 @@ namespace orthia
         mutable std::shared_ptr<IPeristentItemStorage> m_persistentStorage;
 
         void QueryNamesEx(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names, int* totalCount) const;
+        NameInfo QueryAddressNameNoLock(Address_type address) const;
+        NameInfo QueryAddressNameImpl(Address_type address, orthia::ModuleInfo& moduleInfo) const;
 
     public:
         CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
