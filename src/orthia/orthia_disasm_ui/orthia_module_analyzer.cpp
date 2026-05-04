@@ -173,7 +173,10 @@ namespace orthia
 
                 try
                 {
-                    loader->Load(mod, db);
+                    auto onSymbol = [item](Address_type addr, const oui::String& symName) {
+                        item->OnPrivateSymbolLoaded(addr, symName);
+                    };
+                    loader->Load(mod, db, std::move(onSymbol));
                 }
                 catch (const std::exception& e)
                 {

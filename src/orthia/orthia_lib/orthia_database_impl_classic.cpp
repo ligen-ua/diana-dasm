@@ -97,6 +97,9 @@ void CClassicDatabase::Init()
     buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (UINT_LESSOE(meta_address, ?2)) ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress.Get2(), NULL));
 
+    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR (?3 != -1 AND meta_type == ?3)) AND (UINT_LESSOE(meta_address, ?2)) ORDER BY meta_type, meta_address";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress2.Get2(), NULL));
+
     buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address >= ?2) AND (meta_address <= ?3) ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_AddressRange.Get2(), NULL));
 
@@ -581,16 +584,21 @@ void CClassicDatabase::QueryMetaInfoByAddress(int metaType, Address_type metaAdd
     }
 }
 
-void CClassicDatabase::QueryMetaInfoByNearestAddress(int metaType, Address_type address, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler)
+void CClassicDatabase::QueryMetaInfoByNearestAddress(int metaType, Address_type address, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler, int metaType2)
 {
     orthia::CAutoCriticalSection guard(m_lock);
 
-    CSQLAutoReset autoStatement(m_stmtSelectMetainfo_NearestAddress.Get());
-    sqlite3_bind_int64(m_stmtSelectMetainfo_NearestAddress.Get(), 1, metaType);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_NearestAddress.Get(), 2, address);
+    sqlite3_stmt* stmt = (metaType2 != -1) ? m_stmtSelectMetainfo_NearestAddress2.Get() : m_stmtSelectMetainfo_NearestAddress.Get();
+    CSQLAutoReset autoStatement(stmt);
+    sqlite3_bind_int64(stmt, 1, metaType);
+    sqlite3_bind_int64(stmt, 2, address);
+    if (metaType2 != -1)
+    {
+        sqlite3_bind_int64(stmt, 3, metaType2);
+    }
     for (;;)
     {
-        int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_NearestAddress.Get());
+        int stepResult = SQLiteStep_Wrapper(stmt);
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -600,11 +608,11 @@ void CClassicDatabase::QueryMetaInfoByNearestAddress(int metaType, Address_type 
             throw std::runtime_error("SQLiteStep_Wrapper failed");
         }
 
-        // meta_mod_id, meta_address, meta_type, meta_info
-        Address_type moduleAddress = sqlite3_column_int64(m_stmtSelectMetainfo_NearestAddress.Get(), 0);
-        Address_type type = sqlite3_column_int64(m_stmtSelectMetainfo_NearestAddress.Get(), 1);
-        auto text = SQLReadUtf8String(m_stmtSelectMetainfo_NearestAddress.Get(), 2);
-        Address_type metaAddress = sqlite3_column_int64(m_stmtSelectMetainfo_NearestAddress.Get(), 3);
+        // meta_mod_id, meta_type, meta_info, meta_address
+        Address_type moduleAddress = sqlite3_column_int64(stmt, 0);
+        Address_type type = sqlite3_column_int64(stmt, 1);
+        auto text = SQLReadUtf8String(stmt, 2);
+        Address_type metaAddress = sqlite3_column_int64(stmt, 3);
         if (!handler(moduleAddress, (int)type, text, metaAddress))
         {
             break;

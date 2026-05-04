@@ -12,7 +12,7 @@ namespace orthia
 
         std::vector<orthia::ModuleInfo> m_modules;
         std::map<orthia::Address_type, int> m_modulesIndex;
-        orthia::flat_map<orthia::Address_type, oui::String> m_exports;
+        orthia::flat_map<orthia::Address_type, NameInfo> m_exports;
 
         Address_type m_processModuleAddress = 0;
         std::shared_ptr<CModuleManager> m_moduleManager;
@@ -44,10 +44,11 @@ namespace orthia
         MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const override;
         void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const override;
         bool QueryAddressModule(Address_type address, orthia::ModuleInfo& result) const;
-        oui::String QueryAddressName(Address_type address) const;
+        NameInfo QueryAddressName(Address_type address) const;
         std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart);
         Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;
         std::shared_ptr<oui::IProcess> GetAssociatedProcess() override;
+        void OnPrivateSymbolLoaded(Address_type addr, const oui::String& name) override;
     };
 
 }

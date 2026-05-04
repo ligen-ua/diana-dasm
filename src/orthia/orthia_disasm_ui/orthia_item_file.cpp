@@ -198,14 +198,14 @@ namespace orthia
             }
         }
         classicDatabase->QueryMetaInfoModule2(moduleAddress,
-            g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol,
+            g_database_type_fnc_PrivateSymbol, -1,
             handler);
     }
     int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         return classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export)
-             + classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol);
+             + classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_PrivateSymbol, -1);
     }
     int FileWorkplaceItem::GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const
     {
@@ -382,14 +382,16 @@ namespace orthia
             range.lines.push_back(allLines[i]);
         }
     }
-    oui::String FileWorkplaceItem::QueryAddressName(Address_type address) const
+    NameInfo FileWorkplaceItem::QueryAddressName(Address_type address) const
     {
         if (persistentItemStorage)
         {
             auto comment = persistentItemStorage->SyncReadComment(address);
             if (!comment.native.empty())
             {
-                return comment;
+                NameInfo r;
+                r.name = comment;
+                return r;
             }
         }
 
@@ -398,41 +400,62 @@ namespace orthia
         Address_type capturedMetaAddress = 0;
         std::string capturedMetaName;
 
+        NameInfo result;
+        bool exportDone = false;
         classicDatabase->QueryMetaInfoByNearestAddress(g_database_type_fnc_Export,
             address,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
-            capturedModuleAddress = moduleAddress;
-            capturedMetaAddress = metaAddress;
-            Address_type target = 0;
-            CCommonFormatParser parser;
-            parser.Parse(text);
-            parser.QueryMetadata("address", &target);
-            parser.QueryMetadata("name", &capturedMetaName);
-
+            if (metaType == g_database_type_fnc_Export)
+            {
+                if (!exportDone)
+                {
+                    capturedModuleAddress = moduleAddress;
+                    capturedMetaAddress = metaAddress;
+                    CCommonFormatParser parser;
+                    parser.Parse(text);
+                    parser.QueryMetadata("name", &capturedMetaName);
+                    exportDone = true;
+                }
+                return true;
+            }
+            // PrivateSymbol
+            if (metaAddress == address)
+            {
+                Address_type target = 0;
+                std::string nameStr;
+                CCommonFormatParser parser;
+                parser.Parse(text);
+                parser.QueryMetadata("address", &target);
+                parser.QueryMetadata("name", &nameStr);
+                if (target == address)
+                {
+                    result.privateSymbol = Utf8ToPlatformString(nameStr);
+                }
+            }
             return false;
-        });
+        },
+            g_database_type_fnc_PrivateSymbol);
 
         CommonModuleInfo info;
         if (classicDatabase->QueryNearestModule(address, &info))
         {
-            oui::String res;
             if (capturedMetaAddress > info.address)
             {
                 Address_type diff = address - capturedMetaAddress;
-                res.native = info.name + OUI_TCSTR("!") + orthia::Utf8ToPlatformString(capturedMetaName);
+                result.name.native = info.name + OUI_TCSTR("!") + orthia::Utf8ToPlatformString(capturedMetaName);
                 if (diff)
                 {
-                    res = ComposeName(res, capturedMetaAddress, address);
+                    result.name = ComposeName(result.name, capturedMetaAddress, address);
                 }
-                return res;
             }
             else
             {
-                return ComposeName(info.name, info.address, address);
+                result.name = ComposeName(info.name, info.address, address);
             }
         }
-        return oui::String();
+
+        return result;
     }
     Address_type FileWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const
     {

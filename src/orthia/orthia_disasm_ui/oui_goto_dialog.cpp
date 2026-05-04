@@ -135,7 +135,7 @@ namespace oui
         {
             if (item.info.comment.native.empty())
             {
-                item.info.comment = m_workPlace->QueryAddressName(item.info.address);
+                item.info.comment = m_workPlace->QueryAddressName(item.info.address).name;
             }
         }
         UpdateVisibleItems();

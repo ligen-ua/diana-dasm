@@ -31,13 +31,16 @@ namespace orthia
         }
     };
 
+    using OnPrivateSymbolLoaded = std::function<void(Address_type addr, const oui::String& name)>;
+
     class IExternalSymbolsLoader
     {
     public:
         virtual ~IExternalSymbolsLoader() = default;
         virtual bool CanLoad(const ModuleInfo& mod) const = 0;
         virtual void Load(const ModuleInfo& mod,
-                          intrusive_ptr<CClassicDatabase> db) = 0;
+                          intrusive_ptr<CClassicDatabase> db,
+                          OnPrivateSymbolLoaded onSymbol = nullptr) = 0;
     };
 
     std::unique_ptr<IExternalSymbolsLoader> CreateExternalSymbolsLoader(

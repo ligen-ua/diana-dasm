@@ -31,7 +31,7 @@ namespace orthia
         int GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const;
         MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const override;
         void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const override;
-        oui::String QueryAddressName(Address_type address) const override;
+        NameInfo QueryAddressName(Address_type address) const override;
         std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) override;
         Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;
     };

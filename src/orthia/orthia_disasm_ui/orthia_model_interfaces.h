@@ -94,6 +94,7 @@ namespace orthia
         static const int flags_PrivateSymbol = 8;
         Address_type address;
         oui::String name;
+        oui::String privateSymbol;
         int flags = 0;
     };
     struct NameSelectionKey
@@ -203,10 +204,11 @@ namespace orthia
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
         virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const = 0;
         virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const = 0;
-        virtual oui::String QueryAddressName(Address_type address) const = 0;
+        virtual NameInfo QueryAddressName(Address_type address) const = 0;
         virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
         virtual Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const = 0;
         virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr; }
+        virtual void OnPrivateSymbolLoaded(Address_type /*addr*/, const oui::String& /*name*/) {}
     };
 
     void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);
@@ -215,11 +217,11 @@ namespace orthia
     oui::String QueryAddressNameDef(PtrType ptr, Address_type address, int dianaMode)
     {
         auto str = ptr->QueryAddressName(address);
-        if (str.native.empty())
+        if (str.name.native.empty())
         {
             return orthia::AddressToString(address, dianaMode);
         }
-        return str;
+        return str.name;
     }
 
     struct GotoItem

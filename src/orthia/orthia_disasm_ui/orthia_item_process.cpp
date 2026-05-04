@@ -75,7 +75,7 @@ namespace orthia
     struct ExportsCollector:public diana::CBasePeLinkImportsObserver
     {
         const orthia::ModuleInfo* m_moduleInfo = 0;
-        orthia::flat_map<orthia::Address_type, oui::String> m_exports;
+        orthia::flat_map<orthia::Address_type, NameInfo> m_exports;
         bool m_fixupAddresses = false;
 
         ExportsCollector()
@@ -106,7 +106,11 @@ namespace orthia
             {
                 fncAddress += m_moduleInfo->address;
             }
-            m_exports.insert(fncAddress, m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName));
+            NameInfo exportInfo;
+            exportInfo.address = fncAddress;
+            exportInfo.name.native = (m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName));
+            exportInfo.flags = NameInfo::flags_Export;
+            m_exports.insert(fncAddress, exportInfo);
         }
     };
     template<class T, class Stream>
@@ -164,6 +168,8 @@ namespace orthia
         }
         std::sort(modules.begin(), modules.begin(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
 
+        exportsCollector.m_exports.sort();
+
         orthia::CAutoCriticalSection guard(m_lock);
         m_modules = std::move(modules); 
         m_exports = std::move(exportsCollector.m_exports);
@@ -175,6 +181,15 @@ namespace orthia
         if (m_processModuleAddress == 0)
         {
             m_processModuleAddress = processModuleAddress;
+        }
+    }
+    void CProcessWorkplaceItem::OnPrivateSymbolLoaded(Address_type addr, const oui::String& name)
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+        auto it = m_exports.find(addr);
+        if (it != m_exports.end())
+        {
+            it->second.privateSymbol = name;
         }
     }
     void CProcessWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
@@ -195,7 +210,7 @@ namespace orthia
     class CImportsCollector :public diana::CBasePeLinkImportsObserver
     {
         std::vector<NameInfo>& m_names;
-        std::function<oui::String(OPERAND_SIZE address)> m_getName;
+        std::function<NameInfo(OPERAND_SIZE address)> m_getName;
         int m_maxCount = 0;
         int & m_totalCount;
         int m_deliveredCount = 0;
@@ -205,7 +220,7 @@ namespace orthia
     public:
         CImportsCollector(const NameSelectionKey& nameFilter,
             std::vector<NameInfo>& names,
-            std::function<oui::String (OPERAND_SIZE address)> getName,
+            std::function<NameInfo (OPERAND_SIZE address)> getName,
             int maxCount,
             int & totalCount)
             :
@@ -260,7 +275,8 @@ namespace orthia
                 NameInfo info;
                 info.flags = NameInfo::flags_Import;
                 info.address = *pAddress;
-                info.name = m_getName(info.address);
+                auto nameInfo = m_getName(info.address);
+                info.name = nameInfo.name;
 
                 if (info.name.native.empty())
                 {
@@ -563,7 +579,7 @@ namespace orthia
         auto it = m_exports.find(address);
         if (it != m_exports.end())
         {
-            allLines.push_back(MarkupLine(it->second));
+            allLines.push_back(MarkupLine(it->second.name));
         }
 
         AppendXrefLine(address, cache, m_moduleManager.get(), GetDianaMode(), allLines);
@@ -606,7 +622,7 @@ namespace orthia
         auto downcased = orthia::Downcase(text.native);
         orthia::CAutoCriticalSection guard(m_lock);
         {
-            auto it = std::find_if(m_exports.begin(), m_exports.end(), [&](const auto& pair) { return orthia::Downcase(pair.second.native) == downcased;  });
+            auto it = std::find_if(m_exports.begin(), m_exports.end(), [&](const auto& pair) { return orthia::Downcase(pair.second.name.native) == downcased;  });
             if (it != m_exports.end())
             {
                 return it->first;
@@ -646,7 +662,7 @@ namespace orthia
         auto streamAdapter = std::make_shared<DianaReadStreamAdapter>(m_proc, addressStart);
         return std::shared_ptr<::DianaMovableReadStream>(streamAdapter, &streamAdapter->stream.parent);
     }
-    oui::String CProcessWorkplaceItem::QueryAddressName(Address_type address) const
+    NameInfo CProcessWorkplaceItem::QueryAddressName(Address_type address) const
     {
         orthia::CAutoCriticalSection guard(m_lock);
         if (m_persistentStorage)
@@ -654,11 +670,13 @@ namespace orthia
             auto comment = m_persistentStorage->SyncReadComment(address);
             if (!comment.native.empty())
             {
-                return comment;
+                NameInfo r;
+                r.name = comment;
+                return r;
             }
         }
         orthia::Address_type capturedAddress = 0;
-        oui::String capturedName;
+        NameInfo capturedInfo;
         {
             auto it = m_exports.upper_bound(address);
             auto it_end = m_exports.end();
@@ -671,14 +689,14 @@ namespace orthia
                 if (address >= it->first)
                 {
                     capturedAddress = it->first;
-                    capturedName = it->second;
+                    capturedInfo = it->second;
                     break;
                 }
             }
         }
         if (address == capturedAddress)
         {
-            return capturedName;
+            return capturedInfo;
         }
         orthia::ModuleInfo moduleInfo;
         if (QueryAddressModule(address, moduleInfo))
@@ -686,15 +704,19 @@ namespace orthia
             if (moduleInfo.address > capturedAddress)
             {
                 // export function is not found or there is module with a closest address
-                return ComposeName(moduleInfo.name, moduleInfo.address, address);
+                NameInfo r;
+                r.name = ComposeName(moduleInfo.name, moduleInfo.address, address);
+                return r;
             }
         }
         // use found function
-        if (!capturedName.native.empty())
+        if (!capturedInfo.name.native.empty())
         {
-            return ComposeName(capturedName, capturedAddress, address);
+            NameInfo r;
+            r.name = ComposeName(capturedInfo.name, capturedAddress, address);
+            return r;
         }
-        return oui::String();
+        return NameInfo();
     }
 
 }

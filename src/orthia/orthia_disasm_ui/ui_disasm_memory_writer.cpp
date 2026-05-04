@@ -240,11 +240,11 @@ namespace oui
                 }
             }
 
-            auto name = m_workspaceItem->QueryAddressName(gotoAddress);
-            if (!name.native.empty())
+            auto nameInfo = m_workspaceItem->QueryAddressName(gotoAddress);
+            if (!nameInfo.name.native.empty())
             {
                 addCommentSeparator();
-                m_currentBlock.append(name.native);
+                m_currentBlock.append(nameInfo.name.native);
             }
         }
 
@@ -276,11 +276,11 @@ namespace oui
         {
             for (auto& op : m_operands)
             {
-                auto name = m_workspaceItem->QueryAddressName(op.operand);
-                if (!name.native.empty())
+                auto nameInfo = m_workspaceItem->QueryAddressName(op.operand);
+                if (!nameInfo.name.native.empty())
                 {
                     addCommentSeparator();
-                    m_currentBlock.append(name.native);
+                    m_currentBlock.append(nameInfo.name.native);
                 }
             }
         }

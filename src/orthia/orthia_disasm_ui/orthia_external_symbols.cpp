@@ -111,7 +111,8 @@ public:
         return finder.FindNextPdb();
     }
 
-    void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db) override
+    void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db,
+              OnPrivateSymbolLoaded onSymbol = nullptr) override
     {
         CPdbFileFinder finder(mod, m_symbolFolders);
         while (finder.FindNextPdb())
@@ -220,6 +221,8 @@ public:
                 info.name = Utf8ToPlatformString(reinterpret_cast<const char*>(name));
 
                 InsertName(db, mod.address, info, info.address);
+                if (onSymbol)
+                    onSymbol(info.address, info.name);
             }
 
             if (m_logger)
@@ -244,7 +247,8 @@ public:
         return !IsPeModule(mod);
     }
 
-    void Load(const ModuleInfo& /*mod*/, intrusive_ptr<CClassicDatabase> /*db*/) override
+    void Load(const ModuleInfo& /*mod*/, intrusive_ptr<CClassicDatabase> /*db*/,
+              OnPrivateSymbolLoaded /*onSymbol*/ = nullptr) override
     {
         // Not yet implemented.
     }
@@ -274,14 +278,15 @@ public:
         return false;
     }
 
-    void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db) override
+    void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db,
+              OnPrivateSymbolLoaded onSymbol = nullptr) override
     {
         for (const auto& l : m_loaders)
         {
-            if (l->CanLoad(mod)) 
-            { 
-                l->Load(mod, db); 
-                return; 
+            if (l->CanLoad(mod))
+            {
+                l->Load(mod, db, std::move(onSymbol));
+                return;
             }
         }
     }

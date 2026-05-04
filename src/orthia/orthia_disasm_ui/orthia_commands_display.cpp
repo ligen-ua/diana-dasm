@@ -14,11 +14,11 @@ static void ConvertToTextDPS(void* args_in, const char* pBinary, orthia::Platfor
     auto address = *(orthia::Address_type*)pBinary;
     *pText = Address64ToString(address);
 
-    auto name = args.item->QueryAddressName(address);
-    if (!name.native.empty())
+    auto nameInfo = args.item->QueryAddressName(address);
+    if (!nameInfo.name.native.empty())
     {
         pText->append(2, ORTHIA_TCHAR(' '));
-        pText->append(name.native);
+        pText->append(nameInfo.name.native);
     }
 }
 
