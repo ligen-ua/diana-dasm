@@ -221,6 +221,13 @@ public:
 
                 InsertName(db, mod.address, info, info.address);
             }
+
+            if (m_logger)
+            {
+                auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("loading-symbols-done")), mod.name));
+            }
+
             return;
         }
     }
