@@ -384,17 +384,19 @@ namespace orthia
     }
     NameInfo FileWorkplaceItem::QueryAddressName(Address_type address) const
     {
+        auto nameInfo = QueryAddressNameImpl(address);
         if (persistentItemStorage)
         {
             auto comment = persistentItemStorage->SyncReadComment(address);
             if (!comment.native.empty())
             {
-                NameInfo r;
-                r.name = comment;
-                return r;
+                nameInfo.name = comment;
             }
         }
-
+        return nameInfo;
+    }
+    NameInfo FileWorkplaceItem::QueryAddressNameImpl(Address_type address) const
+    {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         Address_type capturedModuleAddress = 0;
         Address_type capturedMetaAddress = 0;

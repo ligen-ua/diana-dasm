@@ -34,6 +34,10 @@ namespace orthia
         NameInfo QueryAddressName(Address_type address) const override;
         std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) override;
         Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;
+
+    private:
+        NameInfo QueryAddressNameImpl(Address_type address) const;
+
     };
 
     class CClassicDatabase;
