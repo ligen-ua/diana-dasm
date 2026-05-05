@@ -171,12 +171,18 @@ namespace orthia
         exportsCollector.m_exports.sort();
 
         orthia::CAutoCriticalSection guard(m_lock);
-        m_modules = std::move(modules); 
+        m_modules = std::move(modules);
         m_exports = std::move(exportsCollector.m_exports);
         m_modulesIndex.clear();
         for (int i = 0, size = (int)m_modules.size(); i < size; ++i)
         {
             m_modulesIndex[m_modules[i].address] = i;
+        }
+        for (auto& mod : m_modules)
+        {
+            auto it = m_moduleFlags.find(mod.address);
+            if (it != m_moduleFlags.end())
+                mod.flags |= it->second;
         }
         if (m_processModuleAddress == 0)
         {
@@ -190,6 +196,16 @@ namespace orthia
         if (it != m_exports.end())
         {
             it->second.privateSymbol = name;
+        }
+    }
+    void CProcessWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+        m_moduleFlags[moduleAddress] |= ModuleInfo::flags_symbolsLoaded;
+        auto it = m_modulesIndex.find(moduleAddress);
+        if (it != m_modulesIndex.end())
+        {
+            m_modules[it->second].flags |= ModuleInfo::flags_symbolsLoaded;
         }
     }
     void CProcessWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
@@ -493,7 +509,7 @@ namespace orthia
         {
             auto classicDatabase = m_moduleManager->QueryDatabaseManager()->GetClassicDatabase();
             classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                g_database_type_fnc_PrivateSymbol, g_database_type_fnc_PrivateSymbol,
+                g_database_type_fnc_PrivateSymbol, -1,
                 [&, markFound](Address_type, int, const std::string& text, Address_type) mutable -> bool {
                     if (totalCount)
                     {
@@ -574,13 +590,15 @@ namespace orthia
         {
             return;
         }
-        std::vector<MarkupLine> allLines;
-        auto it = m_exports.find(address);
-        if (it != m_exports.end())
-        {
-            allLines.push_back(MarkupLine(it->second.name));
-        }
 
+        std::vector<MarkupLine> allLines;
+        auto nameInfo = QueryAddressName(address);
+        if ((nameInfo.flags & NameInfo::flags_Export) ||
+            (nameInfo.flags & NameInfo::flags_PrivateSymbol))
+        {
+            allLines.push_back(MarkupLine(GetPreferredName(nameInfo)));
+        }
+        
         AppendXrefLine(address, cache, m_moduleManager.get(), GetDianaMode(), allLines);
 
         for (int i = index; i < (int)allLines.size() && (int)range.lines.size() < count; ++i)
@@ -678,9 +696,34 @@ namespace orthia
                 nameInfo.comment = comment;
             }
         }
-        if (moduleInfo.flags & ModuleInfo::flags_symbolsLoaded)
+        if ((moduleInfo.flags & ModuleInfo::flags_symbolsLoaded) && nameInfo.privateSymbol.native.empty())
         {
-            // TODO: check private symbol
+            if (m_moduleManager)
+            {
+                auto classicDatabase = m_moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+                classicDatabase->QueryMetaInfoByNearestAddress(
+                    g_database_type_fnc_PrivateSymbol,
+                    address,
+                    [&](Address_type, int, const std::string& text, Address_type metaAddress) -> bool {
+
+                        std::string nameStr;
+                        Address_type target = 0;
+                        CCommonFormatParser parser;
+                        parser.Parse(text);
+                        parser.QueryMetadata("address", &target);
+                        parser.QueryMetadata("name", &nameStr);
+                        if (target == address)
+                        {
+                            nameInfo.flags |= NameInfo::flags_PrivateSymbol;
+                            nameInfo.privateSymbol = Utf8ToPlatformString(nameStr);
+                        }
+                        else
+                        {
+                            nameInfo.privateSymbol = ComposeName(orthia::Utf8ToPlatformString(nameStr), target, address);
+                        }
+                        return false;
+                    });
+            }
         }
         return nameInfo;
     }
@@ -707,6 +750,7 @@ namespace orthia
         }
         if (address == capturedAddress)
         {
+            capturedInfo.flags |= NameInfo::flags_Export;
             return capturedInfo;
         }
         if (QueryAddressModule(address, moduleInfo))

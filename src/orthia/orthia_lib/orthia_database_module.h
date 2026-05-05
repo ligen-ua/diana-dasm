@@ -40,6 +40,7 @@ class CDatabase:public orthia::RefCountedBase
     void DoUpdate_0_1();
     void DoUpdate_1_2();
     void DoUpdate_2_3();
+    void DoUpdate_3_4();
 
 public:
     CDatabase();

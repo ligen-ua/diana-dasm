@@ -12,6 +12,7 @@ namespace orthia
 
         std::vector<orthia::ModuleInfo> m_modules;
         std::map<orthia::Address_type, int> m_modulesIndex;
+        std::map<orthia::Address_type, int> m_moduleFlags;
         orthia::flat_map<orthia::Address_type, NameInfo> m_exports;
 
         Address_type m_processModuleAddress = 0;
@@ -51,6 +52,7 @@ namespace orthia
         Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;
         std::shared_ptr<oui::IProcess> GetAssociatedProcess() override;
         void OnPrivateSymbolLoaded(Address_type addr, const oui::String& name) override;
+        void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
     };
 
 }

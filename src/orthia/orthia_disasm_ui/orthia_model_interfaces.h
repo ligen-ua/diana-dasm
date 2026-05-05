@@ -98,6 +98,7 @@ namespace orthia
         oui::String comment;
         int flags = 0;
     };
+    oui::String GetPreferredName(const NameInfo& nameInfo);
     struct NameSelectionKey
     {
         static const int flags_ContinueFrom = 1;
@@ -210,6 +211,7 @@ namespace orthia
         virtual Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const = 0;
         virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr; }
         virtual void OnPrivateSymbolLoaded(Address_type /*addr*/, const oui::String& /*name*/) {}
+        virtual void OnModuleSymbolsLoaded(Address_type /*moduleAddress*/) {}
     };
 
     void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);

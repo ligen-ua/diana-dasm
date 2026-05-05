@@ -309,4 +309,13 @@ namespace orthia
         }
         return result;
     }
+
+    oui::String GetPreferredName(const NameInfo& nameInfo)
+    {
+        if (!nameInfo.privateSymbol.native.empty())
+        {
+            return nameInfo.privateSymbol;
+        }
+        return nameInfo.name;
+    }
 }

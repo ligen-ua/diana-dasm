@@ -408,18 +408,17 @@ namespace orthia
             address,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
+            capturedModuleAddress = moduleAddress;
+            capturedMetaAddress = metaAddress;
+
             if (metaType == g_database_type_fnc_Export)
             {
                 if (!exportDone)
                 {
-                    capturedModuleAddress = moduleAddress;
-                    capturedMetaAddress = metaAddress;
                     CCommonFormatParser parser;
                     parser.Parse(text);
                     parser.QueryMetadata("name", &capturedMetaName);
-                    exportDone = true;
                 }
-                return true;
             }
             // PrivateSymbol
             if (metaAddress == address)

@@ -241,10 +241,11 @@ namespace oui
             }
 
             auto nameInfo = m_workspaceItem->QueryAddressName(gotoAddress);
-            if (!nameInfo.name.native.empty())
+            auto name = orthia::GetPreferredName(nameInfo);
+            if (!name.native.empty())
             {
                 addCommentSeparator();
-                m_currentBlock.append(nameInfo.name.native);
+                m_currentBlock.append(name.native);
             }
         }
 

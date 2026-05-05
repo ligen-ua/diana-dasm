@@ -94,10 +94,10 @@ void CClassicDatabase::Init()
     buffer = "SELECT meta_mod_id, meta_type, meta_info FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address == ?2) ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Address.Get2(), NULL));
 
-    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (UINT_LESSOE(meta_address, ?2)) ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address <= ?2) ORDER BY meta_address DESC";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress.Get2(), NULL));
 
-    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR (?3 != -1 AND meta_type == ?3)) AND (UINT_LESSOE(meta_address, ?2)) ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR (?3 != -1 AND meta_type == ?3)) AND (meta_address <= ?2) ORDER BY meta_address DESC";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress2.Get2(), NULL));
 
     buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address >= ?2) AND (meta_address <= ?3) ORDER BY meta_type, meta_address";
@@ -486,7 +486,7 @@ void CClassicDatabase::InsertMetaInfo(Address_type moduleAddress, int metaType, 
     sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 1, moduleAddress);
     if (metaAddress != DI_MAX_OPERAND_SIZE)
     {
-        sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 2, metaAddress);
+        sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 2, AddrToDb(metaAddress));
     }
     sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 3, metaType);
     SQLBindUtf8String(m_stmtInsertMetainfo.Get(), text, 4);
@@ -513,7 +513,7 @@ void CClassicDatabase::QueryMetaInfo(int metaType, std::function<bool(Address_ty
 
         // meta_mod_id, meta_address, meta_type, meta_info
         Address_type moduleAddress = sqlite3_column_int64(m_stmtSelectMetainfo_All.Get(), 0);
-        Address_type metaAddress = sqlite3_column_int64(m_stmtSelectMetainfo_All.Get(), 1);
+        Address_type metaAddress = DbToAddr(sqlite3_column_int64(m_stmtSelectMetainfo_All.Get(), 1));
         Address_type type = sqlite3_column_int64(m_stmtSelectMetainfo_All.Get(), 2);
         auto text = SQLReadUtf8String(m_stmtSelectMetainfo_All.Get(), 3);
         if (!handler(moduleAddress, (int)type, text, metaAddress))
@@ -544,7 +544,7 @@ void CClassicDatabase::QueryMetaInfoModule2(Address_type moduleAddress, int meta
         }
 
         // meta_mod_id, meta_address, meta_type, meta_info
-        Address_type metaAddress = sqlite3_column_int64(m_stmtSelectMetainfo_Module2.Get(), 0);
+        Address_type metaAddress = DbToAddr(sqlite3_column_int64(m_stmtSelectMetainfo_Module2.Get(), 0));
         Address_type type = sqlite3_column_int64(m_stmtSelectMetainfo_Module2.Get(), 1);
         auto text = SQLReadUtf8String(m_stmtSelectMetainfo_Module2.Get(), 2);
         if (!handler(moduleAddress, (int)type, text, metaAddress))
@@ -560,7 +560,7 @@ void CClassicDatabase::QueryMetaInfoByAddress(int metaType, Address_type metaAdd
 
     CSQLAutoReset autoStatement(m_stmtSelectMetainfo_Address.Get());
     sqlite3_bind_int64(m_stmtSelectMetainfo_Address.Get(), 1, metaType);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_Address.Get(), 2, metaAddress);
+    sqlite3_bind_int64(m_stmtSelectMetainfo_Address.Get(), 2, AddrToDb(metaAddress));
     for (;;)
     {
         int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_Address.Get());
@@ -591,7 +591,7 @@ void CClassicDatabase::QueryMetaInfoByNearestAddress(int metaType, Address_type 
     sqlite3_stmt* stmt = (metaType2 != -1) ? m_stmtSelectMetainfo_NearestAddress2.Get() : m_stmtSelectMetainfo_NearestAddress.Get();
     CSQLAutoReset autoStatement(stmt);
     sqlite3_bind_int64(stmt, 1, metaType);
-    sqlite3_bind_int64(stmt, 2, address);
+    sqlite3_bind_int64(stmt, 2, AddrToDb(address));
     if (metaType2 != -1)
     {
         sqlite3_bind_int64(stmt, 3, metaType2);
@@ -612,7 +612,7 @@ void CClassicDatabase::QueryMetaInfoByNearestAddress(int metaType, Address_type 
         Address_type moduleAddress = sqlite3_column_int64(stmt, 0);
         Address_type type = sqlite3_column_int64(stmt, 1);
         auto text = SQLReadUtf8String(stmt, 2);
-        Address_type metaAddress = sqlite3_column_int64(stmt, 3);
+        Address_type metaAddress = DbToAddr(sqlite3_column_int64(stmt, 3));
         if (!handler(moduleAddress, (int)type, text, metaAddress))
         {
             break;
@@ -626,8 +626,8 @@ void CClassicDatabase::QueryMetaInfoByAddressRange(int metaType, Address_type ad
 
     CSQLAutoReset autoStatement(m_stmtSelectMetainfo_AddressRange.Get());
     sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 1, metaType);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 2, addr1);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 3, addr2);
+    sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 2, AddrToDb(addr1));
+    sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 3, AddrToDb(addr2));
     for (;;)
     {
         int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_AddressRange.Get());
@@ -644,7 +644,7 @@ void CClassicDatabase::QueryMetaInfoByAddressRange(int metaType, Address_type ad
         Address_type moduleAddress = sqlite3_column_int64(m_stmtSelectMetainfo_AddressRange.Get(), 0);
         Address_type type = sqlite3_column_int64(m_stmtSelectMetainfo_AddressRange.Get(), 1);
         auto text = SQLReadUtf8String(m_stmtSelectMetainfo_AddressRange.Get(), 2);
-        Address_type metaAddress = sqlite3_column_int64(m_stmtSelectMetainfo_AddressRange.Get(), 3);
+        Address_type metaAddress = DbToAddr(sqlite3_column_int64(m_stmtSelectMetainfo_AddressRange.Get(), 3));
         if (!handler(moduleAddress, (int)type, text, metaAddress))
         {
             break;
