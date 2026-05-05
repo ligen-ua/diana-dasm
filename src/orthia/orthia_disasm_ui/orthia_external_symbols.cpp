@@ -229,11 +229,18 @@ public:
                     pending[info.address] = { info, priority };
             }
 
-            for (auto& [addr, entry] : pending)
+            constexpr int kBatchSize = 1000;
+            auto it = pending.begin();
+            while (it != pending.end())
             {
-                InsertName(db, mod.address, entry.first, addr);
-                if (onSymbol)
-                    onSymbol(addr, entry.first.name);
+                auto batch = db->BeginBatch();
+                for (int i = 0; i < kBatchSize && it != pending.end(); ++i, ++it)
+                {
+                    InsertName(db, mod.address, it->second.first, it->first);
+                    if (onSymbol)
+                        onSymbol(it->first, it->second.first.name);
+                }
+                batch->Commit();
             }
 
             if (m_logger)

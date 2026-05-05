@@ -99,6 +99,8 @@ namespace orthia
         int flags = 0;
     };
     oui::String GetPreferredName(const NameInfo& nameInfo);
+    oui::String GetPreferredComment(const NameInfo& nameInfo);
+
     struct NameSelectionKey
     {
         static const int flags_ContinueFrom = 1;

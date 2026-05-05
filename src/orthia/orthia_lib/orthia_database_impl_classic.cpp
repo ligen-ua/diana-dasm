@@ -173,6 +173,36 @@ void CClassicDatabase::DoneSave()
     m_cache.clear();
     ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "COMMIT TRANSACTION"));
 }
+
+CClassicDatabaseBatch::CClassicDatabaseBatch(CClassicDatabase* db)
+    : m_db(db), m_committed(false), m_guard(db->GetLock())
+{
+    m_db->BeginBatchInsert();
+}
+void CClassicDatabaseBatch::Commit()
+{
+    m_db->CommitBatchInsert();
+    m_committed = true;
+}
+CClassicDatabaseBatch::~CClassicDatabaseBatch()
+{
+    if (!m_committed)
+        m_db->RollbackTransactionSilent();
+}
+
+std::unique_ptr<CClassicDatabaseBatch> CClassicDatabase::BeginBatch()
+{
+    return std::unique_ptr<CClassicDatabaseBatch>(new CClassicDatabaseBatch(this));
+}
+void CClassicDatabase::BeginBatchInsert()
+{
+    ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "BEGIN TRANSACTION"));
+}
+void CClassicDatabase::CommitBatchInsert()
+{
+    ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "COMMIT TRANSACTION"));
+}
+
 void CClassicDatabase::CleanupResources()
 {
     orthia::CAutoCriticalSection guard(m_lock);

@@ -318,4 +318,16 @@ namespace orthia
         }
         return nameInfo.name;
     }
+    oui::String GetPreferredComment(const NameInfo& nameInfo)
+    {
+        if (!nameInfo.comment.native.empty())
+        {
+            return nameInfo.comment;
+        }
+        if (nameInfo.privateSymbol.native.empty())
+        {
+            return nameInfo.privateSymbol;
+        }
+        return nameInfo.name;
+    }
 }

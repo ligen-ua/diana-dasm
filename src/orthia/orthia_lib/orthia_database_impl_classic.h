@@ -5,6 +5,7 @@
 #include "orthia_interfaces.h"
 #include "orthia_sqlite_utils.h"
 #include <functional>
+#include <memory>
 
 namespace orthia
 {
@@ -20,6 +21,21 @@ public:
     void Init(CClassicDatabase * pDatabase);
     void Reset();
     ~CAutoRollbackClassicDatabase();
+};
+
+class CClassicDatabaseBatch
+{
+    CClassicDatabase* m_db;
+    bool m_committed;
+    orthia::CAutoCriticalSection m_guard;
+
+    CClassicDatabaseBatch(const CClassicDatabaseBatch&) = delete;
+    CClassicDatabaseBatch& operator=(const CClassicDatabaseBatch&) = delete;
+    explicit CClassicDatabaseBatch(CClassicDatabase* db);
+    friend class CClassicDatabase;
+public:
+    void Commit();
+    ~CClassicDatabaseBatch();
 };
 
 class CClassicDatabase:public orthia::RefCountedBase
@@ -60,6 +76,9 @@ class CClassicDatabase:public orthia::RefCountedBase
 
     void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to);
     void InsertModule(Address_type baseAddress, Address_type size, const orthia::PlatformString_type & moduleName);
+    void BeginBatchInsert();   // no lock -- called with m_lock held by CClassicDatabaseBatch
+    void CommitBatchInsert();  // no lock -- called with m_lock held by CClassicDatabaseBatch
+    friend class CClassicDatabaseBatch;
 
     void Init();
 
@@ -70,12 +89,14 @@ public:
     orthia::CCriticalSection& GetLock() { return m_lock; }
 
     // module loading process:
-    void StartSaveModule(Address_type baseAddress, 
-                         Address_type size, 
+    void StartSaveModule(Address_type baseAddress,
+                         Address_type size,
                          const orthia::PlatformString_type & moduleName,
                          CAutoRollbackClassicDatabase * pRollback);
     void DoneSave();
     void CleanupResources();
+
+    std::unique_ptr<CClassicDatabaseBatch> BeginBatch();
 
     void InsertReferencesToInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
     void InsertReferencesFromInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
