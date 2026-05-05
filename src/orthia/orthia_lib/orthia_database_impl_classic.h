@@ -48,6 +48,7 @@ class CClassicDatabase:public orthia::RefCountedBase
 
     CSQLStatement m_stmtSelectMetainfo_All;
     CSQLStatement m_stmtSelectMetainfo_Module2;
+    CSQLStatement m_stmtSelectMetainfo_Module2_FromAddress;
     CSQLStatement m_stmtSelectMetainfo_Module2_Count;
     CSQLStatement m_stmtSelectMetainfo_Address;
     CSQLStatement m_stmtSelectMetainfo_NearestAddress;
@@ -81,7 +82,7 @@ public:
 
     void InsertMetaInfo(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress = DI_MAX_OPERAND_SIZE);
     void QueryMetaInfo(int metaType, std::function<bool (Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
-    void QueryMetaInfoModule2(Address_type moduleAddress, int metaType1, int metaType2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
+    void QueryMetaInfoModule2(Address_type moduleAddress, int metaType1, int metaType2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler, Address_type addressHint = 0);
     int QueryMetaInfoModule2_Count(Address_type moduleAddress, int metaType1, int metaType2);
     void QueryMetaInfoByAddress(int metaType, Address_type metaAddress, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
     void QueryMetaInfoByNearestAddress(int metaType, Address_type address, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler, int metaType2 = -1);

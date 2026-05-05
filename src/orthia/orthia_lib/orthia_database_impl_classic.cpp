@@ -88,6 +88,9 @@ void CClassicDatabase::Init()
     buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (?3 == -1 OR meta_type == ?3)) AND (meta_mod_id == ?1) ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2.Get2(), NULL));
 
+    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (?3 == -1 OR meta_type == ?3)) AND (meta_mod_id == ?1) AND meta_address >= ?4 ORDER BY meta_type, meta_address";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2_FromAddress.Get2(), NULL));
+
     buffer = "SELECT COUNT(meta_address) FROM tbl_metainfo WHERE ((meta_type == ?2) OR (?3 == -1 OR meta_type == ?3)) AND (meta_mod_id == ?1) ";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2_Count.Get2(), NULL));
 
@@ -523,17 +526,22 @@ void CClassicDatabase::QueryMetaInfo(int metaType, std::function<bool(Address_ty
     }
 }
 
-void CClassicDatabase::QueryMetaInfoModule2(Address_type moduleAddress, int metaType1, int metaType2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler)
+void CClassicDatabase::QueryMetaInfoModule2(Address_type moduleAddress, int metaType1, int metaType2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler, Address_type addressHint)
 {
     orthia::CAutoCriticalSection guard(m_lock);
 
-    CSQLAutoReset autoStatement(m_stmtSelectMetainfo_Module2.Get());
-    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2.Get(), 1, moduleAddress);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2.Get(), 2, metaType1);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2.Get(), 3, metaType2);
+    sqlite3_stmt* stmt = addressHint ? m_stmtSelectMetainfo_Module2_FromAddress.Get() : m_stmtSelectMetainfo_Module2.Get();
+    CSQLAutoReset autoStatement(stmt);
+    sqlite3_bind_int64(stmt, 1, moduleAddress);
+    sqlite3_bind_int64(stmt, 2, metaType1);
+    sqlite3_bind_int64(stmt, 3, metaType2);
+    if (addressHint)
+    {
+        sqlite3_bind_int64(stmt, 4, AddrToDb(addressHint));
+    }
     for (;;)
     {
-        int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_Module2.Get());
+        int stepResult = SQLiteStep_Wrapper(stmt);
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -543,10 +551,9 @@ void CClassicDatabase::QueryMetaInfoModule2(Address_type moduleAddress, int meta
             throw std::runtime_error("SQLiteStep_Wrapper failed");
         }
 
-        // meta_mod_id, meta_address, meta_type, meta_info
-        Address_type metaAddress = DbToAddr(sqlite3_column_int64(m_stmtSelectMetainfo_Module2.Get(), 0));
-        Address_type type = sqlite3_column_int64(m_stmtSelectMetainfo_Module2.Get(), 1);
-        auto text = SQLReadUtf8String(m_stmtSelectMetainfo_Module2.Get(), 2);
+        Address_type metaAddress = DbToAddr(sqlite3_column_int64(stmt, 0));
+        Address_type type = sqlite3_column_int64(stmt, 1);
+        auto text = SQLReadUtf8String(stmt, 2);
         if (!handler(moduleAddress, (int)type, text, metaAddress))
         {
             break;

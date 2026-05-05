@@ -484,7 +484,14 @@ namespace orthia
                 0,
                 moduleAddress);
 
-            exportsCollector.SetFound(importsCollector.IsMarkFound());
+            bool importsMarkFound = importsCollector.IsMarkFound();
+            if (!importsMarkFound &&
+                (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
+                nameFilter.continueMarkNameFlag == NameInfo::flags_Import)
+            {
+                importsMarkFound = true;
+            }
+            exportsCollector.SetFound(importsMarkFound);
 
             DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
 
@@ -502,12 +509,19 @@ namespace orthia
             }
             maxCount -= exportsCollector.GetDeliveredCount();
             markFound = exportsCollector.IsMarkFound();
+            if (!markFound &&
+                (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
+                nameFilter.continueMarkNameFlag == NameInfo::flags_Export)
+            {
+                markFound = true;
+            }
         }
 
         // Also include private symbols from the database (e.g., loaded from PDB).
         if (m_moduleManager)
         {
             auto classicDatabase = m_moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            Address_type addressHint = markFound ? 0 : nameFilter.address;
             classicDatabase->QueryMetaInfoModule2(moduleAddress,
                 g_database_type_fnc_PrivateSymbol, -1,
                 [&, markFound](Address_type, int, const std::string& text, Address_type) mutable -> bool {
@@ -538,7 +552,7 @@ namespace orthia
                     info.flags = NameInfo::flags_PrivateSymbol;
                     names.push_back(info);
                     return !count || (int)names.size() < count;
-                });
+                }, addressHint);
         }
     }
     void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names)const

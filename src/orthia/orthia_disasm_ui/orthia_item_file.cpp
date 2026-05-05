@@ -197,9 +197,17 @@ namespace orthia
                     handler);
             }
         }
+        if (!pageFound &&
+            (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
+            nameFilter.continueMarkNameFlag != 0 &&
+            nameFilter.continueMarkNameFlag != NameInfo::flags_PrivateSymbol)
+        {
+            pageFound = true;
+        }
         classicDatabase->QueryMetaInfoModule2(moduleAddress,
             g_database_type_fnc_PrivateSymbol, -1,
-            handler);
+            handler,
+            continueFromPrivate ? nameFilter.address : 0);
     }
     int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {
