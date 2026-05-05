@@ -1,5 +1,6 @@
 #include "orthia_external_symbols.h"
 #include "orthia_item_file.h"
+#include <unordered_map>
 
 extern "C"
 {
@@ -164,6 +165,8 @@ public:
                 continue;
             }
 
+            std::unordered_map<Address_type, std::pair<NameInfo, int>> pending;
+
             for (uint32_t i = 0; i < nrSymbols; ++i)
             {
                 const SYMTYPE* sym = syms[i];
@@ -220,9 +223,17 @@ public:
                 info.flags = NameInfo::flags_PrivateSymbol;
                 info.name = Utf8ToPlatformString(reinterpret_cast<const char*>(name));
 
-                InsertName(db, mod.address, info, info.address);
+                int priority = (sym->rectyp == S_PUB32) ? 0 : 1;
+                auto it = pending.find(info.address);
+                if (it == pending.end() || priority > it->second.second)
+                    pending[info.address] = { info, priority };
+            }
+
+            for (auto& [addr, entry] : pending)
+            {
+                InsertName(db, mod.address, entry.first, addr);
                 if (onSymbol)
-                    onSymbol(info.address, info.name);
+                    onSymbol(addr, entry.first.name);
             }
 
             if (m_logger)
