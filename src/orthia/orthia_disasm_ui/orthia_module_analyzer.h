@@ -44,6 +44,12 @@ namespace orthia
                                 std::function<void()> onComplete,
                                 const PlatformString_type& singleModuleName = {});
 
+        void EnqueueAnalyzePrivateSymbols(int workspaceId,
+                                          std::shared_ptr<CProcessWorkplaceItem> item,
+                                          std::shared_ptr<oui::BaseOperation> op,
+                                          Address_type mainModuleAddr,
+                                          std::function<void()> onComplete);
+
         void Cancel(int workspaceId);
         void CancelAll();
     };

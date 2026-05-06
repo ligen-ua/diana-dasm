@@ -324,16 +324,20 @@ namespace orthia
             {
                 auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
                 m_analyzer.EnqueueLoadSymbols(workspaceId, info, symOp,
-                    [this, uiThread, workspaceId]() {
-                        std::vector<std::shared_ptr<IUIEventHandler>> handlers;
-                        {
-                            std::unique_lock<std::mutex> lock(m_lock);
-                            handlers.assign(m_handlers.begin(), m_handlers.end());
-                        }
-                        uiThread->AddTask(
-                            [handlers = std::move(handlers), workspaceId]() {
-                                for (auto& h : handlers)
-                                    h->OnWorkspaceItemChanged(workspaceId);
+                    [this, uiThread, workspaceId, info, mainAddr]() {
+                        auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
+                        m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, info, reanalyzeOp, mainAddr,
+                            [this, uiThread, workspaceId]() {
+                                std::vector<std::shared_ptr<IUIEventHandler>> handlers;
+                                {
+                                    std::unique_lock<std::mutex> lock(m_lock);
+                                    handlers.assign(m_handlers.begin(), m_handlers.end());
+                                }
+                                uiThread->AddTask(
+                                    [handlers = std::move(handlers), workspaceId]() {
+                                        for (auto& h : handlers)
+                                            h->OnWorkspaceItemChanged(workspaceId);
+                                    });
                             });
                     });
             }

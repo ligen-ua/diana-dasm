@@ -122,6 +122,88 @@ namespace orthia
         });
     }
 
+    void CModuleAnalyzer::EnqueueAnalyzePrivateSymbols(int workspaceId,
+        std::shared_ptr<CProcessWorkplaceItem> item,
+        std::shared_ptr<oui::BaseOperation> op,
+        Address_type mainModuleAddr,
+        std::function<void()> onComplete)
+    {
+        {
+            std::unique_lock<std::mutex> lock(m_opsLock);
+            m_ops[workspaceId] = op;
+            if (!m_uiThread)
+                m_uiThread = op->GetThread();
+        }
+
+        m_pool.AddTask([this,
+            weakItem = std::weak_ptr<CProcessWorkplaceItem>(item),
+            op,
+            workspaceId,
+            mainModuleAddr,
+            onComplete = std::move(onComplete)]() mutable
+        {
+            auto item = weakItem.lock();
+            if (!item || op->IsCancelled())
+            {
+                Cleanup(workspaceId);
+                return;
+            }
+
+            auto proc = item->GetAssociatedProcess();
+            auto moduleManager = item->GetModuleManager();
+            if (!proc || !moduleManager)
+            {
+                Cleanup(workspaceId);
+                return;
+            }
+
+            std::vector<orthia::ModuleInfo> modules;
+            item->GetModules(modules);
+
+            auto mainIt = std::find_if(modules.begin(), modules.end(),
+                [mainModuleAddr](const auto& m) { return m.IsInRange(mainModuleAddr); });
+            if (mainIt == modules.end())
+            {
+                Cleanup(workspaceId);
+                return;
+            }
+
+            try
+            {
+                auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+                std::vector<orthia::Address_type> hints;
+                db->QueryMetaInfoModule2(mainIt->address,
+                    g_database_type_fnc_PrivateSymbol, -1,
+                    [&hints](orthia::Address_type, int, const std::string&, orthia::Address_type metaAddr) -> bool
+                    {
+                        hints.push_back(metaAddr);
+                        return true;
+                    });
+
+                if (!hints.empty() && !op->IsCancelled())
+                {
+                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols")), mainIt->name));
+
+                    ProcessReaderAdapter reader(proc.get());
+                    moduleManager->ReloadModuleWithHints(mainIt->address, &reader, mainIt->name, 0, hints);
+
+                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols-done")), mainIt->name));
+                }
+            }
+            catch (const std::exception& e)
+            {
+                oui::LogOutput(oui::LogFlags::Error, e.what());
+            }
+
+            Cleanup(workspaceId);
+            if (!op->IsCancelled())
+            {
+                onComplete();
+            }
+        });
+    }
+
     void CModuleAnalyzer::EnqueueLoadSymbols(int workspaceId,
         std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
@@ -184,7 +266,7 @@ namespace orthia
                             item->OnModuleSymbolsLoaded(mod.address);
                         }
                     };
-                    loader->Load(mod, db, std::move(onSymbol));
+                    loader->Load(mod, db, onSymbol);
                 }
                 catch (const std::exception& e)
                 {

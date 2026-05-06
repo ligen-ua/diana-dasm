@@ -69,7 +69,7 @@ void CModuleManager::ReloadRange(Address_type offset,
     module.Analyze(analyserFlags);
 
     CDatabaseSaver fileSaver;
-    fileSaver.Save(module, *QueryDatabaseManager(), regionName.str());
+    fileSaver.Save(module, *QueryDatabaseManager(), regionName.str(), true);
 }
 
 void CModuleManager::ReloadModule(Address_type offset,
@@ -93,8 +93,25 @@ void CModuleManager::ReloadModule(Address_type offset,
         dbManager->GetClassicDatabase()->UnloadModule(offset, true);
         
         CDatabaseSaver fileSaver;
-        fileSaver.Save(module, *dbManager, name);
+        fileSaver.Save(module, *dbManager, name, true);
     }
+}
+
+void CModuleManager::ReloadModuleWithHints(Address_type offset,
+                                           IMemoryReader * pMemoryReader,
+                                           const orthia::PlatformString_type & name,
+                                           int analyserFlags,
+                                           const std::vector<Address_type> & hints)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    CDianaModule module;
+    module.Init(offset, pMemoryReader);
+    module.AnalyzeWithHints(analyserFlags, hints);
+
+    auto dbManager = QueryDatabaseManager();
+    CDatabaseSaver fileSaver;
+    fileSaver.Save(module, *dbManager, name, false);
 }
 
 // module info

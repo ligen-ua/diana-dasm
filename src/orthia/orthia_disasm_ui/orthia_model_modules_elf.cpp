@@ -371,7 +371,8 @@ namespace orthia
                 mod.second.elfFile->GetImageBase(),
                 mod.second.elfFile->GetMappedFile().size(),
                 shortName.native,
-                &rollback);
+                &rollback,
+                true);
 
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.elfFile->GetImageBase(),

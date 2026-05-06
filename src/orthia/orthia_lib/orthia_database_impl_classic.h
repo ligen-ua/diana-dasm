@@ -92,7 +92,8 @@ public:
     void StartSaveModule(Address_type baseAddress,
                          Address_type size,
                          const orthia::PlatformString_type & moduleName,
-                         CAutoRollbackClassicDatabase * pRollback);
+                         CAutoRollbackClassicDatabase * pRollback,
+                         bool replaceExisting);
     void DoneSave();
     void CleanupResources();
 

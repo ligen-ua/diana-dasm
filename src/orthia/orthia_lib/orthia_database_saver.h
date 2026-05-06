@@ -13,7 +13,8 @@ public:
     CDatabaseSaver();
     void Save(CDianaModule & dianaModule,
               CDatabaseManager & databaseManager,
-              const orthia::PlatformString_type & moduleName);
+              const orthia::PlatformString_type & moduleName,
+              bool replaceModule);
 };
 
 }

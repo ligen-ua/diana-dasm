@@ -45,6 +45,7 @@ public:
     Address_type GetModuleAddress() const;
     Address_type GetModuleSize() const;
     void Analyze(int analyserFlags);
+    void AnalyzeWithHints(int analyserFlags, const std::vector<Address_type>& extraEntryPoints);
     orthia::PlatformString_type GetName() const;
 
     void QueryInstructionIterator(CDianaInstructionIterator * pIterator);

@@ -134,6 +134,8 @@ protected:
         m_env.m_stream.m_moduleSize = size;
     }
     virtual void AnalyzeImpl(int analyserFlags)=0;
+    virtual void AnalyzeWithHintsImpl(int analyserFlags,
+                                      const std::vector<Address_type>& extraEntryPoints) = 0;
 public:
     CDianaModuleImpl(Address_type offset,
                      IMemoryReader * pMemoryReader)
@@ -149,8 +151,13 @@ public:
     {
         AnalyzeImpl(analyserFlags);
     }
+    void AnalyzeWithHints(int analyserFlags,
+                          const std::vector<Address_type>& extraEntryPoints)
+    {
+        AnalyzeWithHintsImpl(analyserFlags, extraEntryPoints);
+    }
     orthia::Address_type GetModuleSize() { return m_env.m_moduleSize; }
-    virtual int GetDianaMode() const =0; 
+    virtual int GetDianaMode() const =0;
 };
 
 class CDianaModuleImpl_Executable:public CDianaModuleImpl
@@ -180,6 +187,20 @@ protected:
                                                analyserFlags));
         }
         m_instructionsOwnerGuard.reset(&m_owner);
+    }
+    void AnalyzeWithHintsImpl(int analyserFlags,
+                              const std::vector<Address_type>& extraEntryPoints) override
+    {
+        AnalyzeImpl(analyserFlags);
+        for (auto addr : extraEntryPoints)
+        {
+            if (addr < m_env.m_moduleStart)
+                continue;
+            Address_type relOffset = addr - m_env.m_moduleStart;
+            if (relOffset >= m_env.m_moduleSize)
+                continue;
+            Diana_AnalyzeCode(&m_owner, &m_env, GetDianaMode(), relOffset, m_env.m_moduleSize);
+        }
     }
 public:
     CDianaModuleImpl_Executable(Address_type offset,
@@ -214,6 +235,11 @@ protected:
                                               0x10000));
         m_instructionsOwnerGuard.reset(&m_owner);
         DI_CHECK_CPP(Diana_AnalyzeCode(&m_owner, &m_env, m_dianaMode, 0, m_env.m_moduleSize));
+    }
+    void AnalyzeWithHintsImpl(int analyserFlags,
+                              const std::vector<Address_type>&) override
+    {
+        AnalyzeImpl(analyserFlags);
     }
 public:
     CDianaModuleImpl_Range(Address_type offset,
@@ -268,6 +294,12 @@ void CDianaModule::Init(Address_type offset,
 void CDianaModule::Analyze(int analyserFlags)
 {
     m_impl->Analyze(analyserFlags);
+}
+
+void CDianaModule::AnalyzeWithHints(int analyserFlags,
+                                    const std::vector<Address_type>& extraEntryPoints)
+{
+    m_impl->AnalyzeWithHints(analyserFlags, extraEntryPoints);
 }
 
 orthia::PlatformString_type CDianaModule::GetName() const

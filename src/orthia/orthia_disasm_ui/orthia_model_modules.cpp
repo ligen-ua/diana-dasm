@@ -468,7 +468,8 @@ namespace orthia
             classicDatabase->StartSaveModule(mod.second.peFile->GetImageBase(),
                 mod.second.peFile->GetMappedPeFile().size(),
                 shortName.native,
-                &rollback);
+                &rollback,
+                true);
 
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.peFile->GetImageBase(),

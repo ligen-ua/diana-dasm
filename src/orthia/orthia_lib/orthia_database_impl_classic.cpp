@@ -156,16 +156,21 @@ void CClassicDatabase::InsertModule(Address_type baseAddress,
 
     ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertModule.Get()), "Can't insert module");
 }
-void CClassicDatabase::StartSaveModule(Address_type baseAddress, 
-                                Address_type size, 
-                                const orthia::PlatformString_type & moduleName,
-                                CAutoRollbackClassicDatabase * pRollback)
+void CClassicDatabase::StartSaveModule(Address_type baseAddress,
+    Address_type size,
+    const orthia::PlatformString_type& moduleName,
+    CAutoRollbackClassicDatabase* pRollback,
+    bool replaceExisting)
 {
     orthia::CAutoCriticalSection guard(m_lock);
     ORTHIA_CHECK_SQLITE2(SQLiteExec_Wrapper(m_pDatabase->Get(), "BEGIN TRANSACTION"));
     pRollback->Init(this);
-    InsertModule(baseAddress, size, moduleName);
+    if (replaceExisting)
+    {
+        InsertModule(baseAddress, size, moduleName);
+    }
 }
+
 void CClassicDatabase::DoneSave()
 {
     orthia::CAutoCriticalSection guard(m_lock);

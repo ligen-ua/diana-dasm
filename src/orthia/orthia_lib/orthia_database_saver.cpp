@@ -10,7 +10,8 @@ CDatabaseSaver::CDatabaseSaver()
 
 void CDatabaseSaver::Save(CDianaModule & dianaModule,
                           CDatabaseManager & databaseManager,
-                          const orthia::PlatformString_type & moduleName)
+                          const orthia::PlatformString_type & moduleName,
+                          bool replaceModule)
 {
     orthia::intrusive_ptr<CDatabase> databaseModule = databaseManager.GetDatabase();
     orthia::intrusive_ptr<CClassicDatabase> classicDatabase = databaseModule->GetClassicDatabase();
@@ -24,7 +25,7 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
 
     CClassicDatabaseModuleCleaner cleaner(classicDatabase.get());
     CAutoRollbackClassicDatabase rollback;
-    classicDatabase->StartSaveModule(baseAddress, dianaModule.GetModuleSize(), moduleName, &rollback);
+    classicDatabase->StartSaveModule(baseAddress, dianaModule.GetModuleSize(), moduleName, &rollback, replaceModule);
  
     for(int i = 0; !iterator.IsEmpty(); ++i)
     {

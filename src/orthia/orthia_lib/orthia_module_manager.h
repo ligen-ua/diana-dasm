@@ -31,6 +31,11 @@ public:
                       bool bForce,
                       const orthia::PlatformString_type & name,
                       int analyserFlags);
+    void ReloadModuleWithHints(Address_type offset,
+                               IMemoryReader * pMemoryReader,
+                               const orthia::PlatformString_type & name,
+                               int analyserFlags,
+                               const std::vector<Address_type> & hints);
     void ReloadRange(Address_type offset,
                      Address_type size,
                      IMemoryReader * pMemoryReader,

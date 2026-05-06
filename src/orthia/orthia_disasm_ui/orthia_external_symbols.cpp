@@ -303,7 +303,7 @@ public:
         {
             if (l->CanLoad(mod))
             {
-                l->Load(mod, db, std::move(onSymbol));
+                l->Load(mod, db, onSymbol);
                 return;
             }
         }
