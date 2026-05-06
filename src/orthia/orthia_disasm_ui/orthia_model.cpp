@@ -338,23 +338,16 @@ namespace orthia
                 });
         }
 
-        // Phase 2: load debug symbols; on completion, re-analyze with private symbols
-        // (process only), then notify all UI subscribers that the workspace item changed.
+        // Phase 2: load debug symbols; on completion, re-analyze with private symbols,
+        // then notify all UI subscribers that the workspace item changed.
         auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
         m_analyzer.EnqueueLoadSymbols(workspaceId, item, symOp,
-            [this, uiThread, workspaceId, mainAddr, procItem]() {
-                if (procItem)
-                {
-                    auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
-                    m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, procItem, reanalyzeOp, mainAddr,
-                        [this, uiThread, workspaceId]() {
-                            NotifyWorkspaceChanged(uiThread, workspaceId);
-                        });
-                }
-                else
-                {
-                    NotifyWorkspaceChanged(uiThread, workspaceId);
-                }
+            [this, uiThread, workspaceId, mainAddr, item]() {
+                auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
+                m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, item, reanalyzeOp, mainAddr,
+                    [this, uiThread, workspaceId]() {
+                        NotifyWorkspaceChanged(uiThread, workspaceId);
+                    });
             });
     }
 

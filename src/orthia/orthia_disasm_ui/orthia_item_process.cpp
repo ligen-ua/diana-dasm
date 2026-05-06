@@ -648,6 +648,10 @@ namespace orthia
     {
         return m_proc;
     }
+    std::shared_ptr<IMemoryReader> CProcessWorkplaceItem::CreateMemoryReader()
+    {
+        return std::make_shared<ProcessReaderAdapter>(m_proc.get());
+    }
     Address_type CProcessWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const
     {
         auto downcased = orthia::Downcase(text.native);

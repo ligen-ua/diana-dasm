@@ -1,4 +1,5 @@
 #include "orthia_item_file.h"
+#include "orthia_helpers.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
@@ -537,6 +538,12 @@ namespace orthia
         Diana_InitMemoryStreamEx2(&streamAdapter->stream, (char*)data.data()+diff, data.size()-diff, 0, 0);
 
         return std::shared_ptr<::DianaMovableReadStream>(streamAdapter, &streamAdapter->stream.parent.parent);
+    }
+    std::shared_ptr<IMemoryReader> FileWorkplaceItem::CreateMemoryReader()
+    {
+        const auto& mapped = file->GetMappedFile();
+        return std::make_shared<CMemoryReaderOnLoadedData>(
+            file->GetImageBase(), mapped.data(), mapped.size());
     }
 
     // InsertModuleMetaInfo

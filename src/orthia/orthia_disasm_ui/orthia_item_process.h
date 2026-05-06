@@ -53,6 +53,7 @@ namespace orthia
         std::shared_ptr<oui::IProcess> GetAssociatedProcess() override;
         void OnPrivateSymbolLoaded(Address_type addr, const oui::String& name) override;
         void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
+        std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
     };
 
 }

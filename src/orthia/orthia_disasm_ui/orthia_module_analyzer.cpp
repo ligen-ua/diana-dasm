@@ -123,7 +123,7 @@ namespace orthia
     }
 
     void CModuleAnalyzer::EnqueueAnalyzePrivateSymbols(int workspaceId,
-        std::shared_ptr<CProcessWorkplaceItem> item,
+        std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
         std::function<void()> onComplete)
@@ -136,7 +136,7 @@ namespace orthia
         }
 
         m_pool.AddTask([this,
-            weakItem = std::weak_ptr<CProcessWorkplaceItem>(item),
+            weakItem = std::weak_ptr<IWorkPlaceItem>(item),
             op,
             workspaceId,
             mainModuleAddr,
@@ -149,9 +149,8 @@ namespace orthia
                 return;
             }
 
-            auto proc = item->GetAssociatedProcess();
             auto moduleManager = item->GetModuleManager();
-            if (!proc || !moduleManager)
+            if (!moduleManager)
             {
                 Cleanup(workspaceId);
                 return;
@@ -182,13 +181,16 @@ namespace orthia
 
                 if (!hints.empty() && !op->IsCancelled())
                 {
-                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols")), mainIt->name));
+                    auto reader = item->CreateMemoryReader();
+                    if (reader)
+                    {
+                        auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                        WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols")), mainIt->name));
 
-                    ProcessReaderAdapter reader(proc.get());
-                    moduleManager->ReloadModuleWithHints(mainIt->address, &reader, mainIt->name, 0, hints);
+                        moduleManager->ReloadModuleWithHints(mainIt->address, reader.get(), mainIt->name, 0, hints);
 
-                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols-done")), mainIt->name));
+                        WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols-done")), mainIt->name));
+                    }
                 }
             }
             catch (const std::exception& e)
