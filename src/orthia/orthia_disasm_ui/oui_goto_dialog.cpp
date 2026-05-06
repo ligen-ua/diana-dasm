@@ -130,14 +130,6 @@ namespace oui
             console->FilterOrReplaceUnreadableSymbols(m_currentItems.back().visibleName);
         }
         std::sort(m_currentItems.begin(), m_currentItems.end());
-
-        for (auto& item : m_currentItems)
-        {
-            if (item.info.comment.native.empty())
-            {
-                item.info.comment = m_workPlace->QueryAddressName(item.info.address).comment;
-            }
-        }
         UpdateVisibleItems();
     }
 
@@ -148,7 +140,7 @@ namespace oui
         {
             vit->text.clear();
             vit->text.push_back(orthia::ToWideStringAsHex(it->info.address));
-            vit->text.push_back(it->info.comment);
+            vit->text.push_back(orthia::GetPreferredComment(it->info.nameInfo));
 
             // open file here
             vit->openHandler = [=, info = it->info]() {
@@ -453,7 +445,9 @@ namespace oui
             [](const GotoDialogInfo& info, const String& symbol) 
                 { 
                   return StartsWith(orthia::ObjectToString(info.info.address), symbol.native) ||
-                      StartsWith(info.info.comment.native, symbol.native);
+                      StartsWith(info.info.nameInfo.comment.native, symbol.native) ||
+                      StartsWith(info.info.nameInfo.privateSymbol.native, symbol.native) ||
+                      StartsWith(info.info.nameInfo.name.native, symbol.native);
         });
     }
 

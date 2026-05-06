@@ -462,8 +462,8 @@ namespace orthia
             {
                 result.name = ComposeName(info.name, info.address, address);
             }
+            result.privateSymbol = info.name + OUI_TCSTR("!") + result.privateSymbol.native;
         }
-
         return result;
     }
     Address_type FileWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const

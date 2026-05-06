@@ -233,7 +233,7 @@ namespace orthia
     {
         orthia::CCommonDateTime lastUpdateTime;
         orthia::Address_type address = 0;
-        oui::String comment;
+        orthia::NameInfo nameInfo;
         int flags = 0;
 
         GotoItem()
@@ -303,7 +303,10 @@ namespace orthia
             oui::String text;
         };
         std::unordered_map<orthia::Address_type, CommentInfo> m_comments;
+
+        std::weak_ptr<IWorkPlaceItem> m_item;
     public:
+        void Init(std::shared_ptr<IWorkPlaceItem> item);
         void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
             const oui::String& filter,
             oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,

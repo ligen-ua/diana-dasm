@@ -739,6 +739,10 @@ namespace orthia
                     });
             }
         }
+        if (!moduleInfo.name.empty())
+        {
+            nameInfo.privateSymbol = moduleInfo.name + OUI_TCSTR("!") + nameInfo.privateSymbol.native;
+        }
         return nameInfo;
     }
     NameInfo CProcessWorkplaceItem::QueryAddressNameImpl(Address_type address, orthia::ModuleInfo & moduleInfo) const

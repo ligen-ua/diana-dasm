@@ -248,6 +248,7 @@ namespace orthia
             persistentItemStorage->Init(moduleManager->QueryDatabaseManager());
 
             info->Init(moduleManager, persistentItemStorage);
+            persistentItemStorage->CPersistentItemStorage::Init(info);
         }
         catch (std::exception& e)
         {
@@ -282,6 +283,7 @@ namespace orthia
         auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
         info->ReloadModules();
+        persistentItemStorage->Init(info);
 
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
@@ -444,6 +446,7 @@ namespace orthia
             // fill the model data
             auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
+            persistentItemStorage->CPersistentItemStorage::Init(info);
 
             info->fullName = file->GetFullFileName();
             info->file = mappedExe;
