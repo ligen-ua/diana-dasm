@@ -739,7 +739,7 @@ namespace orthia
                     });
             }
         }
-        if (!moduleInfo.name.empty())
+        if (!moduleInfo.name.empty() && !nameInfo.privateSymbol.native.empty())
         {
             nameInfo.privateSymbol = moduleInfo.name + OUI_TCSTR("!") + nameInfo.privateSymbol.native;
         }

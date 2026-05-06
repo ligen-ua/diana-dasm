@@ -462,7 +462,10 @@ namespace orthia
             {
                 result.name = ComposeName(info.name, info.address, address);
             }
-            result.privateSymbol = info.name + OUI_TCSTR("!") + result.privateSymbol.native;
+            if (!info.name.empty() && !result.privateSymbol.native.empty())
+            {
+                result.privateSymbol = info.name + OUI_TCSTR("!") + result.privateSymbol.native;
+            }
         }
         return result;
     }
