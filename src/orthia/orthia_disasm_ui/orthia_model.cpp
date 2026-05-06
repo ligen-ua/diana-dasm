@@ -300,50 +300,64 @@ namespace orthia
         // OK
         result.error.native.clear();
 
-        auto uiThread = completeHandler->GetThread();
-        auto mainAddr = info->GerProcessModuleAddress();
-        {
-            auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
-
-            m_analyzer.Enqueue(workspaceId, info, bgOp, mainAddr,
-                [this, uiThread, workspaceId, info]() {
-                    std::vector<std::shared_ptr<IUIEventHandler>> handlers;
-                    {
-                        std::unique_lock<std::mutex> lock(m_lock);
-                        handlers.assign(m_handlers.begin(), m_handlers.end());
-                    }
-                    uiThread->AddTask(
-                        [handlers = std::move(handlers), workspaceId, uiLog = m_uiLog]() {
-                            if (auto log = uiLog.lock())
-                            {
-                                auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-                                log->WriteLog(node->QueryValue(ORTHIA_TCSTR("analysis-complete")));
-                            }
-                        });
-                });
-            }
-
-            {
-                auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
-                m_analyzer.EnqueueLoadSymbols(workspaceId, info, symOp,
-                    [this, uiThread, workspaceId, info, mainAddr]() {
-                        auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
-                        m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, info, reanalyzeOp, mainAddr,
-                            [this, uiThread, workspaceId]() {
-                                std::vector<std::shared_ptr<IUIEventHandler>> handlers;
-                                {
-                                    std::unique_lock<std::mutex> lock(m_lock);
-                                    handlers.assign(m_handlers.begin(), m_handlers.end());
-                                }
-                                uiThread->AddTask(
-                                    [handlers = std::move(handlers), workspaceId]() {
-                                        for (auto& h : handlers)
-                                            h->OnWorkspaceItemChanged(workspaceId);
-                                    });
-                            });
-                    });
-            }
+        EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GerProcessModuleAddress(), info);
     }
+    void CProgramModel::NotifyWorkspaceChanged(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId)
+    {
+        std::vector<std::shared_ptr<IUIEventHandler>> handlers;
+        {
+            std::unique_lock<std::mutex> lock(m_lock);
+            handlers.assign(m_handlers.begin(), m_handlers.end());
+        }
+        uiThread->AddTask([handlers = std::move(handlers), workspaceId]() {
+            for (auto& h : handlers)
+                h->OnWorkspaceItemChanged(workspaceId);
+        });
+    }
+
+    void CProgramModel::EnqueueAnalysisOps(
+        std::shared_ptr<oui::CWindowThread> uiThread,
+        int workspaceId,
+        std::shared_ptr<IWorkPlaceItem> item,
+        Address_type mainAddr,
+        std::shared_ptr<CProcessWorkplaceItem> procItem)
+    {
+        if (procItem)
+        {
+            // Phase 1 (process only): disassemble the main module and log a completion message.
+            auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
+            m_analyzer.Enqueue(workspaceId, procItem, bgOp, mainAddr,
+                [uiThread, uiLog = m_uiLog]() {
+                    uiThread->AddTask([uiLog]() {
+                        if (auto log = uiLog.lock())
+                        {
+                            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                            log->WriteLog(node->QueryValue(ORTHIA_TCSTR("analysis-complete")));
+                        }
+                    });
+                });
+        }
+
+        // Phase 2: load debug symbols; on completion, re-analyze with private symbols
+        // (process only), then notify all UI subscribers that the workspace item changed.
+        auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
+        m_analyzer.EnqueueLoadSymbols(workspaceId, item, symOp,
+            [this, uiThread, workspaceId, mainAddr, procItem]() {
+                if (procItem)
+                {
+                    auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
+                    m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, procItem, reanalyzeOp, mainAddr,
+                        [this, uiThread, workspaceId]() {
+                            NotifyWorkspaceChanged(uiThread, workspaceId);
+                        });
+                }
+                else
+                {
+                    NotifyWorkspaceChanged(uiThread, workspaceId);
+                }
+            });
+    }
+
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
     {
@@ -513,9 +527,13 @@ namespace orthia
                     info->fullName.native);
             }
 
-            result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
+            auto workspaceId = RegisterItem(info, false);
+            result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
             // OK
             result.error.native.clear();
+
+            // Kick off symbol loading and notify UI when complete (file items skip disassembly analysis).
+            EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->file->GetImageBase(), nullptr);
         }
         catch (std::exception& e)
         {

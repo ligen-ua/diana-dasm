@@ -83,6 +83,18 @@ namespace orthia
 
     private:
         CModuleAnalyzer m_analyzer;
+
+        // Dispatches workspace-changed event to all UI subscribers from a background thread.
+        void NotifyWorkspaceChanged(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId);
+
+        // Starts background analysis and symbol-loading pipelines for a newly opened workspace item.
+        // procItem is non-null for process items; file items pass nullptr to skip process-only steps
+        // (disassembly analysis and private-symbol re-analysis).
+        void EnqueueAnalysisOps(std::shared_ptr<oui::CWindowThread> uiThread,
+            int workspaceId,
+            std::shared_ptr<IWorkPlaceItem> item,
+            Address_type mainAddr,
+            std::shared_ptr<CProcessWorkplaceItem> procItem);
     };
     oui::String ReadFileToVector(std::shared_ptr<oui::IFile> file, std::vector<char>& data, std::shared_ptr<oui::BaseOperation> operation = nullptr, intrusive_ptr<CTextNode> errorNode = nullptr);
 
