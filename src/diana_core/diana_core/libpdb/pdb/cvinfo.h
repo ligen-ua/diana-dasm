@@ -4907,8 +4907,8 @@ inline int BinaryAnnotationInstructionOperandCount(BinaryAnnotationOpcode op)
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-typedef unsigned __int8 UInt8;
-typedef unsigned __int32 UInt32;
+typedef  uint8_t UInt8;
+typedef uint32_t UInt32;
 
 typedef UInt8 CompressedAnnotation;
 typedef CompressedAnnotation* PCompressedAnnotation;
@@ -4986,9 +4986,9 @@ inline UInt32 CVUncompressData(
 // General compression only work for input < 0x1FFFFFFF
 // algorithm will not work on 0x80000000
 
-inline unsigned __int32 EncodeSignedInt32(__int32 input)
+inline uint32_t EncodeSignedInt32(int32_t input)
 {
-    unsigned __int32 rotatedInput;
+    uint32_t rotatedInput;
 
     if (input >= 0) {
         rotatedInput = input << 1;
@@ -4999,9 +4999,9 @@ inline unsigned __int32 EncodeSignedInt32(__int32 input)
     return rotatedInput;
 }
 
-inline __int32 DecodeSignedInt32(unsigned __int32 input)
+inline int32_t DecodeSignedInt32(uint32_t input)
 {
-    __int32 rotatedInput;
+    int32_t rotatedInput;
 
     if (input & 1) {
         rotatedInput = - (int)(input >> 1);

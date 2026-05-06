@@ -81,6 +81,7 @@ diana_processor/softfloat/softfloat16.c
 diana_processor/softfloat/softfloatx80.c
 diana_processor/softfloat/softfloat_ext.c
 
+libpdb/pdb.c
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
