@@ -206,12 +206,17 @@ namespace orthia
                     handler);
             }
         }
+        if ((int)names.size() >= count)
+        {
+            return;
+        }
         if (!pageFound &&
             (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
             nameFilter.continueMarkNameFlag != 0 &&
             nameFilter.continueMarkNameFlag != NameInfo::flags_PrivateSymbol)
         {
             pageFound = true;
+            continueFromPrivate = false;
         }
         classicDatabase->QueryMetaInfoModule2(moduleAddress,
             g_database_type_fnc_PrivateSymbol, -1,
