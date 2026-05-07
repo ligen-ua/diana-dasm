@@ -85,13 +85,23 @@ void CClassicDatabase::Init()
     buffer = "SELECT meta_mod_id, meta_address, meta_type, meta_info FROM tbl_metainfo WHERE (meta_type == ?1) ORDER BY meta_mod_id, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_All.Get2(), NULL));
 
-    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (meta_type == ?3)) AND (meta_mod_id == ?1) ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE meta_type == ?2 AND meta_mod_id == ?1"
+             " UNION ALL"
+             " SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE meta_type == ?3 AND meta_mod_id == ?1"
+             " ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2.Get2(), NULL));
 
-    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (meta_type == ?3)) AND (meta_mod_id == ?1) AND meta_address >= ?4 ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE meta_type == ?2 AND meta_mod_id == ?1 AND meta_address >= ?4"
+             " UNION ALL"
+             " SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE meta_type == ?3 AND meta_mod_id == ?1 AND meta_address >= ?4"
+             " ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2_FromAddress.Get2(), NULL));
 
-    buffer = "SELECT COUNT(meta_address) FROM tbl_metainfo WHERE ((meta_type == ?2) OR (meta_type == ?3)) AND (meta_mod_id == ?1) ";
+    buffer = "SELECT COUNT(*) FROM ("
+             "SELECT meta_address FROM tbl_metainfo WHERE meta_type == ?2 AND meta_mod_id == ?1"
+             " UNION ALL"
+             " SELECT meta_address FROM tbl_metainfo WHERE meta_type == ?3 AND meta_mod_id == ?1"
+             ")";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2_Count.Get2(), NULL));
 
     buffer = "SELECT meta_mod_id, meta_type, meta_info FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address == ?2) ORDER BY meta_type, meta_address";
@@ -100,10 +110,16 @@ void CClassicDatabase::Init()
     buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address <= ?2) ORDER BY meta_address DESC";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress.Get2(), NULL));
 
-    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR meta_type == ?3) AND (meta_address <= ?2) ORDER BY meta_address DESC";
+    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE meta_type == ?1 AND meta_address <= ?2"
+             " UNION ALL"
+             " SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE meta_type == ?3 AND meta_address <= ?2"
+             " ORDER BY meta_address DESC";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress2.Get2(), NULL));
 
-    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR meta_type == ?4)  AND (meta_address >= ?2) AND (meta_address <= ?3) ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE meta_type == ?1 AND meta_address >= ?2 AND meta_address <= ?3"
+             " UNION ALL"
+             " SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE meta_type == ?4 AND meta_address >= ?2 AND meta_address <= ?3"
+             " ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_AddressRange.Get2(), NULL));
 
     // comments

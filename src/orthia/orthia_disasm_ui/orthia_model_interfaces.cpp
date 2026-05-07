@@ -266,9 +266,26 @@ namespace orthia
             allLines.push_back(std::move(line));
         }
     }
+    oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address, const oui::String& moduleName, Address_type moduleAddress)
+    {
+        if (name.native.empty() || !nameAddress)
+        {
+            return ComposeName(moduleName, moduleAddress, address);
+        }
 
+        oui::String res = ComposeName(name, nameAddress, address);
+        if (res.native.empty())
+        {
+            return res;
+        }
+        return moduleName.native + OUI_TCSTR("!") + res.native;
+    }
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address)
     {
+        if (nameAddress > address)
+        {
+            return name;
+        }
         Address_type diff = address - nameAddress;
         if (!diff)
         {

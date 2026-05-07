@@ -335,6 +335,7 @@ namespace orthia
     const static int g_database_type_fnc_PrivateSymbol = 4;
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
+    oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address, const oui::String& moduleName, Address_type moduleAddress);
 
     // CFilePersistentItemStorage
     class CDatabaseManager;
