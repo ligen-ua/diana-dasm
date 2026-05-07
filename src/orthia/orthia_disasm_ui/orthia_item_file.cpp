@@ -279,6 +279,7 @@ namespace orthia
             CCommonFormatParser parser;
             parser.Parse(text);
             parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &moduleIt->fullName);
+            parser.QueryMetadata("flags", &moduleIt->flags);
             return true;
         });
 
@@ -543,16 +544,56 @@ namespace orthia
         return std::make_shared<CMemoryReaderOnLoadedData>(
             file->GetImageBase(), mapped.data(), mapped.size());
     }
-
+    void FileWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
+    {
+        UpdateModuleFlags(moduleAddress, ModuleInfo::flags_symbolsLoaded, 0);
+    }
+    void FileWorkplaceItem::UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove)
+    {
+        UpdateModuleMetaInfo(GetModuleManager()->QueryDatabaseManager()->GetClassicDatabase(),
+            moduleAddress,
+            [&](CCommonFormatParser& parser, CCommonFormatBuilder& builder) {
+                int flags = 0;
+                parser.QueryMetadata("flags", &flags);
+                flags |= flagsToSet;
+                flags &= ~flagsToRemove;
+                builder.AddMetadata("flags", flags);
+                return true;
+            });
+    }
     // InsertModuleMetaInfo
-    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName)
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName, int moduleFlags)
     {
         orthia::CCommonFormatBuilder builder;
         builder.AddMetadata(ORTHIA_TCSTR("fullname"), fullName.native);
+        builder.AddMetadata("flags", moduleFlags);
         std::string metaInfo;
         builder.Produce(&metaInfo);
 
         database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, metaInfo, moduleAddress);
+    }
+    void UpdateModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, std::function<bool (CCommonFormatParser&, CCommonFormatBuilder&)> handler)
+    {
+        std::string newText;
+        bool needUpdate = false;
+        database->QueryMetaInfoModule2(moduleAddress, g_database_type_moduleMetaInfo, -1,
+            [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+        {            
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            orthia::CCommonFormatBuilder builder(&parser);
+            needUpdate = handler(parser, builder);
+            if (needUpdate)
+            {
+                builder.Produce(&newText);
+            }
+            return false;
+        });
+
+        if (needUpdate)
+        {
+            database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress);
+        }
     }
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)
     {

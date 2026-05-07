@@ -54,6 +54,7 @@ namespace orthia
         void OnPrivateSymbolLoaded(Address_type addr, const oui::String& name) override;
         void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
         std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
+        void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
     };
 
 }

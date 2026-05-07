@@ -84,6 +84,7 @@ public:
     bool QueryMetadata(const std::string & name, std::string * pValue) const;
     bool QueryMetadata(const std::string & name, long long * pValue) const;
     bool QueryMetadata(const std::string & name, unsigned long long * pValue) const;
+    bool QueryMetadata(const std::string & name, int * pValue) const;
 
 #ifndef DIANA_HAS_WIN32
     bool QueryMetadata(const std::string & name, uint64_t * pValue) const;

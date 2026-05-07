@@ -514,10 +514,10 @@ namespace orthia
 
                     importsLoader.ReportModules(info->moduleManager);
                 }
-
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     info->file->GetImageBase(),
-                    info->fullName.native);
+                    info->fullName.native,
+                    ModuleInfo::flags_analyzeDone);
             }
 
             auto workspaceId = RegisterItem(info, false);

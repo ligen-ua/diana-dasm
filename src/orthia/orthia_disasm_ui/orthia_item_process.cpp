@@ -200,13 +200,7 @@ namespace orthia
     }
     void CProcessWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
     {
-        orthia::CAutoCriticalSection guard(m_lock);
-        m_moduleFlags[moduleAddress] |= ModuleInfo::flags_symbolsLoaded;
-        auto it = m_modulesIndex.find(moduleAddress);
-        if (it != m_modulesIndex.end())
-        {
-            m_modules[it->second].flags |= ModuleInfo::flags_symbolsLoaded;
-        }
+        UpdateModuleFlags(moduleAddress, ModuleInfo::flags_symbolsLoaded, 0);
     }
     void CProcessWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
     {
@@ -652,6 +646,20 @@ namespace orthia
     {
         return std::make_shared<ProcessReaderAdapter>(m_proc.get());
     }
+    void CProcessWorkplaceItem::UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove)
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+        auto & flags = m_moduleFlags[moduleAddress];
+        flags |= flagsToSet;
+        flags &= ~flagsToRemove;
+
+        auto it = m_modulesIndex.find(moduleAddress);
+        if (it != m_modulesIndex.end())
+        {
+            m_modules[it->second].flags = flags;
+        }
+    }
+
     Address_type CProcessWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const
     {
         auto downcased = orthia::Downcase(text.native);

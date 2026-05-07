@@ -107,6 +107,7 @@ namespace orthia
                     auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
                     WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
                     moduleManager->ReloadModule(mainIt->address, &reader, false, mainIt->name, 0);
+                    item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
                 }
             }
             catch (const std::exception& e)
@@ -188,7 +189,7 @@ namespace orthia
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols")), mainIt->name));
 
                         moduleManager->ReloadModuleWithHints(mainIt->address, reader.get(), mainIt->name, 0, hints);
-
+                        item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols-done")), mainIt->name));
                     }
                 }

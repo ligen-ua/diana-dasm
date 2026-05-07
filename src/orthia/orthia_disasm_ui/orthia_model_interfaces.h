@@ -214,7 +214,8 @@ namespace orthia
         virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr; }
         virtual void OnPrivateSymbolLoaded(Address_type /*addr*/, const oui::String& /*name*/) {}
         virtual void OnModuleSymbolsLoaded(Address_type /*moduleAddress*/) {}
-        virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() { return nullptr; }
+        virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
+        virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
     };
 
     void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);
