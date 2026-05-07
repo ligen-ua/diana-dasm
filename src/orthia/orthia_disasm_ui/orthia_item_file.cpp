@@ -177,10 +177,6 @@ namespace orthia
                     return true;
                 }
             }
-            if (info.name.native == L"pdb_get_block_size")
-            {
-                __debugbreak();
-            }
             names.push_back(info);
             if ((int)names.size() >= count)
             {
