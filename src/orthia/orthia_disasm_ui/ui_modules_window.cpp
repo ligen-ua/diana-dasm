@@ -142,6 +142,28 @@ bool CModulesWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
             }
         }
     }
+    switch (evt.keyEvent.virtualKey)
+    {
+    case oui::VirtualKey::kF5:
+    {
+        {
+            auto activeItem = m_model->GetActiveItem();
+            if (activeItem)
+            {
+                if (m_selectedModuleAddress)
+                {
+                    SelectModule(m_selectedModuleAddress, m_selectedModuleName);
+                }
+                else
+                {
+                    // TODO: make it async + reload callback
+                    activeItem->ReloadModules();
+                }
+            }
+        }
+        break;
+    }
+    }
     return ParentType::ProcessEvent(evt, evtContext);
 }
 

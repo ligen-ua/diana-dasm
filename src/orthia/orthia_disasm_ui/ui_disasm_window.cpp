@@ -127,8 +127,10 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
             for (auto& m : allModules)
                 moduleNames[m.address] = m.name;
 
-            classicDb->QueryMetaInfoByAddressRange(
-                orthia::g_database_type_fnc_Export, routeStart, routeStart + maxSizeToUse,
+            classicDb->QueryMetaInfoByAddressRange2(
+                orthia::g_database_type_fnc_Export,
+                orthia::g_database_type_fnc_PrivateSymbol, 
+                routeStart, routeStart + maxSizeToUse,
                 [&](orthia::Address_type moduleAddress, int, const std::string& text, orthia::Address_type metaAddress)
             {
                 if (exportInfoVec.size() >= oui::kMaxXrefs) {

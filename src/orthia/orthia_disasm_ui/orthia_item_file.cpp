@@ -139,6 +139,10 @@ namespace orthia
         bool pageFound = false;
         auto handler = [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
+            if ((int)names.size() >= count)
+            {
+                return false;
+            }
             std::string name;
             Address_type target = 0;
             CCommonFormatParser parser;
@@ -172,6 +176,10 @@ namespace orthia
                 {
                     return true;
                 }
+            }
+            if (info.name.native == L"pdb_get_block_size")
+            {
+                __debugbreak();
             }
             names.push_back(info);
             if ((int)names.size() >= count)
@@ -417,13 +425,12 @@ namespace orthia
             address,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
-            capturedModuleAddress = moduleAddress;
-            capturedMetaAddress = metaAddress;
-
             if (metaType == g_database_type_fnc_Export)
             {
                 if (!exportDone)
                 {
+                    capturedModuleAddress = moduleAddress;
+                    capturedMetaAddress = metaAddress;
                     CCommonFormatParser parser;
                     parser.Parse(text);
                     parser.QueryMetadata("name", &capturedMetaName);
@@ -443,7 +450,7 @@ namespace orthia
                     result.privateSymbol = Utf8ToPlatformString(nameStr);
                 }
             }
-            return false;
+            return capturedMetaName.empty();
         },
             g_database_type_fnc_PrivateSymbol);
 

@@ -109,6 +109,7 @@ public:
     void QueryMetaInfoByAddress(int metaType, Address_type metaAddress, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
     void QueryMetaInfoByNearestAddress(int metaType, Address_type address, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler, int metaType2 = -1);
     void QueryMetaInfoByAddressRange(int metaType, Address_type addr1, Address_type addr2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
+    void QueryMetaInfoByAddressRange2(int metaType1, int metaType2,  Address_type addr1, Address_type addr2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
 
     // queries
     Address_type QueryRouteStart(Address_type offset);

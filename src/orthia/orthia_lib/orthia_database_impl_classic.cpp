@@ -85,13 +85,13 @@ void CClassicDatabase::Init()
     buffer = "SELECT meta_mod_id, meta_address, meta_type, meta_info FROM tbl_metainfo WHERE (meta_type == ?1) ORDER BY meta_mod_id, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_All.Get2(), NULL));
 
-    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (?3 == -1 OR meta_type == ?3)) AND (meta_mod_id == ?1) ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (meta_type == ?3)) AND (meta_mod_id == ?1) ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2.Get2(), NULL));
 
-    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (?3 == -1 OR meta_type == ?3)) AND (meta_mod_id == ?1) AND meta_address >= ?4 ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_address, meta_type, meta_info FROM tbl_metainfo WHERE ((meta_type == ?2) OR (meta_type == ?3)) AND (meta_mod_id == ?1) AND meta_address >= ?4 ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2_FromAddress.Get2(), NULL));
 
-    buffer = "SELECT COUNT(meta_address) FROM tbl_metainfo WHERE ((meta_type == ?2) OR (?3 == -1 OR meta_type == ?3)) AND (meta_mod_id == ?1) ";
+    buffer = "SELECT COUNT(meta_address) FROM tbl_metainfo WHERE ((meta_type == ?2) OR (meta_type == ?3)) AND (meta_mod_id == ?1) ";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_Module2_Count.Get2(), NULL));
 
     buffer = "SELECT meta_mod_id, meta_type, meta_info FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address == ?2) ORDER BY meta_type, meta_address";
@@ -100,10 +100,10 @@ void CClassicDatabase::Init()
     buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address <= ?2) ORDER BY meta_address DESC";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress.Get2(), NULL));
 
-    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR (?3 != -1 AND meta_type == ?3)) AND (meta_address <= ?2) ORDER BY meta_address DESC";
+    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR meta_type == ?3) AND (meta_address <= ?2) ORDER BY meta_address DESC";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_NearestAddress2.Get2(), NULL));
 
-    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1) AND (meta_address >= ?2) AND (meta_address <= ?3) ORDER BY meta_type, meta_address";
+    buffer = "SELECT meta_mod_id, meta_type, meta_info, meta_address FROM tbl_metainfo WHERE (meta_type == ?1 OR meta_type == ?4)  AND (meta_address >= ?2) AND (meta_address <= ?3) ORDER BY meta_type, meta_address";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtSelectMetainfo_AddressRange.Get2(), NULL));
 
     // comments
@@ -661,15 +661,20 @@ void CClassicDatabase::QueryMetaInfoByNearestAddress(int metaType, Address_type 
         }
     }
 }
-
 void CClassicDatabase::QueryMetaInfoByAddressRange(int metaType, Address_type addr1, Address_type addr2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler)
+{
+    QueryMetaInfoByAddressRange2(metaType, -1, addr1, addr2, handler);
+}
+void CClassicDatabase::QueryMetaInfoByAddressRange2(int metaType1, int metaType2, Address_type addr1, Address_type addr2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler)
 {
     orthia::CAutoCriticalSection guard(m_lock);
 
     CSQLAutoReset autoStatement(m_stmtSelectMetainfo_AddressRange.Get());
-    sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 1, metaType);
+    sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 1, metaType1);
     sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 2, AddrToDb(addr1));
     sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 3, AddrToDb(addr2));
+    sqlite3_bind_int64(m_stmtSelectMetainfo_AddressRange.Get(), 4, metaType2);
+
     for (;;)
     {
         int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_AddressRange.Get());
@@ -698,13 +703,13 @@ int CClassicDatabase::QueryMetaInfoModule2_Count(Address_type moduleAddress, int
 {
     orthia::CAutoCriticalSection guard(m_lock);
 
-    CSQLAutoReset autoStatement(m_stmtSelectMetainfo_Module2.Get());
-    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2.Get(), 1, moduleAddress);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2.Get(), 2, metaType1);
-    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2.Get(), 3, metaType2);
+    CSQLAutoReset autoStatement(m_stmtSelectMetainfo_Module2_Count.Get());
+    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2_Count.Get(), 1, moduleAddress);
+    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2_Count.Get(), 2, metaType1);
+    sqlite3_bind_int64(m_stmtSelectMetainfo_Module2_Count.Get(), 3, metaType2);
     for (;;)
     {
-        int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_Module2.Get());
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectMetainfo_Module2_Count.Get());
         if (stepResult == SQLITE_DONE)
         {
             break;
@@ -715,7 +720,7 @@ int CClassicDatabase::QueryMetaInfoModule2_Count(Address_type moduleAddress, int
         }
 
         // meta_mod_id, meta_address, meta_type, meta_info
-        return sqlite3_column_int(m_stmtSelectMetainfo_Module2.Get(), 0);
+        return sqlite3_column_int(m_stmtSelectMetainfo_Module2_Count.Get(), 0);
     }
     return 0;
 }

@@ -180,7 +180,7 @@ namespace orthia
             }
             if (match)
             {
-                const int c_pageSize = 1000;
+                const int c_pageSize = 5000;
                 orthia::NameSelectionKey key;
                 key.excludeImports = true;
 
