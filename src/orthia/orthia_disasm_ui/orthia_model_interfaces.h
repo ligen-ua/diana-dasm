@@ -20,6 +20,7 @@ namespace orthia
 {
     class CSimplePeFile;
     class CModuleManager;
+    class ModuleStorage;
 
     struct WorkAddressRangeInfo
     {
@@ -216,6 +217,7 @@ namespace orthia
         virtual void OnModuleSymbolsLoaded(Address_type /*moduleAddress*/) {}
         virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
         virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
+        virtual ModuleStorage* GetModuleStorage() { return nullptr; }
     };
 
     void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);

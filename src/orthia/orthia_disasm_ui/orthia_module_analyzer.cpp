@@ -4,6 +4,7 @@
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_external_symbols.h"
+#include "orthia_module_symbols.h"
 
 namespace orthia
 {
@@ -259,7 +260,7 @@ namespace orthia
                 try
                 {
                     bool anyLoaded = false;
-                    auto onSymbol = 
+                    auto onSymbol =
                         [&mod, item, &anyLoaded](Address_type addr, const oui::String& symName)
                     {
                         item->OnPrivateSymbolLoaded(addr, symName);
@@ -269,7 +270,15 @@ namespace orthia
                             item->OnModuleSymbolsLoaded(mod.address);
                         }
                     };
-                    loader->Load(mod, db, onSymbol);
+                    ModuleSymbols syms;
+                    loader->Load(mod, syms, onSymbol);
+                    if (!syms.IsEmpty())
+                    {
+                        if (auto* storage = item->GetModuleStorage())
+                            storage->Store(mod.address, std::move(syms));
+                        else
+                            syms.FlushToDB(mod.address, db);
+                    }
                 }
                 catch (const std::exception& e)
                 {

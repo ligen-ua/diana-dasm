@@ -1,5 +1,6 @@
 #pragma once
 #include "oui_processes.h"
+#include "orthia_module_symbols.h"
 
 namespace orthia
 {
@@ -18,6 +19,7 @@ namespace orthia
         Address_type m_processModuleAddress = 0;
         std::shared_ptr<CModuleManager> m_moduleManager;
         mutable std::shared_ptr<IPeristentItemStorage> m_persistentStorage;
+        std::shared_ptr<ModuleStorage> m_moduleStorage;
 
         void QueryNamesEx(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names, int* totalCount) const;
         NameInfo QueryAddressNameNoLock(Address_type address) const;
@@ -30,7 +32,8 @@ namespace orthia
             std::shared_ptr<IPeristentItemStorage> persistentStorage);
 
         void Init(std::shared_ptr<CModuleManager> moduleManager,
-            std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage);
+            std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
+            std::shared_ptr<ModuleStorage> moduleStorage);
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;
@@ -55,6 +58,7 @@ namespace orthia
         void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
         std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
         void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
+        ModuleStorage* GetModuleStorage() override;
     };
 
 }

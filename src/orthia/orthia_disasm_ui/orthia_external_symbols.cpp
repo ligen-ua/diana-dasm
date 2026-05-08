@@ -1,6 +1,5 @@
 #include "orthia_external_symbols.h"
 #include "orthia_item_file.h"
-#include <unordered_map>
 
 extern "C"
 {
@@ -8,7 +7,6 @@ extern "C"
 }
 #include "orthia_files.h"
 #include "orthia_utils.h"
-#include "orthia_database_impl_classic.h"
 
 namespace orthia
 {
@@ -112,7 +110,7 @@ public:
         return finder.FindNextPdb();
     }
 
-    void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db,
+    void Load(const ModuleInfo& mod, ModuleSymbols& out,
               OnPrivateSymbolLoaded onSymbol = nullptr) override
     {
         CPdbFileFinder finder(mod, m_symbolFolders);
@@ -164,8 +162,6 @@ public:
             {
                 continue;
             }
-
-            std::unordered_map<Address_type, std::pair<NameInfo, int>> pending;
 
             for (uint32_t i = 0; i < nrSymbols; ++i)
             {
@@ -224,23 +220,16 @@ public:
                 info.name = Utf8ToPlatformString(reinterpret_cast<const char*>(name));
 
                 int priority = (sym->rectyp == S_PUB32) ? 0 : 1;
-                auto it = pending.find(info.address);
-                if (it == pending.end() || priority > it->second.second)
-                    pending[info.address] = { info, priority };
+                out.Insert(info.address, std::move(info), priority);
             }
 
-            constexpr int kBatchSize = 1000;
-            auto it = pending.begin();
-            while (it != pending.end())
+            out.Finalize();
+
+            if (onSymbol)
             {
-                auto batch = db->BeginBatch();
-                for (int i = 0; i < kBatchSize && it != pending.end(); ++i, ++it)
-                {
-                    InsertName(db, mod.address, it->second.first, it->first);
-                    if (onSymbol)
-                        onSymbol(it->first, it->second.first.name);
-                }
-                batch->Commit();
+                out.ForEach([&](Address_type addr, const NameInfo& info) {
+                    onSymbol(addr, info.name);
+                });
             }
 
             if (m_logger)
@@ -265,7 +254,7 @@ public:
         return !IsPeModule(mod);
     }
 
-    void Load(const ModuleInfo& /*mod*/, intrusive_ptr<CClassicDatabase> /*db*/,
+    void Load(const ModuleInfo& /*mod*/, ModuleSymbols& /*out*/,
               OnPrivateSymbolLoaded /*onSymbol*/ = nullptr) override
     {
         // Not yet implemented.
@@ -296,14 +285,14 @@ public:
         return false;
     }
 
-    void Load(const ModuleInfo& mod, intrusive_ptr<CClassicDatabase> db,
+    void Load(const ModuleInfo& mod, ModuleSymbols& out,
               OnPrivateSymbolLoaded onSymbol = nullptr) override
     {
         for (const auto& l : m_loaders)
         {
             if (l->CanLoad(mod))
             {
-                l->Load(mod, db, onSymbol);
+                l->Load(mod, out, onSymbol);
                 return;
             }
         }

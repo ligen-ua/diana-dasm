@@ -7,7 +7,6 @@
 #include "orthia_common_print.h"
 #include "orthia_common_format.h"
 #include "orthia_module_manager.h"
-#include "orthia_database_module.h"
 
 namespace orthia
 {
@@ -25,10 +24,16 @@ namespace orthia
     {
     }
     void CProcessWorkplaceItem::Init(std::shared_ptr<CModuleManager> moduleManager,
-        std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage)
+        std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
+        std::shared_ptr<ModuleStorage> moduleStorage)
     {
         m_moduleManager = moduleManager;
         m_persistentStorage = persistentItemStorage;
+        m_moduleStorage = moduleStorage;
+    }
+    ModuleStorage* CProcessWorkplaceItem::GetModuleStorage()
+    {
+        return m_moduleStorage.get();
     }
     WorkAddressData CProcessWorkplaceItem::ReadData(Address_type address, Address_type size)
     {
@@ -406,7 +411,7 @@ namespace orthia
         {
             *totalCount = 0;
         }
-        names.clear(); 
+        names.clear();
         Address_type moduleSize = 0, entryPoint = 0;
         {
             orthia::CAutoCriticalSection guard(m_lock);
@@ -511,42 +516,11 @@ namespace orthia
             }
         }
 
-        // Also include private symbols from the database (e.g., loaded from PDB).
-        if (m_moduleManager)
+        // Also include private symbols (in-memory if available, DB fallback otherwise).
+        if (m_moduleStorage)
         {
-            auto classicDatabase = m_moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-            Address_type addressHint = markFound ? 0 : nameFilter.address;
-            classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                g_database_type_fnc_PrivateSymbol, -1,
-                [&, markFound](Address_type, int, const std::string& text, Address_type) mutable -> bool {
-                    if (totalCount)
-                    {
-                        ++(*totalCount);
-                        return true;
-                    }
-                    std::string nameStr;
-                    Address_type target = 0;
-                    CCommonFormatParser parser;
-                    parser.Parse(text);
-                    parser.QueryMetadata("address", &target);
-                    parser.QueryMetadata("name", &nameStr);
-
-                    if (!markFound)
-                    {
-                        if (target == nameFilter.address)
-                        {
-                            markFound = true;
-                        }
-                        return true;
-                    }
-
-                    NameInfo info;
-                    info.name = Utf8ToPlatformString(nameStr);
-                    info.address = target;
-                    info.flags = NameInfo::flags_PrivateSymbol;
-                    names.push_back(info);
-                    return !count || (int)names.size() < count;
-                }, addressHint);
+            m_moduleStorage->QueryModulePrivateSymbols(
+                moduleAddress, nameFilter, count, names, totalCount, markFound);
         }
     }
     void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names)const
@@ -722,34 +696,9 @@ namespace orthia
                 nameInfo.comment = comment;
             }
         }
-        if ((moduleInfo.flags & ModuleInfo::flags_symbolsLoaded) && nameInfo.privateSymbol.native.empty())
+        if (nameInfo.privateSymbol.native.empty() && m_moduleStorage)
         {
-            if (m_moduleManager)
-            {
-                auto classicDatabase = m_moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-                classicDatabase->QueryMetaInfoByNearestAddress(
-                    g_database_type_fnc_PrivateSymbol,
-                    address,
-                    [&](Address_type, int, const std::string& text, Address_type metaAddress) -> bool {
-
-                        std::string nameStr;
-                        Address_type target = 0;
-                        CCommonFormatParser parser;
-                        parser.Parse(text);
-                        parser.QueryMetadata("address", &target);
-                        parser.QueryMetadata("name", &nameStr);
-                        if (target == address)
-                        {
-                            nameInfo.flags |= NameInfo::flags_PrivateSymbol;
-                            nameInfo.privateSymbol = Utf8ToPlatformString(nameStr);
-                        }
-                        else
-                        {
-                            nameInfo.privateSymbol = ComposeName(orthia::Utf8ToPlatformString(nameStr), target, address);
-                        }
-                        return false;
-                    });
-            }
+            m_moduleStorage->QueryNearestPrivateSymbol(address, nameInfo);
         }
         if (!moduleInfo.name.empty() && !nameInfo.privateSymbol.native.empty())
         {

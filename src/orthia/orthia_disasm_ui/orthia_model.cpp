@@ -6,6 +6,7 @@
 #include "orthia_item_file.h"
 #include "orthia_model_modules.h"
 #include "orthia_log.h"
+#include "orthia_module_symbols.h"
 
 namespace orthia
 {
@@ -247,7 +248,9 @@ namespace orthia
 
             persistentItemStorage->Init(moduleManager->QueryDatabaseManager());
 
-            info->Init(moduleManager, persistentItemStorage);
+            auto moduleStorage = std::make_shared<ModuleStorage>(
+                moduleManager->QueryDatabaseManager()->GetClassicDatabase());
+            info->Init(moduleManager, persistentItemStorage, moduleStorage);
             persistentItemStorage->CPersistentItemStorage::Init(info);
         }
         catch (std::exception& e)

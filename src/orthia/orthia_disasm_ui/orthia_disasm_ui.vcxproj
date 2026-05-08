@@ -213,6 +213,7 @@
     <ClCompile Include="orthia_model_modules.cpp" />
     <ClCompile Include="orthia_model_modules_elf.cpp" />
     <ClCompile Include="orthia_module_analyzer.cpp" />
+    <ClCompile Include="orthia_module_symbols.cpp" />
     <ClCompile Include="orthia_process_adapter.cpp" />
     <ClCompile Include="oui_disasm_colors.cpp" />
     <ClCompile Include="oui_goto_dialog.cpp" />

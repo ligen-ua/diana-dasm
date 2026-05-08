@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_model_interfaces.h"
+#include "orthia_module_symbols.h"
 #include <memory>
 #include <vector>
 
@@ -39,7 +40,7 @@ namespace orthia
         virtual ~IExternalSymbolsLoader() = default;
         virtual bool CanLoad(const ModuleInfo& mod) const = 0;
         virtual void Load(const ModuleInfo& mod,
-                          intrusive_ptr<CClassicDatabase> db,
+                          ModuleSymbols& out,
                           OnPrivateSymbolLoaded onSymbol = nullptr) = 0;
     };
 
