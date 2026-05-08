@@ -570,7 +570,7 @@ namespace orthia
         std::string metaInfo;
         builder.Produce(&metaInfo);
 
-        database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, metaInfo, moduleAddress);
+        database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, metaInfo, moduleAddress, true);
     }
     void UpdateModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, std::function<bool (CCommonFormatParser&, CCommonFormatBuilder&)> handler)
     {
@@ -592,7 +592,7 @@ namespace orthia
 
         if (needUpdate)
         {
-            database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress);
+            database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress, true);
         }
     }
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)

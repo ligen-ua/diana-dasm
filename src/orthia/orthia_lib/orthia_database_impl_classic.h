@@ -60,6 +60,7 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtQueryRouteStart;
 
     CSQLStatement m_stmtInsertMetainfo;
+    CSQLStatement m_stmtUpdateMetainfo;
     CSQLStatement m_stmtInsertModule;
 
     CSQLStatement m_stmtSelectMetainfo_All;
@@ -102,7 +103,7 @@ public:
     void InsertReferencesToInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
     void InsertReferencesFromInstruction(Address_type offset, const std::vector<CommonReferenceInfo> & references);
 
-    void InsertMetaInfo(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress = DI_MAX_OPERAND_SIZE);
+    void InsertMetaInfo(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress = DI_MAX_OPERAND_SIZE, bool checkDuplicates = false);
     void QueryMetaInfo(int metaType, std::function<bool (Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler);
     void QueryMetaInfoModule2(Address_type moduleAddress, int metaType1, int metaType2, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler, Address_type addressHint = 0);
     int QueryMetaInfoModule2_Count(Address_type moduleAddress, int metaType1, int metaType2);

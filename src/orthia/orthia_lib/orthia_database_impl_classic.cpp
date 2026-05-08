@@ -76,6 +76,9 @@ void CClassicDatabase::Init()
     buffer = "INSERT OR REPLACE INTO tbl_metainfo(meta_mod_id, meta_address, meta_type, meta_info) VALUES(?1, ?2, ?3, ?4)";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtInsertMetainfo.Get2(), NULL));
 
+    buffer = "UPDATE tbl_metainfo SET meta_info = ?4 WHERE meta_mod_id = ?1 AND meta_type = ?3 AND meta_address IS ?2";
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtUpdateMetainfo.Get2(), NULL));
+
     buffer = "INSERT OR REPLACE INTO tbl_modules (mod_address, mod_size, mod_name) VALUES(?1, ?2, ?3)";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtInsertModule.Get2(), NULL));
 
@@ -532,9 +535,26 @@ void CClassicDatabase::RollbackTransactionSilent()
     SQLiteExec_Wrapper(m_pDatabase->Get(), "ROLLBACK TRANSACTION");
 }
 
-void CClassicDatabase::InsertMetaInfo(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+void CClassicDatabase::InsertMetaInfo(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress, bool checkDuplicates)
 {
     orthia::CAutoCriticalSection guard(m_lock);
+
+    if (checkDuplicates)
+    {
+        CSQLAutoReset autoStatement(m_stmtUpdateMetainfo.Get());
+        sqlite3_bind_int64(m_stmtUpdateMetainfo.Get(), 1, moduleAddress);
+        if (metaAddress != DI_MAX_OPERAND_SIZE)
+        {
+            sqlite3_bind_int64(m_stmtUpdateMetainfo.Get(), 2, AddrToDb(metaAddress));
+        }
+        sqlite3_bind_int64(m_stmtUpdateMetainfo.Get(), 3, metaType);
+        SQLBindUtf8String(m_stmtUpdateMetainfo.Get(), text, 4);
+        ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtUpdateMetainfo.Get()), "Can't update meta info");
+        if (sqlite3_changes(m_pDatabase->Get()) > 0)
+        {
+            return;
+        }
+    }
 
     CSQLAutoReset autoStatement(m_stmtInsertMetainfo.Get());
     sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 1, moduleAddress);
@@ -544,7 +564,6 @@ void CClassicDatabase::InsertMetaInfo(Address_type moduleAddress, int metaType, 
     }
     sqlite3_bind_int64(m_stmtInsertMetainfo.Get(), 3, metaType);
     SQLBindUtf8String(m_stmtInsertMetainfo.Get(), text, 4);
-
     ORTHIA_CHECK_SQLITE(SQLiteStep_Wrapper(m_stmtInsertMetainfo.Get()), "Can't insert meta info");
 }
 void CClassicDatabase::QueryMetaInfo(int metaType, std::function<bool(Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)> handler)
