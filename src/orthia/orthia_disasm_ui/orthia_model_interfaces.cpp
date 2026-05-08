@@ -349,6 +349,10 @@ namespace orthia
 
     oui::String GetPreferredName(const NameInfo& nameInfo)
     {
+        if (nameInfo.flags & nameInfo.flags_Export)
+        {
+            return nameInfo.name;
+        }
         if (!nameInfo.privateSymbol.native.empty())
         {
             return nameInfo.privateSymbol;

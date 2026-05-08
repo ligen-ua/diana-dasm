@@ -729,6 +729,7 @@ namespace orthia
         }
         if (address == capturedAddress)
         {
+            QueryAddressModule(address, moduleInfo);
             capturedInfo.flags |= NameInfo::flags_Export;
             return capturedInfo;
         }
