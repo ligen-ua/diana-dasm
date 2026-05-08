@@ -283,6 +283,7 @@ namespace orthia
             parser.Parse(text);
             parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &moduleIt->fullName);
             parser.QueryMetadata("flags", &moduleIt->flags);
+            parser.QueryMetadata("builtinflags", &moduleIt->builtInFlags);
             return true;
         });
 
@@ -565,11 +566,12 @@ namespace orthia
             });
     }
     // InsertModuleMetaInfo
-    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName, int moduleFlags)
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName, int moduleFlags, int builtInModuleFlags)
     {
         orthia::CCommonFormatBuilder builder;
         builder.AddMetadata(ORTHIA_TCSTR("fullname"), fullName.native);
         builder.AddMetadata("flags", moduleFlags);
+        builder.AddMetadata("builtinflags", builtInModuleFlags);
         std::string metaInfo;
         builder.Produce(&metaInfo);
 

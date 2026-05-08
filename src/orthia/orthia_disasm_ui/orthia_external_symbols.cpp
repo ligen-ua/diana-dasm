@@ -18,6 +18,11 @@ namespace
 
 bool IsPeModule(const ModuleInfo& mod)
 {
+    if (mod.builtInFlags & ModuleInfo::builtInFlags_moduleTypePe)
+        return true;
+    if (mod.builtInFlags & ModuleInfo::builtInFlags_moduleTypeElf)
+        return false;
+    // Legacy fallback for modules without builtInFlags (old databases)
     PlatformString_type ext;
     GetExtensionOfFile(mod.fullName, &ext);
     return ext == ORTHIA_TCSTR("dll")

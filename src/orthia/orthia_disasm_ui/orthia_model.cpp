@@ -244,7 +244,7 @@ namespace orthia
             // done readme, create db
             auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto moduleManager = std::make_shared<CModuleManager>();
-            moduleManager->Reinit(dbFileName, false);
+            moduleManager->Reinit(dbFileName, true);
 
             persistentItemStorage->Init(moduleManager->QueryDatabaseManager());
 
@@ -524,10 +524,14 @@ namespace orthia
 
                     importsLoader.ReportModules(info->moduleManager);
                 }
+                const int builtInTypeFlag =
+                    (executableType == DIANA_EXECUTABLE_TYPE_ELF) ? ModuleInfo::builtInFlags_moduleTypeElf :
+                    (executableType == DIANA_EXECUTABLE_TYPE_PE)  ? ModuleInfo::builtInFlags_moduleTypePe : 0;
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     info->file->GetImageBase(),
                     info->fullName.native,
-                    ModuleInfo::flags_analyzeDone);
+                    ModuleInfo::flags_analyzeDone,
+                    builtInTypeFlag);
             }
 
             auto workspaceId = RegisterItem(info, false);

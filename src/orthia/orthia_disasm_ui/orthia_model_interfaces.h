@@ -42,8 +42,12 @@ namespace orthia
         static const int flags_symbolsLoaded = 2;
         static const int flags_analyzePrivateDone = 4;
 
+        static const int builtInFlags_moduleTypePe  = 1;
+        static const int builtInFlags_moduleTypeElf = 2;
+
         PlatformString_type fullName;
         int flags = 0;
+        int builtInFlags = 0;
         PlatformString_type name;
     };
 

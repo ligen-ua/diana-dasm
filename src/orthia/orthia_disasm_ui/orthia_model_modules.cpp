@@ -474,7 +474,8 @@ namespace orthia
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.peFile->GetImageBase(),
                 mod.second.fullName.native,
-                0);
+                0,
+                orthia::ModuleInfo::builtInFlags_moduleTypePe);
 
             InsertNames(moduleManager, mod.second);
 

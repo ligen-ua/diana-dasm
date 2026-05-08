@@ -377,7 +377,8 @@ namespace orthia
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.elfFile->GetImageBase(),
                 mod.second.fullName.native,
-                0);
+                0,
+                orthia::ModuleInfo::builtInFlags_moduleTypeElf);
 
             InsertNames(moduleManager, mod.second);
             classicDatabase->DoneSave();
