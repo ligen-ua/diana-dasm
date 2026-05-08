@@ -355,6 +355,9 @@ namespace orthia
                         NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
                     });
             },
+            [this, uiThread, workspaceId]() {
+                NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
+            },
             procItem ? Address_type{0} : mainAddr);
     }
 

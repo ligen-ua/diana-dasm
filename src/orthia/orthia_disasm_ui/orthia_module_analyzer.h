@@ -41,6 +41,7 @@ namespace orthia
                                 std::shared_ptr<IWorkPlaceItem> item,
                                 std::shared_ptr<oui::BaseOperation> op,
                                 std::function<void()> onComplete,
+                                std::function<void()> onProgress,
                                 Address_type mainModuleAddr = 0);
 
         void EnqueueAnalyzePrivateSymbols(int workspaceId,

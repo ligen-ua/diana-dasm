@@ -7,6 +7,8 @@ extern "C"
 }
 #include "orthia_files.h"
 #include "orthia_utils.h"
+#include <filesystem>
+#include <optional>
 
 namespace orthia
 {
@@ -35,51 +37,82 @@ PlatformString_type GetPdbStem(const ModuleInfo& mod)
     return fileName;
 }
 
+static constexpr int maxPdbScanDepth = 4;
+
 // Iterates over all candidate PDB paths for a module: explicit symbol folders
-// first, then the module's own directory. Call FindNextPdb() until it returns
-// false; Current() holds the last successfully located path.
+// first (each scanned recursively up to maxPdbScanDepth levels), then the
+// module's own directory. Call FindNextPdb() until it returns false;
+// Current() holds the last successfully located path.
 class CPdbFileFinder
 {
     PlatformString_type m_pdbName;
     const std::vector<PlatformString_type>& m_symbolFolders;
-    PlatformString_type m_modPdb;
-    size_t m_folderIndex = 0;
-    bool m_triedModDir = false;
+    PlatformString_type m_modDir;
+    size_t m_folderIndex = 0;  // size() == modDir turn
+    bool m_checkedRoot = false;
+    std::optional<std::filesystem::recursive_directory_iterator> m_dirIt;
     PlatformString_type m_current;
+
+    PlatformString_type CurrentRoot() const
+    {
+        return m_folderIndex < m_symbolFolders.size()
+            ? m_symbolFolders[m_folderIndex]
+            : m_modDir;
+    }
 public:
     CPdbFileFinder(const ModuleInfo& mod, const std::vector<PlatformString_type>& symbolFolders)
         : m_symbolFolders(symbolFolders)
     {
         m_pdbName = GetPdbStem(mod) + ORTHIA_TCSTR(".pdb");
-        PlatformString_type modExt;
-        GetExtensionOfFile(mod.fullName, &modExt);
-        if (!modExt.empty())
-            m_modPdb = mod.fullName.substr(0, mod.fullName.size() - modExt.size()) + ORTHIA_TCSTR("pdb");
-        else
-            m_modPdb = mod.fullName + ORTHIA_TCSTR(".pdb");
+        m_modDir = std::filesystem::path(mod.fullName).parent_path().native();
     }
 
     bool FindNextPdb()
     {
+        namespace fs = std::filesystem;
         std::vector<char> buf;
-        while (m_folderIndex < m_symbolFolders.size())
+
+        while (m_folderIndex <= m_symbolFolders.size())
         {
-            PlatformString_type candidate = m_symbolFolders[m_folderIndex] + ORTHIA_STR_PLATFORM_SLASH + m_pdbName;
+            if (!m_checkedRoot)
+            {
+                m_checkedRoot = true;
+                PlatformString_type candidate = CurrentRoot() + ORTHIA_STR_PLATFORM_SLASH + m_pdbName;
+                std::error_code ec;
+                m_dirIt.emplace(CurrentRoot(), fs::directory_options::skip_permission_denied, ec);
+                if (ec) m_dirIt.reset();
+                if (LoadFileToVector_Silent(candidate, buf) == 0)
+                {
+                    m_current = std::move(candidate);
+                    return true;
+                }
+            }
+
+            while (m_dirIt && *m_dirIt != fs::recursive_directory_iterator{})
+            {
+                auto& it = *m_dirIt;
+                if (it.depth() >= maxPdbScanDepth - 1)
+                    it.disable_recursion_pending();
+
+                std::error_code ec;
+                bool isDir = it->is_directory(ec);
+                fs::path entryPath = it->path();
+                ++it;
+
+                if (isDir && !ec)
+                {
+                    PlatformString_type candidate = (entryPath / m_pdbName).native();
+                    if (LoadFileToVector_Silent(candidate, buf) == 0)
+                    {
+                        m_current = std::move(candidate);
+                        return true;
+                    }
+                }
+            }
+
             ++m_folderIndex;
-            if (LoadFileToVector_Silent(candidate, buf) == 0)
-            {
-                m_current = std::move(candidate);
-                return true;
-            }
-        }
-        if (!m_triedModDir)
-        {
-            m_triedModDir = true;
-            if (LoadFileToVector_Silent(m_modPdb, buf) == 0)
-            {
-                m_current = m_modPdb;
-                return true;
-            }
+            m_checkedRoot = false;
+            m_dirIt.reset();
         }
         return false;
     }
@@ -104,10 +137,7 @@ public:
 
     bool CanLoad(const ModuleInfo& mod) const override
     {
-        if (!IsPeModule(mod))
-            return false;
-        CPdbFileFinder finder(mod, m_symbolFolders);
-        return finder.FindNextPdb();
+        return IsPeModule(mod);
     }
 
     void Load(const ModuleInfo& mod, ModuleSymbols& out,

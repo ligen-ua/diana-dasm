@@ -228,6 +228,7 @@ namespace orthia
         std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         std::function<void()> onComplete,
+        std::function<void()> onProgress,
         Address_type mainModuleAddr)
     {
         {
@@ -242,7 +243,8 @@ namespace orthia
             op,
             workspaceId,
             mainModuleAddr,
-            onComplete = std::move(onComplete)]() mutable
+            onComplete = std::move(onComplete),
+            onProgress = std::move(onProgress)]() mutable
         {
             auto item = weakItem.lock();
             if (!item || op->IsCancelled())
@@ -299,6 +301,7 @@ namespace orthia
                         else
                             syms.FlushToDB(mod.address, db);
                     }
+                    onProgress();
                 }
                 catch (const std::exception& e)
                 {
