@@ -58,7 +58,7 @@ void CClassicDatabase::Init()
     buffer = "SELECT mod_size, mod_name  FROM tbl_modules WHERE mod_address = ?1";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtQueryModuleById.Get2(), NULL));
 
-    buffer = "SELECT mod_address, mod_size, mod_name  FROM tbl_modules WHERE UINT_LESSOE(mod_address, ?1)";
+    buffer = "SELECT mod_address, mod_size, mod_name  FROM tbl_modules WHERE UINT_LESSOE(mod_address, ?1) AND NOT UINT_LESSOE(mod_address + mod_size, ?1)";
     ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), buffer, (int)strlen(buffer), m_stmtQueryNearestModuleById.Get2(), NULL));
 
 

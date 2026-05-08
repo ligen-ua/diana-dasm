@@ -429,15 +429,24 @@ namespace orthia
         std::string capturedPrivateMetaName;
 
         NameInfo result;
+        CommonModuleInfo addressModule;
+        if (!classicDatabase->QueryNearestModule(address, &addressModule))
+        {
+            return result;
+        }
+
         classicDatabase->QueryMetaInfoByNearestAddress(g_database_type_fnc_Export,
             address,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
-            capturedExportModuleAddress = moduleAddress;
-            capturedMetaExportAddress = metaAddress;
-            CCommonFormatParser parser;
-            parser.Parse(text);
-            parser.QueryMetadata("name", &capturedExportMetaName);
+            if (moduleAddress == addressModule.address)
+            {
+                capturedExportModuleAddress = moduleAddress;
+                capturedMetaExportAddress = metaAddress;
+                CCommonFormatParser parser;
+                parser.Parse(text);
+                parser.QueryMetadata("name", &capturedExportMetaName);
+            }
             return false;
         });
 
@@ -445,12 +454,15 @@ namespace orthia
             address,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
+            if (moduleAddress == addressModule.address)
+            {
                 capturedPrivateModuleAddress = moduleAddress;
                 capturedMetaPrivateAddress = metaAddress;
                 CCommonFormatParser parser;
                 parser.Parse(text);
                 parser.QueryMetadata("name", &capturedPrivateMetaName);
-                return false;
+            }
+            return false;
         });
 
         Address_type moduleAddressHint = address;
@@ -462,14 +474,12 @@ namespace orthia
         {
             moduleAddressHint = capturedPrivateModuleAddress;
         }
-        CommonModuleInfo info;
-        if (classicDatabase->QueryNearestModule(moduleAddressHint, &info))
+
+
+        result.name = ComposeName(orthia::Utf8ToPlatformString(capturedExportMetaName), capturedMetaExportAddress, address, addressModule.name, addressModule.address);
+        if (!capturedPrivateMetaName.empty())
         {
-            result.name = ComposeName(orthia::Utf8ToPlatformString(capturedExportMetaName), capturedMetaExportAddress, address, info.name, info.address);
-            if (!capturedPrivateMetaName.empty())
-            {
-                result.privateSymbol = ComposeName(orthia::Utf8ToPlatformString(capturedPrivateMetaName), capturedMetaPrivateAddress, address, info.name, info.address);
-            }
+            result.privateSymbol = ComposeName(orthia::Utf8ToPlatformString(capturedPrivateMetaName), capturedMetaPrivateAddress, address, addressModule.name, addressModule.address);
         }
         return result;
     }
