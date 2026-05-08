@@ -37,12 +37,11 @@ namespace orthia
                      Address_type mainModuleAddr,
                      std::function<void()> onComplete);
 
-        // singleModuleName: if non-empty, load symbols only for the named module.
         void EnqueueLoadSymbols(int workspaceId,
                                 std::shared_ptr<IWorkPlaceItem> item,
                                 std::shared_ptr<oui::BaseOperation> op,
                                 std::function<void()> onComplete,
-                                const PlatformString_type& singleModuleName = {});
+                                Address_type mainModuleAddr = 0);
 
         void EnqueueAnalyzePrivateSymbols(int workspaceId,
                                           std::shared_ptr<IWorkPlaceItem> item,

@@ -346,12 +346,16 @@ namespace orthia
         auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
         m_analyzer.EnqueueLoadSymbols(workspaceId, item, symOp,
             [this, uiThread, workspaceId, mainAddr, item]() {
+
+                NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
+
                 auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
                 m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, item, reanalyzeOp, mainAddr,
                     [this, uiThread, workspaceId]() {
                         NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
                     });
-            });
+            },
+            procItem ? Address_type{0} : mainAddr);
     }
 
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,

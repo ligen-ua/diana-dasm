@@ -228,7 +228,7 @@ namespace orthia
         std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         std::function<void()> onComplete,
-        const PlatformString_type& singleModuleName)
+        Address_type mainModuleAddr)
     {
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
@@ -241,7 +241,7 @@ namespace orthia
             weakItem = std::weak_ptr<IWorkPlaceItem>(item),
             op,
             workspaceId,
-            singleModuleName,
+            mainModuleAddr,
             onComplete = std::move(onComplete)]() mutable
         {
             auto item = weakItem.lock();
@@ -270,7 +270,7 @@ namespace orthia
                 if (op->IsCancelled())
                     break;
 
-                if (!singleModuleName.empty() && mod.name != singleModuleName)
+                if (mainModuleAddr && !mod.IsInRange(mainModuleAddr))
                     continue;
 
                 if (mod.flags & mod.flags_symbolsLoaded)
