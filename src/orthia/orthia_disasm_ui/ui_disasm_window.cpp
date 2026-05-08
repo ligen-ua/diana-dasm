@@ -514,6 +514,11 @@ void CDisasmWindow::SetActiveWorkspaceItem(int itemId)
     ReloadVisibleData();
     Invalidate();
 }
+void CDisasmWindow::ReloadVisibleItems()
+{
+    ReloadVisibleData();
+    Invalidate();
+}
 bool CDisasmWindow::DoGotoOnPage(orthia::Address_type address)
 {
     oui::LineIndex lineIndex(address, 0);

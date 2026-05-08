@@ -60,5 +60,6 @@ public:
     void SaveState(UIState& state) override;
     void SetActiveWorkspaceItem(int itemId) override;
 
+    void ReloadVisibleItems();
     void DoGotoRequest(orthia::Address_type address);
 };

@@ -63,6 +63,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 
     void OnWorkspaceItemChanged(int itemId) override;
     void OnPreWorkspaceItemChange(int itemId) override;
+    void OnWorkspaceDataRefreshed(int itemId) override;
 
     void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);

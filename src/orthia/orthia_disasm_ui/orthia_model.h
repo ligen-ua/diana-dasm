@@ -27,6 +27,7 @@ namespace orthia
         virtual ~IUIEventHandler() {}
         virtual void OnPreWorkspaceItemChange(int itemId) = 0;
         virtual void OnWorkspaceItemChanged(int itemId) = 0;
+        virtual void OnWorkspaceDataRefreshed(int itemId) = 0;
     };
     class CProcessWorkplaceItem;
     class CProgramModel
@@ -84,8 +85,8 @@ namespace orthia
     private:
         CModuleAnalyzer m_analyzer;
 
-        // Dispatches workspace-changed event to all UI subscribers from a background thread.
-        void NotifyWorkspaceChanged(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId);
+        // Dispatches data-refreshed event to all UI subscribers from a background thread.
+        void NotifyWorkspaceDataRefreshed(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId);
 
         // Starts background analysis and symbol-loading pipelines for a newly opened workspace item.
         // procItem is non-null for process items; file items pass nullptr to skip process-only steps

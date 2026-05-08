@@ -305,7 +305,7 @@ namespace orthia
 
         EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GerProcessModuleAddress(), info);
     }
-    void CProgramModel::NotifyWorkspaceChanged(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId)
+    void CProgramModel::NotifyWorkspaceDataRefreshed(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId)
     {
         std::vector<std::shared_ptr<IUIEventHandler>> handlers;
         {
@@ -314,7 +314,7 @@ namespace orthia
         }
         uiThread->AddTask([handlers = std::move(handlers), workspaceId]() {
             for (auto& h : handlers)
-                h->OnWorkspaceItemChanged(workspaceId);
+                h->OnWorkspaceDataRefreshed(workspaceId);
         });
     }
 
@@ -349,7 +349,7 @@ namespace orthia
                 auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
                 m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, item, reanalyzeOp, mainAddr,
                     [this, uiThread, workspaceId]() {
-                        NotifyWorkspaceChanged(uiThread, workspaceId);
+                        NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
                     });
             });
     }
