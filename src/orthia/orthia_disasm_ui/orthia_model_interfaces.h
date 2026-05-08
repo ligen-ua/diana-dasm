@@ -40,6 +40,7 @@ namespace orthia
     {
         static const int flags_analyzeDone = 1;
         static const int flags_symbolsLoaded = 2;
+        static const int flags_analyzePrivateDone = 4;
 
         PlatformString_type fullName;
         int flags = 0;
@@ -110,6 +111,7 @@ namespace orthia
         int flags = 0;
         int continueMarkNameFlag = 0;
         bool excludeImports = false;
+        bool privateSymbolsOnly = false;
     };
 
     struct MarkupRangeInfo

@@ -445,74 +445,78 @@ namespace orthia
         }
         diana::Guard<diana::ExecutableFile> exeGuard(&exe);
 
-        int importsCount = 0;
-        CImportsCollector importsCollector(nameFilter, names, [this](auto address) {
-
-            return QueryAddressName(address);
-        },
-            count,
-            importsCount);
-
-        std::vector<char> page(4096);
-        if (!nameFilter.excludeImports)
+        bool markFound = !(nameFilter.flags & NameSelectionKey::flags_ContinueFrom);
+        if (!nameFilter.privateSymbolsOnly)
         {
-            DianaExecutable_QueryImports(&exe,
-                moduleAddress,
-                &stream,
-                page.data(),
-                (int)page.size(),
-                importsCollector.GetParent(),
-                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
-                0);
-        }
-        if (totalCount)
-        {
-            *totalCount = importsCount;
-        }
+            int importsCount = 0;
+            CImportsCollector importsCollector(nameFilter, names, [this](auto address) {
 
-        int maxCount = count - importsCollector.GetDeliveredCount();
-        bool markFound = importsCollector.IsMarkFound();
-        if (maxCount || totalCount)
-        {
-            int exportsCount = 0;
-            // deliver exports
-            ModuleExportsCollector exportsCollector(nameFilter,
-                names,
-                maxCount,
-                exportsCount,
-                0,
-                moduleAddress);
+                return QueryAddressName(address);
+            },
+                count,
+                importsCount);
 
-            bool importsMarkFound = importsCollector.IsMarkFound();
-            if (!importsMarkFound &&
-                (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
-                nameFilter.continueMarkNameFlag == NameInfo::flags_Import)
+            std::vector<char> page(4096);
+            if (!nameFilter.excludeImports)
             {
-                importsMarkFound = true;
-            }
-            exportsCollector.SetFound(importsMarkFound);
-
-            DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
-
-            // report regular exports
-            DianaExecutable_QueryExports(&exe,
-                    &stream.parent,
+                DianaExecutable_QueryImports(&exe,
+                    moduleAddress,
+                    &stream,
                     page.data(),
                     (int)page.size(),
-                    exportsCollector.GetParent(),
+                    importsCollector.GetParent(),
+                    DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
                     0);
-
+            }
             if (totalCount)
             {
-                *totalCount += exportsCount;
+                *totalCount = importsCount;
             }
-            maxCount -= exportsCollector.GetDeliveredCount();
-            markFound = exportsCollector.IsMarkFound();
-            if (!markFound &&
-                (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
-                nameFilter.continueMarkNameFlag == NameInfo::flags_Export)
+
+            int maxCount = count - importsCollector.GetDeliveredCount();
+            markFound = importsCollector.IsMarkFound();
+            if (maxCount || totalCount)
             {
-                markFound = true;
+                int exportsCount = 0;
+                // deliver exports
+                ModuleExportsCollector exportsCollector(nameFilter,
+                    names,
+                    maxCount,
+                    exportsCount,
+                    0,
+                    moduleAddress);
+
+                bool importsMarkFound = importsCollector.IsMarkFound();
+                if (!importsMarkFound &&
+                    (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
+                    nameFilter.continueMarkNameFlag == NameInfo::flags_Import)
+                {
+                    importsMarkFound = true;
+                }
+                exportsCollector.SetFound(importsMarkFound);
+
+                DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
+
+                // report regular exports
+                DianaExecutable_QueryExports(&exe,
+                        &stream.parent,
+                        page.data(),
+                        (int)page.size(),
+                        exportsCollector.GetParent(),
+                        0);
+
+                if (totalCount)
+                {
+                    *totalCount += exportsCount;
+                }
+                maxCount -= exportsCollector.GetDeliveredCount();
+                markFound = exportsCollector.IsMarkFound();
+                if (!markFound &&
+                    (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
+                    nameFilter.continueMarkNameFlag == NameInfo::flags_Export)
+                {
+                    markFound = true;
+                }
             }
         }
 

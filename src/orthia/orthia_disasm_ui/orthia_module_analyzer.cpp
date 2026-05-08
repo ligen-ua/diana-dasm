@@ -168,18 +168,34 @@ namespace orthia
                 Cleanup(workspaceId);
                 return;
             }
-
+            if (mainIt->flags & ModuleInfo::flags_analyzePrivateDone)
+            {
+                return;
+            }
+            if (!(mainIt->flags & ModuleInfo::flags_symbolsLoaded))
+            {
+                return;
+            }
             try
             {
-                auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
                 std::vector<orthia::Address_type> hints;
-                db->QueryMetaInfoModule2(mainIt->address,
-                    g_database_type_fnc_PrivateSymbol, -1,
-                    [&hints](orthia::Address_type, int, const std::string&, orthia::Address_type metaAddr) -> bool
+                {
+                    const int c_pageSize = 5000;
+                    NameSelectionKey key;
+                    key.privateSymbolsOnly = true;
+                    std::vector<NameInfo> page;
+                    for (;;)
                     {
-                        hints.push_back(metaAddr);
-                        return true;
-                    });
+                        item->QueryNames(mainIt->address, key, c_pageSize, page);
+                        if (page.empty())
+                            break;
+                        for (const auto& info : page)
+                            hints.push_back(info.address);
+                        key.flags |= NameSelectionKey::flags_ContinueFrom;
+                        key.address = page.back().address;
+                        key.continueMarkNameFlag = page.back().flags;
+                    }
+                }
 
                 if (!hints.empty() && !op->IsCancelled())
                 {
@@ -190,7 +206,7 @@ namespace orthia
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols")), mainIt->name));
 
                         moduleManager->ReloadModuleWithHints(mainIt->address, reader.get(), mainIt->name, 0, hints);
-                        item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
+                        item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzePrivateDone, 0);
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols-done")), mainIt->name));
                     }
                 }
@@ -257,6 +273,10 @@ namespace orthia
                 if (!singleModuleName.empty() && mod.name != singleModuleName)
                     continue;
 
+                if (mod.flags & mod.flags_symbolsLoaded)
+                {
+                    continue;
+                }
                 try
                 {
                     bool anyLoaded = false;

@@ -187,32 +187,35 @@ namespace orthia
 
         bool continueFromPrivate = (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
                                    nameFilter.continueMarkNameFlag == NameInfo::flags_PrivateSymbol;
-        if (!continueFromPrivate)
+        if (!nameFilter.privateSymbolsOnly)
         {
-            if (nameFilter.excludeImports)
+            if (!continueFromPrivate)
             {
-                classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                    g_database_type_fnc_Export, -1,
-                    handler);
+                if (nameFilter.excludeImports)
+                {
+                    classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                        g_database_type_fnc_Export, -1,
+                        handler);
+                }
+                else
+                {
+                    classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                        g_database_type_fnc_Import, g_database_type_fnc_Export,
+                        handler);
+                }
             }
-            else
+            if ((int)names.size() >= count)
             {
-                classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                    g_database_type_fnc_Import, g_database_type_fnc_Export,
-                    handler);
+                return;
             }
-        }
-        if ((int)names.size() >= count)
-        {
-            return;
-        }
-        if (!pageFound &&
-            (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
-            nameFilter.continueMarkNameFlag != 0 &&
-            nameFilter.continueMarkNameFlag != NameInfo::flags_PrivateSymbol)
-        {
-            pageFound = true;
-            continueFromPrivate = false;
+            if (!pageFound &&
+                (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
+                nameFilter.continueMarkNameFlag != 0 &&
+                nameFilter.continueMarkNameFlag != NameInfo::flags_PrivateSymbol)
+            {
+                pageFound = true;
+                continueFromPrivate = false;
+            }
         }
         classicDatabase->QueryMetaInfoModule2(moduleAddress,
             g_database_type_fnc_PrivateSymbol, -1,

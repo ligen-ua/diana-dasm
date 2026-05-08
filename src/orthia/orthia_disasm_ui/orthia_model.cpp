@@ -528,7 +528,7 @@ namespace orthia
             // OK
             result.error.native.clear();
 
-            // Kick off symbol loading and notify UI when complete (file items skip disassembly analysis).
+            // kick off symbol loading and notify UI when complete
             EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->file->GetImageBase(), nullptr);
         }
         catch (std::exception& e)
