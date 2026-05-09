@@ -11,18 +11,74 @@ NameResolverOverWorkplaceItem::NameResolverOverWorkplaceItem(std::shared_ptr<ort
     item(item_in)
 {
 }
-orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::PlatformString_type& name) 
+orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::PlatformString_type& name)
 {
     auto address = item->QueryAddressByName(name, 0);
     if (!address)
     {
         address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
-        if (address == DI_MAX_OPERAND_SIZE)
+        if (address != DI_MAX_OPERAND_SIZE)
         {
-            throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
+            return address;
         }
     }
-    return address;
+
+    // try to find private symbols
+    auto nameDowncased = orthia::Downcase(name);
+    std::vector<orthia::StringInfo> parts;
+    orthia::SplitString(nameDowncased, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
+    if (parts.size() == 2)
+    {
+        auto internalName = parts[1].ToString();
+            
+        std::vector<orthia::ModuleInfo> modules;
+        item->GetModules(modules);
+
+        orthia::PlatformString_type text;
+        for (auto& mod : modules)
+        {
+            auto modDowncased = orthia::Downcase(mod.name);
+            bool match = parts[0].ToString() == modDowncased;
+            if (!match)
+            {
+                orthia::PlatformString_type extension;
+                orthia::GetExtensionOfFile(modDowncased, &extension);
+                if (!extension.empty())
+                {
+                    modDowncased.erase(modDowncased.size() - extension.size() - 1);
+                    match = parts[0].ToString() == modDowncased;
+                }
+            }
+            if (!match)
+            {
+                continue;
+            }
+
+            // match
+            const int c_pageSize = 5000;
+            orthia::NameSelectionKey key;
+            key.privateSymbolsOnly = true;
+            std::vector<orthia::NameInfo> page;
+            for (;;)
+            {
+                item->QueryNames(mod.address, key, c_pageSize, page);
+                if (page.empty())
+                    break;
+
+                for (auto& name : page) 
+                {
+                    if (orthia::Downcase(name.privateSymbol.native) == internalName)
+                    {
+                        return name.address;
+                    }
+                }
+                key.flags |= key.flags_ContinueFrom;
+                key.address = page.back().address;
+                key.continueMarkNameFlag = page.back().flags;
+            }
+        }
+    }
+    throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
 }
 orthia::Address_type NameResolverOverWorkplaceItem::Dereference(orthia::Address_type address) 
 {

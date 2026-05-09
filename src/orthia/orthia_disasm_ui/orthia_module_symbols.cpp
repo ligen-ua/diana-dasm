@@ -80,6 +80,7 @@ namespace orthia
             NameInfo info;
             info.address = it->second.address;
             info.name = it->second.name;
+            info.privateSymbol = it->second.name;
             info.flags = NameInfo::flags_PrivateSymbol;
             names.push_back(std::move(info));
             if (count && (int)names.size() >= count)

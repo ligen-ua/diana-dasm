@@ -110,7 +110,7 @@ namespace orthia
     struct NameSelectionKey
     {
         static const int flags_ContinueFrom = 1;
-        Address_type address;
+        Address_type address = 0;
         oui::String name;
         int flags = 0;
         int continueMarkNameFlag = 0;
