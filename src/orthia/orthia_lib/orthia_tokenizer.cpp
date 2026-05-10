@@ -1098,11 +1098,11 @@ std::string CTokenizer::GetNextRawString()
 {
     if (m_eofReached)
     {
-        return 0;
+        return std::string();
     }
     if (!m_pTokenFileSource)
     {
-        return 0;
+        return std::string();
     }
     std::string res;
     for (;;)
