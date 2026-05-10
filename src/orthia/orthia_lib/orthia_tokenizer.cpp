@@ -68,6 +68,55 @@ static bool IsUTF8SpecialByte(char t) {
     return isValidUTF8(&t, 1, asciiCount) == false;
 }
 
+orthia::PlatformString_type ReadRawString(const Token& token)
+{
+    if (!token.pSymbolStorage)
+    {
+        return orthia::PlatformString_type();
+    }
+    auto buffer = (const char*)token.pSymbolStorage->QueryData(token.symbolOffset, token.symbolSize);
+    std::string utf8(buffer, buffer + token.symbolSize);
+    return Utf8ToPlatformString(utf8);
+}
+
+// CSymbolStorage
+CSymbolStorage::CSymbolStorage(size_t hintToReserve)
+{
+    m_storage.reserve(hintToReserve);
+}
+void CSymbolStorage::Clear()
+{
+    m_storage.clear();
+}
+const void * CSymbolStorage::QueryData(size_t offset, size_t size) const
+{
+    size_t endSize = offset + size;
+    if (endSize < offset || endSize < size)
+    {
+        throw std::runtime_error("Overflow");
+    }
+    if (endSize > m_storage.size())
+    {
+        throw std::runtime_error("Symbol overflow");
+    }
+    if (m_storage.empty())
+    {
+        return 0;
+    }
+    return &m_storage[offset];
+}
+size_t CSymbolStorage::RegisterSymbolData(Token * pToken, const void * pRawData, size_t size)
+{
+    size_t offset = m_storage.size();
+    const char * pBegin = (const char *)pRawData;
+    const char * pEnd = pBegin + size;
+    m_storage.insert(m_storage.end(), pBegin, pEnd);
+    pToken->symbolOffset = offset;
+    pToken->symbolSize = size;
+    pToken->pSymbolStorage = this;
+    return offset;
+}
+
 orthia::PlatformString_type ReadString(const Token& token)
 {
     orthia::PlatformString_type res;
@@ -75,7 +124,9 @@ orthia::PlatformString_type ReadString(const Token& token)
     {
         return res;
     }
-    if (token.type != Token::ttName)
+    
+    if ((token.type != Token::ttName)
+        && !(token.type == Token::ttLiteral && (token.literalType == Token::ttLiteralString || token.type == Token::ttLiteralWideString)))
     {
         return res;
     }
@@ -300,12 +351,14 @@ CTokenizer::CTokenizer(CBinaryTokenStorage * pBinaryTokenStorage,
                        ITokenFileSource * pTokenFileSource)
     :
         m_pBinaryTokenStorage(pBinaryTokenStorage),
+        m_pSymbolStorage(nullptr),
         m_pTokenFileSource(pTokenFileSource),
         m_pReservedWordsStorage(pReservedWordsStorage),
         m_lineSize(0),
         m_eofReached(false),
         m_lineNumber(-1),
         m_columnPos(0),
+        m_tokenStartPos(0),
         m_inComment(false),
         m_windbgStyle(false)
 {
@@ -513,16 +566,23 @@ bool CTokenizer::CaptureStringLiteral(Token::LiteralType_type literalType,
         switch(ch)
         {
         case '\\':
-            wideChar = CaptureEscapedChar(isWide);
-            if (isWide)
+            if (m_windbgStyle)
             {
-                AddToTempStorage(&wideChar, sizeof(wideChar));
+                break;
             }
             else
             {
-                m_tempStorage.push_back((char)wideChar);
+                wideChar = CaptureEscapedChar(isWide);
+                if (isWide)
+                {
+                    AddToTempStorage(&wideChar, sizeof(wideChar));
+                }
+                else
+                {
+                    m_tempStorage.push_back((char)wideChar);
+                }
+                continue;
             }
-            continue;
 
         case '\'':
             if (isChar)
@@ -997,9 +1057,19 @@ void CTokenizer::Clear()
     m_eofReached = false;
     m_lineNumber = -1;
     m_columnPos = 0;
+    m_tokenStartPos = 0;
     m_tempStorage.clear();
     m_tempStorageStr.clear();
     m_inComment = false;
+}
+void CTokenizer::RegisterSymbolData(Token * pToken)
+{
+    if (!m_pSymbolStorage)
+        return;
+    int len = m_columnPos - m_tokenStartPos;
+    if (len <= 0)
+        return;
+    m_pSymbolStorage->RegisterSymbolData(pToken, &m_line[m_tokenStartPos], (size_t)len);
 }
 std::string CTokenizer::GetNextRawString()
 {
@@ -1071,17 +1141,21 @@ bool CTokenizer::GetNextToken(Token * pToken, int flags)
             continue;
         }
 
+        m_tokenStartPos = m_columnPos;
+
         if (flags & flags_ForceGetName)
         {
-            return CaptureName(pToken, flags);
+            bool res = CaptureName(pToken, flags);
+            RegisterSymbolData(pToken);
+            return res;
         }
         SymbolMatcherFnc_type symbolMatcher = 0;
         switch(ch)
-        {  
+        {
             // skip whitespaces
             case 9:
-            case 10: 
-            case 13: 
+            case 10:
+            case 13:
             case ' ': ++m_columnPos;
                 continue;
 
@@ -1140,9 +1214,17 @@ bool CTokenizer::GetNextToken(Token * pToken, int flags)
                 break;
 
             case '\'':
-                return CaptureStringLiteral(Token::ttLiteralChar, pToken);
+                {
+                    bool res = CaptureStringLiteral(Token::ttLiteralChar, pToken);
+                    RegisterSymbolData(pToken);
+                    return res;
+                }
             case '\"':
-                return CaptureStringLiteral(Token::ttLiteralString, pToken);
+                {
+                    bool res = CaptureStringLiteral(Token::ttLiteralString, pToken);
+                    RegisterSymbolData(pToken);
+                    return res;
+                }
 
             case '0':
             case '1':
@@ -1154,14 +1236,22 @@ bool CTokenizer::GetNextToken(Token * pToken, int flags)
             case '7':
             case '8':
             case '9':
-                return CaptureDigitLiteral(pToken);
+                {
+                    bool res = CaptureDigitLiteral(pToken);
+                    RegisterSymbolData(pToken);
+                    return res;
+                }
 
             default:
                 if (ch < 20 || ((unsigned char)(ch))>127)
                 {
                     RaiseError("Invalid characters");
                 }
-                return CaptureName(pToken, flags);
+                {
+                    bool res = CaptureName(pToken, flags);
+                    RegisterSymbolData(pToken);
+                    return res;
+                }
         }
         // capture sign
         bool res = CaptureSign(pToken, symbolMatcher);
@@ -1175,6 +1265,7 @@ bool CTokenizer::GetNextToken(Token * pToken, int flags)
             // c-style comment
             continue;
         }
+        RegisterSymbolData(pToken);
         return res;
     }   
 }
@@ -1184,6 +1275,7 @@ CTokenizerEnv::CTokenizerEnv()
     :
         m_tokenizer(&m_binaryStorage, &m_reservedWordsStorage)
 {
+    m_tokenizer.SetSymbolStorage(&m_symbolStorage);
 }
 bool CTokenizerEnv::GetNextToken(Token * pToken, int flags)
 {
@@ -1193,6 +1285,7 @@ void CTokenizerEnv::Clear()
 {
     m_tokenizer.Clear();
     m_binaryStorage.Clear();
+    m_symbolStorage.Clear();
 }
 void CTokenizerEnv::ResetSource(ITokenFileSource * pTokenFileSource)
 {

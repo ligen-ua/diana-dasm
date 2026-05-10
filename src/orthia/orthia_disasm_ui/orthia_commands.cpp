@@ -275,16 +275,34 @@ namespace orthia
 
     void CCommandProcessor::Handle_symfix(CommandArguments& args)
     {
-        auto symbols = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
-        orthia::TrimStringAllWhiteSpace(symbols);
-        if (symbols.empty())
+        orthia::PlatformString_type text;
+        auto& tokenizer = args.parser.GetTokenizer().GetTokenizer();
+        Token token;
+        if (tokenizer.GetNextToken(&token) &&
+            (token.type == Token::ttLiteral && (token.literalType == Token::ttLiteralString || token.type == Token::ttLiteralWideString)))
         {
-            throw std::runtime_error("Module name expected");
+            text = ReadString(token);
+
+            auto tail = ReadRawString(token);
+            orthia::TrimStringAllWhiteSpace(tail);
+            if (!tail.empty())
+            {
+                throw std::runtime_error("Extra text found: " + orthia::PlatformStringToUtf8(tail));
+            }
         }
-        auto platformSymbols = orthia::Utf8ToPlatformString(symbols);
-        args.model->GetConfig()->SetSymbolsFolders(platformSymbols);
+        else
+        {
+            text = ReadRawString(token);
+            text += orthia::Utf8ToPlatformString(tokenizer.GetNextRawString());
+        }
+        orthia::TrimStringAllWhiteSpace(text);
+        if (text.empty())
+        {
+            throw std::runtime_error("File paths separated by semicolon are expected");
+        }
+        args.model->GetConfig()->SetSymbolsFolders(text);
         orthia::PlatformString_type line;
-        line = ORTHIA_TCSTR("Symbols directories: ") + platformSymbols;
+        line = ORTHIA_TCSTR("Symbols directories: ") + text;
         args.ReplyLine(line);
     }
 
@@ -323,7 +341,8 @@ namespace orthia
         catch (std::exception& e)
         {
             auto errStr = orthia::Utf8ToPlatformString(e.what());
-            args.progressHandler->ReplyAnyway(args.progressHandler, errStr, false);
+            args.progressHandler->ReplyAnyway(args.progressHandler, ORTHIA_TCSTR("Error: ") + errStr, false);
+            return;
         }
     }
     void CCommandProcessor::AsyncExecute(ThreadPtr_type targetThread,
