@@ -126,7 +126,7 @@ orthia::PlatformString_type ReadString(const Token& token)
     }
     
     if ((token.type != Token::ttName)
-        && !(token.type == Token::ttLiteral && (token.literalType == Token::ttLiteralString || token.type == Token::ttLiteralWideString)))
+        && !(token.type == Token::ttLiteral && (token.literalType == Token::ttLiteralString || token.literalType == Token::ttLiteralWideString)))
     {
         return res;
     }
@@ -134,6 +134,29 @@ orthia::PlatformString_type ReadString(const Token& token)
     std::string utf8(buffer, buffer + token.tokenSize);
     return Utf8ToPlatformString(utf8);
 }
+orthia::PlatformString_type ReadStringOrRaw(CTokenizer& tokenizer)
+{
+    Token token;
+    if (tokenizer.GetNextToken(&token) &&
+        token.type == Token::ttLiteral &&
+        (token.literalType == Token::ttLiteralString || token.literalType == Token::ttLiteralWideString))
+    {
+        auto tail = ReadRawString(token);
+        orthia::TrimStringAllWhiteSpace(tail);
+        if (!tail.empty())
+        {
+            throw std::runtime_error("Extra text found: " + orthia::PlatformStringToUtf8(tail));
+        }
+        auto text = ReadString(token);
+        orthia::TrimStringAllWhiteSpace(text);
+        return text;
+    }
+    auto text = ReadRawString(token);
+    text += orthia::Utf8ToPlatformString(tokenizer.GetNextRawString());
+    orthia::TrimStringAllWhiteSpace(text);
+    return text;
+}
+
 bool operator == (const Token & token1, const Token & token2)
 {
     bool commonPropsAreEqual = 

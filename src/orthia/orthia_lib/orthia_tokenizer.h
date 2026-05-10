@@ -59,6 +59,9 @@ bool operator == (const Token & token1, const Token & token2);
 orthia::PlatformString_type ReadString(const Token& token);
 orthia::PlatformString_type ReadRawString(const Token& token);
 
+class CTokenizer;
+orthia::PlatformString_type ReadStringOrRaw(CTokenizer& tokenizer);
+
 struct ITokenFileSource
 {
     virtual ~ITokenFileSource(){}

@@ -146,14 +146,11 @@ namespace orthia
 
     void CCommandProcessor::Handle_x(CommandArguments& args)
     {
-        auto mask = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
-        orthia::TrimStringAllWhiteSpace(mask);
-
-        auto maskDowncase = orthia::Downcase(orthia::Utf8ToPlatformString(mask));
+        auto mask = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
+        auto maskDowncase = orthia::Downcase(mask);
 
         std::vector<StringInfo> parts;
         orthia::SplitString(maskDowncase, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
-        
         if (parts.size() != 2)
         {
             return;
@@ -217,44 +214,42 @@ namespace orthia
 
     void CCommandProcessor::Handle_reload(CommandArguments& args)
     {
-        auto moduleName = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
-        orthia::TrimStringAllWhiteSpace(moduleName);        
+        auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
         if (moduleName.empty())
         {
-            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr, 
+            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr,
                 [this]() {
                 });
             return;
         }
         bool moduleFound = false;
         oui::EnumModulesByName(args.item,
-            orthia::Utf8ToPlatformString(moduleName),
+            moduleName,
             [&](orthia::ModuleInfo& mod)
         {
-            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr, 
+            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr,
             [this]() {
-                }, 
+                },
              mod.address);
             moduleFound = true;
             return false;
         });
         if (!moduleFound)
         {
-            throw std::runtime_error("Module not found: " + moduleName);
+            throw std::runtime_error("Module not found: " + orthia::PlatformStringToUtf8(moduleName));
         }
     }
 
     void CCommandProcessor::Handle_analyze(CommandArguments& args)
     {
-        auto moduleName = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
-        orthia::TrimStringAllWhiteSpace(moduleName);
+        auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
         if (moduleName.empty())
         {
             throw std::runtime_error("Module name expected");
         }
         bool moduleFound = false;
         oui::EnumModulesByName(args.item,
-            orthia::Utf8ToPlatformString(moduleName),
+            moduleName,
             [&](orthia::ModuleInfo& mod)
             {
                 args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
@@ -269,33 +264,13 @@ namespace orthia
         );
         if (!moduleFound)
         {
-            throw std::runtime_error("Module not found: " + moduleName);
+            throw std::runtime_error("Module not found: " + orthia::PlatformStringToUtf8(moduleName));
         }
     }
 
     void CCommandProcessor::Handle_symfix(CommandArguments& args)
     {
-        orthia::PlatformString_type text;
-        auto& tokenizer = args.parser.GetTokenizer().GetTokenizer();
-        Token token;
-        if (tokenizer.GetNextToken(&token) &&
-            (token.type == Token::ttLiteral && (token.literalType == Token::ttLiteralString || token.type == Token::ttLiteralWideString)))
-        {
-            text = ReadString(token);
-
-            auto tail = ReadRawString(token);
-            orthia::TrimStringAllWhiteSpace(tail);
-            if (!tail.empty())
-            {
-                throw std::runtime_error("Extra text found: " + orthia::PlatformStringToUtf8(tail));
-            }
-        }
-        else
-        {
-            text = ReadRawString(token);
-            text += orthia::Utf8ToPlatformString(tokenizer.GetNextRawString());
-        }
-        orthia::TrimStringAllWhiteSpace(text);
+        auto text = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
         if (text.empty())
         {
             throw std::runtime_error("File paths separated by semicolon are expected");
