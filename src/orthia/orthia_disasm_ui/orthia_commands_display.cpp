@@ -124,7 +124,7 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
     {
         if (mod.name.size() > maxModuleNameSize)
         {
-            maxModuleNameSize = mod.name.size();
+            maxModuleNameSize = (int)mod.name.size();
         }
     }
     orthia::PlatformString_type columnStart(ORTHIA_TCSTR("start"));

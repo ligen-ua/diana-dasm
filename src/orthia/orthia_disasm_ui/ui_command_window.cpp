@@ -72,7 +72,7 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
         m_currentOperation = operation;
         m_lastCmd = orthia::CCommandProcessor::SpecialUICommands::None;
         PushHistory(text);
-        model->GetCommandProcessor()->AsyncExecute(GetThread(), operation, cmdCallbackOperation, text.native, item);
+        model->GetCommandProcessor()->AsyncExecute(GetThread(), operation, cmdCallbackOperation, text.native, item, model);
     });
 
     // label

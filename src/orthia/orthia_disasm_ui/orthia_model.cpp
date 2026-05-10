@@ -329,7 +329,7 @@ namespace orthia
         {
             // Phase 1 (process only): disassemble the main module and log a completion message.
             auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
-            m_analyzer.Enqueue(workspaceId, procItem, bgOp, mainAddr,
+            m_analyzer.EnqueueAnalyze(procItem, bgOp, mainAddr,
                 [uiThread, uiLog = m_uiLog]() {
                     uiThread->AddTask([uiLog]() {
                         if (auto log = uiLog.lock())
@@ -344,13 +344,13 @@ namespace orthia
         // Phase 2: load debug symbols; on completion, re-analyze with private symbols,
         // then notify all UI subscribers that the workspace item changed.
         auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
-        m_analyzer.EnqueueLoadSymbols(workspaceId, item, symOp,
+        m_analyzer.EnqueueLoadSymbols(item, symOp,
             [this, uiThread, workspaceId, mainAddr, item]() {
 
                 NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
 
                 auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
-                m_analyzer.EnqueueAnalyzePrivateSymbols(workspaceId, item, reanalyzeOp, mainAddr,
+                m_analyzer.EnqueueAnalyzePrivateSymbols(item, reanalyzeOp, mainAddr,
                     [this, uiThread, workspaceId]() {
                         NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
                     });

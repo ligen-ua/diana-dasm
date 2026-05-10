@@ -1,6 +1,4 @@
 #include "orthia_module_analyzer.h"
-#include "orthia_item_process.h"
-#include "orthia_process_adapter.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_external_symbols.h"
@@ -52,38 +50,37 @@ namespace orthia
         m_ops.erase(workspaceId);
     }
 
-    void CModuleAnalyzer::Enqueue(int workspaceId,
-        std::shared_ptr<CProcessWorkplaceItem> item,
+    void CModuleAnalyzer::EnqueueAnalyze(std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
         std::function<void()> onComplete)
     {
+        int itemId = ++m_nextItemId;
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
-            m_ops[workspaceId] = op;
+            m_ops[itemId] = op;
             if (!m_uiThread)
                 m_uiThread = op->GetThread();
         }
 
         m_pool.AddTask([this,
-            weakItem = std::weak_ptr<CProcessWorkplaceItem>(item),
+            weakItem = std::weak_ptr<IWorkPlaceItem>(item),
             op,
-            workspaceId,
+            itemId,
             mainModuleAddr,
             onComplete = std::move(onComplete)]() mutable
         {
             auto item = weakItem.lock();
             if (!item || op->IsCancelled())
             {
-                Cleanup(workspaceId);
+                Cleanup(itemId);
                 return;
             }
 
-            auto proc = item->GetAssociatedProcess();
             auto moduleManager = item->GetModuleManager();
-            if (!proc || !moduleManager)
+            if (!moduleManager)
             {
-                Cleanup(workspaceId);
+                Cleanup(itemId);
                 return;
             }
 
@@ -96,7 +93,7 @@ namespace orthia
             {
                 return;
             }
-            ProcessReaderAdapter reader(proc.get());
+            auto reader = item->CreateMemoryReader();
             auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
             if (op->IsCancelled())
@@ -107,8 +104,11 @@ namespace orthia
                 {
                     auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
                     WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
-                    moduleManager->ReloadModule(mainIt->address, &reader, false, mainIt->name, 0);
-                    item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
+                    if (reader)
+                    {
+                        moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
+                        item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
+                    }
                 }
             }
             catch (const std::exception& e)
@@ -116,7 +116,7 @@ namespace orthia
                 oui::LogOutput(oui::LogFlags::Error, e.what());
             }
 
-            Cleanup(workspaceId);
+            Cleanup(itemId);
             if (!op->IsCancelled())
             {
                 onComplete();
@@ -124,15 +124,15 @@ namespace orthia
         });
     }
 
-    void CModuleAnalyzer::EnqueueAnalyzePrivateSymbols(int workspaceId,
-        std::shared_ptr<IWorkPlaceItem> item,
+    void CModuleAnalyzer::EnqueueAnalyzePrivateSymbols(std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
         std::function<void()> onComplete)
     {
+        int itemId = ++m_nextItemId;
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
-            m_ops[workspaceId] = op;
+            m_ops[itemId] = op;
             if (!m_uiThread)
                 m_uiThread = op->GetThread();
         }
@@ -140,21 +140,21 @@ namespace orthia
         m_pool.AddTask([this,
             weakItem = std::weak_ptr<IWorkPlaceItem>(item),
             op,
-            workspaceId,
+            itemId,
             mainModuleAddr,
             onComplete = std::move(onComplete)]() mutable
         {
             auto item = weakItem.lock();
             if (!item || op->IsCancelled())
             {
-                Cleanup(workspaceId);
+                Cleanup(itemId);
                 return;
             }
 
             auto moduleManager = item->GetModuleManager();
             if (!moduleManager)
             {
-                Cleanup(workspaceId);
+                Cleanup(itemId);
                 return;
             }
 
@@ -165,7 +165,7 @@ namespace orthia
                 [mainModuleAddr](const auto& m) { return m.IsInRange(mainModuleAddr); });
             if (mainIt == modules.end())
             {
-                Cleanup(workspaceId);
+                Cleanup(itemId);
                 return;
             }
             if (mainIt->flags & ModuleInfo::flags_analyzePrivateDone)
@@ -216,7 +216,7 @@ namespace orthia
                 oui::LogOutput(oui::LogFlags::Error, e.what());
             }
 
-            Cleanup(workspaceId);
+            Cleanup(itemId);
             if (!op->IsCancelled())
             {
                 onComplete();
@@ -224,16 +224,17 @@ namespace orthia
         });
     }
 
-    void CModuleAnalyzer::EnqueueLoadSymbols(int workspaceId,
+    void CModuleAnalyzer::EnqueueLoadSymbols(
         std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         std::function<void()> onComplete,
         std::function<void()> onProgress,
-        Address_type mainModuleAddr)
+        Address_type moduleAddressHint)
     {
+        int itemId = ++m_nextItemId;
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
-            m_ops[workspaceId] = op;
+            m_ops[itemId] = op;
             if (!m_uiThread)
                 m_uiThread = op->GetThread();
         }
@@ -241,22 +242,22 @@ namespace orthia
         m_pool.AddTask([this,
             weakItem = std::weak_ptr<IWorkPlaceItem>(item),
             op,
-            workspaceId,
-            mainModuleAddr,
+            itemId,
+            moduleAddressHint,
             onComplete = std::move(onComplete),
             onProgress = std::move(onProgress)]() mutable
         {
             auto item = weakItem.lock();
             if (!item || op->IsCancelled())
             {
-                Cleanup(workspaceId);
+                Cleanup(itemId);
                 return;
             }
 
             auto moduleManager = item->GetModuleManager();
             if (!moduleManager)
             {
-                Cleanup(workspaceId);
+                Cleanup(itemId);
                 return;
             }
 
@@ -272,7 +273,7 @@ namespace orthia
                 if (op->IsCancelled())
                     break;
 
-                if (mainModuleAddr && !mod.IsInRange(mainModuleAddr))
+                if (moduleAddressHint && !mod.IsInRange(moduleAddressHint))
                     continue;
 
                 if (mod.flags & mod.flags_symbolsLoaded)
@@ -301,7 +302,10 @@ namespace orthia
                         else
                             syms.FlushToDB(mod.address, db);
                     }
-                    onProgress();
+                    if (onProgress)
+                    {
+                        onProgress();
+                    }
                 }
                 catch (const std::exception& e)
                 {
@@ -309,10 +313,13 @@ namespace orthia
                 }
             }
 
-            Cleanup(workspaceId);
+            Cleanup(itemId);
             if (!op->IsCancelled())
             {
-                onComplete();
+                if (onComplete)
+                {
+                    onComplete();
+                }
             }
         });
     }

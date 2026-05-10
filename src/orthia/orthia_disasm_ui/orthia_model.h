@@ -81,6 +81,7 @@ namespace orthia
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
         CModuleAnalyzer& GetAnalyzer() { return m_analyzer; }
+        std::shared_ptr<orthia::CConfigOptionsStorage> GetConfig() { return m_config; }
 
     private:
         CModuleAnalyzer m_analyzer;

@@ -68,4 +68,7 @@ namespace oui
     orthia::Address_type CaptureAddress(const orthia::PlatformString_type& addressString);
     orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, std::shared_ptr<orthia::IWorkPlaceItem> item);
 
+    void EnumModulesByName(std::shared_ptr<orthia::IWorkPlaceItem> item,
+        const orthia::PlatformString_type& moduleName,
+        std::function<bool(orthia::ModuleInfo& mod)> handler);
 }
