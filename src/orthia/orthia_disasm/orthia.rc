@@ -51,7 +51,7 @@ BEGIN
             VALUE "FileDescription", "Orthia Disassembler" 
             VALUE "FileVersion", "1, 0, 0, " ORTHIA_REVISION_STR
             VALUE "InternalName", "orthia_disasm"
-            VALUE "LegalCopyright", "Copyright (c) 2013-2023, https://github.com/ligen-ua/diana-dasm"
+            VALUE "LegalCopyright", "Copyright (c) 2013-2026, https://github.com/ligen-ua/diana-dasm"
             VALUE "OriginalFilename", "orthia_disasm.exe"
             VALUE "ProductName", "Orthia Disassembler"
             VALUE "ProductVersion", "1, 0, 0, " ORTHIA_REVISION_STR
