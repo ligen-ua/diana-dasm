@@ -351,6 +351,29 @@ void CClassicDatabase::QueryReferencesToInstruction(Address_type offset, std::ve
     }
 }
 
+void CClassicDatabase::QueryAllModuleReferences(Address_type baseAddress, Address_type size,
+    std::vector<std::pair<Address_type, Address_type>>& result)
+{
+    orthia::CAutoCriticalSection guard(m_lock);
+    CSQLAutoReset autoStatement(m_stmtSelectReferencesFromRange.Get());
+    sqlite3_bind_int64(m_stmtSelectReferencesFromRange.Get(), 1, AddrToDb(baseAddress));
+    sqlite3_bind_int64(m_stmtSelectReferencesFromRange.Get(), 2, AddrToDb(baseAddress + size));
+    for (;;)
+    {
+        int stepResult = SQLiteStep_Wrapper(m_stmtSelectReferencesFromRange.Get());
+        if (stepResult == SQLITE_DONE)
+            break;
+        if (stepResult == SQLITE_ROW)
+        {
+            Address_type from = DbToAddr(sqlite3_column_int64(m_stmtSelectReferencesFromRange.Get(), 0));
+            Address_type to   = DbToAddr(sqlite3_column_int64(m_stmtSelectReferencesFromRange.Get(), 1));
+            result.push_back({from, to});
+            continue;
+        }
+        throw std::runtime_error("SQLiteStep_Wrapper failed");
+    }
+}
+
 void CClassicDatabase::UnloadModule(Address_type address, bool bSilent)
 {
     orthia::CAutoCriticalSection guard(m_lock);

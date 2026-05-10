@@ -118,6 +118,8 @@ public:
     void QueryReferencesToInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pReferences);
     void QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult);
     void QueryReferencesFromInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult);
+    void QueryAllModuleReferences(Address_type baseAddress, Address_type size,
+        std::vector<std::pair<Address_type, Address_type>>& result);
 
     // modules api
     void UnloadModule(Address_type address, bool bSilent);

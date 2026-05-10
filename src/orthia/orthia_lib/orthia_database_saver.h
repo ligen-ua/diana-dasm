@@ -15,6 +15,9 @@ public:
               CDatabaseManager & databaseManager,
               const orthia::PlatformString_type & moduleName,
               bool replaceModule);
+    void SaveWithDedup(CDianaModule & dianaModule,
+                       CDatabaseManager & databaseManager,
+                       const orthia::PlatformString_type & moduleName);
 };
 
 }

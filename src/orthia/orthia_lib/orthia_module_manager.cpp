@@ -111,7 +111,7 @@ void CModuleManager::ReloadModuleWithHints(Address_type offset,
 
     auto dbManager = QueryDatabaseManager();
     CDatabaseSaver fileSaver;
-    fileSaver.Save(module, *dbManager, name, false);
+    fileSaver.SaveWithDedup(module, *dbManager, name);
 }
 
 // module info
