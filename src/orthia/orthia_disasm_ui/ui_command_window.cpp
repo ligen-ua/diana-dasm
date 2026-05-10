@@ -53,7 +53,7 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
                             }
                             break;
                         }
-                        AddLine(oui::String(ORTHIA_TCSTR("---")));
+                        AddLine(oui::String(ORTHIA_TCSTR("Done")));
                         m_currentOperation = nullptr;
                     }
                 }

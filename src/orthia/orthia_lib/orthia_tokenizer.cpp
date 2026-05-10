@@ -141,7 +141,7 @@ orthia::PlatformString_type ReadStringOrRaw(CTokenizer& tokenizer)
         token.type == Token::ttLiteral &&
         (token.literalType == Token::ttLiteralString || token.literalType == Token::ttLiteralWideString))
     {
-        auto tail = ReadRawString(token);
+        auto tail = orthia::Utf8ToPlatformString(tokenizer.GetNextRawString());
         orthia::TrimStringAllWhiteSpace(tail);
         if (!tail.empty())
         {
