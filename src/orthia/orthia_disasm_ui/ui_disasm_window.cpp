@@ -739,6 +739,19 @@ bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& 
             }
             break;
 
+        case oui::VirtualKey::kX:
+            if (evt.keyState.HasJustCtrl())
+            {
+                auto lineItem = m_view->GetCurrentItem();
+                if (lineItem.interfaceTag)
+                {
+                    auto tag = GetDisasmTag(lineItem);
+                    Event_XrefDialog(tag->index.GetIndex());
+                    handled = true;
+                }
+            }
+            break;
+
         default:
             break;
         }
