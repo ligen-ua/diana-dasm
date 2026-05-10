@@ -230,6 +230,7 @@ namespace oui
         if (tag->newOffset)
         {
             auto gotoAddress = tag->newOffset;
+            OPERAND_SIZE  symAddress = 0;
             if (tag->linksToData)
             {
                 // dereference
@@ -239,8 +240,26 @@ namespace oui
                     gotoAddress = Diana_ReadValue(data.pDataStart, m_workspaceItem->GetDianaMode());
                 }
             }
+            else
+            {
+                // TODO: move it to some utils, too low-level here
+                int opSize = 2;
+                switch (m_workspaceItem->GetDianaMode())
+                {
+                case 4:
+                case 8:
+                    opSize = 4;
+                    break;
+                }
+                auto data = m_workspaceItem->ReadData(tag->newOffset, opSize+1);
+                if (data.pDataStart && data.dataSize == opSize + 1 && (*(DI_CHAR*)data.pDataStart == 0xE9))
+                {
+                    symAddress = tag->newOffset + Diana_ReadValue(data.pDataStart + 1, opSize) + 5;
+                }
+            }
 
-            auto name = m_workspaceItem->QueryAddressName(gotoAddress);
+            auto nameInfo = m_workspaceItem->QueryAddressName(symAddress? symAddress:gotoAddress);
+            auto name = orthia::GetPreferredName(nameInfo);
             if (!name.native.empty())
             {
                 addCommentSeparator();
@@ -276,11 +295,11 @@ namespace oui
         {
             for (auto& op : m_operands)
             {
-                auto name = m_workspaceItem->QueryAddressName(op.operand);
-                if (!name.native.empty())
+                auto nameInfo = m_workspaceItem->QueryAddressName(op.operand);
+                if (!nameInfo.name.native.empty())
                 {
                     addCommentSeparator();
-                    m_currentBlock.append(name.native);
+                    m_currentBlock.append(nameInfo.name.native);
                 }
             }
         }

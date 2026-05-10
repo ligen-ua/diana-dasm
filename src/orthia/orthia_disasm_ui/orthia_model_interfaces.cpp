@@ -5,25 +5,45 @@
 
 namespace orthia
 {
+    void CPersistentItemStorage::Init(std::shared_ptr<IWorkPlaceItem> item)
+    {
+        m_item = item;
+    }
 
     void CPersistentItemStorage::AsyncQueryGotoInfo(ThreadPtr_type targetThread,
         const oui::String& filter,
         oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
         int flags)
     {
-        orthia::CAutoCriticalSection guard(m_lock);
+        std::vector<std::pair< orthia::Address_type, GotoItem>> allItems;
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            allItems.reserve(m_dataItems.size());
+            for (auto& pair : m_dataItems)
+            {
+                allItems.push_back(pair);
+            }
+        }
 
         auto filterLowercase = orthia::Downcase(filter.native);
         orthia::PlatformString_type text;
 
         std::vector<GotoItem> items;
-        for (auto& pair : m_dataItems)
+        for (auto& pair : allItems)
         {
+            if (auto item = m_item.lock())
+            {
+                pair.second.nameInfo = item->QueryAddressName(pair.first);
+            }
             if (!filterLowercase.empty())
             {
                 text = orthia::ToWideStringAsHex(pair.first);
                 text.append(ORTHIA_TCSTR("|"));
-                text.append(pair.second.comment.native);
+                text.append(pair.second.nameInfo.comment.native);
+                text.append(ORTHIA_TCSTR("|"));
+                text.append(pair.second.nameInfo.privateSymbol.native);
+                text.append(ORTHIA_TCSTR("|"));
+                text.append(pair.second.nameInfo.name.native);
 
                 text = orthia::Downcase(text);
                 auto substr = text.find(filterLowercase.c_str(), 0);
@@ -246,9 +266,26 @@ namespace orthia
             allLines.push_back(std::move(line));
         }
     }
+    oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address, const oui::String& moduleName, Address_type moduleAddress)
+    {
+        if (name.native.empty() || !nameAddress)
+        {
+            return ComposeName(moduleName, moduleAddress, address);
+        }
 
+        oui::String res = ComposeName(name, nameAddress, address);
+        if (res.native.empty())
+        {
+            return res;
+        }
+        return moduleName.native + OUI_TCSTR("!") + res.native;
+    }
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address)
     {
+        if (nameAddress > address)
+        {
+            return name;
+        }
         Address_type diff = address - nameAddress;
         if (!diff)
         {
@@ -308,5 +345,30 @@ namespace orthia
             result.error = orthia::Utf8ToPlatformString(e.what());
         }
         return result;
+    }
+
+    oui::String GetPreferredName(const NameInfo& nameInfo)
+    {
+        if (nameInfo.flags & nameInfo.flags_Export)
+        {
+            return nameInfo.name;
+        }
+        if (!nameInfo.privateSymbol.native.empty())
+        {
+            return nameInfo.privateSymbol;
+        }
+        return nameInfo.name;
+    }
+    oui::String GetPreferredComment(const NameInfo& nameInfo)
+    {
+        if (!nameInfo.comment.native.empty())
+        {
+            return nameInfo.comment;
+        }
+        if (!nameInfo.privateSymbol.native.empty())
+        {
+            return nameInfo.privateSymbol;
+        }
+        return nameInfo.name;
     }
 }

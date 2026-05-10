@@ -11,7 +11,9 @@
 #include <map>
 #include <iomanip>
 #include "diana_win32_cpp.h"
-
+#include <cstdint>
+#include <type_traits>
+    
 namespace orthia
 {
 typedef diana::CWin32Exception CWin32Exception;

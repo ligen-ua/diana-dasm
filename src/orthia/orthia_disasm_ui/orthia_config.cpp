@@ -68,6 +68,14 @@ namespace orthia
         orthia::CreateAllDirectoriesForFile(m_binDir);
         orthia::CreateAllDirectoriesForFile(m_procDBDir);
         CleanupOldProcFolders(m_procDBDir);
+
+#ifdef DIANA_HAS_WIN32
+        m_symbolFolders.push_back(L"C:\\Sym");
+        m_symbolFolders.push_back(L"C:\\Symbols");
+#else
+        m_symbolFolders.push_back("~/sym");
+        m_symbolFolders.push_back("~/symbols");
+#endif
     }
     PlatformString_type CConfigOptionsStorage::GetReadmeFileName() const
     {
@@ -95,16 +103,13 @@ namespace orthia
     {
         return m_binDir;
     }
+
+    void CConfigOptionsStorage::SetSymbolsFolders(const PlatformString_type& names)
+    {
+        orthia::SplitStringWithoutWhitespace(names, orthia::StringInfo(ORTHIA_TCSTR(";")), &m_symbolFolders);
+    }
     std::vector<PlatformString_type> CConfigOptionsStorage::GetSymbolsFolders() const
     {
-        std::vector<PlatformString_type> res;
-#ifdef DIANA_HAS_WIN32
-        res.push_back(L"C:\\Sym");
-        res.push_back(L"C:\\Symbols");
-#else
-        res.push_back("~/sym");
-        res.push_back("~/symbols");
-#endif
-        return res;
+        return m_symbolFolders;
     }
 }

@@ -14,11 +14,11 @@ static void ConvertToTextDPS(void* args_in, const char* pBinary, orthia::Platfor
     auto address = *(orthia::Address_type*)pBinary;
     *pText = Address64ToString(address);
 
-    auto name = args.item->QueryAddressName(address);
-    if (!name.native.empty())
+    auto nameInfo = args.item->QueryAddressName(address);
+    if (!nameInfo.name.native.empty())
     {
         pText->append(2, ORTHIA_TCHAR(' '));
-        pText->append(name.native);
+        pText->append(nameInfo.name.native);
     }
 }
 
@@ -119,21 +119,41 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
     // print header
     int addressTextSize = (int)orthia::AddressToString(0, dianaMode).size();
 
+    int maxModuleNameSize = 0;
+    for (auto& mod : modules)
+    {
+        if (mod.name.size() > maxModuleNameSize)
+        {
+            maxModuleNameSize = (int)mod.name.size();
+        }
+    }
     orthia::PlatformString_type columnStart(ORTHIA_TCSTR("start"));
     orthia::PlatformString_type columnEnd(ORTHIA_TCSTR("end"));
     orthia::PlatformString_type columnName(ORTHIA_TCSTR("module name")); 
-    
+    orthia::PlatformString_type columnStatus(ORTHIA_TCSTR("status"));
+
     orthia::PlatformString_type column;
+    // add start
     column = columnStart;
     column.resize(addressTextSize + 2, ORTHIA_TCHAR(' '));
     line = column;
 
+    // add end
     column = columnEnd;
     column.resize(addressTextSize + 3, ORTHIA_TCHAR(' '));
     line += column;
 
+    // add name
     column = columnName;
+    column.resize(maxModuleNameSize + 3, ORTHIA_TCHAR(' '));
     line += column;
+
+    // add status
+    column = columnStatus;
+    column.resize(addressTextSize + 3, ORTHIA_TCHAR(' '));
+    line += columnStatus;
+
+    // send header
     args.ReplyLine(line);
  
     for (auto& mod : modules)
@@ -142,7 +162,24 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
         line.append(2, ORTHIA_TCHAR(' '));
         line += orthia::AddressToString(mod.address + mod.size, dianaMode);
         line.append(3, ORTHIA_TCHAR(' '));
-        line += mod.name;
+        column = mod.name;
+        column.resize(maxModuleNameSize + 3, ORTHIA_TCHAR(' '));
+        line += column;
+
+        column = ORTHIA_TCSTR("");
+        if (mod.flags & mod.flags_analyzeDone)
+        {
+            column += ORTHIA_TCSTR("analysis");
+        }
+        if (mod.flags & mod.flags_symbolsLoaded)
+        {
+            if (!column.empty())
+            {
+                column += ORTHIA_TCSTR(", ");
+            }
+            column += ORTHIA_TCSTR("symbols");
+        }
+        line += column;
 
         args.ReplyLine(line);
         line.clear();

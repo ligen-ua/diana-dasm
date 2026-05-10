@@ -142,6 +142,28 @@ bool CModulesWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
             }
         }
     }
+    switch (evt.keyEvent.virtualKey)
+    {
+    case oui::VirtualKey::kF5:
+    {
+        {
+            auto activeItem = m_model->GetActiveItem();
+            if (activeItem)
+            {
+                if (m_selectedModuleAddress)
+                {
+                    SelectModule(m_selectedModuleAddress, m_selectedModuleName);
+                }
+                else
+                {
+                    // TODO: make it async + reload callback
+                    activeItem->ReloadModules();
+                }
+            }
+        }
+        break;
+    }
+    }
     return ParentType::ProcessEvent(evt, evtContext);
 }
 
@@ -240,6 +262,7 @@ void CModulesWindow::UpdateVisibleItems()
             orthia::NameSelectionKey key;
             key.flags = key.flags_ContinueFrom;
             key.address = m_cachedNamesPage.back().address;
+            key.continueMarkNameFlag = m_cachedNamesPage.back().flags;
 
             std::vector<orthia::NameInfo> newPage;
             activeItem->QueryNames(m_selectedModuleAddress, key, g_nameCacheSize, newPage);

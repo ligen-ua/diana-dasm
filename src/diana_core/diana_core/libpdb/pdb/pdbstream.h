@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#pragma pack(push, 1)
-
 enum pdb_stream_version {
     PSV_VC2 = 19941610,
     PSV_VC4 = 19950623,
@@ -18,14 +16,11 @@ enum pdb_stream_version {
     PSV_VC140 = 20140508,
 };
 
-struct pdb_stream_header {
+PACK(struct pdb_stream_header {
     uint32_t version;
     uint32_t signature;
     uint32_t age;
     unsigned char unique_id[16];
-};
-
-
-#pragma pack(pop)
+});
 
 #endif  // PDB_PDBSTREAM_H

@@ -531,6 +531,8 @@ namespace oui
                         info.entryPoint = exe.u.peFile.pImpl->addressOfEntryPoint;
                         Diana_SafeAdd(&info.entryPoint, info.address);
 
+                        info.builtInFlags |= orthia::ModuleInfo::builtInFlags_moduleTypePe;
+
                         if (contextCallback)
                         {
                             ModuleDisasmContext context;

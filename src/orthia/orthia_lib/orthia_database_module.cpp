@@ -101,18 +101,36 @@ void CDatabase::DoUpdate_2_3()
         "CREATE INDEX IF NOT EXISTS idx_ref_to ON tbl_references(ref_address_to)"),
         "Can't create index on tbl_references");
 }
+void CDatabase::DoUpdate_3_4()
+{
+    const char* sql =
+        "UPDATE tbl_metainfo SET "
+        "meta_address = (meta_address & ~?1) | (~meta_address & ?1) "
+        "WHERE meta_address IS NOT NULL";
+    orthia::CSQLStatement stmt;
+    ORTHIA_CHECK_SQLITE2(sqlite3_prepare_v2(m_pDatabase->Get(), sql, -1, stmt.Get2(), NULL));
+    ORTHIA_CHECK_SQLITE2(sqlite3_bind_int64(stmt.Get(), 1, (sqlite3_int64)0x8000000000000000ULL));
+    if (SQLiteStep_Wrapper(stmt.Get()) != SQLITE_DONE)
+    {
+        throw std::runtime_error("Can't migrate tbl_metainfo to XOR encoding");
+    }
+
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),
+        "CREATE INDEX IF NOT EXISTS idx_metainfo_type_addr ON tbl_metainfo(meta_type, meta_address)"),
+        "Can't create index on tbl_metainfo");
+}
 void CDatabase::DoVersionScripts()
 {
     CSQLTransaction transaction(m_pDatabase->Get());
 
-    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_version (ver_database_version INTEGER PRIMARY KEY, ver_action_time DATETIME DEFAULT CURRENT_TIMESTAMP)"), 
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_version (ver_database_version INTEGER PRIMARY KEY, ver_action_time DATETIME DEFAULT CURRENT_TIMESTAMP)"),
         "Can't create database");
 
     m_dbVersion.Init(m_pDatabase->Get());
 
     int version = m_dbVersion.GetDBVersion();
 
-#define ORTHIA_CURRENT_DB_VERSION_INT       3
+#define ORTHIA_CURRENT_DB_VERSION_INT       4
     if (version != ORTHIA_CURRENT_DB_VERSION_INT)
     {
         switch(version)
@@ -127,6 +145,9 @@ void CDatabase::DoVersionScripts()
         case 2:
             DoUpdate_2_3();
             m_dbVersion.AddDBVersion(3);
+        case 3:
+            DoUpdate_3_4();
+            m_dbVersion.AddDBVersion(4);
         case ORTHIA_CURRENT_DB_VERSION_INT:
             ;
         }

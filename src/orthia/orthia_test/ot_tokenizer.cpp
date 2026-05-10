@@ -731,6 +731,67 @@ static void test_operator_tokenizer()
 }
 
 
+static void CheckRawString(orthia::CTokenizerEnv & env,
+                           const std::string & source,
+                           const std::string & expectedRaw)
+{
+    orthia::CStreamTokenFileSource src(source);
+    env.ResetSource(&src);
+    orthia::Token token;
+    bool res = env.GetNextToken(&token);
+    DIANA_TEST_ASSERT(res);
+    DIANA_TEST_ASSERT(token.type != orthia::Token::ttEOF);
+    DIANA_TEST_ASSERT(orthia::ReadRawString(token) == orthia::Utf8ToPlatformString(expectedRaw));
+}
+
+static void test_rawstring_tokenizer()
+{
+    orthia::CTokenizerEnv env;
+
+    // integers: decimal, hex, binary, octal, with suffixes
+    CheckRawString(env, "42",         "42");
+    CheckRawString(env, "0",          "0");
+    CheckRawString(env, "0x1A",       "0x1A");
+    CheckRawString(env, "0b1010",     "0b1010");
+    CheckRawString(env, "042",        "042");
+    CheckRawString(env, "42U",        "42U");
+    CheckRawString(env, "42LL",       "42LL");
+    CheckRawString(env, "42ULL",      "42ULL");
+
+    // string and char literals (raw text includes surrounding quotes and escape sequences verbatim)
+    CheckRawString(env, "\"hello\"",  "\"hello\"");
+    CheckRawString(env, "\"\"",       "\"\"");
+    CheckRawString(env, "\"\\n\"",    "\"\\n\"");
+    CheckRawString(env, "'t'",        "'t'");
+    CheckRawString(env, "'\\n'",      "'\\n'");
+
+    // names and reserved-word candidates
+    CheckRawString(env, "hello",      "hello");
+    CheckRawString(env, "_var_123",   "_var_123");
+
+    // single-char and multi-char operators
+    CheckRawString(env, ";",          ";");
+    CheckRawString(env, "+=",         "+=");
+    CheckRawString(env, "<<=",        "<<=");
+    CheckRawString(env, "...",        "...");
+    CheckRawString(env, "->",         "->");
+    CheckRawString(env, "==",         "==");
+    CheckRawString(env, "||",         "||");
+}
+
+#ifdef WIN32
+static void test_rawstring_wide_tokenizer()
+{
+    orthia::CTokenizerEnv env;
+
+    // wide string and char literals: raw text preserves the L prefix and surrounding quotes
+    CheckRawString(env, "L\"hello\"", "L\"hello\"");
+    CheckRawString(env, "L\"\"",      "L\"\"");
+    CheckRawString(env, "L't'",       "L't'");
+    CheckRawString(env, "L'\\n'",     "L'\\n'");
+}
+#endif
+
 void test_tokenizer()
 {
     DIANA_TEST(test_operator_tokenizer());
@@ -742,8 +803,10 @@ void test_tokenizer()
     DIANA_TEST(test_char_tokenizer());
     DIANA_TEST_WIN32(test_wchar_tokenizer());
     DIANA_TEST(test_string_tokenizer());
-    DIANA_TEST_WIN32(test_wstring_tokenizer());    
+    DIANA_TEST_WIN32(test_wstring_tokenizer());
     DIANA_TEST(test_name_tokenizer());
     DIANA_TEST(test_various_tokenizer());
     DIANA_TEST(test_tokenizer_errors());
+    DIANA_TEST(test_rawstring_tokenizer());
+    DIANA_TEST_WIN32(test_rawstring_wide_tokenizer());
 }

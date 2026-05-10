@@ -74,7 +74,12 @@ namespace oui
             MultiLineViewItem item;
             item.text = OUI_TCSTR(" -  CTRL+LMouseClick - Goto Address");
             lines.push_back(item);
-        } 
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  CTRL+X           - Open XRef Dialog");
+            lines.push_back(item);
+        }
         {
             MultiLineViewItem item;
             item.text = OUI_TCSTR("");
@@ -115,6 +120,21 @@ namespace oui
 
             MultiLineViewItem item;
             item.text = OUI_TCSTR(" -  cls                     - Clear screen");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  .reload [<module>]      - Reload symbols for module");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  .analyze <module>       - Analyze module");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  .symfix [<path>]        - Set symbols directory");
             lines.push_back(item);
         }
         {

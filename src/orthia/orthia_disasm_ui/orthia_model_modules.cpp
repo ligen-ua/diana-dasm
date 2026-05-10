@@ -468,11 +468,14 @@ namespace orthia
             classicDatabase->StartSaveModule(mod.second.peFile->GetImageBase(),
                 mod.second.peFile->GetMappedPeFile().size(),
                 shortName.native,
-                &rollback);
+                &rollback,
+                true);
 
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.peFile->GetImageBase(),
-                mod.second.fullName.native);
+                mod.second.fullName.native,
+                0,
+                orthia::ModuleInfo::builtInFlags_moduleTypePe);
 
             InsertNames(moduleManager, mod.second);
 

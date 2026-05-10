@@ -7,6 +7,7 @@ namespace orthia
 {
 
 class CBinaryTokenStorage;
+class CSymbolStorage;
 const int TokenMaxOperatorSize = 4;
 struct Token
 {
@@ -45,11 +46,21 @@ struct Token
     size_t tokenSize;
 
     CBinaryTokenStorage * pBinaryTokenStorage;
+
+    // raw symbol storage (source text of the token)
+    size_t symbolOffset;
+    size_t symbolSize;
+
+    CSymbolStorage * pSymbolStorage;
 };
 
 bool operator == (const Token & token1, const Token & token2);
 
 orthia::PlatformString_type ReadString(const Token& token);
+orthia::PlatformString_type ReadRawString(const Token& token);
+
+class CTokenizer;
+orthia::PlatformString_type ReadStringOrRaw(CTokenizer& tokenizer);
 
 struct ITokenFileSource
 {
@@ -66,6 +77,16 @@ public:
     size_t RegisterTokenData(Token * pToken, const void * pRawData, size_t size);
     void Clear();
     const void * QueryData(size_t offset, size_t size);
+};
+
+class CSymbolStorage
+{
+    std::vector<char> m_storage;
+public:
+    CSymbolStorage(size_t hintToReserve = 4096);
+    size_t RegisterSymbolData(Token * pToken, const void * pRawData, size_t size);
+    void Clear();
+    const void * QueryData(size_t offset, size_t size) const;
 };
 
 class CReservedWordsStorage
@@ -93,6 +114,7 @@ public:
 protected:
     ITokenFileSource * m_pTokenFileSource;
     CBinaryTokenStorage * m_pBinaryTokenStorage;
+    CSymbolStorage * m_pSymbolStorage;
     CReservedWordsStorage * m_pReservedWordsStorage;
 
     std::vector<char> m_line;
@@ -101,6 +123,7 @@ protected:
 
     int m_lineNumber;
     int m_columnPos;
+    int m_tokenStartPos;
 
     Token m_tokensCache;
     std::vector<char> m_tempStorage;
@@ -115,6 +138,7 @@ protected:
     char HasCurrent() const;
     void RegisterTokenData(Token * pToken, const void * pRawData, size_t size);
     void RegisterTempTokenData(Token * pToken);
+    void RegisterSymbolData(Token * pToken);
     void AddToTempStorage(const void * pRawData, size_t size);
 
     // all capture functions must change the position
@@ -141,6 +165,7 @@ public:
     void ResetSource(ITokenFileSource * pTokenFileSource);
     void TestPopulateAllCaches();
     void SetWindbgStyle(bool val) { m_windbgStyle = val; }
+    void SetSymbolStorage(CSymbolStorage * pSymbolStorage) { m_pSymbolStorage = pSymbolStorage; }
 };
 
 
@@ -190,6 +215,7 @@ class CTokenizerEnv
 {
     CReservedWordsStorage m_reservedWordsStorage;
     CBinaryTokenStorage m_binaryStorage;
+    CSymbolStorage m_symbolStorage;
     CTokenizer m_tokenizer;
 public:
     CTokenizerEnv();
@@ -201,6 +227,8 @@ public:
     CTokenizer & GetTokenizer() { return m_tokenizer; }
     CBinaryTokenStorage & GetBinaryStorage() { return m_binaryStorage; }
     const CBinaryTokenStorage & GetBinaryStorage() const { return m_binaryStorage; }
+    CSymbolStorage & GetSymbolStorage() { return m_symbolStorage; }
+    const CSymbolStorage & GetSymbolStorage() const { return m_symbolStorage; }
     CReservedWordsStorage & GetReservedWordsStorage() { return m_reservedWordsStorage; }
     const CReservedWordsStorage & GetReservedWordsStorage() const { return m_reservedWordsStorage; }
 };

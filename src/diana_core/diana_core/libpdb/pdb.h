@@ -1,7 +1,5 @@
-#pragma once
-
-#define DIANA_DISABLE_EXTENSION_WARNINGS 
-#include "diana_disable_warnings.h"
+#ifndef PDB_H
+#define PDB_H
 
 #include "pdb/cvinfo.h"
 
@@ -11,7 +9,11 @@
 
 #pragma pack(push, 1)
 
-#define PDB_EXPORT 
+#ifdef _WIN32
+#define PDB_EXPORT __declspec(dllexport)
+#else
+#define PDB_EXPORT __attribute__((visibility("default")))
+#endif
 
 #define PDB_SIGNATURE_SZ (32)
 
@@ -110,3 +112,5 @@ PDB_EXPORT pdb_errno_t pdb_errno(void *context);
 PDB_EXPORT const char *pdb_strerror(void *context);
 
 #pragma pack(pop)
+
+#endif  // PDB_H

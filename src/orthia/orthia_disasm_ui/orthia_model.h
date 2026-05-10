@@ -27,6 +27,7 @@ namespace orthia
         virtual ~IUIEventHandler() {}
         virtual void OnPreWorkspaceItemChange(int itemId) = 0;
         virtual void OnWorkspaceItemChanged(int itemId) = 0;
+        virtual void OnWorkspaceDataRefreshed(int itemId) = 0;
     };
     class CProcessWorkplaceItem;
     class CProgramModel
@@ -79,11 +80,23 @@ namespace orthia
         void AddExecutable(std::shared_ptr<oui::IFile2> file,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
-        void LoadSymbols(std::shared_ptr<IWorkPlaceItem> workItem,
-            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+        CModuleAnalyzer& GetAnalyzer() { return m_analyzer; }
+        std::shared_ptr<orthia::CConfigOptionsStorage> GetConfig() { return m_config; }
 
     private:
         CModuleAnalyzer m_analyzer;
+
+        // Dispatches data-refreshed event to all UI subscribers from a background thread.
+        void NotifyWorkspaceDataRefreshed(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId);
+
+        // Starts background analysis and symbol-loading pipelines for a newly opened workspace item.
+        // procItem is non-null for process items; file items pass nullptr to skip process-only steps
+        // (disassembly analysis and private-symbol re-analysis).
+        void EnqueueAnalysisOps(std::shared_ptr<oui::CWindowThread> uiThread,
+            int workspaceId,
+            std::shared_ptr<IWorkPlaceItem> item,
+            Address_type mainAddr,
+            std::shared_ptr<CProcessWorkplaceItem> procItem);
     };
     oui::String ReadFileToVector(std::shared_ptr<oui::IFile> file, std::vector<char>& data, std::shared_ptr<oui::BaseOperation> operation = nullptr, intrusive_ptr<CTextNode> errorNode = nullptr);
 

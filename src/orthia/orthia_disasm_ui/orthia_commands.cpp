@@ -3,6 +3,7 @@
 #include "ui_common.h"
 #include "ui_disasm_memory_writer.h"
 #include "orthia_match.h"
+#include "orthia_model.h"
 
 namespace orthia
 {
@@ -145,14 +146,11 @@ namespace orthia
 
     void CCommandProcessor::Handle_x(CommandArguments& args)
     {
-        auto mask = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
-        orthia::TrimStringAllWhiteSpace(mask);
-
-        auto maskDowncase = orthia::Downcase(orthia::Utf8ToPlatformString(mask));
+        auto mask = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
+        auto maskDowncase = orthia::Downcase(mask);
 
         std::vector<StringInfo> parts;
         orthia::SplitString(maskDowncase, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
-        
         if (parts.size() != 2)
         {
             return;
@@ -180,7 +178,7 @@ namespace orthia
             }
             if (match)
             {
-                const int c_pageSize = 1000;
+                const int c_pageSize = 5000;
                 orthia::NameSelectionKey key;
                 key.excludeImports = true;
 
@@ -208,19 +206,90 @@ namespace orthia
                     }
                     key.flags |= key.flags_ContinueFrom;
                     key.address = names.back().address;
+                    key.continueMarkNameFlag = names.back().flags;
                 }
             }
         }
+    }
+
+    void CCommandProcessor::Handle_reload(CommandArguments& args)
+    {
+        auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
+        if (moduleName.empty())
+        {
+            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr,
+                [this]() {
+                });
+            return;
+        }
+        bool moduleFound = false;
+        oui::EnumModulesByName(args.item,
+            moduleName,
+            [&](orthia::ModuleInfo& mod)
+        {
+            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr,
+            [this]() {
+                },
+             mod.address);
+            moduleFound = true;
+            return false;
+        });
+        if (!moduleFound)
+        {
+            throw std::runtime_error("Module not found: " + orthia::PlatformStringToUtf8(moduleName));
+        }
+    }
+
+    void CCommandProcessor::Handle_analyze(CommandArguments& args)
+    {
+        auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
+        if (moduleName.empty())
+        {
+            throw std::runtime_error("Module name expected");
+        }
+        bool moduleFound = false;
+        oui::EnumModulesByName(args.item,
+            moduleName,
+            [&](orthia::ModuleInfo& mod)
+            {
+                args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
+                        []() {
+                        });
+                args.model->GetAnalyzer().EnqueueAnalyzePrivateSymbols(args.item, args.progressHandler, mod.address,
+                    []() {
+                });
+                moduleFound = true;
+                return false;
+            }
+        );
+        if (!moduleFound)
+        {
+            throw std::runtime_error("Module not found: " + orthia::PlatformStringToUtf8(moduleName));
+        }
+    }
+
+    void CCommandProcessor::Handle_symfix(CommandArguments& args)
+    {
+        auto text = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
+        if (text.empty())
+        {
+            throw std::runtime_error("File paths separated by semicolon are expected");
+        }
+        args.model->GetConfig()->SetSymbolsFolders(text);
+        orthia::PlatformString_type line;
+        line = ORTHIA_TCSTR("Symbols directories: ") + text;
+        args.ReplyLine(line);
     }
 
     void CCommandProcessor::ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
         const orthia::PlatformString_type& text,
-        std::shared_ptr<IWorkPlaceItem> item)
+        std::shared_ptr<IWorkPlaceItem> item,
+        std::shared_ptr<orthia::CProgramModel> model)
     {
         CCommandParser parser;
-        CommandArguments args = { progressHandler, parser, item };
+        CommandArguments args = { progressHandler, parser, item, model };
 
         oui::ScopedGuard reportStopGuard([&]() { ReportStop(args); });
 
@@ -237,6 +306,9 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode());  });
             parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode(), true);  });
             parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { Handle_lm(args);  });
+            parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { Handle_reload(args);  });
+            parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { Handle_analyze(args);  });
+            parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });
             parser.SetHandler(OUI_TCSTR("cls"), [&](CCommandParser& parser) mutable { uiCommandHandler->Reply(uiCommandHandler, SpecialUICommands::ClearScreen);  });
 
             parser.Parse(text);
@@ -244,18 +316,20 @@ namespace orthia
         catch (std::exception& e)
         {
             auto errStr = orthia::Utf8ToPlatformString(e.what());
-            args.progressHandler->ReplyAnyway(args.progressHandler, errStr, false);
+            args.progressHandler->ReplyAnyway(args.progressHandler, ORTHIA_TCSTR("Error: ") + errStr, false);
+            return;
         }
     }
     void CCommandProcessor::AsyncExecute(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
         const orthia::PlatformString_type& text,
-        std::shared_ptr<IWorkPlaceItem> item)
+        std::shared_ptr<IWorkPlaceItem> item,
+        std::shared_ptr<orthia::CProgramModel> model)
     {
         m_pool.AddTask([=]() {
 
-            ExecuteImpl(targetThread, progressHandler, uiCommandHandler, text, item);
+            ExecuteImpl(targetThread, progressHandler, uiCommandHandler, text, item, model);
         });
     }
     bool CCommandProcessor::IsBusy() const

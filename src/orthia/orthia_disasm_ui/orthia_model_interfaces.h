@@ -20,6 +20,7 @@ namespace orthia
 {
     class CSimplePeFile;
     class CModuleManager;
+    class ModuleStorage;
 
     struct WorkAddressRangeInfo
     {
@@ -39,9 +40,14 @@ namespace orthia
     {
         static const int flags_analyzeDone = 1;
         static const int flags_symbolsLoaded = 2;
+        static const int flags_analyzePrivateDone = 4;
+
+        static const int builtInFlags_moduleTypePe  = 1;
+        static const int builtInFlags_moduleTypeElf = 2;
 
         PlatformString_type fullName;
         int flags = 0;
+        int builtInFlags = 0;
         PlatformString_type name;
     };
 
@@ -91,17 +97,25 @@ namespace orthia
         static const int flags_Function = 1;
         static const int flags_Import = 2;
         static const int flags_Export = 4;
+        static const int flags_PrivateSymbol = 8;
         Address_type address;
         oui::String name;
+        oui::String privateSymbol;
+        oui::String comment;
         int flags = 0;
     };
+    oui::String GetPreferredName(const NameInfo& nameInfo);
+    oui::String GetPreferredComment(const NameInfo& nameInfo);
+
     struct NameSelectionKey
     {
         static const int flags_ContinueFrom = 1;
-        Address_type address;
+        Address_type address = 0;
         oui::String name;
         int flags = 0;
+        int continueMarkNameFlag = 0;
         bool excludeImports = false;
+        bool privateSymbolsOnly = false;
     };
 
     struct MarkupRangeInfo
@@ -201,10 +215,15 @@ namespace orthia
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
         virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const = 0;
         virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const = 0;
-        virtual oui::String QueryAddressName(Address_type address) const = 0;
+        virtual NameInfo QueryAddressName(Address_type address) const = 0;
         virtual std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) = 0;
         virtual Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const = 0;
         virtual std::shared_ptr<oui::IProcess> GetAssociatedProcess() { return nullptr; }
+        virtual void OnPrivateSymbolLoaded(Address_type /*addr*/, const oui::String& /*name*/) {}
+        virtual void OnModuleSymbolsLoaded(Address_type /*moduleAddress*/) {}
+        virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
+        virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
+        virtual ModuleStorage* GetModuleStorage() { return nullptr; }
     };
 
     void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);
@@ -213,18 +232,18 @@ namespace orthia
     oui::String QueryAddressNameDef(PtrType ptr, Address_type address, int dianaMode)
     {
         auto str = ptr->QueryAddressName(address);
-        if (str.native.empty())
+        if (str.name.native.empty())
         {
             return orthia::AddressToString(address, dianaMode);
         }
-        return str;
+        return str.name;
     }
 
     struct GotoItem
     {
         orthia::CCommonDateTime lastUpdateTime;
         orthia::Address_type address = 0;
-        oui::String comment;
+        orthia::NameInfo nameInfo;
         int flags = 0;
 
         GotoItem()
@@ -294,7 +313,10 @@ namespace orthia
             oui::String text;
         };
         std::unordered_map<orthia::Address_type, CommentInfo> m_comments;
+
+        std::weak_ptr<IWorkPlaceItem> m_item;
     public:
+        void Init(std::shared_ptr<IWorkPlaceItem> item);
         void AsyncQueryGotoInfo(ThreadPtr_type targetThread,
             const oui::String& filter,
             oui::OperationPtr_type<QueryGotoItemHandler_type> filterHandler,
@@ -319,8 +341,10 @@ namespace orthia
     const static int g_database_type_moduleMetaInfo = 1;
     const static int g_database_type_fnc_Import = 2;
     const static int g_database_type_fnc_Export = 3;
+    const static int g_database_type_fnc_PrivateSymbol = 4;
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
+    oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address, const oui::String& moduleName, Address_type moduleAddress);
 
     // CFilePersistentItemStorage
     class CDatabaseManager;

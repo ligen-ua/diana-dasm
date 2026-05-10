@@ -11,6 +11,16 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#include <io.h>
+#else
+#include <strings.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
 
 #include <signal.h>
 #include <stdio.h>
@@ -18,7 +28,6 @@
 #ifdef PDB_ENABLE_ASSERTIONS
 #include <assert.h>
 #endif  // PDB_ENABLE_ASSERTIONS
-#include "diana_core.h"
 
 #define PDB_SIGNATURE "Microsoft C/C++ MSF 7.00\r\n\x1a\x44\x53\x00\x00\x00"
 
@@ -53,7 +62,7 @@ extern __INLINE char *NextType(const char *pType);
 #define PDB_ASSERT_CTX_NOT_NULL(ctx, retval) \
     do {                                     \
         if ((ctx) == NULL) {                 \
-            return (retval);                 \
+            return retval;                   \
         }                                    \
     } while (0)
 
@@ -61,7 +70,7 @@ extern __INLINE char *NextType(const char *pType);
     do {                                       \
         if (!(ctx)->pdb_loaded) {              \
             (ctx)->error = EPDB_NO_PDB_LOADED; \
-            return (retval);                   \
+            return retval;                     \
         }                                      \
     } while (0)
 
@@ -69,31 +78,7 @@ extern __INLINE char *NextType(const char *pType);
     do {                                           \
         if (!(expr)) {                             \
             (ctx)->error = EPDB_INVALID_PARAMETER; \
-            return (retval);                       \
-        }                                          \
-    } while (0)
-
- /* MSVC doesn't understand no return */
-#define PDB_ASSERT_CTX_NOT_NULL_NR(ctx, retval) \
-    do {                                     \
-        if ((ctx) == NULL) {                 \
-            return;                 \
-        }                                    \
-    } while (0)
-
-#define PDB_ASSERT_PDB_LOADED_NR(ctx, retval)     \
-    do {                                       \
-        if (!(ctx)->pdb_loaded) {              \
-            (ctx)->error = EPDB_NO_PDB_LOADED; \
-            return;                   \
-        }                                      \
-    } while (0)
-
-#define PDB_ASSERT_PARAMETER_NR(ctx, retval, expr)    \
-    do {                                           \
-        if (!(expr)) {                             \
-            (ctx)->error = EPDB_INVALID_PARAMETER; \
-            return;                       \
+            return retval;                         \
         }                                          \
     } while (0)
 
@@ -111,7 +96,8 @@ struct sym_hashrec {
 };
 
 struct sym_hashtable {
-    struct sym_hashrec *buckets[NR_HASH_BUCKETS];
+    struct sym_hashrec **buckets;
+    size_t nr_buckets;
     struct sym_hashrec *hashrecs;
 };
 
@@ -182,6 +168,10 @@ static void cleanup_pdb_context(struct pdb_context *ctx)
         ctx->streams = NULL;
     }
 
+    if (ctx->pubsym_hashtab.buckets != NULL) {
+        ctx->free(ctx->pubsym_hashtab.buckets);
+    }
+
     if (ctx->pubsym_hashtab.hashrecs != NULL) {
         ctx->free(ctx->pubsym_hashtab.hashrecs);
         ctx->pubsym_hashtab.hashrecs = NULL;
@@ -193,7 +183,7 @@ static void cleanup_pdb_context(struct pdb_context *ctx)
 static size_t nr_blocks(size_t count, size_t block_size)
 {
     PDB_ASSERT(block_size != 0);
-    if (count == 0) {
+    if (count == 0 || count == (uint32_t)-1) {
         return 0;
     }
     return 1 + ((count - 1) / block_size);
@@ -524,7 +514,7 @@ static size_t nr_bits_set(const unsigned char *bitvector, size_t bitvector_size)
     static uint8_t table[256] = {0};
 
     if (!table_computed) {
-        for (uint8_t i = 0; i < UINT8_MAX; i++) {
+        for (uint16_t i = 0; i <= UINT8_MAX; i++) {
             uint8_t val = 0;
             uint8_t c = i;
             for (int j = 0; j < 8 && c != 0; j++) {
@@ -588,8 +578,8 @@ static int parse_pubsym_hashtable(struct pdb_context *ctx, const struct gsi_hash
         }
 
         uint32_t sym_offset = hr[i].offset - 1;
-        if (sym_offset + (uint32_t)sizeof(SYMTYPE) > symrec_stream->size ||
-            sym_offset + (uint32_t)sizeof(SYMTYPE) < sym_offset) {
+        if (sym_offset + sizeof(SYMTYPE) > symrec_stream->size ||
+            sym_offset + sizeof(SYMTYPE) < sym_offset) {
             /* Malformed PDB - invalid hash record offset */
             goto err_pdb_corrupt;
         }
@@ -613,28 +603,58 @@ static int parse_pubsym_hashtable(struct pdb_context *ctx, const struct gsi_hash
     /*
      * Get the Present Bit Vector and the number of buckets with data.
      *
-     * WARNING: Even though there is a static limit of 4096 buckets, Microsoft
-     *  actually emits 4097 items in the buckets array (the hashtable still
-     *  only has 4096 bits). The first entry is a NULL sentinel value. I
-     *  suspect this is a workaround for something in their codebase (it
+     * WARNING: Microsoft actually emits N+1 items in the bucket_offsets array
+     *  (where N = nr_full_buckets). The first entry is a NULL sentinel value.
+     *  I suspect this is a workaround for something in their codebase (it
      *  appears they walk backwards through the bucket array during parsing),
      *  but I am not sure. We skip this sentinel value here.
      */
-    size_t pbitvec_sz = NR_HASH_BUCKETS / 8;
-    if (hdr->cb_buckets < pbitvec_sz) {
-        /* Malformed PDB - not enough space for present bit vector */
-        goto err_pdb_corrupt;
+    unsigned char *pbitvec = (unsigned char *)hdr + sizeof(struct gsi_hash_header) + hdr->cb_hr;
+
+    /*
+     * Dynamically determine the bitvec size by scanning in 4-byte steps.
+     * The constraint that uniquely identifies the boundary is:
+     *   nr_bits_set(pbitvec[0..sz]) == (cb_buckets - sz - 4) / 4
+     * where 4 is the sentinel uint32_t and each bucket entry is a uint32_t.
+     * Most PDBs use NR_HASH_BUCKETS/8 = 512 bytes, but some older PDBs use
+     * a much larger bitvec (e.g. 32764 bytes for 262112 hash buckets).
+     */
+    size_t pbitvec_sz = 0;
+    size_t nr_full_buckets = 0;
+    {
+        size_t bits_so_far = 0;
+        for (size_t off = 0; off + sizeof(uint32_t) <= hdr->cb_buckets; off += sizeof(uint32_t)) {
+            bits_so_far += nr_bits_set(pbitvec + off, sizeof(uint32_t));
+            size_t sz = off + sizeof(uint32_t);
+            if (hdr->cb_buckets < sz + sizeof(uint32_t))
+                break;
+            size_t remaining = hdr->cb_buckets - sz - sizeof(uint32_t);
+            if (remaining % sizeof(uint32_t) == 0 && remaining / sizeof(uint32_t) == bits_so_far) {
+                pbitvec_sz = sz;
+                nr_full_buckets = bits_so_far;
+                break;
+            }
+        }
+        if (pbitvec_sz == 0) {
+            /* Malformed PDB - cannot determine bitvec size */
+            goto err_pdb_corrupt;
+        }
     }
 
-    unsigned char *pbitvec = (unsigned char *)hdr + sizeof(struct gsi_hash_header) + hdr->cb_hr;
-    size_t nr_full_buckets = nr_bits_set(pbitvec, pbitvec_sz);
-    if (hdr->cb_buckets < pbitvec_sz + sizeof(uint32_t) + nr_full_buckets * sizeof(uint32_t)) {
-        /* Malformed PDB - not enough space for bucket contents */
-        goto err_pdb_corrupt;
+    /* Allocate the bucket pointer array; one entry per possible bucket index */
+    size_t nr_possible_buckets = pbitvec_sz * 8;
+    ctx->pubsym_hashtab.buckets = ctx->malloc(nr_possible_buckets * sizeof(struct sym_hashrec *));
+    if (ctx->pubsym_hashtab.buckets == NULL) {
+        ctx->error = EPDB_ALLOCATION_FAILURE;
+        if (hashrecs != NULL)
+            ctx->free(hashrecs);
+        return -1;
     }
+    memset(ctx->pubsym_hashtab.buckets, 0, nr_possible_buckets * sizeof(struct sym_hashrec *));
+    ctx->pubsym_hashtab.nr_buckets = nr_possible_buckets;
 
     /* Iterate through the Present Bit Vector, populate buckets, and fixup hashrec chains */
-    uint32_t *buckets = (uint32_t *)(pbitvec + pbitvec_sz + sizeof(uint32_t));
+    uint32_t *bucket_offsets = (uint32_t *)(pbitvec + pbitvec_sz + sizeof(uint32_t));
     size_t buckets_idx = 0;
 
     for (size_t i = 0; i < pbitvec_sz; i++) {
@@ -649,7 +669,7 @@ static int parse_pubsym_hashtable(struct pdb_context *ctx, const struct gsi_hash
                 }
 
                 /* Get the start and end offsets of the chain */
-                uint32_t chain_start_off = buckets[buckets_idx];
+                uint32_t chain_start_off = bucket_offsets[buckets_idx];
                 uint32_t chain_end_off = 0;
                 if (buckets_idx + 1 == nr_full_buckets) {
                     /* This is the last bucket - its chain contains the remainder of the hashrecs */
@@ -660,7 +680,7 @@ static int parse_pubsym_hashtable(struct pdb_context *ctx, const struct gsi_hash
                      * This is an intermediate bucket - its chain lasts until the next full bucket's
                      * chain start
                      */
-                    chain_end_off = buckets[buckets_idx + 1];
+                    chain_end_off = bucket_offsets[buckets_idx + 1];
                 }
 
                 /*
@@ -721,7 +741,11 @@ static int parse_pubsym_hashtable(struct pdb_context *ctx, const struct gsi_hash
     return 0;
 
 err_pdb_corrupt:
-    memset(ctx->pubsym_hashtab.buckets, 0, sizeof(ctx->pubsym_hashtab.buckets));
+    if (ctx->pubsym_hashtab.buckets != NULL) {
+        ctx->free(ctx->pubsym_hashtab.buckets);
+        ctx->pubsym_hashtab.buckets = NULL;
+        ctx->pubsym_hashtab.nr_buckets = 0;
+    }
 
     if (hashrecs != NULL) {
         ctx->free(hashrecs);
@@ -876,7 +900,7 @@ static void get_symbols(struct pdb_context *ctx, const SYMTYPE **symbols, bool p
  * This function was lifted almost verbatim from Microsoft's PDB code on
  * github. See microsoft-pdb PDB/include/misc.h:Hasher::lhashPbCb.
  */
-static uint16_t hash_mod(const unsigned char *data, size_t length, uint32_t modulus)
+static uint32_t hash_mod(const unsigned char *data, size_t length, uint32_t modulus)
 {
     uint32_t hash = 0;
 
@@ -923,7 +947,7 @@ static uint16_t hash_mod(const unsigned char *data, size_t length, uint32_t modu
     hash ^= (hash >> 11u);
 
     hash = (hash ^ (hash >> 16u)) % modulus;
-    return (uint16_t)(hash & 0xffffu);
+    return hash;
 }
 
 bool pdb_sig_match(void *data, size_t len)
@@ -1014,9 +1038,9 @@ void pdb_get_header(
 {
     struct pdb_context *ctx = (struct pdb_context *)context;
 
-    PDB_ASSERT_CTX_NOT_NULL_NR(ctx, /* no-retval */);
-    PDB_ASSERT_PDB_LOADED_NR(ctx, /* no-retval */);
-    PDB_ASSERT_PARAMETER_NR(
+    PDB_ASSERT_CTX_NOT_NULL(ctx, /* no-retval */);
+    PDB_ASSERT_PDB_LOADED(ctx, /* no-retval */);
+    PDB_ASSERT_PARAMETER(
         ctx, /* no-retval */,
         block_size != NULL && nr_blocks != NULL && guid != NULL && age != NULL &&
             nr_streams != NULL);
@@ -1194,10 +1218,10 @@ const PUBSYM32 *pdb_lookup_public_symbol(void *context, const char *name, bool c
     }
 
     int (*strcmp_fn)(const char *, const char *);
-    strcmp_fn = case_sensitive ? strcmp : DIANA_STRICMP;
+    strcmp_fn = case_sensitive ? strcmp : strcasecmp;
 
     /* Hash the symbol and get its bucket from the hashtable */
-    uint16_t hash = hash_mod((unsigned char *)name, strlen(name), NR_HASH_BUCKETS);
+    uint32_t hash = hash_mod((unsigned char *)name, strlen(name), ctx->pubsym_hashtab.nr_buckets);
     const struct sym_hashrec *item = ctx->pubsym_hashtab.buckets[hash];
 
     /* Traverse the chain until we find the symbol */
@@ -1263,7 +1287,7 @@ const char *pdb_strerror(void *context)
     PDB_ASSERT(ctx->error < ARRAY_SIZE(errstrings));
 
     if (ctx->error == EPDB_SYSTEM_ERROR) {
-        return "System error";
+        return strerror(errno);
     }
 
     return errstrings[ctx->error];

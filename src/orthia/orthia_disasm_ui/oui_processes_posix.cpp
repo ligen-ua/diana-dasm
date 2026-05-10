@@ -423,6 +423,8 @@ namespace oui
 
                     info.entryPoint = c.baseAddr + exe.u.elfFile.pImpl->elfHeader.e_entry;
 
+                    info.builtInFlags |= orthia::ModuleInfo::builtInFlags_moduleTypeElf;
+
                     if (contextCallback)
                     {
                         ModuleDisasmContext context;

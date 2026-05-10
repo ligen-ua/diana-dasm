@@ -26,8 +26,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 // Version
 //
 
-#define ORTHIA_REVISION       236
-#define ORTHIA_REVISION_STR   "236"
+#define ORTHIA_REVISION       237
+#define ORTHIA_REVISION_STR   "237"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 2,0,0,ORTHIA_REVISION
@@ -50,7 +50,7 @@ BEGIN
             VALUE "FileDescription", "Orthia Windbg Plugin DLL" 
             VALUE "FileVersion", "2, 0, 0, " ORTHIA_REVISION_STR
             VALUE "InternalName", "orthia"
-            VALUE "LegalCopyright", "Copyright (c) 2013-2023, https://github.com/ligen-ua/diana-dasm"
+            VALUE "LegalCopyright", "Copyright (c) 2013-2026, https://github.com/ligen-ua/diana-dasm"
             VALUE "OriginalFilename", "orthia.dll"
             VALUE "ProductName", "Orthia Windbg Plugin"
             VALUE "ProductVersion", "2, 0, 0, " ORTHIA_REVISION_STR

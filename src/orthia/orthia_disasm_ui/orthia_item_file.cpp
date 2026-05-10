@@ -1,4 +1,5 @@
 #include "orthia_item_file.h"
+#include "orthia_helpers.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
@@ -138,6 +139,10 @@ namespace orthia
         bool pageFound = false;
         auto handler = [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
+            if ((int)names.size() >= count)
+            {
+                return false;
+            }
             std::string name;
             Address_type target = 0;
             CCommonFormatParser parser;
@@ -152,9 +157,13 @@ namespace orthia
             {
                 info.flags = NameInfo::flags_Import;
             }
-            if (metaType == g_database_type_fnc_Export)
+            else if (metaType == g_database_type_fnc_Export)
             {
                 info.flags = NameInfo::flags_Export;
+            }
+            else if (metaType == g_database_type_fnc_PrivateSymbol)
+            {
+                info.flags = NameInfo::flags_PrivateSymbol;
             }
             if (nameFilter.flags & nameFilter.flags_ContinueFrom)
             {
@@ -176,23 +185,48 @@ namespace orthia
             return true;
         };
 
-        if (nameFilter.excludeImports)
+        bool continueFromPrivate = (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
+                                   nameFilter.continueMarkNameFlag == NameInfo::flags_PrivateSymbol;
+        if (!nameFilter.privateSymbolsOnly)
         {
-            classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                g_database_type_fnc_Export, -1,
-                handler);
+            if (!continueFromPrivate)
+            {
+                if (nameFilter.excludeImports)
+                {
+                    classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                        g_database_type_fnc_Export, -1,
+                        handler);
+                }
+                else
+                {
+                    classicDatabase->QueryMetaInfoModule2(moduleAddress,
+                        g_database_type_fnc_Import, g_database_type_fnc_Export,
+                        handler);
+                }
+            }
+            if ((int)names.size() >= count)
+            {
+                return;
+            }
+            if (!pageFound &&
+                (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
+                nameFilter.continueMarkNameFlag != 0 &&
+                nameFilter.continueMarkNameFlag != NameInfo::flags_PrivateSymbol)
+            {
+                pageFound = true;
+                continueFromPrivate = false;
+            }
         }
-        else
-        {
-            classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                g_database_type_fnc_Import, g_database_type_fnc_Export,
-                handler);
-        }
+        classicDatabase->QueryMetaInfoModule2(moduleAddress,
+            g_database_type_fnc_PrivateSymbol, -1,
+            handler,
+            continueFromPrivate ? nameFilter.address : 0);
     }
     int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-        return classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export);
+        return classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export)
+             + classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_PrivateSymbol, -1);
     }
     int FileWorkplaceItem::GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const
     {
@@ -248,6 +282,8 @@ namespace orthia
             CCommonFormatParser parser;
             parser.Parse(text);
             parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &moduleIt->fullName);
+            parser.QueryMetadata("flags", &moduleIt->flags);
+            parser.QueryMetadata("builtinflags", &moduleIt->builtInFlags);
             return true;
         });
 
@@ -369,57 +405,83 @@ namespace orthia
             range.lines.push_back(allLines[i]);
         }
     }
-    oui::String FileWorkplaceItem::QueryAddressName(Address_type address) const
+    NameInfo FileWorkplaceItem::QueryAddressName(Address_type address) const
     {
+        auto nameInfo = QueryAddressNameImpl(address);
         if (persistentItemStorage)
         {
             auto comment = persistentItemStorage->SyncReadComment(address);
             if (!comment.native.empty())
             {
-                return comment;
+                nameInfo.name = comment;
             }
         }
-
+        return nameInfo;
+    }
+    NameInfo FileWorkplaceItem::QueryAddressNameImpl(Address_type address) const
+    {
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-        Address_type capturedModuleAddress = 0;
-        Address_type capturedMetaAddress = 0;
-        std::string capturedMetaName;
+        Address_type capturedExportModuleAddress = 0;
+        Address_type capturedMetaExportAddress = 0;
+        std::string capturedExportMetaName;
+        Address_type capturedPrivateModuleAddress = 0;
+        Address_type capturedMetaPrivateAddress = 0;
+        std::string capturedPrivateMetaName;
+
+        NameInfo result;
+        CommonModuleInfo addressModule;
+        if (!classicDatabase->QueryNearestModule(address, &addressModule))
+        {
+            return result;
+        }
 
         classicDatabase->QueryMetaInfoByNearestAddress(g_database_type_fnc_Export,
             address,
             [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
-            capturedModuleAddress = moduleAddress;
-            capturedMetaAddress = metaAddress;
-            Address_type target = 0;
-            CCommonFormatParser parser;
-            parser.Parse(text);
-            parser.QueryMetadata("address", &target);
-            parser.QueryMetadata("name", &capturedMetaName);
-
+            if (moduleAddress == addressModule.address)
+            {
+                capturedExportModuleAddress = moduleAddress;
+                capturedMetaExportAddress = metaAddress;
+                CCommonFormatParser parser;
+                parser.Parse(text);
+                parser.QueryMetadata("name", &capturedExportMetaName);
+            }
             return false;
         });
 
-        CommonModuleInfo info;
-        if (classicDatabase->QueryNearestModule(address, &info))
+        classicDatabase->QueryMetaInfoByNearestAddress(g_database_type_fnc_PrivateSymbol,
+            address,
+            [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
-            oui::String res;
-            if (capturedMetaAddress > info.address)
+            if (moduleAddress == addressModule.address)
             {
-                Address_type diff = address - capturedMetaAddress;
-                res.native = info.name + OUI_TCSTR("!") + orthia::Utf8ToPlatformString(capturedMetaName);
-                if (diff)
-                {
-                    res = ComposeName(res, capturedMetaAddress, address);
-                }
-                return res;
+                capturedPrivateModuleAddress = moduleAddress;
+                capturedMetaPrivateAddress = metaAddress;
+                CCommonFormatParser parser;
+                parser.Parse(text);
+                parser.QueryMetadata("name", &capturedPrivateMetaName);
             }
-            else
-            {
-                return ComposeName(info.name, info.address, address);
-            }
+            return false;
+        });
+
+        Address_type moduleAddressHint = address;
+        if (capturedExportModuleAddress)
+        {
+            moduleAddressHint = capturedExportModuleAddress;
         }
-        return oui::String();
+        else if (capturedPrivateModuleAddress)
+        {
+            moduleAddressHint = capturedPrivateModuleAddress;
+        }
+
+
+        result.name = ComposeName(orthia::Utf8ToPlatformString(capturedExportMetaName), capturedMetaExportAddress, address, addressModule.name, addressModule.address);
+        if (!capturedPrivateMetaName.empty())
+        {
+            result.privateSymbol = ComposeName(orthia::Utf8ToPlatformString(capturedPrivateMetaName), capturedMetaPrivateAddress, address, addressModule.name, addressModule.address);
+        }
+        return result;
     }
     Address_type FileWorkplaceItem::QueryAddressByName(const oui::String& text, Address_type defValue) const
     {
@@ -490,16 +552,63 @@ namespace orthia
 
         return std::shared_ptr<::DianaMovableReadStream>(streamAdapter, &streamAdapter->stream.parent.parent);
     }
-
+    std::shared_ptr<IMemoryReader> FileWorkplaceItem::CreateMemoryReader()
+    {
+        const auto& mapped = file->GetMappedFile();
+        return std::make_shared<CMemoryReaderOnLoadedData>(
+            file->GetImageBase(), mapped.data(), mapped.size());
+    }
+    void FileWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
+    {
+        UpdateModuleFlags(moduleAddress, ModuleInfo::flags_symbolsLoaded, 0);
+    }
+    void FileWorkplaceItem::UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove)
+    {
+        UpdateModuleMetaInfo(GetModuleManager()->QueryDatabaseManager()->GetClassicDatabase(),
+            moduleAddress,
+            [&](CCommonFormatParser& parser, CCommonFormatBuilder& builder) {
+                int flags = 0;
+                parser.QueryMetadata("flags", &flags);
+                flags |= flagsToSet;
+                flags &= ~flagsToRemove;
+                builder.AddMetadata("flags", flags);
+                return true;
+            });
+    }
     // InsertModuleMetaInfo
-    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName)
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName, int moduleFlags, int builtInModuleFlags)
     {
         orthia::CCommonFormatBuilder builder;
         builder.AddMetadata(ORTHIA_TCSTR("fullname"), fullName.native);
+        builder.AddMetadata("flags", moduleFlags);
+        builder.AddMetadata("builtinflags", builtInModuleFlags);
         std::string metaInfo;
         builder.Produce(&metaInfo);
 
-        database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, metaInfo, moduleAddress);
+        database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, metaInfo, moduleAddress, true);
+    }
+    void UpdateModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, std::function<bool (CCommonFormatParser&, CCommonFormatBuilder&)> handler)
+    {
+        std::string newText;
+        bool needUpdate = false;
+        database->QueryMetaInfoModule2(moduleAddress, g_database_type_moduleMetaInfo, -1,
+            [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
+        {            
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            orthia::CCommonFormatBuilder builder(&parser);
+            needUpdate = handler(parser, builder);
+            if (needUpdate)
+            {
+                builder.Produce(&newText);
+            }
+            return false;
+        });
+
+        if (needUpdate)
+        {
+            database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress, true);
+        }
     }
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)
     {
@@ -517,6 +626,11 @@ namespace orthia
         if (info.flags & orthia::NameInfo::flags_Import)
         {
             database->InsertMetaInfo(moduleAddress, g_database_type_fnc_Import, metaInfo, moduleAddress);
+            return;
+        }
+        if (info.flags & orthia::NameInfo::flags_PrivateSymbol)
+        {
+            database->InsertMetaInfo(moduleAddress, g_database_type_fnc_PrivateSymbol, metaInfo, metaInfoAddres);
         }
     }
 

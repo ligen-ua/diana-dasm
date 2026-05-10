@@ -182,6 +182,21 @@ std::basic_string<CharType> Trim(const CharType * str)
     return Trim(arg);
 }
 
+
+template<class T, int size>
+typename std::enable_if<size != 1, T>::type
+StreamCharTraits(const T& o) {
+    return o;
+}
+
+template<class T, int size>
+typename std::enable_if<size == 1, uint16_t>::type
+StreamCharTraits(const T& o) {
+    return static_cast<uint16_t>(o);
+}
+
+#define ORTHIA_CAST_CHAR(x)  StreamCharTraits<decltype(x), sizeof(x)>(x)
+
 // ToStringAsHex
 template<class ObjectType, template<class> class Traits, template<class> class AllocatorType, class Type>
 void ToStringAsHex(ObjectType id, std::basic_string<Type, Traits<Type>, AllocatorType<Type> > * pStr)
@@ -192,7 +207,7 @@ void ToStringAsHex(ObjectType id, std::basic_string<Type, Traits<Type>, Allocato
     std::hex(stream);
 
     stream << std::setw( sizeof(id)*2 ) << std::setfill( CharTraits<Type>::zero );
-    stream << id;
+    stream << ORTHIA_CAST_CHAR(id);
     stream >> *pStr;
     if (stream.fail() || stream.bad() || !stream.eof())
         throw std::runtime_error("Cannot convert");
@@ -985,7 +1000,7 @@ class flat_map
     bool m_sorted = true;
 public:
     using const_iterator = typename std::vector<Node>::const_iterator;
-    using iterator = typename std::vector<Node>::const_iterator;
+    using iterator = typename std::vector<Node>::iterator;
 
     void insert(const Key& key, const Value& value)
     {
@@ -1018,6 +1033,26 @@ public:
         Node keyNode = { key, Value() };
         return std::upper_bound(m_nodes.begin(), m_nodes.end(), keyNode, [](const Node& n1, const Node& n2) {  return n1.first < n2.first;  });
     }
+    iterator find(const Key& key)
+    {
+        sort();
+        Node keyNode = { key, Value()};
+        for (auto it = std::lower_bound(m_nodes.begin(), m_nodes.end(), keyNode, [](const Node& n1, const Node& n2) {  return n1.first < n2.first;  }),
+            it_end = m_nodes.end();
+            it != it_end;
+            ++it)
+        {
+            if (key < it->first)
+            {
+                return m_nodes.end();
+            }
+            if (!(it->first < key))
+            {
+                return it;
+            }
+        }
+        return m_nodes.end();
+    }
     const_iterator find(const Key& key) const
     {
         const_cast<flat_map<Key, Value>*>(this)->sort();
@@ -1039,6 +1074,8 @@ public:
         }
         return m_nodes.end();
     }
+    iterator begin() { return m_nodes.begin(); }
+    iterator end() { return m_nodes.end(); }
     const_iterator begin() const
     {
         return m_nodes.begin();

@@ -127,8 +127,10 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
             for (auto& m : allModules)
                 moduleNames[m.address] = m.name;
 
-            classicDb->QueryMetaInfoByAddressRange(
-                orthia::g_database_type_fnc_Export, routeStart, routeStart + maxSizeToUse,
+            classicDb->QueryMetaInfoByAddressRange2(
+                orthia::g_database_type_fnc_Export,
+                orthia::g_database_type_fnc_PrivateSymbol, 
+                routeStart, routeStart + maxSizeToUse,
                 [&](orthia::Address_type moduleAddress, int, const std::string& text, orthia::Address_type metaAddress)
             {
                 if (exportInfoVec.size() >= oui::kMaxXrefs) {
@@ -512,6 +514,11 @@ void CDisasmWindow::SetActiveWorkspaceItem(int itemId)
     ReloadVisibleData();
     Invalidate();
 }
+void CDisasmWindow::ReloadVisibleItems()
+{
+    ReloadVisibleData();
+    Invalidate();
+}
 bool CDisasmWindow::DoGotoOnPage(orthia::Address_type address)
 {
     oui::LineIndex lineIndex(address, 0);
@@ -729,6 +736,19 @@ bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& 
             {
                 Event_Goto(orthia::IPeristentItemStorage::goto_flags_history_mode);
                 handled = true;
+            }
+            break;
+
+        case oui::VirtualKey::kX:
+            if (evt.keyState.HasJustCtrl())
+            {
+                auto lineItem = m_view->GetCurrentItem();
+                if (lineItem.interfaceTag)
+                {
+                    auto tag = GetDisasmTag(lineItem);
+                    Event_XrefDialog(tag->index.GetIndex());
+                    handled = true;
+                }
             }
             break;
 

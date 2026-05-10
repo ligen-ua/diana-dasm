@@ -5,6 +5,9 @@
 
 namespace orthia
 {
+    class CCommonFormatParser;
+    class CCommonFormatBuilder;
+
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, IWorkPlaceItem
     {
         std::shared_ptr<orthia::ISimpleFile> file;
@@ -31,12 +34,20 @@ namespace orthia
         int GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const;
         MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const override;
         void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const override;
-        oui::String QueryAddressName(Address_type address) const override;
+        NameInfo QueryAddressName(Address_type address) const override;
         std::shared_ptr<::DianaMovableReadStream> CreateDisasmStream(Address_type addressStart) override;
         Address_type QueryAddressByName(const oui::String& text, Address_type defValue) const override;
+        std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
+        void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
+        void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
+
+    private:
+        NameInfo QueryAddressNameImpl(Address_type address) const;
+
     };
 
     class CClassicDatabase;
-    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String & fullName);
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String & fullName, int moduleFlags, int builtInModuleFlags = 0);
+    void UpdateModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, std::function<bool(CCommonFormatParser&, CCommonFormatBuilder&)> handler);
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo& info, Address_type metaInfoAddres);
 }

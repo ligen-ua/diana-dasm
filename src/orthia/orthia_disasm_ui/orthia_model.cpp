@@ -6,6 +6,7 @@
 #include "orthia_item_file.h"
 #include "orthia_model_modules.h"
 #include "orthia_log.h"
+#include "orthia_module_symbols.h"
 
 namespace orthia
 {
@@ -71,7 +72,7 @@ namespace orthia
     void CProgramModel::SetUILog(std::shared_ptr<IUILogInterface> uiLog)
     {
         m_uiLog = uiLog;
-        m_analyzer.Init(uiLog);
+        m_analyzer.Init(uiLog, m_config);
     }
     std::shared_ptr<oui::CFileSystem> CProgramModel::GetFileSystem()
     {
@@ -243,11 +244,14 @@ namespace orthia
             // done readme, create db
             auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto moduleManager = std::make_shared<CModuleManager>();
-            moduleManager->Reinit(dbFileName, false);
+            moduleManager->Reinit(dbFileName, true);
 
             persistentItemStorage->Init(moduleManager->QueryDatabaseManager());
 
-            info->Init(moduleManager, persistentItemStorage);
+            auto moduleStorage = std::make_shared<ModuleStorage>(
+                moduleManager->QueryDatabaseManager()->GetClassicDatabase());
+            info->Init(moduleManager, persistentItemStorage, moduleStorage);
+            persistentItemStorage->CPersistentItemStorage::Init(info);
         }
         catch (std::exception& e)
         {
@@ -282,6 +286,7 @@ namespace orthia
         auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
         info->ReloadModules();
+        persistentItemStorage->Init(info);
 
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
@@ -298,29 +303,64 @@ namespace orthia
         // OK
         result.error.native.clear();
 
-        auto uiThread = completeHandler->GetThread();
-        auto mainAddr = info->GerProcessModuleAddress();
-        auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
+        EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GerProcessModuleAddress(), info);
+    }
+    void CProgramModel::NotifyWorkspaceDataRefreshed(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId)
+    {
+        std::vector<std::shared_ptr<IUIEventHandler>> handlers;
+        {
+            std::unique_lock<std::mutex> lock(m_lock);
+            handlers.assign(m_handlers.begin(), m_handlers.end());
+        }
+        uiThread->AddTask([handlers = std::move(handlers), workspaceId]() {
+            for (auto& h : handlers)
+                h->OnWorkspaceDataRefreshed(workspaceId);
+        });
+    }
 
-        m_analyzer.Enqueue(workspaceId, info, bgOp, mainAddr,
-            [this, uiThread, workspaceId]() {
-                std::vector<std::shared_ptr<IUIEventHandler>> handlers;
-                {
-                    std::unique_lock<std::mutex> lock(m_lock);
-                    handlers.assign(m_handlers.begin(), m_handlers.end());
-                }
-                uiThread->AddTask(
-                    [handlers = std::move(handlers), workspaceId, uiLog = m_uiLog]() {
+    void CProgramModel::EnqueueAnalysisOps(
+        std::shared_ptr<oui::CWindowThread> uiThread,
+        int workspaceId,
+        std::shared_ptr<IWorkPlaceItem> item,
+        Address_type mainAddr,
+        std::shared_ptr<CProcessWorkplaceItem> procItem)
+    {
+        if (procItem)
+        {
+            // Phase 1 (process only): disassemble the main module and log a completion message.
+            auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
+            m_analyzer.EnqueueAnalyze(procItem, bgOp, mainAddr,
+                [uiThread, uiLog = m_uiLog]() {
+                    uiThread->AddTask([uiLog]() {
                         if (auto log = uiLog.lock())
                         {
                             auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
                             log->WriteLog(node->QueryValue(ORTHIA_TCSTR("analysis-complete")));
                         }
-                        for (auto& h : handlers)
-                            h->OnWorkspaceItemChanged(workspaceId);
                     });
-            });
+                });
+        }
+
+        // Phase 2: load debug symbols; on completion, re-analyze with private symbols,
+        // then notify all UI subscribers that the workspace item changed.
+        auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
+        m_analyzer.EnqueueLoadSymbols(item, symOp,
+            [this, uiThread, workspaceId, mainAddr, item]() {
+
+                NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
+
+                auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
+                m_analyzer.EnqueueAnalyzePrivateSymbols(item, reanalyzeOp, mainAddr,
+                    [this, uiThread, workspaceId]() {
+                        NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
+                    });
+            },
+            [this, uiThread, workspaceId]() {
+                NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
+            },
+            procItem ? Address_type{0} : mainAddr);
     }
+
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
     {
@@ -423,6 +463,7 @@ namespace orthia
             // fill the model data
             auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
+            persistentItemStorage->CPersistentItemStorage::Init(info);
 
             info->fullName = file->GetFullFileName();
             info->file = mappedExe;
@@ -483,31 +524,27 @@ namespace orthia
 
                     importsLoader.ReportModules(info->moduleManager);
                 }
-
+                const int builtInTypeFlag =
+                    (executableType == DIANA_EXECUTABLE_TYPE_ELF) ? ModuleInfo::builtInFlags_moduleTypeElf :
+                    (executableType == DIANA_EXECUTABLE_TYPE_PE)  ? ModuleInfo::builtInFlags_moduleTypePe : 0;
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     info->file->GetImageBase(),
-                    info->fullName.native);
+                    info->fullName.native,
+                    ModuleInfo::flags_analyzeDone,
+                    builtInTypeFlag);
             }
 
-            result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(RegisterItem(info, false));
+            auto workspaceId = RegisterItem(info, false);
+            result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
             // OK
             result.error.native.clear();
+
+            // kick off symbol loading and notify UI when complete
+            EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->file->GetImageBase(), nullptr);
         }
         catch (std::exception& e)
         {
             result.error.native = orthia::Utf8ToPlatformString(e.what());
-        }
-    }
-    void CProgramModel::LoadSymbols(std::shared_ptr<IWorkPlaceItem> workItem,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
-    {
-        auto folders = m_config->GetSymbolsFolders();
-
-        std::vector<orthia::ModuleInfo> modules;
-        workItem->GetModules(modules);
-
-        for (auto& mod : modules)
-        {
         }
     }
 }

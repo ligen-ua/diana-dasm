@@ -59,6 +59,13 @@ void CMainWindow::OnWorkspaceItemChanged(int itemId)
         console->SetTitle(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("caption-file")), item.name));
     }
 }
+void CMainWindow::OnWorkspaceDataRefreshed(int itemId)
+{
+    if (m_disasmWindow)
+        m_disasmWindow->ReloadVisibleItems();
+    if (m_modulesWindow)
+        m_modulesWindow->OnWorkspaceItemChanged();
+}
 void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
 {
 

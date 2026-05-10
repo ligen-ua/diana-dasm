@@ -371,11 +371,14 @@ namespace orthia
                 mod.second.elfFile->GetImageBase(),
                 mod.second.elfFile->GetMappedFile().size(),
                 shortName.native,
-                &rollback);
+                &rollback,
+                true);
 
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.elfFile->GetImageBase(),
-                mod.second.fullName.native);
+                mod.second.fullName.native,
+                0,
+                orthia::ModuleInfo::builtInFlags_moduleTypeElf);
 
             InsertNames(moduleManager, mod.second);
             classicDatabase->DoneSave();
