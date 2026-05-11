@@ -1,4 +1,5 @@
 #include "orthia_item_process.h"
+#include <filesystem>
 #include "orthia_pe.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
@@ -12,6 +13,23 @@ namespace orthia
 {
 
     // CProcessWorkplaceItem
+    CProcessWorkplaceItem::~CProcessWorkplaceItem()
+    {
+        m_moduleManager = nullptr;
+        m_persistentStorage = nullptr;
+        m_moduleStorage = nullptr;
+
+        if (!m_procFolder.empty())
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(std::filesystem::path(m_procFolder), ec);
+        }
+    }
+    void CProcessWorkplaceItem::SetProcFolder(const PlatformString_type& folder)
+    {
+        m_procFolder = folder;
+        orthia::EraseLastSlash(m_procFolder);
+    }
     CProcessWorkplaceItem::CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
         const oui::String& shortName,
         int dianaMode,

@@ -509,6 +509,10 @@ namespace oui
         std::vector<MultiLineViewItem> lines;
         Init(std::move(lines));
     }
+    bool CMultiLineView::HasLines() const
+    {
+        return !m_lines.empty();
+    }
     void CMultiLineView::Init(std::vector<MultiLineViewItem>&& lines, bool cancelSelection)
     {
         m_cursorOutOfText = false;

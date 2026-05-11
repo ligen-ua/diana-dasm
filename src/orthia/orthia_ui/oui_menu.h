@@ -13,6 +13,7 @@ namespace oui
         String text;
         std::function<void()> handler;
         Hotkey hotkey;
+        std::function<bool()> isEnabled;  // nullptr = always enabled
     };
 
     class CMenuButtonWindow:public CWindow

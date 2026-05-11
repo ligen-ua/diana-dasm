@@ -256,10 +256,14 @@ namespace oui
         {
             return;
         }
-        auto handler = ((*popupItems)[m_selectedPosition].handler);
-        if (handler)
+        auto& item = (*popupItems)[m_selectedPosition];
+        if (item.isEnabled && !item.isEnabled())
         {
-            handler();
+            return;
+        }
+        if (item.handler)
+        {
+            item.handler();
             Destroy();
         }
     }
@@ -455,12 +459,19 @@ namespace oui
                 {
                     profile = &colorProfile->popup.selected;
                 }
+                auto textColor = profile->buttonText;
+                auto hotkeyColor = profile->buttonHotkeyText;
+                if (popup.isEnabled && !popup.isEnabled())
+                {
+                    textColor = colorProfile->popup.borderColor;
+                    hotkeyColor = colorProfile->popup.borderColor;
+                }
                 parameters.console.PaintText(pos,
-                    profile->buttonText,
+                    textColor,
                     profile->buttonBackground,
                     tmp,
                     hotKeySymbol,
-                    profile->buttonHotkeyText,
+                    hotkeyColor,
                     profile->buttonBackground);
             }
             popup.text;
@@ -490,7 +501,8 @@ namespace oui
             if (item.hotkey.hotkey != VirtualKey::None)
             {
                 m_hotkeys.Register(item.hotkey,
-                    [handler = item.handler, this, menu]() {
+                    [handler = item.handler, isEnabled = item.isEnabled, this, menu]() {
+                        if (isEnabled && !isEnabled()) return;
                         handler();
                         Destroy();
                 });

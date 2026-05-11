@@ -48,6 +48,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
     void OpenExecutable();
     void OpenProcess();
+    void CloseCurrentItem();
     void ShowAbout();
     void ShowHelp();
     void ToggleWorkspaceView();
@@ -64,6 +65,7 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     void OnWorkspaceItemChanged(int itemId) override;
     void OnPreWorkspaceItemChange(int itemId) override;
     void OnWorkspaceDataRefreshed(int itemId) override;
+    void OnWorkspaceItemRemoved(int itemId) override;
 
     void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);

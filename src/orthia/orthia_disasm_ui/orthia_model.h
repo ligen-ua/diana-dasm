@@ -28,6 +28,7 @@ namespace orthia
         virtual void OnPreWorkspaceItemChange(int itemId) = 0;
         virtual void OnWorkspaceItemChanged(int itemId) = 0;
         virtual void OnWorkspaceDataRefreshed(int itemId) = 0;
+        virtual void OnWorkspaceItemRemoved(int itemId) {}
     };
     class CProcessWorkplaceItem;
     class CProgramModel
@@ -67,6 +68,7 @@ namespace orthia
         int GetActiveItemId() const { return m_activeId; }
         bool QueryWorkspaceItem(int id, WorkplaceItem& item) const;
         bool SetActiveItem(int uid);
+        bool RemoveItem(int uid);
         int QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const;
         bool QueryActiveWorkspaceItem(WorkplaceItem& item) const;
         void SetUILog(std::shared_ptr<IUILogInterface> uiLog);

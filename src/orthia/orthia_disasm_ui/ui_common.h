@@ -45,6 +45,7 @@ public:
     bool ReloadState(int itemId);
     void SaveState(int itemId);
     void SetActiveItem(int itemId);
+    void RemoveItem(int itemId);
     UIState * GetUIState(int itemId, std::shared_ptr<IUIStatefulWindow> window);
 };
 

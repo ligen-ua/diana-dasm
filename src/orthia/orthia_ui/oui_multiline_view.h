@@ -245,6 +245,7 @@ namespace oui
         void SelectAllCached();
         bool PaintInProgress() const;
 
+        bool HasLines() const;
         void Clear();
         void Init(std::vector<MultiLineViewItem>&& lines, bool cancelSelection = true);
         void AddLine(MultiLineViewItem && item);

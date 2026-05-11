@@ -30,6 +30,17 @@ void CMainWindow::OnPreWorkspaceItemChange(int itemId)
 {
     m_stateManager.SaveState(itemId);
 }
+void CMainWindow::OnWorkspaceItemRemoved(int itemId)
+{
+    m_stateManager.RemoveItem(itemId);
+}
+void CMainWindow::CloseCurrentItem()
+{
+    auto activeId = m_model->GetActiveItemId();
+    if (!activeId)
+        return;
+    m_model->RemoveItem(activeId);
+}
 void CMainWindow::OnWorkspaceItemChanged(int itemId)
 {
     if (m_stateManager.ReloadState(itemId))
