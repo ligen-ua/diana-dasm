@@ -217,7 +217,8 @@ namespace orthia
         auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
         if (moduleName.empty())
         {
-            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr,
+            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler,
+                args.workspaceId, nullptr,
                 [this]() {
                 });
             return;
@@ -227,10 +228,11 @@ namespace orthia
             moduleName,
             [&](orthia::ModuleInfo& mod)
         {
-            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler, nullptr,
-            [this]() {
+            args.model->GetAnalyzer().EnqueueLoadSymbols(args.item, args.progressHandler,
+                args.workspaceId, nullptr,
+                [this]() {
                 },
-             mod.address);
+                mod.address);
             moduleFound = true;
             return false;
         });
@@ -253,10 +255,10 @@ namespace orthia
             [&](orthia::ModuleInfo& mod)
             {
                 args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
-                        []() {
+                        args.workspaceId, []() {
                         });
                 args.model->GetAnalyzer().EnqueueAnalyzePrivateSymbols(args.item, args.progressHandler, mod.address,
-                    []() {
+                    args.workspaceId, []() {
                 });
                 moduleFound = true;
                 return false;
@@ -289,7 +291,7 @@ namespace orthia
         std::shared_ptr<orthia::CProgramModel> model)
     {
         CCommandParser parser;
-        CommandArguments args = { progressHandler, parser, item, model };
+        CommandArguments args = { progressHandler, parser, item, model, model->GetActiveItemId() };
 
         oui::ScopedGuard reportStopGuard([&]() { ReportStop(args); });
 

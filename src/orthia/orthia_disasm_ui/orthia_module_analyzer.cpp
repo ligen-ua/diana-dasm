@@ -39,9 +39,16 @@ namespace orthia
     void CModuleAnalyzer::Cancel(int workspaceId)
     {
         std::unique_lock<std::mutex> lock(m_opsLock);
-        auto it = m_ops.find(workspaceId);
-        if (it != m_ops.end())
-            it->second->Cancel();
+        auto it = m_workspaceOps.find(workspaceId);
+        if (it != m_workspaceOps.end())
+        {
+            for (auto& weakOp : it->second)
+            {
+                if (auto op = weakOp.lock())
+                    op->Cancel();
+            }
+            m_workspaceOps.erase(it);
+        }
     }
 
     void CModuleAnalyzer::Cleanup(int workspaceId)
@@ -53,12 +60,16 @@ namespace orthia
     void CModuleAnalyzer::EnqueueAnalyze(std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
+        int workspaceId,
         std::function<void()> onComplete)
     {
+        if (item->IsDeletePending())
+            return;
         int itemId = ++m_nextItemId;
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
             m_ops[itemId] = op;
+            m_workspaceOps[workspaceId].push_back(op);
             if (!m_uiThread)
                 m_uiThread = op->GetThread();
         }
@@ -127,12 +138,16 @@ namespace orthia
     void CModuleAnalyzer::EnqueueAnalyzePrivateSymbols(std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
+        int workspaceId,
         std::function<void()> onComplete)
     {
+        if (item->IsDeletePending())
+            return;
         int itemId = ++m_nextItemId;
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
             m_ops[itemId] = op;
+            m_workspaceOps[workspaceId].push_back(op);
             if (!m_uiThread)
                 m_uiThread = op->GetThread();
         }
@@ -227,14 +242,18 @@ namespace orthia
     void CModuleAnalyzer::EnqueueLoadSymbols(
         std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
+        int workspaceId,
         std::function<void()> onComplete,
         std::function<void()> onProgress,
         Address_type moduleAddressHint)
     {
+        if (item->IsDeletePending())
+            return;
         int itemId = ++m_nextItemId;
         {
             std::unique_lock<std::mutex> lock(m_opsLock);
             m_ops[itemId] = op;
+            m_workspaceOps[workspaceId].push_back(op);
             if (!m_uiThread)
                 m_uiThread = op->GetThread();
         }

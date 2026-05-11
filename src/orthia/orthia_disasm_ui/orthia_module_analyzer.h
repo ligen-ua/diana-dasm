@@ -15,6 +15,7 @@ namespace orthia
     {
         mutable std::mutex m_opsLock;
         std::map<int, std::shared_ptr<oui::BaseOperation>> m_ops;
+        std::map<int, std::vector<std::weak_ptr<oui::BaseOperation>>> m_workspaceOps;
         std::atomic<int> m_nextItemId{0};
         oui::CThreadPool m_pool{1};
 
@@ -23,9 +24,9 @@ namespace orthia
         std::shared_ptr<CConfigOptionsStorage> m_config;
 
         void Cleanup(int workspaceId);
-        void WriteLog(const oui::String& line);
 
     public:
+        void WriteLog(const oui::String& line);
         ~CModuleAnalyzer();
 
         void Init(std::weak_ptr<IUILogInterface> uiLog,
@@ -34,10 +35,12 @@ namespace orthia
         void EnqueueAnalyze(std::shared_ptr<IWorkPlaceItem> item,
                      std::shared_ptr<oui::BaseOperation> op,
                      Address_type mainModuleAddr,
+                     int workspaceId,
                      std::function<void()> onComplete);
 
         void EnqueueLoadSymbols(std::shared_ptr<IWorkPlaceItem> item,
                                 std::shared_ptr<oui::BaseOperation> op,
+                                int workspaceId,
                                 std::function<void()> onComplete,
                                 std::function<void()> onProgress,
                                 Address_type moduleAddressHint = 0);
@@ -45,6 +48,7 @@ namespace orthia
         void EnqueueAnalyzePrivateSymbols(std::shared_ptr<IWorkPlaceItem> item,
                                           std::shared_ptr<oui::BaseOperation> op,
                                           Address_type mainModuleAddr,
+                                          int workspaceId,
                                           std::function<void()> onComplete);
 
         void Cancel(int workspaceId);

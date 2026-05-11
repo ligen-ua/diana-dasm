@@ -223,6 +223,7 @@ namespace orthia
             auto binFileName = dbFolder + m_config->GetBinFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
             CreateAllDirectoriesForFile(dbFileName);
+            info->SetProcFolder(dbFolder);
 
             // save readme file 
             orthia::CFile readmeFile;
@@ -329,7 +330,7 @@ namespace orthia
         {
             // Phase 1 (process only): disassemble the main module and log a completion message.
             auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
-            m_analyzer.EnqueueAnalyze(procItem, bgOp, mainAddr,
+            m_analyzer.EnqueueAnalyze(procItem, bgOp, mainAddr, workspaceId,
                 [uiThread, uiLog = m_uiLog]() {
                     uiThread->AddTask([uiLog]() {
                         if (auto log = uiLog.lock())
@@ -344,13 +345,13 @@ namespace orthia
         // Phase 2: load debug symbols; on completion, re-analyze with private symbols,
         // then notify all UI subscribers that the workspace item changed.
         auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
-        m_analyzer.EnqueueLoadSymbols(item, symOp,
+        m_analyzer.EnqueueLoadSymbols(item, symOp, workspaceId,
             [this, uiThread, workspaceId, mainAddr, item]() {
 
                 NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
 
                 auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
-                m_analyzer.EnqueueAnalyzePrivateSymbols(item, reanalyzeOp, mainAddr,
+                m_analyzer.EnqueueAnalyzePrivateSymbols(item, reanalyzeOp, mainAddr, workspaceId,
                     [this, uiThread, workspaceId]() {
                         NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
                     });
@@ -438,7 +439,9 @@ namespace orthia
                 error = localFile.Open_Silent(binFileName, g_desired_write, g_share_read, g_create_always);
                 if (error)
                 {
-                    result.error = errorNode->QueryValue(ORTHIA_TCSTR("too-big"));
+                    result.error = oui::PassParameter2(errorNode->QueryValue(ORTHIA_TCSTR("file-error-name-code")),
+                        binFileName,
+                        oui::GetErrorText(error));
                     return;
                 }
                 localFile.WriteToFile(binPeFile.data(), binPeFile.size());
@@ -546,5 +549,100 @@ namespace orthia
         {
             result.error.native = orthia::Utf8ToPlatformString(e.what());
         }
+    }
+
+    bool CProgramModel::RemoveItem(int uid)
+    {
+        std::shared_ptr<IWorkPlaceItem> outOfLockLastItem;
+
+        // Stage 1: mark item as delete-pending so no new ops get queued.
+        oui::String itemName;
+        {
+            std::unique_lock<std::mutex> lock(m_lock);
+            auto it = m_items.find(uid);
+            if (it != m_items.end())
+            {
+                itemName = it->second->GetShortName();
+                it->second->SetDeletePending();
+            }
+        }
+        if (!itemName.native.empty())
+        {
+            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+            m_analyzer.WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("closing")), itemName));
+        }
+        // Stage 2: cancel all already-queued ops for this workspace item.
+        m_analyzer.Cancel(uid);
+
+        // Collect event handlers and determine the next active item.
+        std::vector<std::shared_ptr<IUIEventHandler>> handlers;
+        bool wasActive = false;
+        int newActiveId = 0;
+        {
+            std::unique_lock<std::mutex> lock(m_lock);
+            if (m_items.find(uid) == m_items.end())
+            {
+                return false;
+            }
+            wasActive = (m_activeId == uid);
+            handlers.assign(m_handlers.begin(), m_handlers.end());
+
+            if (wasActive)
+            {
+                auto it = m_items.upper_bound(uid);
+                if (it != m_items.end())
+                {
+                    newActiveId = it->first;
+                }
+                else
+                {
+                    auto rit = m_items.lower_bound(uid);
+                    if (rit != m_items.begin())
+                    {
+                        --rit;
+                        newActiveId = rit->first;
+                    }
+                }
+            }
+        }
+
+        // Let subscribers save UI state before the item disappears.
+        if (wasActive)
+        {
+            for (auto& h : handlers)
+            {
+                h->OnPreWorkspaceItemChange(uid);
+            }
+        }
+
+        // Remove the item and update the active ID atomically.
+        {
+            std::unique_lock<std::mutex> lock(m_lock);
+            auto it = m_items.find(uid);
+            if (it != m_items.end())
+            {
+                outOfLockLastItem = it->second;
+                m_items.erase(it);
+            }
+            if (wasActive)
+            {
+                m_activeId = newActiveId;
+            }
+        }
+
+        // Notify subscribers that this item was removed (state cleanup).
+        for (auto& h : handlers)
+        {
+            h->OnWorkspaceItemRemoved(uid);
+        }
+        // Notify subscribers that the active item has changed (or 0 = none).
+        if (wasActive)
+        {
+            for (auto& h : handlers)
+            {
+                h->OnWorkspaceItemChanged(newActiveId);
+            }
+        }
+        return true;
     }
 }

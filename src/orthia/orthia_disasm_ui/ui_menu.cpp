@@ -284,6 +284,12 @@ void CMainWindow::ConstuctMenu()
                 oui::Hotkey(oui::VirtualKey::kP)
             },
             {
+                uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("close_item")),
+                [this]() { CloseCurrentItem(); },
+                oui::Hotkey(oui::VirtualKey::kC),
+                [this]() -> bool { return m_model->GetActiveItemId() != 0; }
+            },
+            {
                 orthia::PlatformString_type(),
                 nullptr
             },

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include "orthia_utils.h"
 #include "orthia_interfaces.h"
 #include "orthia_text_manager.h"
@@ -202,6 +203,8 @@ namespace orthia
     struct IWorkPlaceItem
     {
         virtual ~IWorkPlaceItem() {}
+        virtual void SetDeletePending() = 0;
+        virtual bool IsDeletePending() const = 0;
         virtual WorkAddressRangeInfo GetRangeInfo(Address_type address) const = 0;
         virtual const std::shared_ptr<CModuleManager> GetModuleManager() const = 0;
         virtual WorkAddressData ReadData(Address_type address, Address_type size) = 0;
@@ -224,6 +227,14 @@ namespace orthia
         virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
         virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
         virtual ModuleStorage* GetModuleStorage() { return nullptr; }
+    };
+
+    class BaseWorkPlaceItem : public IWorkPlaceItem
+    {
+        std::atomic<bool> m_deletePending{false};
+    public:
+        void SetDeletePending() override { m_deletePending = true; }
+        bool IsDeletePending() const override { return m_deletePending; }
     };
 
     void AppendXrefLine(Address_type address, IMarkupCache* cache, CModuleManager* moduleManager, int dianaMode, std::vector<MarkupLine>& allLines);

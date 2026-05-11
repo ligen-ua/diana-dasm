@@ -126,7 +126,12 @@ void CUIStateManager::SetActiveItem(int itemId)
     {
         wnd->SetActiveWorkspaceItem(itemId);
     }
-}    
+}
+void CUIStateManager::RemoveItem(int itemId)
+{
+    m_workspaces.erase(itemId);
+}
+
 UIState* CUIStateManager::GetUIState(int itemId, std::shared_ptr<IUIStatefulWindow> window)
 {
     auto item = m_workspaces.find(itemId);

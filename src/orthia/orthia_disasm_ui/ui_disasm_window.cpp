@@ -68,6 +68,10 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     auto item = m_model->GetItem(m_itemUid);
     if (!item)
     {
+        if (m_view->HasLines())
+        {
+            m_view->Clear();
+        }
         return;
     }
 

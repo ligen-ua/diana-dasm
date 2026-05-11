@@ -8,7 +8,7 @@ namespace orthia
     class CCommonFormatParser;
     class CCommonFormatBuilder;
 
-    struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, IWorkPlaceItem
+    struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, BaseWorkPlaceItem
     {
         std::shared_ptr<orthia::ISimpleFile> file;
         oui::String fullName, shortName;

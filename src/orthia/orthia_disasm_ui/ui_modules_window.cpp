@@ -207,6 +207,16 @@ void CModulesWindow::UpdateVisibleItems()
     {
         activeItem->GetModules(m_lastModules);
     }
+    else
+    {
+        m_modulesBox->Clear();
+        m_namesBox->Clear(); 
+        m_lastModules.clear();
+        m_cachedNamesPage.clear();
+        m_lastTotalNamesCount = 0;
+        m_selectedModuleAddress = 0;
+        m_selectedModuleName.native.clear();
+    }
     auto firstRunAfterReload = m_needUpdateModulesBox;
     if (firstRunAfterReload)
     {
@@ -233,40 +243,43 @@ void CModulesWindow::UpdateVisibleItems()
         vit->colorsHandler = [=]() { return oui::LabelColorState{ m_colorProfile->listBoxFolders, oui::Color() }; };
     });
 
-    if (firstRunAfterReload)
+    if (activeItem)
     {
-        // first run after reload state
-        activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), m_requiredNamesCacheSize, m_cachedNamesPage);
-        m_namesBox->SetOffset(m_requiredNamesOffset);
-        m_namesBox->SetSelectedPosition(0);
-
-        m_requiredNamesOffset = 0;
-        m_requiredNamesCacheSize = 0;
-    }
-    else
-    if (m_cachedNamesPage.empty() && m_selectedModuleAddress)
-    {
-        // usual first run
-        m_namesBox->SetSelectedPosition(0);
-        activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), g_nameCacheSize, m_cachedNamesPage);
-    }
-    else if (!m_cachedNamesPage.empty())
-    {
-        // need next page
-        auto offset = m_namesBox->GetOffset();
-        auto visibleSize = m_namesBox->GetVisibleSize();
-        auto itemsHandled = offset + visibleSize;
-        if (itemsHandled > (int)m_cachedNamesPage.size() && itemsHandled < m_lastTotalNamesCount)
+        if (firstRunAfterReload)
         {
-            // reload more data
-            orthia::NameSelectionKey key;
-            key.flags = key.flags_ContinueFrom;
-            key.address = m_cachedNamesPage.back().address;
-            key.continueMarkNameFlag = m_cachedNamesPage.back().flags;
+            // first run after reload state
+            activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), m_requiredNamesCacheSize, m_cachedNamesPage);
+            m_namesBox->SetOffset(m_requiredNamesOffset);
+            m_namesBox->SetSelectedPosition(0);
 
-            std::vector<orthia::NameInfo> newPage;
-            activeItem->QueryNames(m_selectedModuleAddress, key, g_nameCacheSize, newPage);
-            m_cachedNamesPage.insert(m_cachedNamesPage.end(), newPage.begin(), newPage.end());
+            m_requiredNamesOffset = 0;
+            m_requiredNamesCacheSize = 0;
+        }
+        else
+        if (m_cachedNamesPage.empty() && m_selectedModuleAddress)
+        {
+            // usual first run
+            m_namesBox->SetSelectedPosition(0);
+            activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), g_nameCacheSize, m_cachedNamesPage);
+        }
+        else if (!m_cachedNamesPage.empty())
+        {
+            // need next page
+            auto offset = m_namesBox->GetOffset();
+            auto visibleSize = m_namesBox->GetVisibleSize();
+            auto itemsHandled = offset + visibleSize;
+            if (itemsHandled > (int)m_cachedNamesPage.size() && itemsHandled < m_lastTotalNamesCount)
+            {
+                // reload more data
+                orthia::NameSelectionKey key;
+                key.flags = key.flags_ContinueFrom;
+                key.address = m_cachedNamesPage.back().address;
+                key.continueMarkNameFlag = m_cachedNamesPage.back().flags;
+
+                std::vector<orthia::NameInfo> newPage;
+                activeItem->QueryNames(m_selectedModuleAddress, key, g_nameCacheSize, newPage);
+                m_cachedNamesPage.insert(m_cachedNamesPage.end(), newPage.begin(), newPage.end());
+            }
         }
     }
     DefaultUpdateVisibleItems(this, &m_namesOwner, m_namesBox, m_cachedNamesPage,

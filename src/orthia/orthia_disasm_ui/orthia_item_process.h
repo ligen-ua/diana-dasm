@@ -4,12 +4,13 @@
 
 namespace orthia
 {
-    class CProcessWorkplaceItem:public std::enable_shared_from_this<CProcessWorkplaceItem>, public IWorkPlaceItem
+    class CProcessWorkplaceItem:public std::enable_shared_from_this<CProcessWorkplaceItem>, public BaseWorkPlaceItem
     {
         mutable orthia::CCriticalSection m_lock;
         std::shared_ptr<oui::IProcess> m_proc;
         oui::String m_shortName;
         int m_dianaMode = 0;
+        PlatformString_type m_procFolder;
 
         std::vector<orthia::ModuleInfo> m_modules;
         std::map<orthia::Address_type, int> m_modulesIndex;
@@ -26,11 +27,13 @@ namespace orthia
         NameInfo QueryAddressNameImpl(Address_type address, orthia::ModuleInfo& moduleInfo) const;
 
     public:
+        ~CProcessWorkplaceItem();
         CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
             const oui::String& shortName,
             int dianaMode,
             std::shared_ptr<IPeristentItemStorage> persistentStorage);
 
+        void SetProcFolder(const PlatformString_type& folder);
         void Init(std::shared_ptr<CModuleManager> moduleManager,
             std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
             std::shared_ptr<ModuleStorage> moduleStorage);

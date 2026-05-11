@@ -700,16 +700,16 @@ namespace oui
             case oui::VirtualKey::kC:
                 if (evt.keyState.state & evt.keyState.AnyCtrl)
                 {
-                    if (SelectionIsActive())
+                    if (auto console = GetConsole())
                     {
-                        if (auto console = GetConsole())
+                        if (!m_llHandlers.ctrlCHandler || !m_llHandlers.ctrlCHandler(evt))
                         {
-                            if (!m_llHandlers.ctrlCHandler || !m_llHandlers.ctrlCHandler(evt))
+                            if (SelectionIsActive())
                             {
                                 console->CopyTextToClipboard(ExtractSelected(false));
+                                handled = true;
                             }
                         }
-                        handled = true;
                     }
                 }
                 break;

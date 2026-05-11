@@ -32,6 +32,7 @@ public:
         CCommandParser& parser;
         std::shared_ptr<IWorkPlaceItem> item;
         std::shared_ptr<orthia::CProgramModel> model;
+        int workspaceId = 0;
 
         int linesWithoutSync = 0;
         void ReplyLine(const oui::String& text);
