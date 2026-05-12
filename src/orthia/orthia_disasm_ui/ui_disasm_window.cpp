@@ -1,5 +1,6 @@
 #include "ui_disasm_window.h"
 #include "ui_disasm_memory_writer.h"
+#include "oui_menu.h"
 #include "orthia_pe.h"
 #include "oui_goto_dialog.h"
 #include "oui_disasm_colors.h"
@@ -692,6 +693,113 @@ void CDisasmWindow::MakeComment()
         },
         comment));
     editBox->Dock();
+}
+void CDisasmWindow::OnContextMenu(const oui::Point& point)
+{
+    bool hasSelection = m_view->SelectionIsActive();
+    auto lineItem = m_view->GetCurrentItem();
+
+    auto contextMenuNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.disasm.contextmenu"));
+    std::vector<oui::PopupItem> items;
+
+    if (hasSelection)
+    {
+        items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("copy")),
+            [this]() { m_view->CopySelected(); } });
+        items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("copy_assembler")),
+            [this]() {
+                auto [p1, p2] = m_view->GetSelectionRange();
+                CopySelectedAssembler(p1, p2);
+            } });
+    }
+    else
+    {
+        orthia::Address_type targetAddr = 0;
+        bool hasTag = lineItem.interfaceTag != nullptr;
+        if (hasTag)
+        {
+            targetAddr = GetDisasmTag(lineItem)->index.GetIndex();
+        }
+
+        items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("show_references")),
+            [this, hasTag, targetAddr]() {
+                if (hasTag)
+                {
+                    Event_XrefDialog(targetAddr);
+                }
+            } });
+    }
+    oui::Point pointToUse{ point.x + 1, point.y + 1 };
+    auto parent = GetPool()->GetRootWindow();
+    auto popup = parent->AddChild_t(std::make_shared<oui::CMenuPopup>(std::move(items)));
+    popup->Init(parent->GetPtr());
+    popup->Dock(pointToUse);
+    popup->SetFocus();
+}
+void CDisasmWindow::CopySelectedAssembler(const oui::MultiLineSelPoint& p1_in, const oui::MultiLineSelPoint& p2_in)
+{
+    auto console = GetConsole();
+    if (!console)
+        return;
+
+    auto item = m_model->GetItem(m_itemUid);
+    if (!item)
+        return;
+
+    oui::MultiLineSelPoint p1 = p1_in;
+    oui::MultiLineSelPoint p2 = p2_in;
+    if (p1.y.GetIndex() > p2.y.GetIndex())
+        std::swap(p1, p2);
+
+    orthia::Address_type maxSizeInBytes = p2.y.GetIndex() - p1.y.GetIndex() + 16;
+    if (maxSizeInBytes > 0x1000000)
+        return;
+
+    auto stream = item->CreateDisasmStream(p1.y.GetIndex());
+    if (!stream)
+        return;
+
+    struct DisasmAsmCopier : oui::DisasmWriter
+    {
+        orthia::PlatformString_type text;
+
+        void PrintLine(const orthia::PlatformString_type& line) override
+        {
+        }
+        void PrintLine(const orthia::PlatformString_type& line,
+            const oui::TextMarkup& markup,
+            std::shared_ptr<oui::IMultilineViewTag> tag)
+        {
+            int commandStart = -1, pos = 0;
+            for (const auto& range : markup.ranges)
+            {
+                if (range.id == oui::g_region_id_command)
+                {
+                    commandStart = pos;
+                    break;
+                }
+                pos += range.sizeInTChars;
+            }
+            if (commandStart >= 0 && commandStart < (int)line.size())
+                text.append(line.substr(commandStart) + OUI_TCSTR("\n"));
+        }
+    } writer;
+
+    oui::MemoryPrinter printer(&writer,
+        item->GetDianaMode(),
+        p1.y,
+        DI_MAX_OPERAND_SIZE,
+        item);
+
+    printer.SetEndAddress(p2.y);
+
+    oui::MemoryPrinter::DianaPrintContext context;
+    Diana_InitContext(&context.context, item->GetDianaMode());
+
+    context.pStream = stream.get();
+    printer.OnStream(&context, p1.y, false);
+
+    console->CopyTextToClipboard(writer.text);
 }
 bool CDisasmWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext)
 {

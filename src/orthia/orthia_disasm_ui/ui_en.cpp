@@ -33,6 +33,11 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.disasm"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Disassembly"))
         ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.disasm.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("copy"), ORTHIA_TCSTR("&Copy"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("copy_assembler"), ORTHIA_TCSTR("Copy &assembler"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("show_references"), ORTHIA_TCSTR("Show &references"))
+        ;
 
     // modules
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules"))
@@ -58,13 +63,31 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.output"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Output"))
         ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.output.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("copy"), ORTHIA_TCSTR("&Copy"))
+        ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.commands"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Commands"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.commands.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("copy"), ORTHIA_TCSTR("&Copy"))
         ;
 
     // workspace
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.workspace"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Workspace"))
+        ;
+
+    // help
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.help.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("copy"), ORTHIA_TCSTR("&Copy"))
+        ;
+
+    // editbox
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.editbox.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("cut"),   ORTHIA_TCSTR("Cu&t"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("copy"),  ORTHIA_TCSTR("&Copy"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("paste"), ORTHIA_TCSTR("&Paste"))
         ;
 
     // dialogs

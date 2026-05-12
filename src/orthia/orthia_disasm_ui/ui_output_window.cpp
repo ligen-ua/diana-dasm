@@ -3,6 +3,8 @@
 
 #include "ui_output_window.h"
 #include "orthia_log.h"
+#include "oui_menu.h"
+#include "orthia_model_interfaces.h"
 
 class OutputLogProxy :public orthia::RefCountedBase_t<orthia::ILowLevelLog>
 {
@@ -76,12 +78,15 @@ void COutputWindow::AddLine(const oui::String& line_in)
         (int)tm.tm_min,
         (int)tm.tm_sec,
         (int)milliseconds);
-   
+
 
     oui::MultiLineViewItem item;
     item.text = oui::String::string_type(buffer) + line.native;
     m_view->AddLine(std::move(item));
-    m_view->GoToLastLine();
+    if (m_view->IsCursorOutOfText())
+    {
+        m_view->GoToLastLine();
+    }
 }
 
 void COutputWindow::ConstructChilds()
@@ -96,6 +101,23 @@ void COutputWindow::OnResize()
 void COutputWindow::SetFocusImpl()
 {
     m_view->SetFocus();
+}
+void COutputWindow::OnContextMenu(const oui::Point& point)
+{
+    if (!m_view->SelectionIsActive())
+        return;
+
+    auto contextMenuNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.output.contextmenu"));
+    std::vector<oui::PopupItem> items;
+    items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("copy")),
+        [this]() { m_view->CopySelected(); } });
+
+    oui::Point pointToUse{ point.x + 1, point.y + 1 };
+    auto parent = GetPool()->GetRootWindow();
+    auto popup = parent->AddChild_t(std::make_shared<oui::CMenuPopup>(std::move(items)));
+    popup->Init(parent->GetPtr());
+    popup->Dock(pointToUse);
+    popup->SetFocus();
 }
 
 std::shared_ptr<oui::CMultiLineView> COutputWindow::SF_GetView()

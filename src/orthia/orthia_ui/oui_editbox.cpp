@@ -1,11 +1,72 @@
 #include "oui_editbox.h"
 #include "oui_console.h"
+#include "oui_menu.h"
 
 // TODO: Add LTR support after switching to new terminal style
 namespace oui
 {
     String CEditBox::m_chunk;
     String CEditBox::m_chunk2;
+
+    static EditBoxContextMenuLabelsProvider g_contextMenuLabelsProvider;
+
+    void EditBox_SetContextMenuLabelsProvider(EditBoxContextMenuLabelsProvider provider)
+    {
+        g_contextMenuLabelsProvider = std::move(provider);
+    }
+
+    void CEditBox::OpenContextMenu(const Point& point)
+    {
+        auto console = GetConsole();
+        if (!console)
+            return;
+
+        String labelCut, labelCopy, labelPaste;
+        if (g_contextMenuLabelsProvider)
+        {
+            std::tie(labelCut, labelCopy, labelPaste) = g_contextMenuLabelsProvider();
+        }
+        else
+        {
+            labelCut   = OUI_TCSTR("Cu&t");
+            labelCopy  = OUI_TCSTR("&Copy");
+            labelPaste = OUI_TCSTR("&Paste");
+        }
+
+        std::vector<PopupItem> items;
+
+        if (!IsReadOnly() && SelectionIsActive())
+        {
+            items.push_back({ labelCut,
+                [this, console]() {
+                    console->CopyTextToClipboard(ExtractSelected(true));
+                }});
+        }
+        if (SelectionIsActive())
+        {
+            items.push_back({ labelCopy,
+                [this, console]() {
+                    console->CopyTextToClipboard(ExtractSelected(false));
+                }});
+        }
+        if (!IsReadOnly())
+        {
+            items.push_back({ labelPaste,
+                [this, console]() {
+                    InsertText(console->PasteTextFromClipboard());
+                }});
+        }
+
+        if (items.empty())
+            return;
+
+        Point pointToUse{ point.x + 1, point.y + 1 };
+        auto parent = GetPool()->GetRootWindow();
+        auto popup = parent->AddChild_t(std::make_shared<CMenuPopup>(std::move(items)));
+        popup->Init(parent->GetPtr());
+        popup->Dock(pointToUse);
+        popup->SetFocus();
+    }
 
     CEditBox::CEditBox(std::shared_ptr<DialogColorProfile> colorProfile)
         :
@@ -16,6 +77,14 @@ namespace oui
     bool CEditBox::SelectionIsActive() const
     {
         return m_selPosStart != m_selPosEnd;
+    }
+    std::pair<int, int> CEditBox::GetSelectedRange() const
+    {
+        if (!SelectionIsActive())
+        {
+            return std::make_pair(0,0);
+        }
+        return std::make_pair(m_selPosStart, m_selPosEnd);
     }
     String CEditBox::ExtractSelected(bool cut)
     {
@@ -512,7 +581,15 @@ namespace oui
             }
         }
 
-        if (evt.mouseEvent.button == MouseButton::Left && 
+        if (evt.mouseEvent.button == MouseButton::Right &&
+            evt.mouseEvent.state == MouseState::Released)
+        {
+            OpenContextMenu(evt.mouseEvent.point);
+            SkipNextMouseEvent();
+            return true;
+        }
+
+        if (evt.mouseEvent.button == MouseButton::Left &&
             (evt.mouseEvent.state == MouseState::Pressed ||
             evt.mouseEvent.state == MouseState::DoubleClick))
         {
@@ -860,14 +937,23 @@ namespace oui
         }
         Invalidate();
     }
+    void CEditBox::UpdateBehaviorFlags(int flagsToSet, int flagsToRemove)
+    {
+        m_behavior |= flagsToSet;
+        m_behavior &= ~flagsToRemove;
+    }
     void CEditBox::SetLastMousePoint(Point lastMouseMovePoint)
     {
         m_lastMouseMovePoint = lastMouseMovePoint;
     }
 
-    bool g_test = false;
     void CEditBox::ResetSelection()
     {
+        if (SelectionIsActive())
+        {
+            int cccc = 1;
+            cccc = 2;
+        }
         m_selPosStart = m_cursorIterator;
         m_selPosEnd = m_cursorIterator;
         Invalidate();
@@ -882,8 +968,10 @@ namespace oui
             console->HideCursor();
         }
 
-        ResetSelection();
-
+        if (m_behavior & BehaviorFlags_CancelSelectionOnFocusLost)
+        {
+            ResetSelection();
+        }
         Parent_type::OnFocusLost();
     }
     void CEditBox::OnFocusEnter()

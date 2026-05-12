@@ -1,4 +1,6 @@
 #include "ui_command_window.h"
+#include "oui_menu.h"
+#include "orthia_model_interfaces.h"
 
 CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
     std::shared_ptr<orthia::CProgramModel> model,
@@ -248,6 +250,23 @@ void CCommandWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
 void CCommandWindow::SetFocusImpl()
 {
     m_commandEdit->SetFocus();
+}
+void CCommandWindow::OnContextMenu(const oui::Point& point)
+{
+    if (!m_view->SelectionIsActive())
+        return;
+
+    auto contextMenuNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.commands.contextmenu"));
+    std::vector<oui::PopupItem> items;
+    items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("copy")),
+        [this]() { m_view->CopySelected(); } });
+
+    oui::Point pointToUse{ point.x + 1, point.y + 1 };
+    auto parent = GetPool()->GetRootWindow();
+    auto popup = parent->AddChild_t(std::make_shared<oui::CMenuPopup>(std::move(items)));
+    popup->Init(parent->GetPtr());
+    popup->Dock(pointToUse);
+    popup->SetFocus();
 }
 
 std::shared_ptr<oui::CMultiLineView> CCommandWindow::SF_GetView()

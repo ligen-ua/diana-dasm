@@ -213,6 +213,10 @@ public:
                 case S_PUB32:
                 case S_GDATA32:
                 case S_LDATA32:
+                case S_GTHREAD32:
+                case S_LTHREAD32:
+                case S_GMANDATA:
+                case S_LMANDATA:
                 {
                     // PUBSYM32 and DATASYM32 share identical off/seg/name layout
                     auto* d = reinterpret_cast<const DATASYM32*>(sym);
@@ -223,11 +227,31 @@ public:
                 }
                 case S_GPROC32:
                 case S_LPROC32:
+                case S_GPROC32_ID:
+                case S_LPROC32_ID:
                 {
                     auto* p = reinterpret_cast<const PROCSYM32*>(sym);
                     seg = p->seg;
                     off = p->off;
                     name = p->name;
+                    break;
+                }
+                case S_THUNK32:
+                {
+                    auto* t = reinterpret_cast<const THUNKSYM32*>(sym);
+                    seg = t->seg; off = t->off; name = t->name;
+                    break;
+                }
+                case S_LABEL32:
+                {
+                    auto* l = reinterpret_cast<const LABELSYM32*>(sym);
+                    seg = l->seg; off = l->off;
+
+                    // Labels have no name — synthesize one from the address so
+                    // the RVA still gets indexed and is reachable by address lookup.
+                    char synth[32];
+                    snprintf(synth, sizeof(synth), "__label_%08lX", off);
+                    // assign to a local std::string/buffer and point `name` at it
                     break;
                 }
                 default:

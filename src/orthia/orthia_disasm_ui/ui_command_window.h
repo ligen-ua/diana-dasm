@@ -24,6 +24,7 @@ class CCommandWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     void ConstructChilds() override;
     void OnResize() override;
     void SetFocusImpl() override;
+    void OnContextMenu(const oui::Point& point) override;
 
     std::shared_ptr<oui::CMultiLineView> SF_GetView() override;
     oui::CConsole* SF_GetConsole() override;

@@ -147,6 +147,7 @@ namespace oui
     }
     void MemoryPrinter::PackCommand(const orthia::PlatformString_type& command, std::shared_ptr<DisasmLineContextTag> tag)
     {
+        m_textMarkupBuilder.AddNextRange(0, m_colors.command, g_region_id_command);
         m_currentBlock.append(command);
     }
     void MemoryPrinter::PrintCommandEx(unsigned long long address,

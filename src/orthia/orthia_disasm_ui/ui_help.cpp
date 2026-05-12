@@ -1,5 +1,7 @@
 #include "ui_help.h"
 #include "orthia_version.h"
+#include "oui_menu.h"
+#include "orthia_model_interfaces.h"
 
 namespace oui
 {
@@ -163,6 +165,24 @@ namespace oui
         labelProfile->mouseHighlight.text = oui::ColorBrightYellow();
         m_textLabel->SetColorProfile(labelProfile);
     }
+    void CHelpWindow::OnContextMenu(const oui::Point& point)
+    {
+        if (!m_helpText->SelectionIsActive())
+            return;
+
+        auto contextMenuNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.help.contextmenu"));
+        std::vector<oui::PopupItem> items;
+        items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("copy")),
+            [this]() { m_helpText->CopySelected(); } });
+
+        oui::Point pointToUse{ point.x + 1, point.y + 1 };
+        auto parent = GetPool()->GetRootWindow();
+        auto popup = parent->AddChild_t(std::make_shared<oui::CMenuPopup>(std::move(items)));
+        popup->Init(parent->GetPtr());
+        popup->Dock(pointToUse);
+        popup->SetFocus();
+    }
+
     void CHelpWindow::ConstructChilds()
     {
         AddChild(m_helpText);
