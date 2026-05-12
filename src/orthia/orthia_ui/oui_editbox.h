@@ -20,6 +20,10 @@ namespace oui
 
     class CEditBox:public SimpleBrush<MouseFocusable<CWindow>>
     {
+    public:
+        const static int BehaviorFlags_CancelSelectionOnFocusLost = 0x0001;
+
+    private:
         using Parent_type = SimpleBrush<MouseFocusable<CWindow>>;
 
         std::shared_ptr<DialogColorProfile> m_colorProfile;
@@ -50,22 +54,26 @@ namespace oui
         TextMarkup::Range m_lastSelectedRange;
 
         std::uint16_t m_manualHighlight = 0;
+        int m_behavior = BehaviorFlags_CancelSelectionOnFocusLost;
+
         void SetTextImpl(const String& text);
         void MoveToNextWordRight();
         void MoveToNextWordLeft();
         void ProcessDelete();
         bool ProcessBackpace();
         int GetSymOffset(int symbol) const;
-        void DoPaintMarkupText(DrawParameters& parameters, 
+        void DoPaintMarkupText(DrawParameters& parameters,
             std::vector<TextMarkup::Range>::const_iterator& it,
             int& rangePos,
-            Point& target, String* stringToRender, 
+            Point& target, String* stringToRender,
             int startPos, int endPos,
             int chunkStartOffset);
         void DoPaintImpl(const Rect& rect, DrawParameters& parameters);
+        void OpenContextMenu(const Point& point);
 
     public:
         CEditBox(std::shared_ptr<DialogColorProfile> colorProfile);
+        void UpdateBehaviorFlags(int flagsToSet, int flagsToRemove);
         void SetLastMousePoint(Point lastMouseMovePoint);
         void ResetSelection();
         void SetSelectAllOnFocus(bool selectAllOnFocus);
@@ -88,6 +96,7 @@ namespace oui
         void OnFocusEnter() override;
         bool SelectionIsActive() const;
         String ExtractSelected(bool cut);
+        std::pair<int, int> GetSelectedRange() const;
 
         void SelectAll(bool moveCursor = true);
         void SelectCurrentWord();
@@ -100,4 +109,8 @@ namespace oui
         void SetVirtualCursorPosition(int newIterator, bool changeSelecton, bool shiftMode);
     };
 
+    using EditBoxContextMenuLabelsProvider =
+        std::function<std::tuple<String, String, String>()>;
+
+    void EditBox_SetContextMenuLabelsProvider(EditBoxContextMenuLabelsProvider provider);
 }

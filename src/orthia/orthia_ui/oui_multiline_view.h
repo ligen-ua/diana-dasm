@@ -147,6 +147,7 @@ namespace oui
         virtual bool SelectAll() = 0;
         virtual void OnEnter() = 0;
         virtual void OnPaintStart(std::shared_ptr<CEditBox> ) {}
+        virtual void OnContextMenu(const Point& point) {}
     };
     class CMultiLineView;
     class CSelfHostedMultiLineViewOwner:public IMultiLineViewOwner
@@ -216,7 +217,7 @@ namespace oui
 
         void SetupHandlers();
         void SetNewCursor(const Point& pt);
-        void SetNewYCursorPosImpl(int newCursor);
+        void SetNewYCursorPosImpl(int newCursor, bool modifySelection = true);
 
         bool HandleMouseEventImpl(const Rect& rect, InputEvent& evt, bool fromEditBox, MouseEventContext& mouseEventContext);
         bool KeyStateHasSelection() const;
@@ -225,6 +226,7 @@ namespace oui
         void CancelSelectionIfNecessary();
         void OnEditBoxPaintDone();
         void DoPaintImpl(const Rect& rect, DrawParameters& parameters);
+        bool SelectionIsActiveImpl() const;
 
     public:
         CMultiLineView(std::shared_ptr<DialogColorProfile> colorProfile, IMultiLineViewOwner* owner, bool dynamicLogMode);
@@ -244,6 +246,7 @@ namespace oui
         bool CopySelected();
         void SelectAllCached();
         bool PaintInProgress() const;
+        bool IsCursorOutOfText() const;
 
         bool HasLines() const;
         void Clear();
@@ -261,6 +264,7 @@ namespace oui
         bool SetCursorYPos(const oui::LineIndex& index);
         String ExtractSelected();
         void GoToLastLine();
+        std::pair<MultiLineSelPoint, MultiLineSelPoint> GetSelectionRange() const;
     };
 
 }

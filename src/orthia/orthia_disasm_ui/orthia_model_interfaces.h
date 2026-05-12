@@ -402,5 +402,6 @@ namespace oui {
     const std::uint32_t g_region_id_xref_dialog = oui::g_id_user_range + 3;
     const std::uint32_t g_region_id_xref_0      = oui::g_id_user_range + 4;
     const std::uint32_t g_region_id_xref_last   = g_region_id_xref_0 + kMaxXrefs - 1;
+    const std::uint32_t g_region_id_command      = g_region_id_xref_last + 1;
 
 }

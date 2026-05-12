@@ -12,6 +12,7 @@ class COutputWindow:public oui::SimpleBrush<oui::CPanelWindow>, oui::CSelfHosted
     void ConstructChilds() override;
     void OnResize() override;
     void SetFocusImpl() override;
+    void OnContextMenu(const oui::Point& point) override;
 
     // orthia::IUILogInterface
     void WriteLog(const oui::String& line) override;

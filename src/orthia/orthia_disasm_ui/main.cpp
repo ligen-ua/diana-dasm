@@ -1,5 +1,6 @@
 #include "orthia_core.h"
 #include "ui_main_window.h"
+#include "oui_editbox.h"
 #include "orthia_config.h"
 #include <iostream>
 #include "diana_core_cpp.h"
@@ -155,6 +156,14 @@ int wmain(int argc, const wchar_t* argv[])
 
         g_textManager = new orthia::CTextManager();
         InitLanguage_EN(g_textManager);
+        oui::EditBox_SetContextMenuLabelsProvider([&]() {
+            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.editbox.contextmenu"));
+            return std::make_tuple(
+                node->QueryValue(ORTHIA_TCSTR("cut")),
+                node->QueryValue(ORTHIA_TCSTR("copy")),
+                node->QueryValue(ORTHIA_TCSTR("paste"))
+            );
+        });
 
         auto config = std::make_shared<orthia::CConfigOptionsStorage>();
         config->Init();

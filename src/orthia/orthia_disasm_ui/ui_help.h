@@ -15,6 +15,7 @@ namespace oui
 
         std::shared_ptr<oui::CMultiLineView> SF_GetView() override;
         oui::CConsole* SF_GetConsole() override;
+        void OnContextMenu(const oui::Point& point) override;
     public:
         CHelpWindow();
         void ConstructChilds() override;
