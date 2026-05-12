@@ -250,7 +250,7 @@ public:
                     // Labels have no name — synthesize one from the address so
                     // the RVA still gets indexed and is reachable by address lookup.
                     char synth[32];
-                    snprintf(synth, sizeof(synth), "__label_%08X", off);
+                    snprintf(synth, sizeof(synth), "__label_%08lX", off);
                     // assign to a local std::string/buffer and point `name` at it
                     break;
                 }
