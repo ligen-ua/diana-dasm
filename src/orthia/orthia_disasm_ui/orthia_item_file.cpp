@@ -4,6 +4,7 @@
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
 #include "orthia_common_print.h"
+#include "orthia_model_sections.h"
 
 namespace orthia
 {
@@ -610,6 +611,12 @@ namespace orthia
             database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress, true);
         }
     }
+    void FileWorkplaceItem::QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out)
+    {
+        auto reader = CreateMemoryReader();
+        QuerySectionsImpl(reader.get(), moduleBase ? moduleBase : file->GetImageBase(), sections_out);
+    }
+
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)
     {
         orthia::CCommonFormatBuilder builder;

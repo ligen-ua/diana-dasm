@@ -116,6 +116,12 @@
     <ClCompile Include="orthia_module_symbols.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_model_sections.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_sections_window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h">
@@ -198,6 +204,12 @@
     </ClInclude>
     <ClInclude Include="orthia_external_symbols.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_model_sections.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ui_sections_window.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

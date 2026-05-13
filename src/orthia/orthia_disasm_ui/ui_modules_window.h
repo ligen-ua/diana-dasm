@@ -50,7 +50,10 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     static const int field_modulesBox_Position = 6;
 
     std::function<void(orthia::Address_type address)> m_onGotoAddress;
+    std::function<void(orthia::Address_type address, const oui::String& name)> m_onShowSections;
     void SelectModule(orthia::Address_type address, const oui::String& name);
+    void ShowSectionsForSelectedRow();
+    void OnContextMenu(std::vector<oui::PopupItem>& items);
 
     oui::Rect CalcModulesScrollRect(const oui::Rect& clientRect);
     void ConstructChilds() override;
@@ -77,10 +80,11 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
             ContainerType& container,
             Predicate predicate);
 public:
-    CModulesWindow(std::function<oui::String()> getCaption, 
+    CModulesWindow(std::function<oui::String()> getCaption,
         std::shared_ptr<orthia::CProgramModel> model,
         std::shared_ptr<oui::IPanelChildSwitcher> parentTabSwitcher,
-        std::function<void (orthia::Address_type address)> onGotoAddress);
+        std::function<void (orthia::Address_type address)> onGotoAddress,
+        std::function<void(orthia::Address_type address, const oui::String& name)> onShowSections);
     void OnWorkspaceItemChanged();
     void SetActiveWorkspaceItem(int itemId) override;
     void Invalidate(bool valid = false) override;

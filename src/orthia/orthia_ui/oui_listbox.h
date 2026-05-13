@@ -6,12 +6,18 @@
 
 namespace oui
 {
+    struct ListBoxItemTag
+    {
+        virtual ~ListBoxItemTag() {}
+    };
+    struct PopupItem;
     struct ListBoxItem
     {
         std::vector<String> text;
         std::function<void()> openHandler;
         std::function<LabelColorState()> colorsHandler;
         int fsFlags = 0;
+        std::shared_ptr<ListBoxItemTag> tag;
     };
 
     class CListBox;
@@ -23,6 +29,7 @@ namespace oui
         virtual void ShiftViewWindow(int newOffset) = 0;
         virtual void OnVisibleItemChanged() = 0;
         virtual bool ShiftViewWindowToSymbol(const String& symbol) = 0;
+        virtual void PrepareContextMenu(std::vector<oui::PopupItem>& items) {}
     };
     class ListBoxOwnerProxy :public IListBoxOwner
     {
@@ -32,6 +39,7 @@ namespace oui
         std::function<void(int newOffset)> shiftViewWindow;
         std::function<void()> onVisibleItemChanged;
         std::function<bool(const String& symbol)> shiftViewWindowToSymbol;
+        std::function<void(std::vector<oui::PopupItem>& items)> prepareContextMenu;
 
         int GetTotalCount() const
         {
@@ -72,6 +80,14 @@ namespace oui
                 return false;
             }
             return shiftViewWindowToSymbol(symbol);
+        }
+        void PrepareContextMenu(std::vector<oui::PopupItem>& items) override
+        {
+            if (!prepareContextMenu)
+            {
+                return;
+            }
+            prepareContextMenu(items);
         }
     };
 

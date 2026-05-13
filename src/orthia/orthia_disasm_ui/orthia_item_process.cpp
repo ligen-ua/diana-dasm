@@ -8,6 +8,7 @@
 #include "orthia_common_print.h"
 #include "orthia_common_format.h"
 #include "orthia_module_manager.h"
+#include "orthia_model_sections.h"
 
 namespace orthia
 {
@@ -773,6 +774,12 @@ namespace orthia
             return r;
         }
         return NameInfo();
+    }
+
+    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out)
+    {
+        auto reader = CreateMemoryReader();
+        QuerySectionsImpl(reader.get(), moduleBase, sections_out);
     }
 
 }

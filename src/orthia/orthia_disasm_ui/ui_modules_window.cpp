@@ -2,7 +2,21 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "ui_modules_window.h"
+#include "oui_menu.h"
 #include <ctime>
+
+struct ModuleItemContextTag :public oui::ListBoxItemTag
+{
+    orthia::Address_type address;
+    orthia::PlatformString_type name;
+
+    ModuleItemContextTag(orthia::Address_type address_in, const orthia::PlatformString_type& name_in)
+        :
+        address(address_in),
+        name(name_in)
+    {
+    }
+};
 
 const int CModulesWindow::field_selectedModuleAddress;
 const int CModulesWindow::field_selectedModuleName;
@@ -24,14 +38,16 @@ oui::String NameInfoFlagsToString(int flags)
     return OUI_TCHAR("F");
 }
 
-CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption, 
+CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
     std::shared_ptr<orthia::CProgramModel> model,
     std::shared_ptr<oui::IPanelChildSwitcher> parentTabSwitcher,
-    std::function<void(orthia::Address_type address)> onGotoAddress)
-    : 
+    std::function<void(orthia::Address_type address)> onGotoAddress,
+    std::function<void(orthia::Address_type address, const oui::String& name)> onShowSections)
+    :
     ParentType(getCaption),
     m_model(model),
-    m_onGotoAddress(onGotoAddress)
+    m_onGotoAddress(onGotoAddress),
+    m_onShowSections(onShowSections)
 {
     // FOR WIN LOGIC DEBUG
     //    SetBackgroundColor(oui::ColorBlue());
@@ -42,6 +58,7 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
     // create modules edit box
     auto columnsNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.modules.columns"));
 
+    m_modulesOwner.prepareContextMenu = [this](std::vector<oui::PopupItem>& items) {  OnContextMenu(items); };
     m_modulesOwner.getTotalCount = [this]() { return Modules_GetTotalCount(); };
     m_modulesOwner.shiftViewWindow = [this](int newOffset) { return Modules_ShiftViewWindow(newOffset); };
     m_modulesOwner.shiftViewWindowToSymbol = [this](const oui::String& symbol) { return Modules_ShiftViewWindowToSymbol(symbol); };
@@ -141,6 +158,11 @@ bool CModulesWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
                 return parent->SwitchNextPanel();
             }
         }
+        if (evt.keyEvent.valid && evt.keyEvent.virtualKey == oui::VirtualKey::kS)
+        {
+            ShowSectionsForSelectedRow();
+            return true;
+        }
     }
     switch (evt.keyEvent.virtualKey)
     {
@@ -200,6 +222,7 @@ int CModulesWindow::Names_GetTotalCount() const
     }
     return 0;
 }
+
 void CModulesWindow::UpdateVisibleItems()
 {
     auto activeItem = m_model->GetActiveItem();
@@ -236,6 +259,7 @@ void CModulesWindow::UpdateVisibleItems()
         vit->text.push_back(orthia::ToWideStringAsHex(it->address));
         vit->text.push_back(orthia::ToWideStringAsHex((unsigned int)it->size));
         vit->text.push_back(it->fullName);
+        vit->tag = std::make_shared<ModuleItemContextTag>(it->address, it->name);
 
         vit->openHandler = [this, address = it->address, name = it->name] {
             SelectModule(address, name);
@@ -290,7 +314,7 @@ void CModulesWindow::UpdateVisibleItems()
         vit->text.push_back(NameInfoFlagsToString(it->flags));
         vit->text.push_back(it->name);
         vit->text.push_back(orthia::ToWideStringAsHex(it->address));
-
+        
         vit->openHandler = [this, address = it->address]() {
             GotoAddress(address);
         };
@@ -301,6 +325,29 @@ void CModulesWindow::UpdateVisibleItems()
 void CModulesWindow::GotoAddress(orthia::Address_type address)
 {
     m_onGotoAddress(address);
+}
+void CModulesWindow::ShowSectionsForSelectedRow()
+{
+    if (!m_onShowSections)
+        return;
+    oui::ListBoxItem selected;
+    if (!m_modulesBox->GetSelectedItem(selected) || !selected.tag)
+        return;
+
+    auto tag = std::dynamic_pointer_cast<ModuleItemContextTag>(selected.tag);
+    if (!tag)
+    {
+        return;
+    }
+
+  //  selected.text.size
+    m_onShowSections(tag->address, tag->name);
+}
+void CModulesWindow::OnContextMenu(std::vector<oui::PopupItem>& items)
+{
+    auto contextMenuNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.modules.contextmenu"));
+    items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("show_sections")),
+        [this]() { ShowSectionsForSelectedRow(); } });
 }
 void CModulesWindow::HighlightItem(int highlightItemOffset)
 {
