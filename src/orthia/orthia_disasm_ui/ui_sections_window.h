@@ -54,10 +54,10 @@ class CSectionsWindow : public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWi
 
     void VertScroll_OnStartDrag(const oui::Point& point);
 
-    static const int field_moduleAddress        = 1;
-    static const int field_sectionsBox_Offset   = 2;
-    static const int field_sectionsBox_Position = 3;
-    static const int field_attrsBox_Offset      = 4;
+    inline static const int field_moduleAddress        = 1;
+    inline static const int field_sectionsBox_Offset   = 2;
+    inline static const int field_sectionsBox_Position = 3;
+    inline static const int field_attrsBox_Offset      = 4;
 
 public:
     CSectionsWindow(std::function<oui::String()> getCaption,
