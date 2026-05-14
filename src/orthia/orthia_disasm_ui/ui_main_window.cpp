@@ -41,6 +41,11 @@ void CMainWindow::CloseCurrentItem()
         return;
     m_model->RemoveItem(activeId);
 }
+void CMainWindow::SwitchToSectionsPanel()
+{
+    if (m_defaultGroup && m_sectionsWindow)
+        m_defaultGroup->SwitchPanel(m_sectionsWindow);
+}
 void CMainWindow::OnWorkspaceItemChanged(int itemId)
 {
     if (m_stateManager.ReloadState(itemId))
@@ -121,7 +126,8 @@ void CMainWindow::ConstructChilds()
 
     // construct panels
     m_panelContainerWindow = AddChild_t(std::make_shared<oui::CPanelContainerWindow>());
-    auto defaultGroup = m_panelContainerWindow->CreateDefaultGroup();
+    m_defaultGroup = m_panelContainerWindow->CreateDefaultGroup();
+    auto defaultGroup = m_defaultGroup;
     auto topGroup = defaultGroup;
     {
         // disasm panel
@@ -144,10 +150,14 @@ void CMainWindow::ConstructChilds()
             m_model,
             defaultGroup,
             [this, defaultGroup](auto address) {
-
-            defaultGroup->SwitchPanel(m_disasmWindow);
-            m_disasmWindow->DoGotoRequest(address);
-        });
+                defaultGroup->SwitchPanel(m_disasmWindow);
+                m_disasmWindow->DoGotoRequest(address);
+            },
+            [this](auto address, const auto& name) {
+                SwitchToSectionsPanel();
+                if (m_sectionsWindow)
+                    m_sectionsWindow->NavigateTo(address, name);
+            });
         defaultGroup->AddPanel(m_modulesWindow);
         m_stateManager.Register(m_modulesWindow);
 
@@ -168,6 +178,21 @@ void CMainWindow::ConstructChilds()
         m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
             oui::VirtualKey::kC), [=]() { 
                 defaultGroup->SwitchPanel(m_commandWindow);
+            });
+    }
+    {
+        // sections window
+        auto sectionsNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.sections"));
+        m_sectionsWindow = std::make_shared<CSectionsWindow>(
+            [=]() { return sectionsNode->QueryValue(ORTHIA_TCSTR("caption")); },
+            m_model,
+            defaultGroup);
+        defaultGroup->AddPanel(m_sectionsWindow);
+        m_stateManager.Register(m_sectionsWindow);
+
+        m_hotkeys.Register(oui::Hotkey(oui::KeyState(oui::KeyState::AnyAlt),
+            oui::VirtualKey::kS), [=]() {
+                defaultGroup->SwitchPanel(m_sectionsWindow);
             });
     }
     {

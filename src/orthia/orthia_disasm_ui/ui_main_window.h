@@ -12,6 +12,7 @@
 #include "ui_workspace_window.h"
 #include "ui_modules_window.h"
 #include "ui_command_window.h"
+#include "ui_sections_window.h"
 
 extern orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
 
@@ -35,6 +36,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     std::shared_ptr<CWorkspaceWindow> m_workspaceWindow;
     std::shared_ptr<CModulesWindow> m_modulesWindow;
     std::shared_ptr<CCommandWindow> m_commandWindow;
+    std::shared_ptr<CSectionsWindow> m_sectionsWindow;
+    std::shared_ptr<oui::CPanelGroupWindow> m_defaultGroup;
 
     oui::CHotkeyStorage m_hotkeys;
     std::vector<InitialOpenFileInfo> m_fileToOpen;
@@ -80,4 +83,6 @@ public:
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
     bool AsyncOpenFile(std::shared_ptr<oui::IFile2> file);
     bool AsyncOpenProcess(std::shared_ptr<oui::IProcess> process);
+    std::shared_ptr<CSectionsWindow> GetSectionsWindow() { return m_sectionsWindow; }
+    void SwitchToSectionsPanel();
 };

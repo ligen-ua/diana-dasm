@@ -108,6 +108,15 @@ namespace orthia
     oui::String GetPreferredName(const NameInfo& nameInfo);
     oui::String GetPreferredComment(const NameInfo& nameInfo);
 
+    struct SectionInfo
+    {
+        oui::String name;
+        Address_type virtualAddress = 0;
+        Address_type size = 0;
+        oui::String flagsShort;
+        std::vector<std::pair<oui::String, oui::String>> attributes;
+    };
+
     struct NameSelectionKey
     {
         static const int flags_ContinueFrom = 1;
@@ -227,6 +236,7 @@ namespace orthia
         virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
         virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
         virtual ModuleStorage* GetModuleStorage() { return nullptr; }
+        virtual void QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out) {}
     };
 
     class BaseWorkPlaceItem : public IWorkPlaceItem

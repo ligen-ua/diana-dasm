@@ -212,6 +212,7 @@
     <ClCompile Include="orthia_model_interfaces.cpp" />
     <ClCompile Include="orthia_model_modules.cpp" />
     <ClCompile Include="orthia_model_modules_elf.cpp" />
+    <ClCompile Include="orthia_model_sections.cpp" />
     <ClCompile Include="orthia_module_analyzer.cpp" />
     <ClCompile Include="orthia_module_symbols.cpp" />
     <ClCompile Include="orthia_process_adapter.cpp" />
@@ -229,6 +230,7 @@
     <ClCompile Include="ui_main_window.cpp" />
     <ClCompile Include="ui_menu.cpp" />
     <ClCompile Include="ui_modules_window.cpp" />
+    <ClCompile Include="ui_sections_window.cpp" />
     <ClCompile Include="ui_output_window.cpp" />
     <ClCompile Include="ui_tests.cpp" />
     <ClCompile Include="ui_workspace_window.cpp" />
@@ -244,6 +246,7 @@
     <ClInclude Include="orthia_model_interfaces.h" />
     <ClInclude Include="orthia_model_modules.h" />
     <ClInclude Include="orthia_model_modules_elf.h" />
+    <ClInclude Include="orthia_model_sections.h" />
     <ClInclude Include="orthia_module_analyzer.h" />
     <ClInclude Include="orthia_process_adapter.h" />
     <ClInclude Include="orthia_version.h" />
@@ -259,6 +262,7 @@
     <ClInclude Include="ui_help.h" />
     <ClInclude Include="ui_main_window.h" />
     <ClInclude Include="ui_modules_window.h" />
+    <ClInclude Include="ui_sections_window.h" />
     <ClInclude Include="ui_output_window.h" />
     <ClInclude Include="ui_workspace_window.h" />
   </ItemGroup>

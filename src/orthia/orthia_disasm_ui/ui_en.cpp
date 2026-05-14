@@ -73,6 +73,24 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("copy"), ORTHIA_TCSTR("&Copy"))
         ;
 
+    // sections
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.sections"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("&Sections"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.sections.columns"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("name"),    ORTHIA_TCSTR("Name"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("address"), ORTHIA_TCSTR("VirtAddr"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("size"),    ORTHIA_TCSTR("Size"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("flags"),   ORTHIA_TCSTR("RWX"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.sections.attrs"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("field"), ORTHIA_TCSTR("Field"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("value"), ORTHIA_TCSTR("Value"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("show_sections"), ORTHIA_TCSTR("Show &Sections"))
+        ;
+
     // workspace
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.workspace"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Workspace"))

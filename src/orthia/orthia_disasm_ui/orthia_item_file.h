@@ -40,6 +40,7 @@ namespace orthia
         std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
         void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
         void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
+        void QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out) override;
 
     private:
         NameInfo QueryAddressNameImpl(Address_type address) const;
