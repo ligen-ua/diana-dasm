@@ -57,6 +57,7 @@ namespace orthia
         int RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive);
     public:
         CProgramModel(std::shared_ptr<orthia::CConfigOptionsStorage> config);
+        void Stop();
 
         void SubscribeUI(std::shared_ptr<IUIEventHandler> handler);
         void UnsubscribeUI(std::shared_ptr<IUIEventHandler> handler);

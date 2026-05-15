@@ -151,6 +151,11 @@ namespace orthia
         }
         return true;
     }
+    void CProgramModel::Stop()
+    {
+        m_fileSystem->Stop();
+        m_analyzer.Stop();
+    }
 
     void CProgramModel::SubscribeUI(std::shared_ptr<IUIEventHandler> handler)
     {

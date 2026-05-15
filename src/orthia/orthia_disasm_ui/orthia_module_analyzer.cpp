@@ -8,10 +8,13 @@ namespace orthia
 {
     CModuleAnalyzer::~CModuleAnalyzer()
     {
+        Stop();
+    }
+    void CModuleAnalyzer::Stop()
+    {
         CancelAll();
         m_pool.Stop();
     }
-
     void CModuleAnalyzer::Init(std::weak_ptr<IUILogInterface> uiLog,
                                std::shared_ptr<CConfigOptionsStorage> config)
     {

@@ -28,6 +28,7 @@ namespace orthia
     public:
         void WriteLog(const oui::String& line);
         ~CModuleAnalyzer();
+        void Stop();
 
         void Init(std::weak_ptr<IUILogInterface> uiLog,
                   std::shared_ptr<CConfigOptionsStorage> config);

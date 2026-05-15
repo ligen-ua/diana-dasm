@@ -70,6 +70,10 @@ namespace oui
             m_fsImpl->AsyncExecute(targetThread, handler);
         });
     }
+    void CFileSystem::Stop()
+    {
+        m_pool.Stop();
+    }
     void CFileSystem::AsyncQueryDefaultRoot(ThreadPtr_type targetThread, 
         QueryDefaultRootHandler_type handler)
     {

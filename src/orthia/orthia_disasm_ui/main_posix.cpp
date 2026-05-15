@@ -99,6 +99,7 @@ int main(int argc, const char* argv[])
 
         oui::ScopedGuard handlerGuard([&]() {
             programModel->UnsubscribeUI(rootWindow);
+            programModel->Stop();
         });
 
         for (auto& pid : processesToOpen)

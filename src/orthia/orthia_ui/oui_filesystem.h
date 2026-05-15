@@ -91,6 +91,8 @@ namespace oui
         // async execute
         virtual void AsyncExecute(ThreadPtr_type targetThread,
             ExecuteHandler_type handler) = 0;
+
+        virtual void Stop() {}
     };
 
     // default filesystem
@@ -128,6 +130,7 @@ namespace oui
         void AsyncExecute(ThreadPtr_type targetThread,
             ExecuteHandler_type handler) override;
 
+        void Stop() override;
     };
 
     std::shared_ptr<IFileSystem> CreateDefaultFSProvider();

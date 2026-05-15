@@ -185,6 +185,7 @@ int wmain(int argc, const wchar_t* argv[])
 
         oui::ScopedGuard handlerGuard([&]() {
             programModel->UnsubscribeUI(rootWindow);
+            programModel->Stop();
         });
 #if 0
         rootWindow->AddInitialTextOutputInfo(L"this");
