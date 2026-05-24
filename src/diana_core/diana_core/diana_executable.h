@@ -60,6 +60,9 @@ int DianaExecutable_QueryTLSCallbacks(DianaExecutable* pExe,
     OPERAND_SIZE* pAddressOfTLSIndex,
     int streamFlags);
 
+/* Minimum number of bytes required by DianaExecutable_DetectType */
+#define DIANA_EXECUTABLE_DETECT_MIN_SIZE 4
+
 /* Detect executable type from raw bytes; returns DIANA_EXECUTABLE_TYPE_* */
 int DianaExecutable_DetectType(const char* pData, OPERAND_SIZE size);
 

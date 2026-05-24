@@ -564,6 +564,40 @@ namespace orthia
         }
     }
 
+    void CProgramModel::AsyncOpenFileWithType(oui::ThreadPtr_type thread,
+        const oui::FileUnifiedId& fileId,
+        oui::FileWithTypeRecipientHandler_type resultCallback)
+    {
+        m_fileSystem->AsyncOpenFile(thread, fileId,
+            [resultCallback, fileSystem = m_fileSystem, thread]
+            (std::shared_ptr<oui::IFile2> file, int error, const oui::String& folderName)
+            {
+                if (error || !file || !folderName.native.empty())
+                {
+                    resultCallback(file, error, folderName, DIANA_EXECUTABLE_TYPE_NONE);
+                    return;
+                }
+                auto operation = std::make_shared<oui::Operation<oui::FileWithTypeRecipientHandler_type>>(
+                    thread, resultCallback);
+                fileSystem->AsyncExecute(thread,
+                    [file, operation]()
+                    {
+                        int fileType = DIANA_EXECUTABLE_TYPE_NONE;
+                        auto [sizeErr, fileSize] = file->GetSizeInBytes();
+                        if (!sizeErr && fileSize >= 2)
+                        {
+                            size_t bytesToRead = (size_t)std::min(fileSize, (unsigned long long)DIANA_EXECUTABLE_DETECT_MIN_SIZE);
+                            std::vector<char> header;
+                            if (file->ReadExact(nullptr, 0, bytesToRead, header) == 0)
+                            {
+                                fileType = DianaExecutable_DetectType(header.data(), (OPERAND_SIZE)header.size());
+                            }
+                        }
+                        operation->ReplyWithRetain(operation, file, 0, oui::String(), fileType);
+                    });
+            });
+    }
+
     void CProgramModel::AddExecutableAsShellcode(std::shared_ptr<oui::IFile2> file,
         DI_UINT64 baseAddress,
         int dianaMode,

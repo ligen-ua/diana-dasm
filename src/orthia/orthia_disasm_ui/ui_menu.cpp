@@ -256,6 +256,12 @@ void CMainWindow::OpenExecutable()
             return result;
         },
         m_model->GetFileSystem(),
+        [model = m_model](oui::ThreadPtr_type thread,
+            const oui::FileUnifiedId& fileId,
+            oui::FileWithTypeRecipientHandler_type resultCallback)
+        {
+            model->AsyncOpenFileWithType(thread, fileId, std::move(resultCallback));
+        },
         oui::FileInfo::flag_any_executable));
     dialog->Dock();
 }
