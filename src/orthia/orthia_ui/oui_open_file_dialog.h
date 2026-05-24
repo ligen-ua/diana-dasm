@@ -30,7 +30,7 @@ namespace oui
     class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
     public:
-        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile2>, OperationPtr_type<fsui::FileCompleteHandler_type>)>;
+        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile2>, OperationPtr_type<fsui::FileCompleteHandler_type>, int fileType)>;
 
     private:
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;

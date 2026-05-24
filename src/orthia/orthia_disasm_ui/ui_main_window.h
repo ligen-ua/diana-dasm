@@ -60,7 +60,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 
     oui::fsui::OpenResult HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
         std::shared_ptr<oui::IFile2> file,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+        int fileType);
 
     oui::fsui::OpenResult HandleOpenProcess(std::shared_ptr<oui::COpenProcessDialog> dialog,
         std::shared_ptr<oui::IProcess> process,

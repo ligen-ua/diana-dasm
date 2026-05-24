@@ -142,8 +142,9 @@ bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process)
 }
 
 oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
-    std::shared_ptr<oui::IFile2> file, 
-    oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
+    std::shared_ptr<oui::IFile2> file,
+    oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+    int fileType)
 { 
     if (dialog && file && completeHandler)
     {
@@ -247,10 +248,10 @@ void CMainWindow::OpenExecutable()
 
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>(oui::String(),
         dialogStrings,
-        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile2> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler) {
+        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile2> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler, int fileType) {
             if (auto p = weakMe.lock())
             {
-                return p->HandleOpenExecutable(dlg, file, handler);
+                return p->HandleOpenExecutable(dlg, file, handler, fileType);
             }
             oui::fsui::OpenResult result(OUI_TCSTR("Error"));
             return result;

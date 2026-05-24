@@ -381,7 +381,7 @@ namespace oui
                 }
             });
             m_openOperation = operation;
-            auto errorText = m_resultCallback(me, m_result, m_openOperation);
+            auto errorText = m_resultCallback(me, m_result, m_openOperation, m_lastFileType);
             if (errorText.error.native.empty())
             {
                 return;
@@ -518,7 +518,7 @@ namespace oui
         {
             // report nothing
             auto me = GetPtr_t<COpenFileDialog>(this);
-            m_resultCallback(me, m_result, nullptr);
+            m_resultCallback(me, m_result, nullptr, 0);
             m_resultCallback = nullptr;
         }
         Parent_type::OnFinishDialog();
