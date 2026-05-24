@@ -84,9 +84,34 @@ namespace oui
         }
         return text;
     }
+    void CButton::SetClickHandler(std::function<void()> handler)
+    {
+        m_onClick = std::move(handler);
+    }
+
     bool CButton::HandleMouseEvent(const Rect& rect, InputEvent& evt, MouseEventContext& mouseEventContext)
     {
         Invalidate(false);
+        if (evt.mouseEvent.button == MouseButton::Left &&
+            evt.mouseEvent.state  == MouseState::Released)
+        {
+            if (m_onClick)
+                m_onClick();
+        }
         return true;
+    }
+
+    bool CButton::ProcessEvent(InputEvent& evt, WindowEventContext& evtContext)
+    {
+        if (evt.keyEvent.valid)
+        {
+            if (evt.keyEvent.virtualKey == VirtualKey::Enter)
+            {
+                if (m_onClick)
+                    m_onClick();
+                return true;
+            }
+        }
+        return Parent_type::ProcessEvent(evt, evtContext);
     }
 }

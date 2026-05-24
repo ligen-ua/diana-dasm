@@ -25,6 +25,7 @@ set(SOURCES
     orthia_process_adapter.cpp
     oui_disasm_colors.cpp
     oui_goto_dialog.cpp
+    oui_shellcode_dialog.cpp
     oui_open_process_dialog.cpp
     oui_processes.cpp
     ui_command_window.cpp

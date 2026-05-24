@@ -9,6 +9,7 @@
 #include "ui_output_window.h"
 #include "oui_open_file_dialog.h"
 #include "oui_open_process_dialog.h"
+#include "oui_shellcode_dialog.h"
 #include "ui_workspace_window.h"
 #include "ui_modules_window.h"
 #include "ui_command_window.h"
@@ -72,6 +73,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 
     void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);
+    void ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file);
+    bool AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode);
     void SetFocusImpl() override;
 
     void SetDefaultTitle();

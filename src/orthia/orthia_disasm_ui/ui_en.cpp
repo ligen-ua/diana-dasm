@@ -139,6 +139,13 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("label"), ORTHIA_TCSTR("New comment:"))
         ;
 
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.shellcode"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"),    ORTHIA_TCSTR("Open as Shellcode"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("message"),    ORTHIA_TCSTR("File format not recognized. Open as raw shellcode?"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("addr-label"), ORTHIA_TCSTR("Load address:"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("mode-label"), ORTHIA_TCSTR("Architecture (32 or 64):"))
+        ;
+
     // main
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.main"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Orthia Disassembler"))
@@ -164,7 +171,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("model.errors"))
         << textManager->RegisterValue(ORTHIA_TCSTR("file-error-name"), ORTHIA_TCSTR("Can't open file: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("file-error-name-code"), ORTHIA_TCSTR("Can't open file: \"%1\", %2"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("unknown"), ORTHIA_TCSTR("Can't parse PE file"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("unknown"), ORTHIA_TCSTR("Can't parse module file, unknown format"))
         << textManager->RegisterValue(ORTHIA_TCSTR("empty"), ORTHIA_TCSTR("File is empty"))
         << textManager->RegisterValue(ORTHIA_TCSTR("too-big"), ORTHIA_TCSTR("File is too big"))
         << textManager->RegisterValue(ORTHIA_TCSTR("no-app-dir"), ORTHIA_TCSTR("Can't locate application folder"))

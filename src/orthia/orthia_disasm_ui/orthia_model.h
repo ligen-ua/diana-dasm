@@ -21,6 +21,7 @@ namespace orthia
     // OpenResult extra fields
     const int model_OpenResult_extraInfo_InitalAddress = 1;
     const int model_OpenResult_extraInfo_WorkspaceId = 2;
+    const int model_OpenResult_extraInfo_CanOpenAsShellcode = 3;
 
     struct IUIEventHandler
     {
@@ -81,6 +82,11 @@ namespace orthia
             oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
 
         void AddExecutable(std::shared_ptr<oui::IFile2> file,
+            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+
+        void AddExecutableAsShellcode(std::shared_ptr<oui::IFile2> file,
+            DI_UINT64 baseAddress,
+            int dianaMode,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
         CModuleAnalyzer& GetAnalyzer() { return m_analyzer; }

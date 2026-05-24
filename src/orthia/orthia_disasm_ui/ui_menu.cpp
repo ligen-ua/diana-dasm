@@ -18,6 +18,16 @@ void CMainWindow::ToggleMenu(bool openPopup)
 }
 void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result)
 {
+    // unknown format: offer shellcode loading
+    auto scIt = result.extraInfo.find(orthia::model_OpenResult_extraInfo_CanOpenAsShellcode);
+    if (scIt != result.extraInfo.end())
+    {
+        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+        m_outputWindow->AddLine(mainNode->QueryValue(ORTHIA_TCSTR("unknown")));
+        ShowShellcodeDialog(std::any_cast<std::shared_ptr<oui::IFile2>>(scIt->second));
+        return;
+    }
+
     // final result
     if (result.error.native.empty())
     {
@@ -37,6 +47,50 @@ void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::
             file->GetFullFileNameForUI(),
             result.error));
     }
+}
+
+void CMainWindow::ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file)
+{
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    if (!me)
+        return;
+
+    std::weak_ptr<CMainWindow> weakMe = me;
+    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.shellcode"));
+
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::CShellcodeDialog>(
+        [node]() { return node->QueryValue(ORTHIA_TCSTR("message")); },
+        [node]() { return node->QueryValue(ORTHIA_TCSTR("addr-label")); },
+        [node]() { return node->QueryValue(ORTHIA_TCSTR("mode-label")); },
+        [weakMe, file](DI_UINT64 address, int dianaMode)
+        {
+            if (auto p = weakMe.lock())
+                p->AsyncOpenFileAsShellcode(file, address, dianaMode);
+        }
+    ));
+    dialog->SetCaption(node->QueryValue(ORTHIA_TCSTR("caption")));
+    dialog->Dock();
+}
+
+bool CMainWindow::AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode)
+{
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    std::weak_ptr<CMainWindow> weakMe = me;
+    if (!me)
+        return false;
+
+    auto completeHandler = std::make_shared<oui::Operation<oui::fsui::FileCompleteHandler_type>>(
+        this->GetThread(),
+        [=](std::shared_ptr<oui::BaseOperation> op, std::shared_ptr<oui::IFile> f, const oui::fsui::OpenResult& result) {
+        if (auto p = weakMe.lock())
+            p->OnFileOpen(f, result);
+    });
+
+    m_model->GetFileSystem()->AsyncExecute(GetThread(),
+        [file, baseAddress, dianaMode, model = m_model, completeHandler = std::move(completeHandler)]() {
+        model->AddExecutableAsShellcode(file, baseAddress, dianaMode, completeHandler);
+    });
+    return true;
 }
 bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile2> file)
 {
