@@ -21,7 +21,6 @@ namespace orthia
     // OpenResult extra fields
     const int model_OpenResult_extraInfo_InitalAddress = 1;
     const int model_OpenResult_extraInfo_WorkspaceId = 2;
-    const int model_OpenResult_extraInfo_CanOpenAsShellcode = 3;
 
     struct IUIEventHandler
     {

@@ -18,16 +18,6 @@ void CMainWindow::ToggleMenu(bool openPopup)
 }
 void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result)
 {
-    // unknown format: offer shellcode loading
-    auto scIt = result.extraInfo.find(orthia::model_OpenResult_extraInfo_CanOpenAsShellcode);
-    if (scIt != result.extraInfo.end())
-    {
-        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
-        m_outputWindow->AddLine(mainNode->QueryValue(ORTHIA_TCSTR("unknown")));
-        ShowShellcodeDialog(std::any_cast<std::shared_ptr<oui::IFile2>>(scIt->second));
-        return;
-    }
-
     // final result
     if (result.error.native.empty())
     {
@@ -160,11 +150,12 @@ bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process)
 oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
     std::shared_ptr<oui::IFile2> file,
     oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
-    int fileType)
+    int fileType,
+    oui::OpenFileModelInfo modelInfo)
 { 
     if (dialog && file && completeHandler)
     {
-        if (fileType == DIANA_EXECUTABLE_TYPE_NONE)
+        if (fileType == DIANA_EXECUTABLE_TYPE_NONE && !(oui::model_flag_already_opened & modelInfo.flags))
         {
             ShowShellcodeDialog(file, completeHandler);
             return oui::fsui::OpenResult();
@@ -188,9 +179,23 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
             rawHandler(op, file, result);
         });
 
-        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
-            model->AddExecutable(file, completeHandler);
-        });
+        if (fileType == DIANA_EXECUTABLE_TYPE_NONE
+            && (oui::model_flag_already_opened & modelInfo.flags)
+            && modelInfo.dianaMode != 0)
+        {
+            auto baseAddress = modelInfo.baseAddress;
+            auto dianaMode = modelInfo.dianaMode;
+            m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(),
+                [file, model = m_model, completeHandler = std::move(completeHandler), baseAddress, dianaMode]() {
+                    model->AddExecutableAsShellcode(file, baseAddress, dianaMode, completeHandler);
+                });
+        }
+        else
+        {
+            m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
+                model->AddExecutable(file, completeHandler);
+            });
+        }
     }
     return oui::fsui::OpenResult();
 };
@@ -269,10 +274,10 @@ void CMainWindow::OpenExecutable()
 
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>(oui::String(),
         dialogStrings,
-        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile2> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler, int fileType) {
+        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile2> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler, int fileType, oui::OpenFileModelInfo modelInfo) {
             if (auto p = weakMe.lock())
             {
-                return p->HandleOpenExecutable(dlg, file, handler, fileType);
+                return p->HandleOpenExecutable(dlg, file, handler, fileType, std::move(modelInfo));
             }
             oui::fsui::OpenResult result(OUI_TCSTR("Error"));
             return result;

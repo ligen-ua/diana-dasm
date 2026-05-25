@@ -74,4 +74,18 @@ void DianaMovableReadStreamOverMemory_Init(DianaMovableReadStreamOverMemory* pTh
     const void* pBuffer,
     OPERAND_SIZE bufferSize);
 
+
+typedef struct _dianaMemoryStream2
+{
+    DianaMemoryStream parent;
+    OPERAND_SIZE absoluteModuleAddress;
+}DianaMemoryStream2;
+
+void Diana_InitMemoryStream2(DianaMemoryStream2* pStream,
+    void* pBuffer,
+    DIANA_SIZE_T bufferSize,
+    int bWritable,
+    OPERAND_SIZE addressDifference,
+    OPERAND_SIZE absoluteModuleAddress);  // constructor
+
 #endif

@@ -183,12 +183,12 @@ namespace orthia
         }
 
         std::vector<char> page(4096);
-        ::DianaMemoryStream rwStream;
-        Diana_InitMemoryStreamEx2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0);
+        ::DianaMemoryStream2 rwStream;
+        Diana_InitMemoryStream2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0, m_imageBase);
 
         return DianaPeFile_QueryImports(&m_dianaContext->mappedPE,
             0,
-            &rwStream.parent,
+            &rwStream.parent.parent,
             page.data(),
             (int)page.size(),
             observer->GetParent(),
@@ -203,11 +203,11 @@ namespace orthia
         }
 
         std::vector<char> page(4096);
-        ::DianaMemoryStream rwStream;
-        Diana_InitMemoryStreamEx2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0);
+        ::DianaMemoryStream2 rwStream;
+        Diana_InitMemoryStream2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0, m_imageBase);
 
         return DianaPeFile_QueryExports(&m_dianaContext->mappedPE,
-            &rwStream.parent.parent,
+            &rwStream.parent.parent.parent,
             page.data(),
             (int)page.size(),
             observer->GetParent(),
@@ -218,15 +218,15 @@ namespace orthia
     {
         callbacks.clear();
 
-        ::DianaMemoryStream stream;
-        Diana_InitMemoryStreamEx2(&stream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0);
+        ::DianaMemoryStream2 stream;
+        Diana_InitMemoryStream2(&stream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0, m_imageBase);
 
         void* pTlsCallbacks = 0;
         int tlsCallbacksCount = 0;
         OPERAND_SIZE addressOfTLSIndex = 0;
         if (auto error = DianaPeFile_QueryTLSCallbacks(&GetImpl()->mappedPE,
             GetImageBase(),
-            &stream.parent,
+            &stream.parent.parent,
             &pTlsCallbacks,
             &tlsCallbacksCount,
             &addressOfTLSIndex,

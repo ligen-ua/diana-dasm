@@ -166,6 +166,11 @@ int AnalyzeJumps(DianaParserResult* pResult,
     *pAbsoluteAddress = 0;
     *pLinksToData = 0;
 
+    if (pLinkedInfo->relArgrumentNumber >= pResult->iLinkedOpCount)
+    {
+        return DI_UNSUPPORTED_COMMAND;
+    }
+
     switch(pOp->type)
     {
     // usual call smth

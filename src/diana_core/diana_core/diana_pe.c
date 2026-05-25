@@ -1137,7 +1137,7 @@ int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                                  pResult,
                                                  (int)sizeToRead,
                                                  &readBytes,
-                                                 streamFlags));
+                                                 streamFlags| DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
     if (readBytes != sizeToRead)
     {
         status = DI_ERROR;
@@ -1281,7 +1281,7 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                                                          pOutStream,
                                                          ppTlsCallbacks,
                                                          pCallbacksCount,
-                                                         streamFlags));
+                                                         streamFlags | DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
             break;
         case DIANA_MODE64:
             if (pTLSDirectory->Size < sizeof(DIANA_IMAGE_TLS_DIRECTORY64))
@@ -1294,7 +1294,7 @@ int DianaPeFile_QueryTLSCallbacks(/* in */ Diana_PeFile * pPeFile,
                                                          pOutStream,
                                                          ppTlsCallbacks,
                                                          pCallbacksCount,
-                                                         streamFlags));
+                                                         streamFlags | DIANA_ANALYZE_RANDOM_READ_ABSOLUTE));
             break;
         default:
             DI_CHECK_GOTO(DI_ERROR);

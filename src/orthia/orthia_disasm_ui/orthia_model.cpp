@@ -8,6 +8,7 @@
 #include "orthia_log.h"
 #include "orthia_module_symbols.h"
 #include "orthia_shellcode.h"
+#include "orthia_common_format.h"
 
 namespace orthia
 {
@@ -406,8 +407,7 @@ namespace orthia
             if (executableType == DIANA_EXECUTABLE_TYPE_NONE)
             {
                 // Unknown format: store the IFile2 so the UI can offer shellcode loading
-                result.extraInfo[model_OpenResult_extraInfo_CanOpenAsShellcode] = std::any(file);
-                result.error.native.clear();
+                result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
                 return;
             }
             orthia::MapFileParameters params;
@@ -569,20 +569,21 @@ namespace orthia
         oui::FileWithTypeRecipientHandler_type resultCallback)
     {
         m_fileSystem->AsyncOpenFile(thread, fileId,
-            [resultCallback, fileSystem = m_fileSystem, thread]
+            [resultCallback, fileSystem = m_fileSystem, thread, config = m_config]
             (std::shared_ptr<oui::IFile2> file, int error, const oui::String& folderName)
             {
                 if (error || !file || !folderName.native.empty())
                 {
-                    resultCallback(file, error, folderName, DIANA_EXECUTABLE_TYPE_NONE);
+                    resultCallback(file, error, folderName, DIANA_EXECUTABLE_TYPE_NONE, oui::OpenFileModelInfo());
                     return;
                 }
                 auto operation = std::make_shared<oui::Operation<oui::FileWithTypeRecipientHandler_type>>(
                     thread, resultCallback);
                 fileSystem->AsyncExecute(thread,
-                    [file, operation]()
+                    [file, operation, config]()
                     {
                         int fileType = DIANA_EXECUTABLE_TYPE_NONE;
+                        oui::OpenFileModelInfo modelInfo;
                         auto [sizeErr, fileSize] = file->GetSizeInBytes();
                         if (!sizeErr && fileSize >= 2)
                         {
@@ -593,7 +594,49 @@ namespace orthia
                                 fileType = DianaExecutable_DetectType(header.data(), (OPERAND_SIZE)header.size());
                             }
                         }
-                        operation->ReplyWithRetain(operation, file, 0, oui::String(), fileType);
+
+                        if (fileType == DIANA_EXECUTABLE_TYPE_NONE)
+                        {
+                            std::vector<char> fullContent;
+                            if (fileSize <= g_maxSizeBytes &&
+                                file->ReadExact(nullptr, 0, (size_t)fileSize, fullContent) == 0)
+                            {
+                                auto fileHash = CalcSha1(fullContent);
+                                auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
+                                auto dbFolder = config->GetDBFolder() + AddSlash2(fileHashStr);
+                                auto dbFileName = dbFolder + config->GetDBFileName();
+                                if (orthia::IsFileExist(dbFileName))
+                                {
+                                    modelInfo.flags |= oui::model_flag_already_opened;
+                                    modelInfo.dbFileName = dbFileName;
+
+                                    auto paramsFileName = dbFolder + config->GetParamsFileName();
+                                    orthia::CFile paramsFile;
+                                    if (paramsFile.Open_Silent(paramsFileName, g_desired_read, g_share_read, g_open_existing) == 0)
+                                    {
+                                        auto paramsSize = paramsFile.GetSize();
+                                        if (paramsSize > 0 && paramsSize < 4096)
+                                        {
+                                            std::vector<char> paramsData((size_t)paramsSize);
+                                            if (paramsFile.ExactRead_Silent(paramsData.data(), (ULONG)paramsSize) == 0)
+                                            {
+                                                orthia::CCommonFormatParser parser;
+                                                if (parser.Parse(paramsData, false))
+                                                {
+                                                    unsigned long long base = 0;
+                                                    int mode = 0;
+                                                    parser.QueryMetadata("base_address", &base);
+                                                    parser.QueryMetadata("diana_mode", &mode);
+                                                    modelInfo.baseAddress = base;
+                                                    modelInfo.dianaMode = mode;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        operation->ReplyWithRetain(operation, file, 0, oui::String(), fileType, std::move(modelInfo));
                     });
             });
     }
@@ -639,6 +682,20 @@ namespace orthia
             CreateAllDirectoriesForFile(dbFileName);
             WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
                 dbFileName));
+
+            {
+                auto paramsFileName = dbFolder + m_config->GetParamsFileName();
+                orthia::CFile paramsFile;
+                if (paramsFile.Open_Silent(paramsFileName, g_desired_write, g_share_read, g_create_always) == 0)
+                {
+                    orthia::CCommonFormatBuilder builder;
+                    builder.AddMetadata("base_address", (unsigned long long)baseAddress);
+                    builder.AddMetadata("diana_mode", dianaMode);
+                    std::vector<char> paramsData;
+                    builder.Produce(&paramsData);
+                    paramsFile.WriteToFile(paramsData.data(), paramsData.size());
+                }
+            }
 
             bool hashIsValid = false;
             int error = 0;

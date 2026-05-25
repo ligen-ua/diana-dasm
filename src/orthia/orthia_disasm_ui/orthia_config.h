@@ -19,6 +19,7 @@ namespace orthia
         PlatformString_type GetDBFileName() const;
         PlatformString_type GetDBFolder() const;
         PlatformString_type GetReadmeFileName() const;
+        PlatformString_type GetParamsFileName() const;
         PlatformString_type GetBinFolder() const;
         PlatformString_type GetProcDBFolder() const;
         std::vector<PlatformString_type> GetSymbolsFolders() const;
