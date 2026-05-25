@@ -178,8 +178,6 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("cant-open-file"), ORTHIA_TCSTR("Can't open file"))
         << textManager->RegisterValue(ORTHIA_TCSTR("invalid-image-base"), ORTHIA_TCSTR("ImageBase is invalid"))
         << textManager->RegisterValue(ORTHIA_TCSTR("cant-create-fs"), ORTHIA_TCSTR("Can't create folder: %1"))
-
-
-
+        << textManager->RegisterValue(ORTHIA_TCSTR("cancelled"), ORTHIA_TCSTR("Cancelled by user"))
         ;
 }

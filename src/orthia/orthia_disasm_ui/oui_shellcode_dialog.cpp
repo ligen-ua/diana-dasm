@@ -1,32 +1,9 @@
 #include "oui_shellcode_dialog.h"
 #include "oui_color.h"
+#include "ui_common.h"
 
 namespace oui
 {
-    static bool ParseHexAddress(const String& text, DI_UINT64& out)
-    {
-        auto str = text.native;
-        if (str.empty())
-            return false;
-        // strip optional "0x" / "0X" prefix
-        if (str.size() >= 2 &&
-            str[0] == String::char_type('0') &&
-            (str[1] == String::char_type('x') || str[1] == String::char_type('X')))
-        {
-            str = str.substr(2);
-        }
-        if (str.empty())
-            return false;
-        try {
-            size_t pos = 0;
-            out = (DI_UINT64)std::stoull(str, &pos, 16);
-            return pos == str.size();
-        }
-        catch (...) {
-            return false;
-        }
-    }
-
     static bool ParseMode(const String& text, int& dianaMode)
     {
         if (text.native == OUI_TCSTR("32")) { dianaMode = DIANA_MODE32; return true; }
@@ -75,16 +52,35 @@ namespace oui
         m_cancelButton->SetClickHandler([this]() { FinishDialog(); });
     }
 
+    void CShellcodeDialog::SetCancelHandler(std::function<void()> handler)
+    {
+        m_cancelHandler = std::move(handler);
+    }
+
+    void CShellcodeDialog::OnFinishDialog()
+    {
+        if (!m_confirmed && m_cancelHandler)
+            m_cancelHandler();
+        Parent_type::OnFinishDialog();
+    }
+
     void CShellcodeDialog::TryConfirm()
     {
         DI_UINT64 address = 0;
-        if (!ParseHexAddress(m_addressEdit->GetText(), address))
+        try
+        {
+            address = CaptureAddress(m_addressEdit->GetText().native);
+        }
+        catch (...)
+        {
             return;
+        }
 
         int dianaMode = 0;
         if (!ParseMode(m_modeEdit->GetText(), dianaMode))
             return;
 
+        m_confirmed = true;
         m_handler(address, dianaMode);
         FinishDialog();
     }

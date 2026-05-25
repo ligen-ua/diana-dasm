@@ -74,8 +74,10 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 
     void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);
-    void ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file);
-    bool AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode);
+    void ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file,
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler = nullptr);
+    bool AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode,
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> outerHandler = nullptr);
     void SetFocusImpl() override;
 
     void SetDefaultTitle();

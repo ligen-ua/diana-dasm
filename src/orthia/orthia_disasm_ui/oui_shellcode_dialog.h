@@ -27,6 +27,8 @@ namespace oui
         std::function<String()> m_getAddressLabelText;
         std::function<String()> m_getModeLabelText;
         std::function<void(DI_UINT64 address, int dianaMode)> m_handler;
+        std::function<void()> m_cancelHandler;
+        bool m_confirmed = false;
 
         void TryConfirm();
 
@@ -35,6 +37,7 @@ namespace oui
         void OnResize() override;
         void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
         void OnPreDock(Rect& rect) override;
+        void OnFinishDialog() override;
 
     public:
         CShellcodeDialog(
@@ -43,6 +46,7 @@ namespace oui
             std::function<String()> getModeLabelText,
             std::function<void(DI_UINT64 address, int dianaMode)> handler);
 
+        void SetCancelHandler(std::function<void()> handler);
         bool Resize(const Size& newSize) override;
         bool ProcessEvent(InputEvent& evt, WindowEventContext& evtContext) override;
     };
