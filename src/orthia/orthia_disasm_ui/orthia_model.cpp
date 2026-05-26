@@ -618,7 +618,7 @@ namespace orthia
                                         if (paramsSize > 0 && paramsSize < 4096)
                                         {
                                             std::vector<char> paramsData((size_t)paramsSize);
-                                            if (paramsFile.ExactRead_Silent(paramsData.data(), (ULONG)paramsSize) == 0)
+                                            if (paramsFile.ExactRead_Silent(paramsData.data(), (unsigned int)paramsSize) == 0)
                                             {
                                                 orthia::CCommonFormatParser parser;
                                                 if (parser.Parse(paramsData, false))

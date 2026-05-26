@@ -137,6 +137,15 @@ unsigned int CFile::Read(void * pData, unsigned int dwSize)
     ORTHIA_CHECK_LESS_ZERO(res, "Can't read file");
     return (unsigned long)res;
 }
+int CFile::ExactRead_Silent(void* pData, unsigned int dwSize)
+{
+    unsigned int readBytes = Read(pData, dwSize);
+    if (readBytes != dwSize)
+    {
+        return EIO;
+    }
+    return 0;
+}
 void CFile::ExactRead(void * pData, unsigned int dwSize)
 {
     unsigned int readBytes = Read(pData, dwSize);

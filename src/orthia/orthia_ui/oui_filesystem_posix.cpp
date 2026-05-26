@@ -33,6 +33,10 @@ static bool SplitPath(const std::string& path, std::string& dir, std::string& na
 
 static std::string StripTrailingSlashes(const std::string& path)
 {
+    if (path == "/")
+    {
+        return std::string();
+    }
     size_t end = path.size();
     while (end > 1 && IsSeparator(path[end - 1]))
         --end;
@@ -123,20 +127,23 @@ class CPosixFileSystemImpl
                 continue;
             if (strcmp(dname, "..") == 0)
             {
-                FileInfo uplink;
-                uplink.fileName = String(std::string(".."));
-                uplink.flags = FileInfo::flag_uplink;
-                result.push_back(std::move(uplink));
+                continue;
+            }
+            std::string dnameStr = (dname);
+            if (dnameStr.empty())
+            {
                 continue;
             }
 
-            std::string fullPath = path + "/" + dname;
+            std::string fullPath = StripTrailingSlashes(path) + "/" + dnameStr;
             struct stat st;
             if (stat(fullPath.c_str(), &st) != 0)
                 continue;
+            
+
 
             FileInfo info;
-            info.fileName = String(std::string(dname));
+            info.fileName = String(dnameStr);
             info.size = (unsigned long long)st.st_size;
 
             if (S_ISDIR(st.st_mode))

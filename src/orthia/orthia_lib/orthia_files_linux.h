@@ -146,6 +146,7 @@ public:
     void WriteToFile(const void * pBegin, const void * pEnd);
     unsigned int Read(void * pData, unsigned int dwSize);
     void ExactRead(void * pData, unsigned int dwSize);
+    int ExactRead_Silent(void* pData, unsigned int dwSize);
     void FlushBuffers();
     int FlushBuffers_Silent();
 
