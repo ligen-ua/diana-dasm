@@ -30,7 +30,7 @@ namespace oui
     class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
     public:
-        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile2>, OperationPtr_type<fsui::FileCompleteHandler_type>)>;
+        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile2>, OperationPtr_type<fsui::FileCompleteHandler_type>, int fileType, OpenFileModelInfo modelInfo)>;
 
     private:
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
@@ -58,6 +58,9 @@ namespace oui
         OperationPtr_type<oui::fsui::FileCompleteHandler_type> m_openOperation;
         int m_typesToHighlight = 0;
         bool m_readyToExit = false;
+        AsyncOpenFileWithTypeCallback_type m_openFileCallback;
+        int m_lastFileType = 0;
+        OpenFileModelInfo m_lastModelInfo;
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
             const FileUnifiedId& folderId,
@@ -73,7 +76,7 @@ namespace oui
             const String& fileName,
             bool combine);
         void OnWaitBoxDestroyed();
-        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName);
+        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName, int fileType, OpenFileModelInfo modelInfo);
         void FinishFileOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
 
         template<class OwnerType, class ContainerType, class Predicate>
@@ -101,6 +104,7 @@ namespace oui
             const oui::CommonDialogStrings& dialogStrings,
             FileRecipientHandler_type resultCallback,
             std::shared_ptr<IFileSystem> fileSystem,
+            AsyncOpenFileWithTypeCallback_type openFileCallback,
             int typesToHighlight = 0);
         ~COpenFileDialog();
         void ShiftViewWindow(int newPosition) override;

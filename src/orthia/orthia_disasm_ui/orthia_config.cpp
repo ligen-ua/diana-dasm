@@ -82,6 +82,10 @@ namespace orthia
         // haha, this is a joke for us, u know, the old people
         return ORTHIA_TCSTR("DIRINFO");
     }
+    PlatformString_type CConfigOptionsStorage::GetParamsFileName() const
+    {
+        return ORTHIA_TCSTR("parameters.xml");
+    }
     PlatformString_type CConfigOptionsStorage::GetBinFileName() const
     {
         return ORTHIA_TCSTR("target.bin");

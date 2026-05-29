@@ -83,6 +83,15 @@ namespace orthia
         void AddExecutable(std::shared_ptr<oui::IFile2> file,
             oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
 
+        void AddExecutableAsShellcode(std::shared_ptr<oui::IFile2> file,
+            DI_UINT64 baseAddress,
+            int dianaMode,
+            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+
+        void AsyncOpenFileWithType(oui::ThreadPtr_type thread,
+            const oui::FileUnifiedId& fileId,
+            oui::FileWithTypeRecipientHandler_type resultCallback);
+
         CModuleAnalyzer& GetAnalyzer() { return m_analyzer; }
         std::shared_ptr<orthia::CConfigOptionsStorage> GetConfig() { return m_config; }
 

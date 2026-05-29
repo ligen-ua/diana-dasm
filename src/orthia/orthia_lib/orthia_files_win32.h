@@ -270,7 +270,7 @@ int LoadFileToVector_Silent(const std::wstring& fileName,
         return 0;
 
     char* pData = &data[0];
-    return file.ExactRead_Silent(pData, (ULONG)fileSize);
+    return file.ExactRead_Silent(pData, (unsigned int)fileSize);
 }
 
 bool IsFileExists(const std::wstring& fileName);

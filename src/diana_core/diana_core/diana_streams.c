@@ -355,3 +355,28 @@ void DianaMovableReadStreamOverMemory_Init(DianaMovableReadStreamOverMemory* pTh
         (void*)pBuffer,
         (DIANA_SIZE_T)bufferSize);
 }
+
+static int DianaMemoryStream2_TranslateAbsoluteAddress(struct _dianaMemoryStream* pThis, OPERAND_SIZE* address)
+{
+    DianaMemoryStream2* realThis = (DianaMemoryStream2*)pThis;
+    if (*address < realThis->absoluteModuleAddress)
+    {
+        return DI_OVERFLOW;
+    }
+    *address -= realThis->absoluteModuleAddress;
+    return DI_SUCCESS;
+}
+
+void Diana_InitMemoryStream2(DianaMemoryStream2* pStream,
+    void* pBuffer,
+    DIANA_SIZE_T bufferSize,
+    int bWritable,
+    OPERAND_SIZE addressDifference,
+    OPERAND_SIZE absoluteModuleAddress)
+{
+    Diana_InitMemoryStreamEx2(&pStream->parent, pBuffer, bufferSize, bWritable, addressDifference);
+    pStream->parent.translateAbsoluteAddress = DianaMemoryStream2_TranslateAbsoluteAddress;
+    pStream->absoluteModuleAddress = absoluteModuleAddress;
+}
+
+

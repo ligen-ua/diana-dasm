@@ -9,6 +9,7 @@
 #include "ui_output_window.h"
 #include "oui_open_file_dialog.h"
 #include "oui_open_process_dialog.h"
+#include "oui_shellcode_dialog.h"
 #include "ui_workspace_window.h"
 #include "ui_modules_window.h"
 #include "ui_command_window.h"
@@ -59,7 +60,9 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 
     oui::fsui::OpenResult HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
         std::shared_ptr<oui::IFile2> file,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+        int fileType,
+        oui::OpenFileModelInfo modelInfo);
 
     oui::fsui::OpenResult HandleOpenProcess(std::shared_ptr<oui::COpenProcessDialog> dialog,
         std::shared_ptr<oui::IProcess> process,
@@ -72,6 +75,10 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 
     void OnWorkspaceItemChanged(const oui::fsui::OpenResult& result);
     void OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::OpenResult& result);
+    void ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file,
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler = nullptr);
+    bool AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode,
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> outerHandler = nullptr);
     void SetFocusImpl() override;
 
     void SetDefaultTitle();

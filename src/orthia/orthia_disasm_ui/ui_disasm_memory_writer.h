@@ -38,6 +38,7 @@ namespace oui
         bool m_firstPrint = true;
         oui::LineIndex m_firstVirtualOffset;
         const char* m_pDataFlags = 0;
+        orthia::Address_type m_dataSize = 0;
         orthia::Address_type m_routeStart = 0;
         oui::DisasmColorsProfile m_colors;
         DisasmWriter* m_pTextPrinter;
@@ -75,7 +76,7 @@ namespace oui
             const orthia::PlatformString_type& bytes,
             const orthia::PlatformString_type& command,
             std::shared_ptr<DisasmLineContextTag> tag);
-        void SetFlags(const char* pDataFlags, orthia::Address_type routeStart);
+        void SetFlags(const char* pDataFlags, orthia::Address_type dataSize, orthia::Address_type routeStart);
         bool IsBadByte(orthia::Address_type virtualOffset) override;
         void Preprocess(int iRes,
             ::DianaContext& context,

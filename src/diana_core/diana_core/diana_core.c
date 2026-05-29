@@ -169,6 +169,10 @@ int Diana_ParseCmd(DianaContext * pContext, //IN
     {
         Diana_FatalBreak();
     }
+    if (iRes && iRes != DI_END)
+    {
+        pResult->iLinkedOpCount = 0;
+    }
     return iRes;
 }
 

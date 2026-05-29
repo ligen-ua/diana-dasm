@@ -305,12 +305,12 @@ namespace oui
         {
             targetFile = folderId.fullFileName;
         }
-        m_fileSystem->AsyncOpenFile(this->GetThread(),
+        m_openFileCallback(this->GetThread(),
             FileUnifiedId(targetFile),
-            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile2> file, int error, const oui::String& folderName) {
+            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile2> file, int error, const oui::String& folderName, int fileType, OpenFileModelInfo modelInfo) {
             if (auto p = weakMe.lock())
             {
-                me->SetOpenFileResult(openFileSeq, file, error, folderName);
+                me->SetOpenFileResult(openFileSeq, file, error, folderName, fileType, std::move(modelInfo));
             }
         });
     }
@@ -340,7 +340,7 @@ namespace oui
             m_waitBox->Invalidate();
         }
     }
-    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName)
+    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName, int fileType, OpenFileModelInfo modelInfo)
     {
         if (openFileSeq != m_openFileSeq)
         {
@@ -365,6 +365,8 @@ namespace oui
             }
             return;
         }
+        m_lastFileType = fileType;
+        m_lastModelInfo = std::move(modelInfo);
         m_result = file;
         auto me = GetPtr_t<COpenFileDialog>(this);
         if (m_resultCallback && me)
@@ -380,7 +382,7 @@ namespace oui
                 }
             });
             m_openOperation = operation;
-            auto errorText = m_resultCallback(me, m_result, m_openOperation);
+            auto errorText = m_resultCallback(me, m_result, m_openOperation, m_lastFileType, m_lastModelInfo);
             if (errorText.error.native.empty())
             {
                 return;
@@ -447,10 +449,11 @@ namespace oui
             operation);
     }
 
-    COpenFileDialog::COpenFileDialog(const String& rootFile, 
+    COpenFileDialog::COpenFileDialog(const String& rootFile,
         const oui::CommonDialogStrings& dialogStrings,
         FileRecipientHandler_type resultCallback,
         std::shared_ptr<IFileSystem> fileSystem,
+        AsyncOpenFileWithTypeCallback_type openFileCallback,
         int typesToHighlight)
         :
             m_resultCallback(resultCallback),
@@ -458,7 +461,8 @@ namespace oui
             m_rootFile(rootFile),
             m_openingText(dialogStrings.openingText),
             m_errorText(dialogStrings.errorText),
-            m_typesToHighlight(typesToHighlight)
+            m_typesToHighlight(typesToHighlight),
+            m_openFileCallback(std::move(openFileCallback))
     {
         SetCaption(dialogStrings.caption);
 
@@ -515,7 +519,7 @@ namespace oui
         {
             // report nothing
             auto me = GetPtr_t<COpenFileDialog>(this);
-            m_resultCallback(me, m_result, nullptr);
+            m_resultCallback(me, m_result, nullptr, 0, OpenFileModelInfo{});
             m_resultCallback = nullptr;
         }
         Parent_type::OnFinishDialog();

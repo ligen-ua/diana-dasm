@@ -91,7 +91,7 @@ namespace orthia
         std::vector<char> flags(size);
         auto* pFlagsStart = flags.data();
         memset(pFlagsStart + 0, WorkAddressData::dataFlags_Invalid, startInvalidBytes);
-        memset(pBufferStart + startInvalidBytes + startValidBytes, WorkAddressData::dataFlags_Invalid, endInvalidBytes);
+        memset(pFlagsStart + startInvalidBytes + startValidBytes, WorkAddressData::dataFlags_Invalid, endInvalidBytes);
 
         return WorkAddressData(
             pBufferStart,

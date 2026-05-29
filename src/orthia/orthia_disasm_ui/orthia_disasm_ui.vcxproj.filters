@@ -122,6 +122,9 @@
     <ClCompile Include="ui_sections_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="oui_shellcode_dialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h">
@@ -202,13 +205,16 @@
     <ClInclude Include="orthia_module_analyzer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="orthia_external_symbols.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="orthia_model_sections.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_sections_window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_external_symbols.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="oui_shellcode_dialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

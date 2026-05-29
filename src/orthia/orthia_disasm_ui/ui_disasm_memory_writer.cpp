@@ -316,9 +316,10 @@ namespace oui
         m_operands.clear();
     }
 
-    void MemoryPrinter::SetFlags(const char* pDataFlags, orthia::Address_type routeStart)
+    void MemoryPrinter::SetFlags(const char* pDataFlags, orthia::Address_type dataSize, orthia::Address_type routeStart)
     {
         m_pDataFlags = pDataFlags;
+        m_dataSize = dataSize;
         m_routeStart = routeStart;
     }
 
@@ -348,7 +349,29 @@ namespace oui
         }
         
         Diana_InitContext(&context, m_dianaMode);
-        Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
+
+        // cut off tail - extra zeroes from stream
+        DIANA_SIZE_T bufferSize = (size_t)vmRange.size;
+        bool foundValid = false;
+        if (vmRange.HasData() && m_pDataFlags)
+        {
+            for (const char* p = m_pDataFlags; p < m_pDataFlags + m_dataSize; ++p)
+            {
+                if ((*p & orthia::WorkAddressData::dataFlags_Invalid))
+                {
+                    if (foundValid)
+                    {
+                        bufferSize = p - m_pDataFlags;
+                        break;
+                    }
+                }
+                else
+                {
+                    foundValid = true;
+                }
+            }
+        }
+        Diana_InitMemoryStream(&stream, (void*)pDataStart, bufferSize);
 
         oui::LineIndex virtualOffset = oui::LineIndex(vmRange.address, 0);
         OnStream(&ctx, virtualOffset, reportNoData);
@@ -484,6 +507,10 @@ namespace oui
         if (m_pDataFlags)
         {
             auto relativeOffset = virtualOffset - m_routeStart;
+            if (relativeOffset >= m_dataSize)
+            {
+                return orthia::WorkAddressData::dataFlags_Invalid;
+            }
             auto& flag = m_pDataFlags[relativeOffset];
             return flag & orthia::WorkAddressData::dataFlags_Invalid;
         }

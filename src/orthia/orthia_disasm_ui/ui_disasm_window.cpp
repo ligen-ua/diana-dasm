@@ -176,7 +176,7 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     }
     orthia::MarkupRangeCache markupCache(rangeInfoVec, std::move(exportInfoVec));
     printer.SetReferencesCache(&markupCache);
-    printer.SetFlags(data.pDataFlags, routeStart);
+    printer.SetFlags(data.pDataFlags, data.dataSize, routeStart);
     printer.OnRange(vmRangeInfo, data.pDataStart);
 
     m_view->Init(std::move(writer.items), false);
