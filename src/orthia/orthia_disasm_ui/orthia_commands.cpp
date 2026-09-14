@@ -4,6 +4,8 @@
 #include "ui_disasm_memory_writer.h"
 #include "orthia_match.h"
 #include "orthia_model.h"
+#include "orthia_external_symbols.h"
+#include "orthia_memory_cache.h"
 
 namespace orthia
 {
@@ -283,6 +285,74 @@ namespace orthia
         args.ReplyLine(line);
     }
 
+
+    void CCommandProcessor::Handle_pe_info(CommandArguments& args)
+    {
+        auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
+        if (moduleName.empty())
+        {
+            throw std::runtime_error("Module name expected");
+        }
+        bool moduleFound = false;
+        oui::EnumModulesByName(args.item,
+            moduleName,
+            [&](orthia::ModuleInfo& mod)  {
+
+            if (!orthia::IsPeModule(mod))
+            {
+                throw std::runtime_error("Not a PE module: " + orthia::PlatformStringToUtf8(mod.fullName));
+            }
+
+            auto pMemoryReader = args.item->CreateMemoryReader();
+
+            DIANA_UUID guid = { 0, };
+            DI_UINT32 age = 0;
+            orthia::PlatformString_type pdbName;
+            orthia::QueryModulePeDebugInfo(pMemoryReader.get(), mod, guid, age, pdbName);
+
+            orthia::PlatformString_type line;
+            line = ORTHIA_TCSTR("Module: ") + mod.name;
+            args.ReplyLine(line);
+
+            line = ORTHIA_TCSTR("Full name: ") + mod.fullName;
+            args.ReplyLine(line);
+
+#ifdef WIN32
+            {
+                orthia::CMemoryStorageOfModifiedData storage(pMemoryReader.get());
+                orthia::VmMemoryRangesTargetOverVectorPlain moduleData;
+                storage.ReportRegions(mod.address, mod.size, &moduleData, true);
+                if (!moduleData.m_data.empty())
+                {
+                    const wchar_t* version = orthia::QueryModuleVersion((HMODULE)moduleData.m_data.data());
+                    if (version)
+                    {
+                        line = ORTHIA_TCSTR("Version: ") + orthia::PlatformString_type(version);
+                        args.ReplyLine(line);
+                    }
+                }
+            }
+#endif
+
+            line = ORTHIA_TCSTR("Debug GUID: ") + orthia::UUIDToString(guid);
+            args.ReplyLine(line);
+
+            line = ORTHIA_TCSTR("Debug Age: ") + orthia::ObjectToString(age);
+            args.ReplyLine(line);
+
+            line = ORTHIA_TCSTR("Pdb name: ") + pdbName;
+            args.ReplyLine(line);
+
+            moduleFound = true;
+            return false;
+        }
+        );
+        if (!moduleFound)
+        {
+            throw std::runtime_error("Module not found: " + orthia::PlatformStringToUtf8(moduleName));
+        }
+    }
+
     void CCommandProcessor::ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
@@ -311,6 +381,7 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { Handle_reload(args);  });
             parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { Handle_analyze(args);  });
             parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });
+            parser.SetHandler(OUI_TCSTR("pe_info"), [&](CCommandParser& parser) mutable { Handle_pe_info(args);  });
             parser.SetHandler(OUI_TCSTR("cls"), [&](CCommandParser& parser) mutable { uiCommandHandler->Reply(uiCommandHandler, SpecialUICommands::ClearScreen);  });
 
             parser.Parse(text);

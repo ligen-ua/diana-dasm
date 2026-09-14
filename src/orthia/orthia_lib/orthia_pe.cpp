@@ -246,6 +246,25 @@ namespace orthia
         return DI_SUCCESS;
     }
 
+    int CSimplePeFile::QueryGUID(DIANA_UUID* pGuid, DI_UINT32* pAge)
+    {
+        if (m_mappedPeFile.empty() || !m_dianaContext.get())
+        {
+            return DI_ERROR;
+        }
+
+        ::DianaMemoryStream2 stream;
+        Diana_InitMemoryStream2(&stream, m_mappedPeFile.data(), m_mappedPeFile.size(), 0, 0, m_imageBase);
+
+        return DianaPeFile_QueryGUID(&m_dianaContext->mappedPE,
+            &stream.parent.parent.parent,
+            0,
+            pGuid,
+            pAge,
+            nullptr,
+            0);
+    }
+
     const std::vector<char>& CSimplePeFile::GetMappedFile() const
     {
         return m_mappedPeFile;

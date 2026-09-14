@@ -141,6 +141,11 @@ namespace oui
         }
         {
             MultiLineViewItem item;
+            item.text = OUI_TCSTR(" -  pe_info <module>        - Show PE/debug info for module");
+            lines.push_back(item);
+        }
+        {
+            MultiLineViewItem item;
             item.text = OUI_TCSTR("Note: pass CTRL+C to command edit box to stop the command");
             lines.push_back(item);
         }    }

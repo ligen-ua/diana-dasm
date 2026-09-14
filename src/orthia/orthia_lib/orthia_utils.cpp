@@ -2,6 +2,30 @@
 namespace orthia
 {
 
+PlatformString_type UUIDToString(const DIANA_UUID & uid)
+{
+    PlatformString_type part;
+    PlatformString_type result;
+
+    ToStringAsHex(uid.Data1, &part);
+    result += part;
+    result += ORTHIA_TCSTR("-");
+
+    ToStringAsHex(uid.Data2, &part);
+    result += part;
+    result += ORTHIA_TCSTR("-");
+
+    ToStringAsHex(uid.Data3, &part);
+    result += part;
+    result += ORTHIA_TCSTR("-");
+
+    result += ToHexString(reinterpret_cast<const char *>(uid.Data4), 2);
+    result += ORTHIA_TCSTR("-");
+    result += ToHexString(reinterpret_cast<const char *>(uid.Data4) + 2, 6);
+
+    return result;
+}
+
 Address_type ToAddress(const orthia::PlatformString_type & sourceStr)
 {
     ORTHIA_TCHAR * pEndStr = const_cast<ORTHIA_TCHAR*>(sourceStr.c_str() + sourceStr.size());

@@ -381,14 +381,16 @@ ORTHIA_DECLARE_API(pe_info)
     peFileGuard.reset(&peFile);
 
     DIANA_UUID uid = { 0, };
-    DianaPeFile_QueryGUID(&peFile, &peFileStream.stream, 0, &uid);
-    
+    DI_UINT32 age = 0;
+    DianaPeFile_QueryGUID(&peFile, &peFileStream.stream, 0, &uid, &age, nullptr, 0);
+
     auto uidStr = orthia::UUIDToString(*((UUID*)&uid));
-    
+
     dprintf("Module: %s\n", module->windbgName.c_str());
     dprintf("Full name: %s\n", module->fullName.c_str());
     dprintf("Version: %S\n", version);
     dprintf("Debug GUID: %S\n", uidStr.c_str());
+    dprintf("Debug Age: %u\n", age);
 
     ORTHIA_CMD_END
 }

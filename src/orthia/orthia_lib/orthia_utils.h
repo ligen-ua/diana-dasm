@@ -8,6 +8,11 @@
 #include "orthia_utils_win32.h"
 #include "orthia_utils_posix.h"
 
+extern "C"
+{
+#include "diana_uids.h"
+}
+
 namespace orthia
 {
 
@@ -486,11 +491,12 @@ PlatformString_type ToHexString(const Type & obj)
     return ToHexString((const char * )&obj, sizeof(obj));
 }
 template<class Type>
-PlatformString_type ToHexString(Type * pArray, 
+PlatformString_type ToHexString(Type * pArray,
                          size_t count)
 {
     return ToHexString((const char * )pArray, sizeof(Type)*count);
 }
+PlatformString_type UUIDToString(const DIANA_UUID & uid);
 template<class CharType>
 void Split(const std::basic_string<CharType> & sourceString, 
            std::vector<std::basic_string<CharType> > * pArgs,   

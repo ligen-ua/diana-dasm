@@ -612,7 +612,8 @@ void DianaPeFile_LinkImports_Observer_Init2(DianaPeFile_LinkImports_Observer * p
 int DianaPeFile_LinkDll32(OPERAND_SIZE address,
                           DianaReadWriteRandomStream * pOutStream,
                         const char * pDllName,
-                        OPERAND_SIZE firstThunkOffset, 
+                        OPERAND_SIZE firstThunkOffset,
+                        OPERAND_SIZE nameThunkOffset,
                         void * pPage,
                         int pageSize,
                         void * pImageImportBuffer,
@@ -625,6 +626,7 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
     char * p_end = 0;
     OPERAND_SIZE readBytes = 0;
     OPERAND_SIZE currentThunkOffset = firstThunkOffset;
+    OPERAND_SIZE currentNameThunkOffset = nameThunkOffset;
     int thunksCountInPage = pageSize/sizeof(DIANA_IMAGE_THUNK_DATA32);
     int usedPageSize = thunksCountInPage*sizeof(DIANA_IMAGE_THUNK_DATA32);
     if (thunksCountInPage == 0)
@@ -635,7 +637,7 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
     for(;;)
     {
         DI_CHECK(pOutStream->parent.pRandomRead(pOutStream,
-                                                currentThunkOffset,
+                                                currentNameThunkOffset,
                                                 pPage,
                                                 usedPageSize,
                                                 &readBytes,
@@ -649,7 +651,7 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
         p_end = (char*)p + readBytes;
         for(;
             ((char*)p_end - (char*)p) > sizeof(DIANA_IMAGE_THUNK_DATA32);
-            ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA32))
+            ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA32),currentNameThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA32))
         {
             OPERAND_SIZE function = 0;
             if (!p->u1.AddressOfData)
@@ -735,7 +737,8 @@ int DianaPeFile_LinkDll32(OPERAND_SIZE address,
 int DianaPeFile_LinkDll64(OPERAND_SIZE address,
                           DianaReadWriteRandomStream * pOutStream,
                         const char * pDllName,
-                        OPERAND_SIZE firstThunkOffset, 
+                        OPERAND_SIZE firstThunkOffset,
+                        OPERAND_SIZE nameThunkOffset,
                         void * pPage,
                         int pageSize,
                         void * pImageImportBuffer,
@@ -748,6 +751,7 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
     char * p_end = 0;
     OPERAND_SIZE readBytes = 0;
     OPERAND_SIZE currentThunkOffset = firstThunkOffset;
+    OPERAND_SIZE currentNameThunkOffset = nameThunkOffset;
     int thunksCountInPage = pageSize/sizeof(DIANA_IMAGE_THUNK_DATA64);
     int usedPageSize = thunksCountInPage*sizeof(DIANA_IMAGE_THUNK_DATA64);
     if (thunksCountInPage == 0)
@@ -757,7 +761,7 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
     for(;;)
     {
         DI_CHECK(pOutStream->parent.pRandomRead(pOutStream,
-                                                currentThunkOffset,
+                                                currentNameThunkOffset,
                                                 pPage,
                                                 usedPageSize,
                                                 &readBytes,
@@ -771,7 +775,7 @@ int DianaPeFile_LinkDll64(OPERAND_SIZE address,
         p_end = (char*)p + readBytes;
         for(;
             ((char*)p_end - (char*)p) > sizeof(DIANA_IMAGE_THUNK_DATA64);
-            ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA64))
+            ++p,currentThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA64),currentNameThunkOffset+=sizeof(DIANA_IMAGE_THUNK_DATA64))
         {
             OPERAND_SIZE function = 0;
             if (!p->u1.AddressOfData)
@@ -867,7 +871,10 @@ typedef struct _DIANA_CV_INFO_PDB70
 int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
                           /* inout */ DianaMovableReadStream* pOutStream,
                           /* in */ OPERAND_SIZE address,
-                          /* out */ DIANA_UUID * pPdbUID)
+                          /* out */ DIANA_UUID * pPdbUID,
+                          /* out */ DI_UINT32* pAge,
+                          /* out, optional */ char* pPdbNameBuffer,
+                          /* in */ DI_UINT32 pdbNameBufferSize)
 {
     DIANA_IMAGE_DATA_DIRECTORY* pDebugDirectory = &pPeFile->pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_DEBUG];
     int status = 0;
@@ -876,6 +883,11 @@ int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
     long long debugCounter = 0;
     OPERAND_SIZE readBytes = 0;
     PDIANA_IMAGE_DEBUG_DIRECTORY pDebugDescriptor = 0;
+
+    if (pPdbNameBuffer && pdbNameBufferSize > 0)
+    {
+        pPdbNameBuffer[0] = 0;
+    }
 
     if (!pDebugDirectory)
     {
@@ -931,6 +943,31 @@ int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
         }
 
         *pPdbUID = pdbInfo.Signature;
+        *pAge = pdbInfo.Age;
+
+        if (status == 0 && pPdbNameBuffer && pdbNameBufferSize > 0)
+        {
+            DI_UINT32 fixedHeaderSize = (DI_UINT32)(sizeof(DI_UINT32) + sizeof(DIANA_UUID) + sizeof(DI_UINT32));
+            if (pDebugDescriptor->SizeOfData > fixedHeaderSize)
+            {
+                DI_UINT32 toRead = pDebugDescriptor->SizeOfData - fixedHeaderSize;
+                OPERAND_SIZE nameReadBytes = 0;
+                if (toRead > pdbNameBufferSize - 1)
+                {
+                    toRead = pdbNameBufferSize - 1;
+                }
+                if (toRead > 0 &&
+                    pOutStream->pRandomRead(pOutStream,
+                        address + pDebugDescriptor->AddressOfRawData + fixedHeaderSize,
+                        pPdbNameBuffer,
+                        toRead,
+                        &nameReadBytes,
+                        0) == 0)
+                {
+                    pPdbNameBuffer[nameReadBytes] = 0;
+                }
+            }
+        }
     }
 
 cleanup:
@@ -1005,8 +1042,17 @@ int DianaPeFile_LinkImportsEx(/* in */ Diana_PeFile * pPeFile,
     {
         OPERAND_SIZE dllNameOffset = address;
         OPERAND_SIZE firstThunkOffset = address;
+        OPERAND_SIZE nameThunkOffset = address;
+        DI_UINT32 originalFirstThunkRva = pImportDescriptor->Misc.OriginalFirstThunk;
         DI_CHECK_GOTO(Diana_SafeAdd(&dllNameOffset, pImportDescriptor->Name));
         DI_CHECK_GOTO(Diana_SafeAdd(&firstThunkOffset, pImportDescriptor->FirstThunk));
+        /* OriginalFirstThunk (the INT) is never rewritten by the loader/binder and always
+           holds RVA-based name/ordinal thunks. FirstThunk (the IAT) is rewritten in place
+           for bound images (e.g. ntoskrnl.exe) to already-resolved VAs, so it must not be
+           parsed as a name thunk array - only OriginalFirstThunk (or FirstThunk as a
+           fallback when OriginalFirstThunk is absent) is safe for that. */
+        DI_CHECK_GOTO(Diana_SafeAdd(&nameThunkOffset,
+            originalFirstThunkRva ? originalFirstThunkRva : pImportDescriptor->FirstThunk));
 
         if (!pImportDescriptor->FirstThunk || !pImportDescriptor->Name)
         {
@@ -1028,8 +1074,9 @@ int DianaPeFile_LinkImportsEx(/* in */ Diana_PeFile * pPeFile,
         case DIANA_MODE32:
              DI_CHECK_GOTO(DianaPeFile_LinkDll32(address,
                                           pOutStream,
-                                          pDllNameBuffer, 
+                                          pDllNameBuffer,
                                           firstThunkOffset,
+                                          nameThunkOffset,
                                           pPage,
                                           pageSize,
                                           pImageImportBuffer,
@@ -1041,8 +1088,9 @@ int DianaPeFile_LinkImportsEx(/* in */ Diana_PeFile * pPeFile,
         case DIANA_MODE64:
              DI_CHECK_GOTO(DianaPeFile_LinkDll64(address,
                                           pOutStream,
-                                          pDllNameBuffer, 
+                                          pDllNameBuffer,
                                           firstThunkOffset,
+                                          nameThunkOffset,
                                           pPage,
                                           pageSize,
                                           pImageImportBuffer,

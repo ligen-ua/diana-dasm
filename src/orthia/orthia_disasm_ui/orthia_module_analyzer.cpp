@@ -289,6 +289,7 @@ namespace orthia
             auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
             auto logger = std::make_shared<CLoaderUILogger>(m_uiThread, m_uiLog);
             auto loader = CreateExternalSymbolsLoader(m_config->GetSymbolsFolders(), logger);
+            auto memoryReader = item->CreateMemoryReader();
 
             for (auto& mod : modules)
             {
@@ -316,7 +317,7 @@ namespace orthia
                         }
                     };
                     ModuleSymbols syms;
-                    loader->Load(mod, syms, onSymbol);
+                    loader->Load(mod, memoryReader.get(), syms, onSymbol);
                     if (!syms.IsEmpty())
                     {
                         if (auto* storage = item->GetModuleStorage())

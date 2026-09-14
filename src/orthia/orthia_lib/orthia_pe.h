@@ -46,6 +46,7 @@ namespace orthia
         int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryTLSCallbacks(std::vector<OPERAND_SIZE>& callbacks);
+        int QueryGUID(DIANA_UUID* pGuid, DI_UINT32* pAge);
 
         // ISimpleFile overrides
         const std::vector<char>& GetMappedFile() const override;

@@ -157,7 +157,10 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
 int DianaPeFile_QueryGUID(/* in */ Diana_PeFile* pPeFile,
                           /* inout */ DianaMovableReadStream* pOutStream,
                           /* in */ OPERAND_SIZE address,
-                          /* out */ DIANA_UUID* pPdbUID);
+                          /* out */ DIANA_UUID* pPdbUID,
+                          /* out */ DI_UINT32* pAge,
+                          /* out, optional */ char* pPdbNameBuffer,
+                          /* in */ DI_UINT32 pdbNameBufferSize);
 
 int DianaPeFile_ReadAllVirtual(/* in */ OPERAND_SIZE peStartAddress,
                                 /* inout */ DianaReadWriteRandomStream * pOutStream,

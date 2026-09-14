@@ -4,16 +4,17 @@
 extern "C"
 {
 #include "diana_pdb.h"
+#include "diana_uids.h"
 }
 #include "orthia_files.h"
+#include "orthia_memory_cache.h"
+#include "orthia_pe.h"
+#include "orthia_streams.h"
 #include "orthia_utils.h"
 #include <filesystem>
 #include <optional>
 
 namespace orthia
-{
-
-namespace
 {
 
 bool IsPeModule(const ModuleInfo& mod)
@@ -30,6 +31,59 @@ bool IsPeModule(const ModuleInfo& mod)
         || ext == ORTHIA_TCSTR("sys");
 }
 
+// Reads a module's own memory image (already mapped by memoryReader at
+// mod.address) and extracts the GUID+Age+PDB name recorded in its CodeView
+// (RSDS) debug directory entry. Same adapter the "pe_info" command uses
+// (CMemoryCache + DianaMemoryStream + Diana_PeFile), so it relies on the
+// module already being mapped rather than re-reading its file from disk.
+bool QueryModulePeDebugInfo(IMemoryReader* memoryReader,
+                            const ModuleInfo& mod,
+                            DIANA_UUID& guid,
+                            DI_UINT32& age,
+                            PlatformString_type& pdbName)
+{
+    guid = { 0, };
+    age = 0;
+    pdbName.clear();
+
+    if (!memoryReader || !mod.size)
+        return false;
+
+    try
+    {
+        // diana PE analyzer uses relative pointers
+        CMemoryCache module(memoryReader, mod.address);
+        DianaMemoryStream stream(0, &module, mod.size);
+
+        Diana_PeFile peFile;
+        diana::Guard<diana::PeFile> peFileGuard;
+        DI_CHECK_CPP(DianaPeFile_Init(&peFile,
+            &stream.parent,
+            mod.size,
+            DIANA_PE_FILE_FLAGS_MODULE_MODE));
+        peFileGuard.reset(&peFile);
+
+        char pdbNameBuffer[1024] = { 0 };
+        if (DianaPeFile_QueryGUID(&peFile, &stream.parent, 0, &guid, &age,
+                                   pdbNameBuffer, sizeof(pdbNameBuffer)) != 0)
+        {
+            return false;
+        }
+
+        if (pdbNameBuffer[0])
+            pdbName = Utf8ToPlatformString(pdbNameBuffer);
+
+        return true;
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+}
+
+namespace
+{
+
 // Build the PDB stem (filename without path or extension) for a module.
 PlatformString_type GetPdbStem(const ModuleInfo& mod)
 {
@@ -40,6 +94,14 @@ PlatformString_type GetPdbStem(const ModuleInfo& mod)
     if (!ext.empty())
         return fileName.substr(0, fileName.size() - ext.size() - 1);
     return fileName;
+}
+
+// Strips any path prefix (either slash style) from a PDB name recorded in a
+// module's CodeView entry, which is typically the full local build path.
+PlatformString_type GetBaseName(const PlatformString_type& path)
+{
+    auto pos = path.find_last_of(ORTHIA_TCSTR("\\/"));
+    return pos == PlatformString_type::npos ? path : path.substr(pos + 1);
 }
 
 static constexpr int maxPdbScanDepth = 4;
@@ -65,10 +127,13 @@ class CPdbFileFinder
             : m_modDir;
     }
 public:
-    CPdbFileFinder(const ModuleInfo& mod, const std::vector<PlatformString_type>& symbolFolders)
+    CPdbFileFinder(const ModuleInfo& mod, const std::vector<PlatformString_type>& symbolFolders,
+                   const PlatformString_type& embeddedPdbName)
         : m_symbolFolders(symbolFolders)
     {
-        m_pdbName = GetPdbStem(mod) + ORTHIA_TCSTR(".pdb");
+        m_pdbName = !embeddedPdbName.empty()
+            ? GetBaseName(embeddedPdbName)
+            : GetPdbStem(mod) + ORTHIA_TCSTR(".pdb");
         m_modDir = std::filesystem::path(mod.fullName).parent_path().native();
     }
 
@@ -145,10 +210,15 @@ public:
         return IsPeModule(mod);
     }
 
-    void Load(const ModuleInfo& mod, ModuleSymbols& out,
+    void Load(const ModuleInfo& mod, IMemoryReader* memoryReader, ModuleSymbols& out,
               OnPrivateSymbolLoaded onSymbol = nullptr) override
     {
-        CPdbFileFinder finder(mod, m_symbolFolders);
+        DIANA_UUID moduleGuid = { 0, };
+        DI_UINT32 moduleAge = 0;
+        PlatformString_type modulePdbName;
+        bool haveModuleGuid = QueryModulePeDebugInfo(memoryReader, mod, moduleGuid, moduleAge, modulePdbName);
+
+        CPdbFileFinder finder(mod, m_symbolFolders, modulePdbName);
         while (finder.FindNextPdb())
         {
             const PlatformString_type& pdbPath = finder.Current();
@@ -182,6 +252,27 @@ public:
             if (pdb_load(ctx, pdbData.data(), pdbData.size()) < 0)
             {
                 continue;
+            }
+
+            if (haveModuleGuid)
+            {
+                // Age is intentionally not compared: Microsoft's own tooling
+                // (symchk/dbghelp) treats the GUID as the authoritative match
+                // and tolerates Age drift, since post-processing a PDB (e.g.
+                // stripping private symbols for public release) bumps its
+                // internal Age without touching the binary that was linked
+                // against an earlier revision of that same PDB.
+                const struct guid* pdbGuid = pdb_get_guid(ctx);
+                if (!pdbGuid ||
+                    DIANA_UUID_Compare(reinterpret_cast<const DIANA_UUID*>(pdbGuid), &moduleGuid) != 0)
+                {
+                    if (m_logger)
+                    {
+                        auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                        m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("symbols-mismatch")), pdbPath));
+                    }
+                    continue;
+                }
             }
 
             uint32_t nrSections = pdb_get_nr_sections(ctx);
@@ -313,7 +404,7 @@ public:
         return !IsPeModule(mod);
     }
 
-    void Load(const ModuleInfo& /*mod*/, ModuleSymbols& /*out*/,
+    void Load(const ModuleInfo& /*mod*/, IMemoryReader* /*memoryReader*/, ModuleSymbols& /*out*/,
               OnPrivateSymbolLoaded /*onSymbol*/ = nullptr) override
     {
         // Not yet implemented.
@@ -344,14 +435,14 @@ public:
         return false;
     }
 
-    void Load(const ModuleInfo& mod, ModuleSymbols& out,
+    void Load(const ModuleInfo& mod, IMemoryReader* memoryReader, ModuleSymbols& out,
               OnPrivateSymbolLoaded onSymbol = nullptr) override
     {
         for (const auto& l : m_loaders)
         {
             if (l->CanLoad(mod))
             {
-                l->Load(mod, out, onSymbol);
+                l->Load(mod, memoryReader, out, onSymbol);
                 return;
             }
         }
