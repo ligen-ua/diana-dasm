@@ -1,6 +1,10 @@
 #include "cmd_common.h"
 #include "orthia_files.h"
 #include "orthia_pe.h"
+#include "orthia_pdb_symbols.h"
+#include "orthia_match.h"
+#include <map>
+#include <unordered_map>
 
 namespace orthia
 {
@@ -12,12 +16,35 @@ namespace orthia
         std::vector<std::string> functions;
     };
 
+    namespace
+    {
+        bool IsWildcardPattern(const std::string& name)
+        {
+            return name.find('*') != name.npos || name.find('?') != name.npos;
+        }
+
+        // Collects every named PE export so wildcard patterns can be matched
+        // against them; ordinal-only exports (no name) can't be matched by a
+        // name pattern, so they're skipped, same as the existing literal-name
+        // lookup already requires a name.
+        struct CExportNameCollector : public diana::CBasePeLinkImportsObserver
+        {
+            std::vector<std::string> names;
+            void QueryFunctionByOrdinal(const char* /*pDllName*/, DI_UINT32 /*ordinal*/, OPERAND_SIZE* /*pAddress*/) override
+            {
+            }
+            void QueryFunctionByName(const char* /*pDllName*/, const char* pFunctionName, DI_UINT32 /*hint*/, OPERAND_SIZE* /*pAddress*/) override
+            {
+                if (pFunctionName && *pFunctionName)
+                {
+                    names.push_back(pFunctionName);
+                }
+            }
+        };
+    }
+
     static void Dump(DumpOptions& options, IToolOutputStream* streamToUse)
     {
-        if (!options.pdbFile.empty())
-        {
-            std::cerr << "PDB file parsing is not implemented yet\n";
-        }
         std::vector<char> peFile;
         orthia::LoadFileToVector(options.exeModule, peFile);
         if (peFile.empty())
@@ -32,11 +59,110 @@ namespace orthia
         }
         mappedPE.MapFile(peFile, params);
 
+        // Optional PDB symbols: exact-name lookups fall back to the PDB only
+        // when the export table doesn't have a match; wildcard patterns are
+        // matched against both exports and PDB symbols.
+        orthia::CPdbSymbols pdbSymbols;
+        bool pdbLoaded = false;
+        if (!options.pdbFile.empty())
+        {
+            std::vector<char> pdbFile;
+            orthia::LoadFileToVector(options.pdbFile, pdbFile);
+            pdbSymbols.Load(pdbFile);
+            pdbLoaded = true;
+
+            DIANA_UUID moduleGuid = {};
+            DI_UINT32 moduleAge = 0;
+            DIANA_UUID pdbGuid = {};
+            if (mappedPE.QueryGUID(&moduleGuid, &moduleAge) == DI_SUCCESS &&
+                pdbSymbols.QueryGUID(&pdbGuid, nullptr) &&
+                DIANA_UUID_Compare(&moduleGuid, &pdbGuid) != 0)
+            {
+                // Age is intentionally not compared here, matching the UI's
+                // PDB loader policy: GUID is authoritative, Age can drift
+                // when a PDB is post-processed without relinking the module.
+                std::cerr << "warning: PDB GUID does not match module GUID\n";
+            }
+        }
+
+        // Lazily built on first use: name -> RVA of PDB public/global symbols.
+        std::unordered_map<std::string, DI_UINT64> pdbByName;
+        bool pdbByNameBuilt = false;
+        auto ensurePdbByName = [&]() -> std::unordered_map<std::string, DI_UINT64>&
+        {
+            if (!pdbByNameBuilt)
+            {
+                for (auto& sym : pdbSymbols.GetSymbols())
+                {
+                    pdbByName.emplace(sym.name, sym.rva);
+                }
+                pdbByNameBuilt = true;
+            }
+            return pdbByName;
+        };
+
+        // Lazily built on first use: every named PE export.
+        std::vector<std::string> exportNames;
+        bool exportNamesBuilt = false;
+        auto ensureExportNames = [&]() -> std::vector<std::string>&
+        {
+            if (!exportNamesBuilt)
+            {
+                CExportNameCollector collector;
+                mappedPE.QueryExports(&collector);
+                exportNames = std::move(collector.names);
+                exportNamesBuilt = true;
+            }
+            return exportNames;
+        };
+
         streamToUse->OutVar(L"ImageBase", orthia::ToWideStringAsHex(mappedPE.GetImageBase()));
         for (auto& name : options.functions)
         {
-            DI_UINT64 address = mappedPE.DiGetProcAddress(name.c_str()); 
-            streamToUse->OutVar(name.c_str(), orthia::ToAnsiStringAsHex(address));
+            if (!IsWildcardPattern(name))
+            {
+                DI_UINT64 address = mappedPE.DiGetProcAddress(name.c_str());
+                if (!address && pdbLoaded)
+                {
+                    auto& byName = ensurePdbByName();
+                    auto it = byName.find(name);
+                    if (it != byName.end())
+                    {
+                        address = mappedPE.GetImageBase() + it->second;
+                    }
+                }
+                streamToUse->OutVar(name.c_str(), orthia::ToAnsiStringAsHex(address));
+                continue;
+            }
+
+            // Wildcard pattern: match against exports first, then PDB symbols,
+            // deduplicating by name (export address wins on collision).
+            std::map<std::string, DI_UINT64> matches;
+            for (auto& exportName : ensureExportNames())
+            {
+                if (utils::match(name, exportName))
+                {
+                    DI_UINT64 address = mappedPE.DiGetProcAddress(exportName.c_str());
+                    if (address)
+                    {
+                        matches.emplace(exportName, address);
+                    }
+                }
+            }
+            if (pdbLoaded)
+            {
+                for (auto& sym : pdbSymbols.GetSymbols())
+                {
+                    if (utils::match(name, sym.name))
+                    {
+                        matches.emplace(sym.name, mappedPE.GetImageBase() + sym.rva);
+                    }
+                }
+            }
+            for (auto& match : matches)
+            {
+                streamToUse->OutVar(match.first, orthia::ToAnsiStringAsHex(match.second));
+            }
         }
     }
     int ParseAndRunDump(int argc, wchar_t* argv[])
@@ -113,7 +239,7 @@ namespace orthia
                 continue;
             }
 
-            // image base arg
+            // pdb file arg
             if (wcscmp(argv[optionIndex], L"--pdb") == 0)
             {
                 dumpOptions.pdbFile = argv[argumentIndex];

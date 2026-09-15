@@ -69,10 +69,10 @@ bool QueryModulePeDebugInfo(IMemoryReader* memoryReader,
         {
             return false;
         }
-
         if (pdbNameBuffer[0])
+        {
             pdbName = Utf8ToPlatformString(pdbNameBuffer);
-
+        }
         return true;
     }
     catch (const std::exception&)

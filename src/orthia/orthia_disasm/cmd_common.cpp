@@ -35,6 +35,9 @@ namespace orthia
     void PrintUsage()
     {
         std::wcout << L"Usage: 1) dump <module> <functions> [--fmt <json>] [--base <imagebase>] [--pdb <pdbfile>]\n";
+        std::wcout << L"          <functions> is a ;/,-separated list of names; entries may contain '*'/'?' wildcards\n";
+        std::wcout << L"          to list every matching export (and PDB symbol, when --pdb is given). Exact names\n";
+        std::wcout << L"          are resolved against exports first, falling back to the PDB if not found there.\n";
         std::wcout << L"       2) disasm <file> <address> [--size <n>] [--base <imagebase>] [--mode <x86|x64>] [--rva]\n";
     }
     int PrintInvalidArgument(const wchar_t* arg, const wchar_t* expect)
