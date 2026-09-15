@@ -14,6 +14,7 @@ namespace oui
         std::function<bool(InputEvent& evt)> ctrlAHandler;
         std::function<void(std::shared_ptr<CEditBox> editBox)> onPaintStart;
         std::function<void()> onPaintDone;
+        std::function<void()> onSelPosChanged;
     };
     
     struct EditBoxSelectionRange;

@@ -83,7 +83,8 @@ orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::P
 
                 for (auto& name : page)
                 {
-                    if (orthia::Downcase(name.privateSymbol.native) == internalName)
+                    if (orthia::Downcase(name.privateSymbol.native) == internalName ||
+                        orthia::Downcase(name.name.native) == internalName)
                     {
                         address = name.address;
                         addressFound = true;

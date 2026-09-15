@@ -62,6 +62,16 @@ namespace oui
         };
         handlers.onPaintDone = [&]() {
             OnEditBoxPaintDone();
+        };        
+        handlers.onSelPosChanged = [&]() {
+            if (!m_editBox->SelectionIsActive())
+            {
+                m_selectionIsActive = false;
+            }
+            if (m_selectionIsActive)
+            {
+                m_selPosEnd.x = m_editBox->GetSelectedRange().second;
+            }
         };
         m_editBox->UpdateBehaviorFlags(0, CEditBox::BehaviorFlags_CancelSelectionOnFocusLost);
         m_editBox->SetLowLevelHandlers(std::move(handlers));
@@ -304,6 +314,10 @@ namespace oui
             {
                 // special case when user selects a lot and then returns back
                 m_editBox->Select(m_selPosStart.x, m_selPosEnd.x);
+                if (m_selPosStart.x == m_selPosEnd.x)
+                {
+                    m_selectionIsActive = false;
+                }   
             }
             else
             {

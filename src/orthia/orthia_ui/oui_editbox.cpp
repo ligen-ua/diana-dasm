@@ -855,6 +855,7 @@ namespace oui
 
             if (cursorMove)
             {
+                bool wasUpdate = false;
                 if (evt.keyState.HasShift())
                 {
                     if (!SelectionIsActive())
@@ -866,6 +867,10 @@ namespace oui
                 else
                 {
                     ResetSelection();
+                }
+                if (m_llHandlers.onSelPosChanged)
+                {
+                    m_llHandlers.onSelPosChanged();
                 }
             }
             if (!handled && !evt.keyEvent.rawText.native.empty() && 
