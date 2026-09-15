@@ -35,6 +35,7 @@ namespace orthia
     void PrintUsage()
     {
         std::wcout << L"Usage: 1) dump <module> <functions> [--fmt <json>] [--base <imagebase>] [--pdb <pdbfile>]\n";
+        std::wcout << L"       2) disasm <file> <address> [--size <n>] [--base <imagebase>] [--mode <x86|x64>] [--rva]\n";
     }
     int PrintInvalidArgument(const wchar_t* arg, const wchar_t* expect)
     {
@@ -87,12 +88,12 @@ namespace orthia
         }
         if (arg.size() > 2)
         {
-            if (arg[0] == '0' && arg[0] == 'x')
+            if (arg[0] == '0' && arg[1] == 'x')
             {
                 orthia::HexStringToObject(std::wstring(arg.begin() + 2, arg.end()), &result);
                 return result;
             }
-            if (arg[0] == '0' && arg[0] == 'n')
+            if (arg[0] == '0' && arg[1] == 'n')
             {
                 orthia::StringToObject(std::wstring(arg.begin() + 2, arg.end()), &result);
                 return result;

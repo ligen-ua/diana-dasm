@@ -21,6 +21,9 @@
     <ClCompile Include="cmd_dump.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cmd_disasm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="cmd_common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

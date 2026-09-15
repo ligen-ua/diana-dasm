@@ -42,6 +42,7 @@ namespace orthia
         void FinalFlush() override;
     };
     int ParseAndRunDump(int argc, wchar_t* argv[]);
+    int ParseAndRunDisasm(int argc, wchar_t* argv[]);
     void PrintUsage();
     
     int PrintInvalidArgument(const wchar_t* arg, const wchar_t* expect = 0);

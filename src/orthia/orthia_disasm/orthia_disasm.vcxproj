@@ -157,6 +157,7 @@
   <ItemGroup>
     <ClCompile Include="cmd_common.cpp" />
     <ClCompile Include="cmd_dump.cpp" />
+    <ClCompile Include="cmd_disasm.cpp" />
     <ClCompile Include="orthia_disasm.cpp" />
   </ItemGroup>
   <ItemGroup>

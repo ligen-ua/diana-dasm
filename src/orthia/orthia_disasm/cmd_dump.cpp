@@ -88,7 +88,7 @@ namespace orthia
 
             if (argumentIndex >= argc)
             {
-                std::cerr << "Argument required: " << argv[i] << "\n";
+                std::wcerr << L"Argument required: " << argv[i] << L"\n";
                 return 1;
             }
             i+=2;

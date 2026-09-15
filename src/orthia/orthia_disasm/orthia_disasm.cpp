@@ -15,6 +15,10 @@ int wmain(int argc, wchar_t * argv[])
         {
             return orthia::ParseAndRunDump(argc, argv);
         }
+        if (wcscmp(argv[1], L"disasm") == 0)
+        {
+            return orthia::ParseAndRunDisasm(argc, argv);
+        }
         std::wcerr << L"Unknown command: "<<argv[1]<<"\n";
         return 1;
     }
