@@ -4,7 +4,8 @@
 
 CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
     std::shared_ptr<orthia::CProgramModel> model,
-    std::shared_ptr<oui::IPanelChildSwitcher> parentTabSwitcher)
+    std::shared_ptr<oui::IPanelChildSwitcher> parentTabSwitcher,
+    std::function<void()> uiExitHandler)
     : 
         Parent_type(getCaption)
 {
@@ -22,7 +23,7 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
     m_commandEdit = std::make_shared<oui::CEditBox>(m_colorProfile);
     m_commandEdit->SetEnterHandler([=](const oui::String& text) { 
 
-
+    m_uiExitHandler = uiExitHandler;
         auto itemId = model->GetActiveItemId();
 
         auto item = model->GetActiveItem();
@@ -74,6 +75,11 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
         m_currentOperation = operation;
         m_lastCmd = orthia::CCommandProcessor::SpecialUICommands::None;
         PushHistory(text);
+        if (text.native == ORTHIA_TCSTR("exit")) {
+            m_uiExitHandler();
+            operation->Reply(operation, oui::String(), true);
+            return;
+        }
         model->GetCommandProcessor()->AsyncExecute(GetThread(), operation, cmdCallbackOperation, text.native, item, model);
     });
 

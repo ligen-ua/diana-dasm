@@ -20,6 +20,7 @@ class CCommandWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     std::vector<oui::String> m_cmdHistory;
     int m_cmdHistoryPointer = 0;
     orthia::CCommandProcessor::SpecialUICommands m_lastCmd = orthia::CCommandProcessor::SpecialUICommands::None;
+    std::function<void()> m_uiExitHandler;
 
     void ConstructChilds() override;
     void OnResize() override;
@@ -38,7 +39,8 @@ class CCommandWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
 public:
     CCommandWindow(std::function<oui::String()> getCaption,
                    std::shared_ptr<orthia::CProgramModel> model,
-                   std::shared_ptr<oui::IPanelChildSwitcher> parentTabSwitcher);
+                   std::shared_ptr<oui::IPanelChildSwitcher> parentTabSwitcher,
+                   std::function<void()> uiExitHandler);
 
     void WriteLog(const oui::String& text);
 

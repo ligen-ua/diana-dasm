@@ -82,6 +82,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     void SetFocusImpl() override;
 
     void SetDefaultTitle();
+    void OnUIExit();
+
 public:
     CMainWindow(std::shared_ptr<orthia::CProgramModel> model);
     void AddInitialArgument(const InitialOpenFileInfo& info);

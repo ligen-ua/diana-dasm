@@ -285,8 +285,7 @@ namespace orthia
         args.ReplyLine(line);
     }
 
-
-    void CCommandProcessor::Handle_pe_info(CommandArguments& args)
+    void CCommandProcessor::Handle_mod_info(CommandArguments& args)
     {
         auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
         if (moduleName.empty())
@@ -361,7 +360,7 @@ namespace orthia
         std::shared_ptr<orthia::CProgramModel> model)
     {
         CCommandParser parser;
-        CommandArguments args = { progressHandler, parser, item, model, model->GetActiveItemId() };
+        CommandArguments args = { progressHandler, parser, item, model, model->GetActiveItemId(), uiCommandHandler };
 
         oui::ScopedGuard reportStopGuard([&]() { ReportStop(args); });
 
@@ -381,7 +380,7 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { Handle_reload(args);  });
             parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { Handle_analyze(args);  });
             parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });
-            parser.SetHandler(OUI_TCSTR("pe_info"), [&](CCommandParser& parser) mutable { Handle_pe_info(args);  });
+            parser.SetHandler(OUI_TCSTR("modinfo"), [&](CCommandParser& parser) mutable { Handle_mod_info(args);  });
             parser.SetHandler(OUI_TCSTR("cls"), [&](CCommandParser& parser) mutable { uiCommandHandler->Reply(uiCommandHandler, SpecialUICommands::ClearScreen);  });
 
             parser.Parse(text);

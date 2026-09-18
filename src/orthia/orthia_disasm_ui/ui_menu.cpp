@@ -384,10 +384,7 @@ void CMainWindow::ConstuctMenu()
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("exit")),
                 [&]()
                 {
-                    if (auto pool = this->m_pool.lock())
-                    {
-                        pool->ExitLoop();
-                    }
+                    OnUIExit();
                 },
                 oui::Hotkey(oui::VirtualKey::kX)
             }

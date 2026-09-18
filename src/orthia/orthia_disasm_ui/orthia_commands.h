@@ -33,6 +33,7 @@ public:
         std::shared_ptr<IWorkPlaceItem> item;
         std::shared_ptr<orthia::CProgramModel> model;
         int workspaceId = 0;
+        oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler;
 
         int linesWithoutSync = 0;
         void ReplyLine(const oui::String& text);
@@ -58,7 +59,7 @@ protected:
     void Handle_reload(CommandArguments& args);
     void Handle_analyze(CommandArguments& args);
     void Handle_symfix(CommandArguments& args);
-    void Handle_pe_info(CommandArguments& args);
+    void Handle_mod_info(CommandArguments& args);
 
     int PrepareTokens(CommandArguments& args, std::vector<Token>& tokens, const Address_type maxCountOfItems, Address_type& countOfItems);
     std::shared_ptr<ICalcNode> BuildNodes(CommandArguments& args, std::vector<Token>& tokens, int indexOfLength, std::shared_ptr<ICalcNode> currentNode);

@@ -120,6 +120,13 @@ void CMainWindow::AddInitialTextOutputInfo(const oui::String& text)
 {
     m_initialText.push_back(text);
 }
+void CMainWindow::OnUIExit()
+{
+    if (auto pool = this->m_pool.lock())
+    {
+        pool->ExitLoop();
+    }
+}
 void CMainWindow::ConstructChilds()
 {
     CMainWindow::ConstuctMenu();
@@ -171,7 +178,8 @@ void CMainWindow::ConstructChilds()
         auto workspaceNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.commands"));
         m_commandWindow = std::make_shared<CCommandWindow>([=]() {  return workspaceNode->QueryValue(ORTHIA_TCSTR("caption"));  },
             m_model,
-            defaultGroup);
+            defaultGroup,
+            [this]() { OnUIExit();  });
         defaultGroup->AddPanel(m_commandWindow);
         m_stateManager.Register(m_commandWindow);
 
