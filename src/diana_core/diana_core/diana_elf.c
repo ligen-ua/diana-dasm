@@ -2267,3 +2267,102 @@ int DianaElfFile_MapEx(/* in */  Diana_ElfFile* pElfFile,
         address,
         pOutStream);
 }
+
+int DianaElfFile_QueryBuildId(/* in */ Diana_ElfFile* pElfFile,
+    /* inout */ DianaMovableReadStream* pOutStream,
+    /* in */ OPERAND_SIZE address,
+    /* out */ DI_UINT8* pBuildIdBuffer,
+    /* in */ DI_UINT32 bufferSize,
+    /* out */ DI_UINT32* pBuildIdSize)
+{
+    Diana_ElfFile_impl* pImpl = pElfFile->pImpl;
+    int status = DI_NOT_FOUND;
+    void* pCapturedSegment = 0;
+    int i;
+
+    if (pBuildIdSize)
+        *pBuildIdSize = 0;
+
+    if (!pImpl || !pOutStream || !pBuildIdBuffer || bufferSize == 0)
+        return DI_INVALID_INPUT;
+
+    for (i = 0; i < pImpl->capturedSegmentCount && status == DI_NOT_FOUND; ++i)
+    {
+        DIANA_ELF_PROGRAM_HEADER* pPhdr = pImpl->pCapturedSegments + i;
+        DI_UINT8* pNote;
+        DI_UINT8* pNoteEnd;
+        OPERAND_SIZE readBytes = 0;
+        OPERAND_SIZE segmentVA = 0;
+        OPERAND_SIZE segmentFileSize = (OPERAND_SIZE)pPhdr->p_filesz;
+        DIANA_SIZE_T noteAllocSize = 0;
+
+        if (pPhdr->p_type != DIANA_PT_NOTE)
+            continue;
+        if (segmentFileSize == 0 || segmentFileSize > DIANA_MAX_SAFE_ALLOC_SIZE)
+            continue;
+
+        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&segmentFileSize, &noteAllocSize));
+        pCapturedSegment = DIANA_MALLOC(noteAllocSize);
+        DI_CHECK_ALLOC_GOTO(pCapturedSegment);
+
+        segmentVA = (OPERAND_SIZE)pPhdr->p_vaddr;
+        DI_CHECK_GOTO(Diana_SafeAdd(&segmentVA, address));
+
+        DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
+            segmentVA,
+            pCapturedSegment,
+            (int)segmentFileSize,
+            &readBytes,
+            0));
+
+        pNote = (DI_UINT8*)pCapturedSegment;
+        pNoteEnd = pNote + readBytes;
+
+        while ((OPERAND_SIZE)(pNoteEnd - pNote) >= sizeof(DIANA_ELF_NOTE_HEADER))
+        {
+            DIANA_ELF_NOTE_HEADER noteHeader;
+            DI_UINT32 nameSizeAligned;
+            DI_UINT32 descSizeAligned;
+            DI_UINT8* pName;
+            DI_UINT8* pDesc;
+
+            DIANA_MEMCPY(&noteHeader, pNote, sizeof(noteHeader));
+            pNote += sizeof(noteHeader);
+
+            nameSizeAligned = (noteHeader.n_namesz + 3) & ~(DI_UINT32)3;
+            descSizeAligned = (noteHeader.n_descsz + 3) & ~(DI_UINT32)3;
+
+            if ((OPERAND_SIZE)(pNoteEnd - pNote) < (OPERAND_SIZE)nameSizeAligned + (OPERAND_SIZE)descSizeAligned)
+                break;
+
+            pName = pNote;
+            pDesc = pNote + nameSizeAligned;
+
+            if (noteHeader.n_type == DIANA_NT_GNU_BUILD_ID &&
+                noteHeader.n_namesz == 4 &&
+                DIANA_MEMCMP(pName, "GNU", 4) == 0)
+            {
+                DI_UINT32 toCopy = noteHeader.n_descsz;
+                if (toCopy > bufferSize)
+                    toCopy = bufferSize;
+                DIANA_MEMCPY(pBuildIdBuffer, pDesc, toCopy);
+                if (pBuildIdSize)
+                    *pBuildIdSize = toCopy;
+                status = DI_SUCCESS;
+                break;
+            }
+
+            pNote = pDesc + descSizeAligned;
+        }
+
+        DIANA_FREE(pCapturedSegment);
+        pCapturedSegment = 0;
+    }
+
+    return status;
+
+cleanup:
+    if (pCapturedSegment)
+        DIANA_FREE(pCapturedSegment);
+    return status;
+}

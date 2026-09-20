@@ -6,6 +6,7 @@ extern "C"
 #include "diana_pdb.h"
 #include "diana_uids.h"
 }
+#include "orthia_elf.h"
 #include "orthia_files.h"
 #include "orthia_memory_cache.h"
 #include "orthia_pe.h"
@@ -73,6 +74,52 @@ bool QueryModulePeDebugInfo(IMemoryReader* memoryReader,
         {
             pdbName = Utf8ToPlatformString(pdbNameBuffer);
         }
+        return true;
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+}
+
+// ELF analogue of QueryModulePeDebugInfo: reads a module's own memory
+// image (already mapped by memoryReader at mod.address) and extracts the
+// GNU build-id note, if present, as a lowercase hex string.
+bool QueryModuleElfDebugInfo(IMemoryReader* memoryReader,
+                             const ModuleInfo& mod,
+                             PlatformString_type& buildIdHex)
+{
+    buildIdHex.clear();
+
+    if (!memoryReader || !mod.size)
+        return false;
+
+    try
+    {
+        // diana ELF analyzer uses relative pointers, same as the PE one
+        CMemoryCache module(memoryReader, mod.address);
+        DianaMemoryStream stream(0, &module, mod.size);
+
+        Diana_ElfFile elfFile;
+        diana::Guard<diana::ElfFile> elfFileGuard;
+        DI_CHECK_CPP(DianaElfFile_Init(&elfFile,
+            &stream.parent,
+            mod.size,
+            DIANA_ELF_FILE_FLAGS_MODULE_MODE));
+        elfFileGuard.reset(&elfFile);
+
+        DI_UINT8 buildId[256] = { 0, };
+        DI_UINT32 buildIdSize = 0;
+        if (DianaElfFile_QueryBuildId(&elfFile, &stream.parent, 0,
+                                       buildId, sizeof(buildId), &buildIdSize) != 0)
+        {
+            return false;
+        }
+        if (!buildIdSize)
+        {
+            return false;
+        }
+        buildIdHex = ToHexString(reinterpret_cast<const char*>(buildId), buildIdSize);
         return true;
     }
     catch (const std::exception&)
