@@ -100,4 +100,17 @@ int DianaElfFile_GetNeededLibraries(/* in */ Diana_ElfFile* pElfFile,
     /* in */ void* pContext,
     /* in */ int streamFlags);
 
+// Scans the PT_NOTE segments for an NT_GNU_BUILD_ID note (name "GNU") and
+// returns its descriptor bytes (the raw build-id, typically 20 bytes for a
+// SHA1-based id). Returns DI_NOT_FOUND if no such note is present.
+// `address` is added to each segment's p_vaddr before reading, same
+// convention as DianaElfFile_MapEx (0 when pOutStream is already rooted at
+// the module's base, e.g. a module-mode stream over a live process image).
+int DianaElfFile_QueryBuildId(/* in */ Diana_ElfFile* pElfFile,
+    /* inout */ DianaMovableReadStream* pOutStream,
+    /* in */ OPERAND_SIZE address,
+    /* out */ DI_UINT8* pBuildIdBuffer,
+    /* in */ DI_UINT32 bufferSize,
+    /* out */ DI_UINT32* pBuildIdSize);
+
 #endif

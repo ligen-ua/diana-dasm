@@ -163,6 +163,38 @@ static void test_simple_elf_relocate()
     DIANA_TEST_ASSERT(elf.GetImageEnd() > newBase);
 }
 
+static void test_elf_build_id()
+{
+    std::vector<char> data = LoadElfTestFile(ORTHIA_TCSTR("ls.bin"));
+
+    DianaMemoryStream dianaElfFileStream;
+    Diana_InitMemoryStream(&dianaElfFileStream, &data.front(), data.size());
+    dianaElfFileStream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+
+    Diana_ElfFile dianaElfFile;
+    DI_CHECK_CPP(DianaElfFile_Init(&dianaElfFile,
+        &dianaElfFileStream.parent.parent,
+        data.size(),
+        0));
+    diana::Guard<diana::ElfFile> elfFileGuard(&dianaElfFile);
+
+    DI_UINT8 buildId[256] = { 0, };
+    DI_UINT32 buildIdSize = 0;
+    DI_CHECK_CPP(DianaElfFile_QueryBuildId(&dianaElfFile,
+        &dianaElfFileStream.parent.parent,
+        0,
+        buildId,
+        sizeof(buildId),
+        &buildIdSize));
+
+    const DI_UINT8 expected[] = {
+        0x05, 0xda, 0xd2, 0xc2, 0x79, 0xf7, 0x65, 0x17, 0x22, 0x80,
+        0x9f, 0xa7, 0x5a, 0xdb, 0xa6, 0xbf, 0x9a, 0xb1, 0xc2, 0x09
+    };
+    DIANA_TEST_ASSERT(buildIdSize == sizeof(expected));
+    DIANA_TEST_ASSERT(memcmp(buildId, expected, sizeof(expected)) == 0);
+}
+
 void test_elf()
 {
     DIANA_TEST(test_elf1());
@@ -170,4 +202,5 @@ void test_elf()
     DIANA_TEST(test_simple_elf_needed_libs());
     DIANA_TEST(test_simple_elf_imports());
     DIANA_TEST(test_simple_elf_relocate());
+    DIANA_TEST(test_elf_build_id());
 }

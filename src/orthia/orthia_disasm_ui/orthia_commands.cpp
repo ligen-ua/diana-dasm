@@ -297,17 +297,7 @@ namespace orthia
             moduleName,
             [&](orthia::ModuleInfo& mod)  {
 
-            if (!orthia::IsPeModule(mod))
-            {
-                throw std::runtime_error("Not a PE module: " + orthia::PlatformStringToUtf8(mod.fullName));
-            }
-
             auto pMemoryReader = args.item->CreateMemoryReader();
-
-            DIANA_UUID guid = { 0, };
-            DI_UINT32 age = 0;
-            orthia::PlatformString_type pdbName;
-            orthia::QueryModulePeDebugInfo(pMemoryReader.get(), mod, guid, age, pdbName);
 
             orthia::PlatformString_type line;
             line = ORTHIA_TCSTR("Module: ") + mod.name;
@@ -316,31 +306,54 @@ namespace orthia
             line = ORTHIA_TCSTR("Full name: ") + mod.fullName;
             args.ReplyLine(line);
 
-#ifdef WIN32
+            if (mod.builtInFlags & orthia::ModuleInfo::builtInFlags_moduleTypeElf)
             {
-                orthia::CMemoryStorageOfModifiedData storage(pMemoryReader.get());
-                orthia::VmMemoryRangesTargetOverVectorPlain moduleData;
-                storage.ReportRegions(mod.address, mod.size, &moduleData, true);
-                if (!moduleData.m_data.empty())
+                orthia::PlatformString_type buildIdHex;
+                if (!orthia::QueryModuleElfDebugInfo(pMemoryReader.get(), mod, buildIdHex))
                 {
-                    const wchar_t* version = orthia::QueryModuleVersion((HMODULE)moduleData.m_data.data());
-                    if (version)
+                    buildIdHex = ORTHIA_TCSTR("<none>");
+                }
+
+                line = ORTHIA_TCSTR("Build ID: ") + buildIdHex;
+                args.ReplyLine(line);
+            }
+            else if (orthia::IsPeModule(mod))
+            {
+                DIANA_UUID guid = { 0, };
+                DI_UINT32 age = 0;
+                orthia::PlatformString_type pdbName;
+                orthia::QueryModulePeDebugInfo(pMemoryReader.get(), mod, guid, age, pdbName);
+
+#ifdef WIN32
+                {
+                    orthia::CMemoryStorageOfModifiedData storage(pMemoryReader.get());
+                    orthia::VmMemoryRangesTargetOverVectorPlain moduleData;
+                    storage.ReportRegions(mod.address, mod.size, &moduleData, true);
+                    if (!moduleData.m_data.empty())
                     {
-                        line = ORTHIA_TCSTR("Version: ") + orthia::PlatformString_type(version);
-                        args.ReplyLine(line);
+                        const wchar_t* version = orthia::QueryModuleVersion((HMODULE)moduleData.m_data.data());
+                        if (version)
+                        {
+                            line = ORTHIA_TCSTR("Version: ") + orthia::PlatformString_type(version);
+                            args.ReplyLine(line);
+                        }
                     }
                 }
-            }
 #endif
 
-            line = ORTHIA_TCSTR("Debug GUID: ") + orthia::UUIDToString(guid);
-            args.ReplyLine(line);
+                line = ORTHIA_TCSTR("Debug GUID: ") + orthia::UUIDToString(guid);
+                args.ReplyLine(line);
 
-            line = ORTHIA_TCSTR("Debug Age: ") + orthia::ObjectToString(age);
-            args.ReplyLine(line);
+                line = ORTHIA_TCSTR("Debug Age: ") + orthia::ObjectToString(age);
+                args.ReplyLine(line);
 
-            line = ORTHIA_TCSTR("Pdb name: ") + pdbName;
-            args.ReplyLine(line);
+                line = ORTHIA_TCSTR("Pdb name: ") + pdbName;
+                args.ReplyLine(line);
+            }
+            else
+            {
+                throw std::runtime_error("Unknown module format: " + orthia::PlatformStringToUtf8(mod.fullName));
+            }
 
             moduleFound = true;
             return false;

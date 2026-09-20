@@ -25,6 +25,14 @@ namespace orthia
                                 DI_UINT32& age,
                                 PlatformString_type& pdbName);
 
+    // ELF analogue of QueryModulePeDebugInfo: reads a module's own memory
+    // image and extracts the GNU build-id (NT_GNU_BUILD_ID note, if any)
+    // as a lowercase hex string. Returns false if the module carries no
+    // such note (e.g. built without --build-id).
+    bool QueryModuleElfDebugInfo(IMemoryReader* memoryReader,
+                                 const ModuleInfo& mod,
+                                 PlatformString_type& buildIdHex);
+
     class CLoaderUILogger
     {
         std::shared_ptr<oui::CWindowThread> m_uiThread;

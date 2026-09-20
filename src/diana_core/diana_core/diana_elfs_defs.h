@@ -56,6 +56,9 @@
 #define DIANA_PF_W  (1 << 1)   // Write
 #define DIANA_PF_R  (1 << 2)   // Read
 
+// Note types (PT_NOTE / SHT_NOTE payload)
+#define DIANA_NT_GNU_BUILD_ID   3
+
 // Section header types
 #define DIANA_SHT_NULL          0
 #define DIANA_SHT_PROGBITS      1
@@ -259,6 +262,17 @@ typedef struct
     DI_UINT64 d_un;                  // Value
 
 } DIANA_ELF_DYN;
+
+// Note Header (PT_NOTE / SHT_NOTE payload; same layout for ELF32 and ELF64).
+// Followed by n_namesz bytes of name (padded to 4-byte alignment), then
+// n_descsz bytes of descriptor (also padded to 4-byte alignment).
+typedef struct
+{
+    DI_UINT32 n_namesz;
+    DI_UINT32 n_descsz;
+    DI_UINT32 n_type;
+
+} DIANA_ELF_NOTE_HEADER;
 
 // Helper macros for symbol table entries
 #define DIANA_ELF_ST_BIND(info)           (((info) >> 4) & 0xf)
