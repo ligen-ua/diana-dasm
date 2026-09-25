@@ -16,13 +16,40 @@ extern "C"
 
 int RunTests();
 
-static void PrintUsage()
+static std::string GetProgramName(const char* argv0)
 {
-    std::cout << "Usage: [--run-tests]\n";
-    std::cout << "       --pid <pid-to-open>\n";
-    std::cout << "       --cmd <command>   run <command> without UI and exit\n";
-    std::cout << "                         (repeatable, one command per --cmd, executed in order)\n";
-    std::cout << "       <filename>        requires --cmd, UI file mode is not supported in this build\n";
+    if (!argv0 || !*argv0)
+    {
+        return "orthia";
+    }
+    const char* slash = strrchr(argv0, '/');
+    return slash ? slash + 1 : argv0;
+}
+
+static void PrintUsage(std::ostream& out, const std::string& programName)
+{
+    out << "Usage: " << programName << " [options] [<filename>...]\n";
+    out << "\n";
+    out << "Options:\n";
+    out << "  --pid <pid>       open the process with the given id (\"self\" for this process)\n";
+    out << "  --cmd <command>   run <command> without UI and exit\n";
+    out << "                    (repeatable, one command per --cmd, executed in order)\n";
+    out << "  --run-tests       run the built-in tests and exit\n";
+    out << "  -h, --help        show this help and exit\n";
+    out << "\n";
+    out << "<filename> requires --cmd, UI file mode is not supported in this build.\n";
+    out << "\n";
+    out << "Exit codes (--cmd mode):\n";
+    out << "  0  success\n";
+    out << "  1  at least one command reported an error\n";
+    out << "  2  bad or incomplete argument\n";
+    out << "  3  target failed to open, or no target given\n";
+    out << "  4  unexpected error\n";
+}
+
+static bool IsHelpSwitch(const char* arg)
+{
+    return strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0;
 }
 
 int main(int argc, const char* argv[])
@@ -35,6 +62,7 @@ int main(int argc, const char* argv[])
     std::vector<unsigned long long> processesToOpen;
     std::vector<std::string> filenamesToOpen;
     std::vector<std::string> commandsToRun;
+    const std::string programName = GetProgramName(argc > 0 ? argv[0] : nullptr);
 
     try
     {
@@ -79,16 +107,23 @@ int main(int argc, const char* argv[])
                 nextIsCmd = true;
                 continue;
             }
+            if (IsHelpSwitch(argv[i]))
+            {
+                PrintUsage(std::cout, programName);
+                return orthia::consoleExit_Ok;
+            }
             if (strncmp(argv[i], "--", 2) == 0)
             {
-                PrintUsage();
+                std::cerr << "Unknown option: " << argv[i] << "\n\n";
+                PrintUsage(std::cerr, programName);
                 return orthia::consoleExit_Usage;
             }
             filenamesToOpen.push_back(argv[i]);
         }
         if (nextIsPid || nextIsCmd)
         {
-            PrintUsage();
+            std::cerr << "Missing value for " << argv[argc - 1] << "\n\n";
+            PrintUsage(std::cerr, programName);
             return orthia::consoleExit_Usage;
         }
 

@@ -19,12 +19,34 @@ extern "C"
 
 int RunTests();
 
-static void PrintUsage()
+static void PrintUsage(std::ostream& out)
 {
-    std::cout << "Usage: [--run-tests] <filename>\n";
-    std::cout << "       --pid <pid-to-open>\n";
-    std::cout << "       --cmd <command>   run <command> without UI and exit\n";
-    std::cout << "                         (repeatable, one command per --cmd, executed in order)\n";
+    out << "Usage: orthia [options] [<filename>...]\n";
+    out << "\n";
+    out << "Options:\n";
+    out << "  --pid <pid>         open the process with the given id (\"self\" for this process)\n";
+    out << "  --cmd <command>     run <command> without UI and exit\n";
+    out << "                      (repeatable, one command per --cmd, executed in order)\n";
+    out << "  --run-tests         run the built-in tests and exit\n";
+    out << "  -h, --help, /?      show this help and exit\n";
+    out << "\n";
+    out << "Without --cmd the UI is started with the given files and processes opened.\n";
+    out << "\n";
+    out << "Exit codes (--cmd mode):\n";
+    out << "  0  success\n";
+    out << "  1  at least one command reported an error\n";
+    out << "  2  bad or incomplete argument\n";
+    out << "  3  target failed to open, or no target given\n";
+    out << "  4  unexpected error\n";
+}
+
+static bool IsHelpSwitch(const wchar_t* arg)
+{
+    // "/help" and "/h" are not accepted: they are valid root-relative paths
+    return wcscmp(arg, L"--help") == 0 ||
+           wcscmp(arg, L"-h") == 0 ||
+           wcscmp(arg, L"/?") == 0 ||
+           wcscmp(arg, L"-?") == 0;
 }
 
 
@@ -158,16 +180,23 @@ int wmain(int argc, const wchar_t* argv[])
                 nextIsCmd = true;
                 continue;
             }
+            if (IsHelpSwitch(argv[i]))
+            {
+                PrintUsage(std::cout);
+                return orthia::consoleExit_Ok;
+            }
             if (wcsncmp(argv[i], L"--", 2) == 0)
             {
-                PrintUsage();
+                std::cerr << "Unknown option: " << orthia::ToAnsiString_Silent(argv[i]) << "\n\n";
+                PrintUsage(std::cerr);
                 return orthia::consoleExit_Usage;
             }
             filenamesToOpen.push_back(argv[i]);
         }
         if (nextIsPid || nextIsCmd)
         {
-            PrintUsage();
+            std::cerr << "Missing value for " << orthia::ToAnsiString_Silent(argv[argc - 1]) << "\n\n";
+            PrintUsage(std::cerr);
             return orthia::consoleExit_Usage;
         }
 
