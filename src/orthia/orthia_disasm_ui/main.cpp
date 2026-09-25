@@ -31,6 +31,7 @@ static void PrintUsage(std::ostream& out)
     out << "  -h, --help, /?      show this help and exit\n";
     out << "\n";
     out << "Without --cmd the UI is started with the given files and processes opened.\n";
+    out << "--cmd requires exactly one target: one <filename> or one --pid.\n";
     out << "\n";
     out << "Exit codes (--cmd mode):\n";
     out << "  0  success\n";
@@ -248,29 +249,7 @@ int wmain(int argc, const wchar_t* argv[])
 #endif
 
         // pass arguments
-        for (auto& name : filenamesToOpen)
-        {
-            int platformError = 0;
-            std::shared_ptr<oui::IFile2> file;
-            std::tie(platformError, file) = programModel->GetFileSystem()->SyncOpenFile(oui::FileUnifiedId(name));
-            if (!file)
-            {
-                throw orthia::CWin32Exception("Can't open file: " + orthia::ToAnsiString_Silent(name), platformError);
-            }
-            rootWindow->AddInitialArgument({ platformError, name, file, nullptr });
-        }
-        for (auto& pid : processesToOpen)
-        {
-            int platformError = 0;
-            std::shared_ptr<oui::IProcess> process;
-            std::tie(platformError, process) = programModel->GetProcessSystem()->SyncOpenProcess(oui::ProcessUnifiedId(pid));
-            if (!process)
-            {
-                throw orthia::CWin32Exception("Can't open process: " + orthia::ObjectToString_Ansi(pid), platformError);
-            }
-            auto uiName = process->GetFullFileNameForUI();
-            rootWindow->AddInitialArgument({ platformError, uiName, nullptr, process });
-        }
+        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen);
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

@@ -168,29 +168,12 @@ namespace
         return true;
     }
 
-    // On win32 the file system prepends the \\?\ prefix, which only works for fully
-    // qualified names, so a relative command line argument has to be resolved first.
-    // Posix opens the name as given and needs nothing.
-    PlatformString_type ToAbsolutePath(const PlatformString_type& name)
-    {
-#ifdef WIN32
-        std::vector<wchar_t> buffer(1024);
-        DWORD size = ::GetFullPathNameW(name.c_str(), (DWORD)buffer.size(), buffer.data(), nullptr);
-        if (!size || size >= buffer.size())
-        {
-            return name;
-        }
-        return PlatformString_type(buffer.data(), size);
-#else
-        return name;
-#endif
-    }
-
     bool OpenFile(CHeadlessPump& pump,
         const std::shared_ptr<CProgramModel>& model,
         const PlatformString_type& name_in)
     {
-        const PlatformString_type name = ToAbsolutePath(name_in);
+        // on error the name is returned as given, SyncOpenFile reports the real problem
+        const PlatformString_type name = std::get<1>(model->GetFileSystem()->SyncGetFullPathName(name_in)).native;
         int platformError = 0;
         std::shared_ptr<oui::IFile2> file;
         std::tie(platformError, file) = model->GetFileSystem()->SyncOpenFile(oui::FileUnifiedId(name));
@@ -294,6 +277,12 @@ namespace
             fflush(stderr);
         });
 
+        // commands run against the single active item, so more targets would be ambiguous
+        if (options.files.size() + options.pids.size() > 1)
+        {
+            WriteLine(stderr, ORTHIA_TCSTR("--cmd accepts a single target: one <filename> or one --pid"));
+            return consoleExit_Usage;
+        }
         if (options.files.empty() && options.pids.empty())
         {
             WriteLine(stderr, ORTHIA_TCSTR("No target: a file name or --pid is required"));

@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include <algorithm>
 
 namespace oui
@@ -196,6 +197,16 @@ public:
                        result.native.begin(), ::tolower);
         if (expectSo && result.native.find('.') == std::string::npos)
             result.native += ".so";
+        return std::make_tuple(0, result);
+    }
+
+    std::tuple<int, String> SyncGetFullPathName(const String& fileName) override
+    {
+        char* resolved = realpath(fileName.native.c_str(), nullptr);
+        if (!resolved)
+            return std::make_tuple(errno, fileName);
+        String result(resolved);
+        free(resolved);
         return std::make_tuple(0, result);
     }
 

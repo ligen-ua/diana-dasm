@@ -368,6 +368,22 @@ namespace oui
             }
             return std::make_tuple(0, result);
         }
+        std::tuple<int, String> SyncGetFullPathName(const String& fileName)
+        {
+            // SyncOpenFile prepends \\?\, which only works for fully qualified names
+            DWORD size = ::GetFullPathNameW(fileName.native.c_str(), 0, nullptr, nullptr);
+            if (!size)
+            {
+                return std::make_tuple((int)GetLastError(), fileName);
+            }
+            std::vector<wchar_t> buffer(size);
+            size = ::GetFullPathNameW(fileName.native.c_str(), (DWORD)buffer.size(), buffer.data(), nullptr);
+            if (!size || size >= buffer.size())
+            {
+                return std::make_tuple(size ? (int)ERROR_INSUFFICIENT_BUFFER : (int)GetLastError(), fileName);
+            }
+            return std::make_tuple(0, String(std::wstring(buffer.data(), size)));
+        }
         std::tuple<int, std::shared_ptr<IFile2>> SyncOpenFile(const FileUnifiedId& fileId_in)
         {
             FileUnifiedId fileId = fileId_in;

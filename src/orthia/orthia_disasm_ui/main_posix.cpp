@@ -37,7 +37,8 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "  --run-tests       run the built-in tests and exit\n";
     out << "  -h, --help        show this help and exit\n";
     out << "\n";
-    out << "<filename> requires --cmd, UI file mode is not supported in this build.\n";
+    out << "Without --cmd the UI is started with the given files and processes opened.\n";
+    out << "--cmd requires exactly one target: one <filename> or one --pid.\n";
     out << "\n";
     out << "Exit codes (--cmd mode):\n";
     out << "  0  success\n";
@@ -128,12 +129,6 @@ int main(int argc, const char* argv[])
         }
 
         const bool consoleMode = !commandsToRun.empty();
-        if (!consoleMode && !filenamesToOpen.empty())
-        {
-            std::cerr << "File mode is not supported in this build\n";
-            return 1;
-        }
-
         if (!consoleMode)
         {
             // would pollute the command output otherwise
@@ -163,18 +158,7 @@ int main(int argc, const char* argv[])
             programModel->Stop();
         });
 
-        for (auto& pid : processesToOpen)
-        {
-            int platformError = 0;
-            std::shared_ptr<oui::IProcess> process;
-            std::tie(platformError, process) = programModel->GetProcessSystem()->SyncOpenProcess(oui::ProcessUnifiedId(pid));
-            if (!process)
-            {
-                throw orthia::CWin32Exception("Can't open process: " + orthia::ObjectToString_Ansi(pid), platformError);
-            }
-            auto uiName = process->GetFullFileNameForUI();
-            rootWindow->AddInitialArgument({ platformError, uiName, nullptr, process });
-        }
+        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen);
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

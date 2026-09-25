@@ -25,6 +25,10 @@ namespace oui
     {
         return m_fsImpl->SyncSanitizeName(fileName);
     }
+    std::tuple<int, String> CFileSystem::SyncGetFullPathName(const String& fileName)
+    {
+        return m_fsImpl->SyncGetFullPathName(fileName);
+    }
     // id-based stuff
     void CFileSystem::AsyncOpenFile(ThreadPtr_type targetThread, 
         const FileUnifiedId& fileId,
