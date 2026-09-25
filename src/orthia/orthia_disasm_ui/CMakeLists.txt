@@ -8,6 +8,7 @@ include_directories("../orthia_lib")
 include_directories("../orthia_ui")
 
 set(SOURCES
+    console_mode.cpp
     orthia_commands.cpp
     orthia_commands_display.cpp
     orthia_config.cpp

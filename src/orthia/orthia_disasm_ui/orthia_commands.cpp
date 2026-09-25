@@ -44,7 +44,7 @@ namespace orthia
     }
     void CCommandProcessor::ReportStop(CommandArguments& args)
     {
-        args.progressHandler->ReplyAnyway(args.progressHandler, oui::String(), true);
+        args.progressHandler->ReplyAnyway(args.progressHandler, args.errorText, true);
     }
     int CCommandProcessor::PrepareTokens(CommandArguments& args, std::vector<Token> & tokens, const Address_type maxCountOfItems, Address_type & countOfItems)
     {
@@ -401,7 +401,8 @@ namespace orthia
         catch (std::exception& e)
         {
             auto errStr = orthia::Utf8ToPlatformString(e.what());
-            args.progressHandler->ReplyAnyway(args.progressHandler, ORTHIA_TCSTR("Error: ") + errStr, false);
+            // reported by the guard as the final reply, so callers get a failure signal
+            args.errorText = oui::String(ORTHIA_TCSTR("Error: ") + errStr);
             return;
         }
     }

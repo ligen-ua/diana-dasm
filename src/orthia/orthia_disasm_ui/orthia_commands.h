@@ -36,6 +36,8 @@ public:
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler;
 
         int linesWithoutSync = 0;
+        // non-empty when the command failed, sent as the final reply
+        oui::String errorText;
         void ReplyLine(const oui::String& text);
         void Sync();
     };

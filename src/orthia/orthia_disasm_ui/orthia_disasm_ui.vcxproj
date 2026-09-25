@@ -200,6 +200,7 @@
     <ResourceCompile Include="orthia.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="console_mode.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="orthia_commands.cpp" />
     <ClCompile Include="orthia_commands_display.cpp" />
@@ -237,6 +238,7 @@
     <ClCompile Include="ui_workspace_window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="console_mode.h" />
     <ClInclude Include="orthia_commands.h" />
     <ClInclude Include="orthia_config.h" />
     <ClInclude Include="orthia_helpers.h" />

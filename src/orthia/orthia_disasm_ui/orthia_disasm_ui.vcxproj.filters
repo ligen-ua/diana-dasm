@@ -98,6 +98,9 @@
     <ClCompile Include="ui_command_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="console_mode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="orthia_commands.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -191,6 +194,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_command_window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="console_mode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_commands.h">

@@ -11,16 +11,18 @@ extern "C"
 #include "diana_processor/diana_processor_core.h"
 }
 #include "orthia_files.h"
+#include "console_mode.h"
 #include <unistd.h>
 
-orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
-void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 int RunTests();
 
 static void PrintUsage()
 {
     std::cout << "Usage: [--run-tests]\n";
     std::cout << "       --pid <pid-to-open>\n";
+    std::cout << "       --cmd <command>   run <command> without UI and exit\n";
+    std::cout << "                         (repeatable, one command per --cmd, executed in order)\n";
+    std::cout << "       <filename>        requires --cmd, UI file mode is not supported in this build\n";
 }
 
 int main(int argc, const char* argv[])
@@ -31,12 +33,22 @@ int main(int argc, const char* argv[])
     ORTHIA_DEV_LOG(orthia::LogSeverity::Info, "Logging enabled");
 
     std::vector<unsigned long long> processesToOpen;
+    std::vector<std::string> filenamesToOpen;
+    std::vector<std::string> commandsToRun;
 
     try
     {
         bool nextIsPid = false;
+        bool nextIsCmd = false;
         for (int i = 1; i < argc; ++i)
         {
+            // checked first, so that a command starting with -- is taken as a value
+            if (nextIsCmd)
+            {
+                commandsToRun.push_back(argv[i]);
+                nextIsCmd = false;
+                continue;
+            }
             if (nextIsPid)
             {
                 std::string text = argv[i];
@@ -62,36 +74,50 @@ int main(int argc, const char* argv[])
                 nextIsPid = true;
                 continue;
             }
+            if (strcmp(argv[i], "--cmd") == 0)
+            {
+                nextIsCmd = true;
+                continue;
+            }
             if (strncmp(argv[i], "--", 2) == 0)
             {
                 PrintUsage();
-                return 1;
+                return orthia::consoleExit_Usage;
             }
+            filenamesToOpen.push_back(argv[i]);
+        }
+        if (nextIsPid || nextIsCmd)
+        {
+            PrintUsage();
+            return orthia::consoleExit_Usage;
+        }
+
+        const bool consoleMode = !commandsToRun.empty();
+        if (!consoleMode && !filenamesToOpen.empty())
+        {
             std::cerr << "File mode is not supported in this build\n";
             return 1;
         }
 
-        std::cout << "Welcome to Orthia Disasm\n\n";
-        std::cout.flush();
+        if (!consoleMode)
+        {
+            // would pollute the command output otherwise
+            std::cout << "Welcome to Orthia Disasm\n\n";
+            std::cout.flush();
+        }
 
-        g_textManager = new orthia::CTextManager();
-        InitLanguage_EN(g_textManager);
-        oui::EditBox_SetContextMenuLabelsProvider([&]() {
-            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.editbox.contextmenu"));
-            return std::make_tuple(
-                node->QueryValue(ORTHIA_TCSTR("cut")),
-                node->QueryValue(ORTHIA_TCSTR("copy")),
-                node->QueryValue(ORTHIA_TCSTR("paste"))
-            );
-        });
-
-        auto config = std::make_shared<orthia::CConfigOptionsStorage>();
-        config->Init();
-
-        Diana_Init();
-        DianaProcessor_GlobalInit();
+        auto config = orthia::InitAppCore();
 
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
+
+        if (consoleMode)
+        {
+            const int result = orthia::RunConsoleMode(programModel,
+                { commandsToRun, filenamesToOpen, processesToOpen });
+            programModel.reset();
+            return result;
+        }
+
         oui::CConsoleApp app;
 
         auto rootWindow = std::make_shared<CMainWindow>(programModel);
@@ -119,6 +145,7 @@ int main(int argc, const char* argv[])
     catch (const std::exception& err)
     {
         std::cerr << "Error: " << err.what() << "\n";
+        return orthia::consoleExit_Exception;
     }
     return 0;
 }

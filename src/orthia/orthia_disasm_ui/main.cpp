@@ -15,15 +15,16 @@ extern "C"
 #include "resource.h"
 #include "orthia_files.h"
 #include "orthia_processes_ex.h"
+#include "console_mode.h"
 
-orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
-void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 int RunTests();
 
 static void PrintUsage()
 {
     std::cout << "Usage: [--run-tests] <filename>\n";
     std::cout << "       --pid <pid-to-open>\n";
+    std::cout << "       --cmd <command>   run <command> without UI and exit\n";
+    std::cout << "                         (repeatable, one command per --cmd, executed in order)\n";
 }
 
 
@@ -112,12 +113,21 @@ int wmain(int argc, const wchar_t* argv[])
     // MessageBox(0, 0, 0, 0);
     std::vector<std::wstring> filenamesToOpen;
     std::vector<unsigned long long> processesToOpen;
+    std::vector<std::wstring> commandsToRun;
 
     try
     {
         bool nextIsPid = false;
+        bool nextIsCmd = false;
         for (int i = 1; i < argc; ++i)
         {
+            // checked first, so that a command starting with -- is taken as a value
+            if (nextIsCmd)
+            {
+                commandsToRun.push_back(argv[i]);
+                nextIsCmd = false;
+                continue;
+            }
             if (nextIsPid)
             {
                 std::wstring text = argv[i];
@@ -143,33 +153,34 @@ int wmain(int argc, const wchar_t* argv[])
                 nextIsPid = true;
                 continue;
             }
+            if (wcscmp(argv[i], L"--cmd") == 0)
+            {
+                nextIsCmd = true;
+                continue;
+            }
             if (wcsncmp(argv[i], L"--", 2) == 0)
             {
                 PrintUsage();
-                return 1;
+                return orthia::consoleExit_Usage;
             }
             filenamesToOpen.push_back(argv[i]);
         }
+        if (nextIsPid || nextIsCmd)
+        {
+            PrintUsage();
+            return orthia::consoleExit_Usage;
+        }
 
-        std::cout << "Welcome to Orthia Disasm\n\n";
-        std::cout.flush();
+        const bool consoleMode = !commandsToRun.empty();
+        if (!consoleMode)
+        {
+            // would pollute the command output otherwise
+            std::cout << "Welcome to Orthia Disasm\n\n";
+            std::cout.flush();
+        }
 
-        g_textManager = new orthia::CTextManager();
-        InitLanguage_EN(g_textManager);
-        oui::EditBox_SetContextMenuLabelsProvider([&]() {
-            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.editbox.contextmenu"));
-            return std::make_tuple(
-                node->QueryValue(ORTHIA_TCSTR("cut")),
-                node->QueryValue(ORTHIA_TCSTR("copy")),
-                node->QueryValue(ORTHIA_TCSTR("paste"))
-            );
-        });
+        auto config = orthia::InitAppCore();
 
-        auto config = std::make_shared<orthia::CConfigOptionsStorage>();
-        config->Init();
-
-        Diana_Init();
-        DianaProcessor_GlobalInit();
         DianaWin32_Init();
 
 #if defined(_M_AMD64)
@@ -177,6 +188,15 @@ int wmain(int argc, const wchar_t* argv[])
 #endif //  M_AMD64
 
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
+
+        if (consoleMode)
+        {
+            const int result = orthia::RunConsoleMode(programModel,
+                { commandsToRun, filenamesToOpen, processesToOpen });
+            programModel.reset();
+            return result;
+        }
+
         oui::CConsoleApp app;
 
         // create root windows
@@ -227,6 +247,7 @@ int wmain(int argc, const wchar_t* argv[])
     catch (const std::exception& err)
     {
         std::cerr << "Error: " << err.what() << "\n";
+        return orthia::consoleExit_Exception;
     }
     return 0;
 }

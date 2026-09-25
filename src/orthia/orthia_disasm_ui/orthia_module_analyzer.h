@@ -54,5 +54,9 @@ namespace orthia
 
         void Cancel(int workspaceId);
         void CancelAll();
+
+        // Queued or running analysis tasks. Chained work is re-enqueued from inside the
+        // active task, so the count stays non-zero across such a hand-off.
+        bool IsBusy() const { return m_pool.GetTasksCount() != 0; }
     };
 }
