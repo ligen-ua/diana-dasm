@@ -21,9 +21,10 @@ int RunTests();
 
 static void PrintUsage(std::ostream& out)
 {
-    out << "Usage: orthia [options] [<filename>...]\n";
+    out << "Usage: orthia [options]\n";
     out << "\n";
     out << "Options:\n";
+    out << "  --file <filename>   open the given executable file\n";
     out << "  --pid <pid>         open the process with the given id (\"self\" for this process)\n";
     out << "  --cmd <command>     run <command> without UI and exit\n";
     out << "                      (repeatable, one command per --cmd, executed in order)\n";
@@ -31,7 +32,7 @@ static void PrintUsage(std::ostream& out)
     out << "  -h, --help, /?      show this help and exit\n";
     out << "\n";
     out << "Without --cmd the UI is started with the given files and processes opened.\n";
-    out << "--cmd requires exactly one target: one <filename> or one --pid.\n";
+    out << "--file and --pid are repeatable in UI mode, --cmd requires exactly one of them.\n";
     out << "\n";
     out << "Exit codes (--cmd mode):\n";
     out << "  0  success\n";
@@ -142,13 +143,20 @@ int wmain(int argc, const wchar_t* argv[])
     {
         bool nextIsPid = false;
         bool nextIsCmd = false;
+        bool nextIsFile = false;
         for (int i = 1; i < argc; ++i)
         {
-            // checked first, so that a command starting with -- is taken as a value
+            // checked first, so that a value starting with -- is taken as a value
             if (nextIsCmd)
             {
                 commandsToRun.push_back(argv[i]);
                 nextIsCmd = false;
+                continue;
+            }
+            if (nextIsFile)
+            {
+                filenamesToOpen.push_back(argv[i]);
+                nextIsFile = false;
                 continue;
             }
             if (nextIsPid)
@@ -181,6 +189,11 @@ int wmain(int argc, const wchar_t* argv[])
                 nextIsCmd = true;
                 continue;
             }
+            if (wcscmp(argv[i], L"--file") == 0)
+            {
+                nextIsFile = true;
+                continue;
+            }
             if (IsHelpSwitch(argv[i]))
             {
                 PrintUsage(std::cout);
@@ -192,9 +205,12 @@ int wmain(int argc, const wchar_t* argv[])
                 PrintUsage(std::cerr);
                 return orthia::consoleExit_Usage;
             }
-            filenamesToOpen.push_back(argv[i]);
+            std::cerr << "Unexpected argument: " << orthia::ToAnsiString_Silent(argv[i])
+                      << " (use --file <filename> to open a file)\n\n";
+            PrintUsage(std::cerr);
+            return orthia::consoleExit_Usage;
         }
-        if (nextIsPid || nextIsCmd)
+        if (nextIsPid || nextIsCmd || nextIsFile)
         {
             std::cerr << "Missing value for " << orthia::ToAnsiString_Silent(argv[argc - 1]) << "\n\n";
             PrintUsage(std::cerr);

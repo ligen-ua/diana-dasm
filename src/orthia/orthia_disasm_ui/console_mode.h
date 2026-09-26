@@ -13,7 +13,7 @@ namespace orthia
     struct ConsoleModeOptions
     {
         std::vector<PlatformString_type> commands;      // --cmd, in order
-        std::vector<PlatformString_type> files;         // positional arguments
+        std::vector<PlatformString_type> files;         // --file
         std::vector<unsigned long long> pids;           // --pid
     };
 

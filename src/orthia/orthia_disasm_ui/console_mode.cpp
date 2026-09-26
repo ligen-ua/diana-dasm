@@ -280,12 +280,12 @@ namespace
         // commands run against the single active item, so more targets would be ambiguous
         if (options.files.size() + options.pids.size() > 1)
         {
-            WriteLine(stderr, ORTHIA_TCSTR("--cmd accepts a single target: one <filename> or one --pid"));
+            WriteLine(stderr, ORTHIA_TCSTR("--cmd accepts a single target: one --file or one --pid"));
             return consoleExit_Usage;
         }
         if (options.files.empty() && options.pids.empty())
         {
-            WriteLine(stderr, ORTHIA_TCSTR("No target: a file name or --pid is required"));
+            WriteLine(stderr, ORTHIA_TCSTR("No target: --file or --pid is required"));
             return consoleExit_OpenFail;
         }
 
