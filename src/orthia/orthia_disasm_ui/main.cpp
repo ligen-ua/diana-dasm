@@ -28,6 +28,8 @@ static void PrintUsage(std::ostream& out)
     out << "  --pid <pid>         open the process with the given id (\"self\" for this process)\n";
     out << "  --cmd <command>     run <command> without UI and exit\n";
     out << "                      (repeatable, one command per --cmd, executed in order)\n";
+    out << "  --analyze           with --cmd: deep code analysis and symbol loading on open\n";
+    out << "                      (default: headers, modules, imports and exports only)\n";
     out << "  --run-tests         run the built-in tests and exit\n";
     out << "  -h, --help, /?      show this help and exit\n";
     out << "\n";
@@ -142,6 +144,7 @@ int wmain(int argc, const wchar_t* argv[])
     std::vector<std::wstring> filenamesToOpen;
     std::vector<unsigned long long> processesToOpen;
     std::vector<std::wstring> commandsToRun;
+    bool analyze = false;
 
     try
     {
@@ -198,6 +201,12 @@ int wmain(int argc, const wchar_t* argv[])
                 nextIsFile = true;
                 continue;
             }
+            if (wcscmp(argv[i], L"--analyze") == 0)
+            {
+                // the UI always analyzes, so it only matters with --cmd
+                analyze = true;
+                continue;
+            }
             if (IsHelpSwitch(argv[i]))
             {
                 PrintUsage(std::cout);
@@ -242,7 +251,7 @@ int wmain(int argc, const wchar_t* argv[])
         if (consoleMode)
         {
             const int result = orthia::RunConsoleMode(programModel,
-                { commandsToRun, filenamesToOpen, processesToOpen });
+                { commandsToRun, filenamesToOpen, processesToOpen, analyze });
             programModel.reset();
             return result;
         }

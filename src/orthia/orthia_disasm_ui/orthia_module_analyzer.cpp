@@ -114,13 +114,21 @@ namespace orthia
                 return;
             try
             {
-                if (!db->IsModuleExists(mainIt->address))
+                // not IsModuleExists: a quick open (--cmd without --analyze) registers the module unanalyzed
+                if (!(mainIt->flags & ModuleInfo::flags_analyzeDone))
                 {
                     auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
                     WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
                     if (reader)
                     {
-                        moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
+                        if (db->IsModuleExists(mainIt->address))
+                        {
+                            moduleManager->AnalyzeRegisteredModule(mainIt->address, reader.get(), mainIt->name, 0);
+                        }
+                        else
+                        {
+                            moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
+                        }
                         item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
                     }
                 }

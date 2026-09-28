@@ -265,6 +265,9 @@ namespace
 #endif
         CHeadlessPump pump;
 
+        // before anything is opened: AddExecutable/AddProcess and the analyzer read it
+        model->GetConfig()->SetDeepAnalysis(options.analyze);
+
         auto log = std::make_shared<CConsoleLog>();
         model->SetUILog(log);   // also initializes the analyzer
 

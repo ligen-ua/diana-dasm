@@ -458,7 +458,10 @@ namespace orthia
         {
             if (mod.second.originalFile)
             {
+                // one transaction: in autocommit every name is a separate disk sync (seconds for ntoskrnl)
+                auto batch = classicDatabase->BeginBatch();
                 InsertNames(moduleManager, mod.second);
+                batch->Commit();
                 continue;
             }
             oui::String shortName;

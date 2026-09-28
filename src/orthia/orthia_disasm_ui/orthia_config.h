@@ -12,6 +12,9 @@ namespace orthia
         PlatformString_type m_procDBDir;
 
         std::vector<PlatformString_type> m_symbolFolders;
+        // false: open targets without code analysis and symbol loading (--cmd without --analyze);
+        // set once before anything is opened
+        bool m_deepAnalysis = true;
 
     public:
         void Init();
@@ -24,5 +27,7 @@ namespace orthia
         PlatformString_type GetProcDBFolder() const;
         std::vector<PlatformString_type> GetSymbolsFolders() const;
         void SetSymbolsFolders(const PlatformString_type& names);
+        bool GetDeepAnalysis() const { return m_deepAnalysis; }
+        void SetDeepAnalysis(bool value) { m_deepAnalysis = value; }
     };
 }

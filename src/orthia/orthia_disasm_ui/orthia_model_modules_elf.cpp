@@ -358,7 +358,10 @@ namespace orthia
         {
             if (mod.second.originalFile)
             {
+                // one transaction: in autocommit every name is a separate disk sync
+                auto batch = classicDatabase->BeginBatch();
                 InsertNames(moduleManager, mod.second);
+                batch->Commit();
                 continue;
             }
             if (!mod.second.elfFile->GetImpl())
