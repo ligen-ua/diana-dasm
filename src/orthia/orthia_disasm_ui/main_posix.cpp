@@ -47,6 +47,10 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "  2  bad or incomplete argument\n";
     out << "  3  target failed to open, or no target given\n";
     out << "  4  unexpected error\n";
+    out << "\n";
+    out << "Environment:\n";
+    out << "  ORTHIA_HOME       data folder to use instead of $XDG_DATA_HOME/Orthia\n";
+    out << "  ORTHIA_SYMBOL_PATH symbol folders separated by ';' (default ~/sym;~/symbols)\n";
 }
 
 static bool IsHelpSwitch(const char* arg)

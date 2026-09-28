@@ -2,6 +2,7 @@
 #include "orthia_model.h"
 #include <filesystem>
 #include <chrono>
+#include <stdlib.h>
 
 namespace fs = std::filesystem;
 
@@ -48,18 +49,43 @@ namespace orthia
     const PlatformString_type g_nextDB = ORTHIA_TCSTR("db");
     const PlatformString_type g_binFolder = ORTHIA_TCSTR("bin");
     const PlatformString_type g_nextProc = ORTHIA_TCSTR("proc");
+    static PlatformString_type QueryEnvironmentString(const PlatformString_type::value_type* name)
+    {
+#ifdef DIANA_HAS_WIN32
+        wchar_t* value = nullptr;
+        size_t size = 0;
+        if (_wdupenv_s(&value, &size, name) || !value)
+        {
+            return PlatformString_type();
+        }
+        PlatformString_type text(value);
+        free(value);
+        return text;
+#else
+        const char* value = getenv(name);
+        return PlatformString_type(value ? value : "");
+#endif
+    }
     void CConfigOptionsStorage::Init()
     {
-        auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
-        PlatformString_type appDataFolder;
-        int error = GetAppDataFolderWithSlash_Silent(appDataFolder);
-        if (error)
+        // ORTHIA_HOME replaces the whole <app data>/Orthia folder (used by tests to isolate the DB cache)
+        auto orthiaHome = QueryEnvironmentString(ORTHIA_TCSTR("ORTHIA_HOME"));
+        if (!orthiaHome.empty())
         {
-            auto text = errorNode->QueryValue(ORTHIA_TCSTR("cant-open-file"));
-            throw orthia::CWin32Exception(PlatformStringToUtf8(text), error);
+            m_appDir = AddSlash2(orthiaHome);
         }
-
-        m_appDir = appDataFolder + AddSlash2(g_rootFolderName);
+        else
+        {
+            auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+            PlatformString_type appDataFolder;
+            int error = GetAppDataFolderWithSlash_Silent(appDataFolder);
+            if (error)
+            {
+                auto text = errorNode->QueryValue(ORTHIA_TCSTR("cant-open-file"));
+                throw orthia::CWin32Exception(PlatformStringToUtf8(text), error);
+            }
+            m_appDir = appDataFolder + AddSlash2(g_rootFolderName);
+        }
         m_dbDir = m_appDir + AddSlash2(g_nextDB);
         m_procDBDir = m_appDir + AddSlash2(g_nextProc);
         m_binDir = m_appDir + AddSlash2(g_binFolder);
@@ -69,6 +95,13 @@ namespace orthia
         orthia::CreateAllDirectoriesForFile(m_procDBDir);
         CleanupOldProcFolders(m_procDBDir);
 
+        // ORTHIA_SYMBOL_PATH replaces the default symbol folders, same format as .symfix
+        auto symbolPath = QueryEnvironmentString(ORTHIA_TCSTR("ORTHIA_SYMBOL_PATH"));
+        if (!symbolPath.empty())
+        {
+            SetSymbolsFolders(symbolPath);
+            return;
+        }
 #ifdef DIANA_HAS_WIN32
         m_symbolFolders.push_back(L"C:\\Sym");
         m_symbolFolders.push_back(L"C:\\Symbols");
