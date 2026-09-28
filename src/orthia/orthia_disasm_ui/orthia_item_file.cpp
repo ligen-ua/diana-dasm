@@ -490,18 +490,24 @@ namespace orthia
         bool found = false;
         auto downcased = orthia::Downcase(text.native);
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        // prefer the export of the opened file over same-named exports of its dependencies
+        const Address_type mainModuleAddress = file->GetImageBase();
         classicDatabase->QueryMetaInfo(g_database_type_fnc_Export, [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
-  
             orthia::PlatformString_type name;
             CCommonFormatParser parser;
             parser.Parse(text);
-            parser.QueryMetadata("address", &target);
             parser.QueryMetadata(OUI_TCSTR("name"), &name);
-
-            auto downcased2 = orthia::Downcase(name);
-            found = downcased2 == downcased;
-            return !found;
+            if (orthia::Downcase(name) != downcased)
+            {
+                return true;
+            }
+            if (!found || moduleAddress == mainModuleAddress)
+            {
+                parser.QueryMetadata("address", &target);
+                found = true;
+            }
+            return moduleAddress != mainModuleAddress;
         });
         if (found)
         {

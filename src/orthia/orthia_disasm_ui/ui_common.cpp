@@ -49,20 +49,37 @@ NameResolverOverWorkplaceItem::NameResolverOverWorkplaceItem(std::shared_ptr<ort
 orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::PlatformString_type& name)
 {
     auto address = item->QueryAddressByName(name, 0);
-    if (!address)
+    if (address)
     {
-        address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
-        if (address != DI_MAX_OPERAND_SIZE)
-        {
-            return address;
-        }
+        return address;
+    }
+    address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
+    if (address != DI_MAX_OPERAND_SIZE)
+    {
+        return address;
     }
 
-    // try to find private symbols
+    // try to find module!name among exports and private symbols
     auto nameDowncased = orthia::Downcase(name);
     std::vector<orthia::StringInfo> parts;
     bool addressFound = false;
     orthia::SplitString(nameDowncased, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
+    if (parts.size() == 1)
+    {
+        // module name without extension
+        EnumModulesByName(item,
+            nameDowncased,
+            [&address, &addressFound](orthia::ModuleInfo& mod)
+        {
+            address = mod.address;
+            addressFound = true;
+            return false;
+        });
+        if (addressFound)
+        {
+            return address;
+        }
+    }
     if (parts.size() == 2)
     {
         auto internalName = parts[1].ToString();
@@ -73,7 +90,7 @@ orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::P
 
             const int c_pageSize = 5000;
             orthia::NameSelectionKey key;
-            key.privateSymbolsOnly = true;
+            key.excludeImports = true;
             std::vector<orthia::NameInfo> page;
             for (;;)
             {
