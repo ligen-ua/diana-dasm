@@ -1,4 +1,5 @@
 """ELF files (report section "ELF")."""
+import re
 import sys
 
 import pytest
@@ -81,3 +82,24 @@ def test_lm_header(orthia, dmesg):
 def test_modinfo_full_name_has_no_long_path_prefix(orthia, dmesg):
     line = orthia.run("modinfo dmesg", **dmesg).assert_line(r"^Full name: (.*)$")
     assert not line.group(1).startswith("\\\\?\\")
+
+
+@pytest.mark.parametrize("name, size", [("trunc_64", 64), ("trunc_20480", 20 * 1024)])
+@pytest.mark.xfail(reason="B5: malformed image rejected with 'DiException, errorCode = -9'")
+def test_truncated_elf_reports_reason(orthia, data, name, size):
+    res = orthia.run("lm", file=data.truncated(data.elf("dmesg"), size, name))
+    assert res.code == EXIT_OPEN_FAILED, res
+    assert "DiException" not in res.stderr, res
+
+
+@pytest.mark.xfail(reason="B5: ELF with garbage section headers rejected with 'DiException, errorCode = -9'")
+def test_elf_with_bad_section_headers(orthia, data):
+    # the program headers are valid (Linux runs it), so it may load, or fail with a clear reason
+    res = orthia.run("lm", file=data.elf("ls.bin"))
+    assert "DiException" not in res.stderr, res
+
+
+@pytest.mark.xfail(reason="B12: .reload on an ELF prints nothing, not even 'no symbols'")
+def test_reload_reports_result(orthia_cold, dmesg):
+    res = orthia_cold.run(".reload", **dmesg).assert_ok()
+    assert re.search(r"(?i)symbol.*\bdmesg\b|\bdmesg\b.*symbol", res.stdout + res.stderr), res

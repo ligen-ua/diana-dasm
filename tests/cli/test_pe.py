@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from orthia_runner import EXIT_COMMAND_ERROR
+from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OK, EXIT_OPEN_FAILED
 
 pytestmark = pytest.mark.pe
 
@@ -89,3 +89,41 @@ def test_x_without_module_searches_main_module(orthia, nt):
     names = orthia.run("x Ke*", **nt).assert_ok().symbols
     assert "ntoskrnl.exe!KeBugCheck" in names
     assert all(n.startswith("ntoskrnl.exe!") for n in names), names
+
+
+@pytest.mark.xfail(reason="B5: truncated PE rejected with 'DiException, errorCode = -11'")
+def test_truncated_pe_reports_reason(orthia, data):
+    res = orthia.run("lm", file=data.truncated(data.ntoskrnl, 1024, "trunc_pe.exe"))
+    assert res.code == EXIT_OPEN_FAILED, res
+    assert "DiException" not in res.stderr, res
+
+
+# cng.sys is never found (it lives in System32\drivers), hal.dll comes from the Windows host
+@pytest.mark.parametrize("module", [
+    "cng.sys",
+    pytest.param("hal.dll", marks=pytest.mark.skipif(sys.platform != "win32", reason="host DLL")),
+])
+@pytest.mark.xfail(reason="B8: modinfo on a dependency without image data prints a zero GUID and exits 0")
+def test_modinfo_dependency_without_image(orthia, nt, module):
+    res = orthia.run(f"modinfo {module}", **nt)
+    if res.code == EXIT_OK:
+        guid = res.assert_line(r"^Debug GUID: (\S+)$").group(1)
+        assert guid.strip("0-"), res
+    else:
+        assert res.code == EXIT_COMMAND_ERROR, res
+
+
+@pytest.mark.xfail(reason="B12: u on unmapped memory prints nothing and exits 0")
+def test_u_unmapped(orthia, nt):
+    # db prints ?? rows here; u should print something similar or fail
+    res = orthia.run("u 0 L2", **nt)
+    assert res.code == EXIT_COMMAND_ERROR or res.lines, res
+
+
+@pytest.mark.xfail(reason="B12: .analyze on a module without image data does nothing and exits 0")
+def test_analyze_module_without_image(orthia_cold, nt):
+    res = orthia_cold.run(".analyze cng.sys", "lm", **nt)
+    if res.code == EXIT_OK:
+        res.assert_line(r"\bcng\.sys\s+analysis")
+    else:
+        assert res.code == EXIT_COMMAND_ERROR, res

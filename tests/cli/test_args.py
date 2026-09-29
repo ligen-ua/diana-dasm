@@ -1,4 +1,7 @@
 """Argument parsing and exit codes (report section "Argument parsing")."""
+import os
+import re
+
 import pytest
 
 from orthia_runner import (EXIT_BAD_ARGUMENT, EXIT_COMMAND_ERROR, EXIT_OK,
@@ -90,3 +93,41 @@ def test_cmd_error_echoes_whole_token(orthia, dmesg):
 def test_non_numeric_pid(orthia, pid):
     res = orthia.raw("--pid", pid, "--cmd", "lm")
     assert res.code == EXIT_BAD_ARGUMENT, res
+
+
+@pytest.mark.xfail(reason="B6: --pid -1 is accepted and wraps to 18446744073709551615")
+def test_negative_pid(orthia):
+    res = orthia.raw("--pid", "-1", "--cmd", "lm")
+    assert res.code == EXIT_BAD_ARGUMENT, res
+
+
+@pytest.mark.process
+@pytest.mark.xfail(reason="B6: hex --pid is rejected as an unexpected error (exit 4)")
+def test_hex_pid(orthia):
+    # the test runner's own process: hex should open it, or be rejected as a bad argument
+    res = orthia.raw("--pid", hex(os.getpid()), "--cmd", "lm")
+    if res.code == EXIT_OK:
+        res.assert_line(r"(?i)\bpython")
+    else:
+        assert res.code == EXIT_BAD_ARGUMENT, res
+
+
+@pytest.mark.xfail(reason="B15: UI mode without a console prints the banner and exits 0")
+def test_ui_mode_without_console_fails(orthia_cold, dmesg):
+    # stdin/stdout are not a console here, as in a script or CI. orthia_cold: the UI does a full open
+    res = orthia_cold.raw("--file", str(dmesg), timeout=30)
+    assert res.code != EXIT_OK, res
+
+
+@pytest.mark.xfail(reason="B16: open failure doesn't say why ('Can't open file: <path>')")
+def test_missing_file_reports_reason(orthia, tmp_path):
+    res = orthia.run("lm", file=tmp_path / "nonexist.exe")
+    assert res.code == EXIT_OPEN_FAILED, res
+    assert re.search(r"(?i)cannot find|no such file", res.stderr), res
+
+
+@pytest.mark.xfail(reason="B16: open failure doesn't say why ('Can't open file: <path>')")
+def test_directory_as_file_reports_reason(orthia, tmp_path):
+    res = orthia.run("lm", file=tmp_path)
+    assert res.code == EXIT_OPEN_FAILED, res
+    assert re.search(r"(?i)access is denied|is a directory", res.stderr), res

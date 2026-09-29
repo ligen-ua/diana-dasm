@@ -92,6 +92,16 @@ class DataSet:
             shutil.copyfile(src, dest)
         return dest
 
+    def pdb_mismatch_copy(self, src: Path, name: str) -> Path:
+        """Copy with one byte of the RSDS debug GUID flipped: new SHA1, and its PDB no longer matches."""
+        dest = self.work_dir / "derived" / name
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            image = bytearray(src.read_bytes())
+            image[image.index(b"RSDS") + 4] ^= 0xFF
+            dest.write_bytes(image)
+        return dest
+
     def truncated(self, src: Path, size: int, name: str) -> Path:
         dest = self.work_dir / "derived" / name
         dest.parent.mkdir(parents=True, exist_ok=True)

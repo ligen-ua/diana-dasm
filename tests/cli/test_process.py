@@ -4,6 +4,8 @@ import sys
 
 import pytest
 
+from orthia_runner import EXIT_OPEN_FAILED
+
 pytestmark = pytest.mark.process
 
 SELF = {"pid": "self"}
@@ -62,3 +64,11 @@ def test_x_without_module_skips_other_modules(orthia, runtime):
     # the runtime library is not the main module, so a bare name must not find its export
     res = orthia.run(f"x {RUNTIME_EXPORT}", **SELF).assert_ok()
     assert not res.symbols, res
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="pid 4 (System) is Windows-only")
+@pytest.mark.xfail(reason="B16: open failure doesn't say why ('Can't open process: 4')")
+def test_open_failure_reports_reason(orthia):
+    res = orthia.raw("--pid", "4", "--cmd", "lm")
+    assert res.code == EXIT_OPEN_FAILED, res
+    assert re.search(r"(?i)access is denied", res.stderr), res
