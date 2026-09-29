@@ -3,6 +3,8 @@ import sys
 
 import pytest
 
+from orthia_runner import EXIT_COMMAND_ERROR
+
 pytestmark = pytest.mark.pe
 
 KE_BUG_CHECK = 0x1_4015_DAE0
@@ -62,9 +64,24 @@ def test_u_length_counts_instructions(orthia_full, nt):
     assert len(res.instructions()) == 2, res
 
 
-@pytest.mark.xfail(reason="B11: lower-case length prefix is rejected")
-def test_u_lowercase_length(orthia, nt):
-    orthia.run("u ntoskrnl!KeBugCheck l4", **nt).assert_ok()
+@pytest.mark.parametrize("length", ["l4", "L 4", "l 4", "l(2*2)", "l0n4", "L1+3"])
+def test_u_length_forms(orthia, nt, length):
+    # compared with L4 rather than counted: L also counts label lines (B1)
+    expected = orthia.run("u ntoskrnl!KeBugCheck L4", **nt).assert_ok().lines
+    res = orthia.run(f"u ntoskrnl!KeBugCheck {length}", **nt).assert_ok()
+    assert res.first_addr() == KE_BUG_CHECK
+    assert res.lines == expected, res
+
+
+def test_db_lowercase_length(orthia, nt):
+    res = orthia.run(f"db {KE_BUG_CHECK:x} l3", **nt).assert_ok()
+    res.assert_line(r"^00000001`4015dae0  48 83 ec\s+H\.\.$")
+
+
+@pytest.mark.parametrize("length", ["L?4", "L-4", "L4 5"])
+def test_u_invalid_length(orthia, nt, length):
+    res = orthia.run(f"u ntoskrnl!KeBugCheck {length}", **nt)
+    assert res.code == EXIT_COMMAND_ERROR, res
 
 
 def test_x_without_module_searches_main_module(orthia, nt):

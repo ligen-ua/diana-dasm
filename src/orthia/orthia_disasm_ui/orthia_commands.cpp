@@ -46,62 +46,17 @@ namespace orthia
     {
         args.progressHandler->ReplyAnyway(args.progressHandler, args.errorText, true);
     }
-    int CCommandProcessor::PrepareTokens(CommandArguments& args, std::vector<Token> & tokens, const Address_type maxCountOfItems, Address_type & countOfItems)
+    void CCommandProcessor::Handle_u(CommandArguments& args)
     {
-        Token token;
-        int indexOfLength = -1;
-        for (; args.parser.GetTokenizer().GetNextToken(&token);)
-        {
-            if (token.type == Token::ttName)
-            {
-                auto str = orthia::ReadString(token);
-                if (str[0] == 'L')
-                {
-                    indexOfLength = (int)tokens.size();
-                }
-            }
-            tokens.push_back(token);
-        }
-        if (tokens.empty())
-        {
-            throw orthia::NoTokenError();
-        }
-
-
-        if (indexOfLength != -1)
-        {
-            orthia::PlatformString_type lengthString = orthia::ReadString(tokens[indexOfLength]);
-            countOfItems = oui::CaptureAddress(orthia::PlatformString_type(lengthString.begin() + 1, lengthString.end()));
-        }
-        if (countOfItems > maxCountOfItems)
+        const Address_type maxCountOfLines = 1000;
+        auto resolver = std::make_shared< oui::NameResolverOverWorkplaceItem>(args.item);
+        auto range = orthia::CaptureAddressRangeExp(args.parser.GetTokenizer(), resolver);
+        auto targetAddress = range.address;
+        Address_type countOfLines = range.length.value_or(10);
+        if (countOfLines > maxCountOfLines)
         {
             throw std::runtime_error("Length is too big");
         }
-        return indexOfLength;
-    }
-    std::shared_ptr<ICalcNode> CCommandProcessor::BuildNodes(CommandArguments& args, std::vector<Token>& tokens, int indexOfLength, std::shared_ptr<ICalcNode> currentNode)
-    {        
-         // calc address
-         for (int i = 0, size = (int)tokens.size(); i < size; ++i)
-         {
-             if (indexOfLength == i)
-             {
-                 break;
-             }
-             currentNode = AppendToken(currentNode, tokens[i]);
-         }
-         return currentNode;
-    }
-    void CCommandProcessor::Handle_u(CommandArguments& args)
-    {
-        std::shared_ptr<ICalcNode> rootNode = CreateRootNode(&args.parser.GetTokenizer());
-        std::vector<Token> tokens;
-        const Address_type maxCountOfLines = 1000;
-        Address_type countOfLines = 10;
-        int indexOfLength = PrepareTokens(args, tokens, maxCountOfLines, countOfLines);
-        auto currentNode = BuildNodes(args, tokens, indexOfLength, rootNode);
-        auto resolver = std::make_shared< oui::NameResolverOverWorkplaceItem>(args.item);
-        auto targetAddress = orthia::CaptureAddressExp(rootNode, currentNode, tokens.back(), resolver);
 
         auto stream = args.item->CreateDisasmStream(targetAddress);
         if (!stream)

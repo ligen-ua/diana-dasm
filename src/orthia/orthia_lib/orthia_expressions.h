@@ -13,6 +13,8 @@ class CExpressionTokenizerEnv;
 struct AppendResult
 {
     static const int flag_SentToParent = 1;
+    // the token doesn't belong to the expression, the tree is unchanged
+    static const int flag_Rejected = 2;
     
     std::shared_ptr<ICalcNode> newNode;
     int flags = 0;
@@ -204,7 +206,18 @@ orthia::Address_type CaptureAddressExp(std::shared_ptr<ICalcNode> rootNode,
     std::shared_ptr<orthia::INameResolver> resolver);
 
 std::shared_ptr<ICalcNode> CreateRootNode(CExpressionTokenizerEnv* pTokernizerEnv);
-std::shared_ptr<ICalcNode> AppendToken(std::shared_ptr<ICalcNode> currentNode_in, orthia::Token& token);
+AppendResult AppendToken(std::shared_ptr<ICalcNode> currentNode_in, orthia::Token& token);
+
+struct AddressRangeExp
+{
+    Address_type address = 0;
+    std::optional<Address_type> length;
+};
+// "<address expression> [L|l <length expression>]", reads tokens from env up to EOF
+AddressRangeExp CaptureAddressRangeExp(CExpressionTokenizerEnv& env,
+    std::shared_ptr<orthia::INameResolver> resolver);
+AddressRangeExp CaptureAddressRangeExp(const orthia::PlatformString_type& expression,
+    std::shared_ptr<orthia::INameResolver> resolver);
 
 class ReservedWord
 {

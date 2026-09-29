@@ -63,9 +63,6 @@ protected:
     void Handle_symfix(CommandArguments& args);
     void Handle_mod_info(CommandArguments& args);
 
-    int PrepareTokens(CommandArguments& args, std::vector<Token>& tokens, const Address_type maxCountOfItems, Address_type& countOfItems);
-    std::shared_ptr<ICalcNode> BuildNodes(CommandArguments& args, std::vector<Token>& tokens, int indexOfLength, std::shared_ptr<ICalcNode> currentNode);
-
 public:
 
     CCommandProcessor();

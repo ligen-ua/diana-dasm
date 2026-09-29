@@ -188,14 +188,15 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
 
 void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize, bool dps)
 {
-    std::shared_ptr<ICalcNode> rootNode = CreateRootNode(&args.parser.GetTokenizer());
-    std::vector<Token> tokens;
     const Address_type maxCountOfItems = 100000;
-    Address_type countOfItems = 16*8/itemSize;
-    int indexOfLength = PrepareTokens(args, tokens, maxCountOfItems, countOfItems);
-    auto currentNode = BuildNodes(args, tokens, indexOfLength, rootNode);
     auto resolver = std::make_shared< oui::NameResolverOverWorkplaceItem>(args.item);
-    auto targetAddress = orthia::CaptureAddressExp(rootNode, currentNode, tokens.back(), resolver);
+    auto range = orthia::CaptureAddressRangeExp(args.parser.GetTokenizer(), resolver);
+    auto targetAddress = range.address;
+    Address_type countOfItems = range.length.value_or(16*8/itemSize);
+    if (countOfItems > maxCountOfItems)
+    {
+        throw std::runtime_error("Length is too big");
+    }
 
     const int columnsCount = dps?1:(16/itemSize);
     std::vector<char> page(columnsCount * 1024);
