@@ -109,6 +109,7 @@
       <SubSystem>Windows</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
       <ProgramDatabaseFile>$(OutDir)$(TargetName)_dll.pdb</ProgramDatabaseFile>
+      <ImportLibrary>$(OutDir)$(TargetName)_dll.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -136,6 +137,7 @@
       <SubSystem>Windows</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
       <ProgramDatabaseFile>$(OutDir)$(TargetName)_dll.pdb</ProgramDatabaseFile>
+      <ImportLibrary>$(OutDir)$(TargetName)_dll.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -159,6 +161,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
       <ProgramDatabaseFile>$(OutDir)$(TargetName)_dll.pdb</ProgramDatabaseFile>
+      <ImportLibrary>$(OutDir)$(TargetName)_dll.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -188,6 +191,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX64</TargetMachine>
       <ProgramDatabaseFile>$(OutDir)$(TargetName)_dll.pdb</ProgramDatabaseFile>
+      <ImportLibrary>$(OutDir)$(TargetName)_dll.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
