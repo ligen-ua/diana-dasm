@@ -298,7 +298,7 @@ namespace orthia
 
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
-        if (auto address = info->GerProcessModuleAddress())
+        if (auto address = info->GetMainModuleAddress())
         {
             auto rangeInfo = info->GetRangeInfo(address);
             auto addressToStart = std::max(rangeInfo.entryPoint, rangeInfo.address);
@@ -311,7 +311,7 @@ namespace orthia
         // OK
         result.error.native.clear();
 
-        EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GerProcessModuleAddress(), info);
+        EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GetMainModuleAddress(), info);
     }
     void CProgramModel::NotifyWorkspaceDataRefreshed(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId)
     {

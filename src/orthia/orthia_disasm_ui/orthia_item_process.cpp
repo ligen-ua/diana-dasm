@@ -91,7 +91,7 @@ namespace orthia
     {
         return m_shortName;
     }
-    Address_type CProcessWorkplaceItem::GerProcessModuleAddress()
+    Address_type CProcessWorkplaceItem::GetMainModuleAddress() const
     {
         return m_processModuleAddress;
     }

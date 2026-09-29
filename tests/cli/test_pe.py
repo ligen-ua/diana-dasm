@@ -67,6 +67,7 @@ def test_u_lowercase_length(orthia, nt):
     orthia.run("u ntoskrnl!KeBugCheck l4", **nt).assert_ok()
 
 
-def test_x_without_module_reports_error(orthia, nt):
-    res = orthia.run("x nobang", **nt)
-    assert res.code != 0 or res.lines, res
+def test_x_without_module_searches_main_module(orthia, nt):
+    names = orthia.run("x Ke*", **nt).assert_ok().symbols
+    assert "ntoskrnl.exe!KeBugCheck" in names
+    assert all(n.startswith("ntoskrnl.exe!") for n in names), names

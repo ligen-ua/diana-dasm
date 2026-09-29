@@ -56,3 +56,9 @@ def test_unknown_name(orthia, runtime):
     res = orthia.run(f"db {module}!NoSuchName L1", **SELF)
     assert res.code == 1, res
     res.assert_line(r"^Error: Unknown variable: ")
+
+
+def test_x_without_module_skips_other_modules(orthia, runtime):
+    # the runtime library is not the main module, so a bare name must not find its export
+    res = orthia.run(f"x {RUNTIME_EXPORT}", **SELF).assert_ok()
+    assert not res.symbols, res

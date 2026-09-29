@@ -153,9 +153,16 @@ namespace orthia
 
         std::vector<StringInfo> parts;
         orthia::SplitString(maskDowncase, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
+        // no module part: search the main module, or every module if the target has none
+        Address_type mainModuleAddress = 0;
+        if (parts.size() == 1)
+        {
+            mainModuleAddress = args.item->GetMainModuleAddress();
+            parts.insert(parts.begin(), orthia::StringInfo(ORTHIA_TCSTR("*")));
+        }
         if (parts.size() != 2)
         {
-            throw std::runtime_error("Invalid mask, expected module!name: " + orthia::PlatformStringToUtf8(mask));
+            throw std::runtime_error("Invalid mask, expected [module!]name: " + orthia::PlatformStringToUtf8(mask));
         }
 
         std::vector<orthia::ModuleInfo> modules;
@@ -166,6 +173,10 @@ namespace orthia
         auto dianaMode = args.item->GetDianaMode();
         for (auto& mod : modules)
         {
+            if (mainModuleAddress && mod.address != mainModuleAddress)
+            {
+                continue;
+            }
             auto modDowncased = orthia::Downcase(mod.name);
             bool match = utils::match(parts[0].ToString(), modDowncased);
             if (!match)

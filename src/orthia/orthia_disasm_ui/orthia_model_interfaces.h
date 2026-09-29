@@ -221,6 +221,7 @@ namespace orthia
         virtual void ReloadModules() = 0;
         virtual void GetModules(std::vector<orthia::ModuleInfo>& modules) const = 0;
         virtual int GetModulesCount() const = 0;
+        virtual Address_type GetMainModuleAddress() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
         virtual int GetDianaMode() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const = 0;

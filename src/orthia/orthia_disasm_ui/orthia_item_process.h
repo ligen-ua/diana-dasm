@@ -46,7 +46,7 @@ namespace orthia
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
         int GetModulesCount() const override;
         int GetDianaMode() const override { return m_dianaMode;}
-        Address_type GerProcessModuleAddress();
+        Address_type GetMainModuleAddress() const override;
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;

@@ -301,6 +301,10 @@ namespace orthia
         std::vector<orthia::ModuleInfo> modules;
         return GetModulesEx(true, modules);
     }
+    Address_type FileWorkplaceItem::GetMainModuleAddress() const
+    {
+        return file ? file->GetImageBase() : 0;
+    }
     std::shared_ptr<IPeristentItemStorage> FileWorkplaceItem::GetPersistentStorage()
     {
         return persistentItemStorage;
@@ -491,7 +495,7 @@ namespace orthia
         auto downcased = orthia::Downcase(text.native);
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         // prefer the export of the opened file over same-named exports of its dependencies
-        const Address_type mainModuleAddress = file->GetImageBase();
+        const Address_type mainModuleAddress = GetMainModuleAddress();
         classicDatabase->QueryMetaInfo(g_database_type_fnc_Export, [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
         {
             orthia::PlatformString_type name;
