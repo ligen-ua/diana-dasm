@@ -42,11 +42,14 @@ orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze]
 | `--run-tests` | run the built-in tests and exit |
 | `-h`, `--help`, `/?` | show help and exit |
 
+All arguments are optional: plain `orthia` with no arguments starts the UI with an empty workspace,
+and you open files and processes from the **File** menu (*Open executable*, *Open process*).
 Without `--cmd` the UI starts with all given files and processes open.
 With `--cmd`, exactly one `--file` or `--pid` is required.
 
 Examples:
 ```
+orthia
 orthia --file C:\Windows\System32\notepad.exe
 orthia --pid 1234
 orthia --file data/elf/dmesg --cmd lm --cmd 'u dmesg!$entrypoint L5'
@@ -79,7 +82,6 @@ A database created by a quick open is upgraded in place by a later `--analyze` o
 ## Commands
 
 The commands follow WinDbg syntax. Type them in the UI's command window, or pass them with `--cmd`.
-Addresses are expressions: `module!symbol`, `module+offset`, hex numbers and arithmetic all work.
 
 | Command | Description |
 |---|---|
@@ -96,6 +98,33 @@ Addresses are expressions: `module!symbol`, `module+offset`, hex numbers and ari
 | `exit` | Exit the program (UI only) |
 
 In the UI, press CTRL+C in the command edit box to stop a running command.
+
+### Expressions
+
+The address of `u` and of the `db`/`dw`/`dd`/`dq`/`dp`/`dps` commands is an expression, not just a number.
+The same expressions work in the UI's *Go to address* dialog (G).
+The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`, `.reload` and `.analyze` take a module name.
+
+| Syntax | Meaning |
+|---|---|
+| `7ff76948`, `7ff76948h`, `0x7ff76948` | hex number (numbers are hex by default) |
+| ``fffff806`b1458a9e`` | hex number with a WinDbg-style `` ` `` separator |
+| `0n15` | decimal number |
+| `ntdll!LdrLoadDll` | symbol: an export or a private (PDB) symbol of the module |
+| `ntdll`, `ntdll+1000` | module base (name without extension), module base plus offset |
+| `dmesg!$entrypoint` | module entry point |
+| `+`, `-`, `*`, `/`, `( )` | arithmetic with the usual precedence, unary `+`/`-` included |
+| `poi(<expr>)` | the pointer-sized value stored at `<expr>` |
+| `DS:[7ff769486040h]` | a memory operand as the disassembler prints it; evaluates to the address in the brackets, so you can paste it from the disassembly |
+
+The length after `L` (or `l`) is an expression too, and the space after it is optional:
+```
+u ntdll!LdrLoadDll+10 L0n20
+dps poi(ntdll+1000) L(2*4)
+db ntdll L 40
+```
+The length is a count of instructions for `u` and a count of elements for the `d*` commands.
+`L?` and negative lengths are not supported.
 
 ## UI hotkeys
 
