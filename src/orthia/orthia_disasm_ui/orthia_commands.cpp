@@ -155,7 +155,7 @@ namespace orthia
         orthia::SplitString(maskDowncase, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
         if (parts.size() != 2)
         {
-            return;
+            throw std::runtime_error("Invalid mask, expected module!name: " + orthia::PlatformStringToUtf8(mask));
         }
 
         std::vector<orthia::ModuleInfo> modules;

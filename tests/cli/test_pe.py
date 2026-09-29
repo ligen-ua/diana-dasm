@@ -67,7 +67,6 @@ def test_u_lowercase_length(orthia, nt):
     orthia.run("u ntoskrnl!KeBugCheck l4", **nt).assert_ok()
 
 
-@pytest.mark.xfail(reason="B12: x without '!' silently does nothing and exits 0")
 def test_x_without_module_reports_error(orthia, nt):
     res = orthia.run("x nobang", **nt)
     assert res.code != 0 or res.lines, res
