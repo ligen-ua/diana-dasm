@@ -57,19 +57,20 @@ def test_cold_open_of_fresh_copy_analyze(orthia_cold, data):
     res.assert_line(r"\bnt_fresh_analyze\.exe\s+analysis$")
 
 
-@pytest.mark.xfail(reason="B1: L counts annotation lines, not instructions")
 def test_u_length_counts_instructions(orthia_full, nt):
     # --analyze: the cross-reference annotation lines only exist after deep analysis
     res = orthia_full.run(f"u {KE_BUG_CHECK:x} L2", **nt).assert_ok()
     assert len(res.instructions()) == 2, res
+    # annotations are still shown, just not counted
+    res.assert_line(r"; ntoskrnl\.exe!KeBugCheck$")
 
 
 @pytest.mark.parametrize("length", ["l4", "L 4", "l 4", "l(2*2)", "l0n4", "L1+3"])
 def test_u_length_forms(orthia, nt, length):
-    # compared with L4 rather than counted: L also counts label lines (B1)
     expected = orthia.run("u ntoskrnl!KeBugCheck L4", **nt).assert_ok().lines
     res = orthia.run(f"u ntoskrnl!KeBugCheck {length}", **nt).assert_ok()
     assert res.first_addr() == KE_BUG_CHECK
+    assert len(res.instructions()) == 4, res
     assert res.lines == expected, res
 
 

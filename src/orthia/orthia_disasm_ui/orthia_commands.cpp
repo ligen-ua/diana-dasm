@@ -48,12 +48,12 @@ namespace orthia
     }
     void CCommandProcessor::Handle_u(CommandArguments& args)
     {
-        const Address_type maxCountOfLines = 1000;
+        const Address_type maxCountOfInstructions = 1000;
         auto resolver = std::make_shared< oui::NameResolverOverWorkplaceItem>(args.item);
         auto range = orthia::CaptureAddressRangeExp(args.parser.GetTokenizer(), resolver);
         auto targetAddress = range.address;
-        Address_type countOfLines = range.length.value_or(10);
-        if (countOfLines > maxCountOfLines)
+        Address_type countOfInstructions = range.length.value_or(10);
+        if (countOfInstructions > maxCountOfInstructions)
         {
             throw std::runtime_error("Length is too big");
         }
@@ -91,7 +91,8 @@ namespace orthia
         oui::MemoryPrinter printer(&writer,
             args.item->GetDianaMode(),
             oui::LineIndex(targetAddress, 0),
-            countOfLines,
+            countOfInstructions,
+            oui::LimitKind::Instructions,
             args.item);
 
         oui::MemoryPrinter::DianaPrintContext context;
