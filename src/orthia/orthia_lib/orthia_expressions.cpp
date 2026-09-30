@@ -29,6 +29,82 @@ Address_type MapNameResolver::Dereference(Address_type address)
     }
     return it->second;
 }
+size_t MapNameResolver::MatchKnownNamePrefix(const char* text, size_t size)
+{
+    size_t result = 0;
+    for (auto& name : names)
+    {
+        auto moduleName = orthia::PlatformStringToUtf8(name.first);
+        moduleName.erase(std::min(moduleName.find('!'), moduleName.size()));
+        if (HasNonNameChars(moduleName))
+        {
+            result = std::max(result, MatchNamePrefix(text, size, moduleName));
+        }
+    }
+    return result;
+}
+
+static bool IsWordChar(char ch)
+{
+    return (ch >= '0' && ch <= '9') ||
+        (ch >= 'a' && ch <= 'z') ||
+        (ch >= 'A' && ch <= 'Z') ||
+        ch == '_' ||
+        (unsigned char)ch > 127;
+}
+size_t MatchNamePrefix(const char* text, size_t size, const std::string& name)
+{
+    if (name.empty() || name.size() > size)
+    {
+        return 0;
+    }
+    for (size_t i = 0; i < name.size(); ++i)
+    {
+        if (tolower((unsigned char)text[i]) != tolower((unsigned char)name[i]))
+        {
+            return 0;
+        }
+    }
+    if (name.size() < size && IsWordChar(text[name.size()]))
+    {
+        // "ext-ms-foo-l1-1-0" is not the start of "ext-ms-foo-l1-1-01"
+        return 0;
+    }
+    return name.size();
+}
+bool HasNonNameChars(const std::string& name)
+{
+    for (char ch : name)
+    {
+        if (!IsWordChar(ch) && ch != '@' && ch != '$' && ch != '.' && ch != '#' && ch != '!' && ch != '?')
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// installs the resolver's known names into the tokenizer for the time of one expression
+class KnownNameMatcherGuard
+{
+    CTokenizer& m_tokenizer;
+public:
+    KnownNameMatcherGuard(CTokenizer& tokenizer, std::shared_ptr<orthia::INameResolver> resolver)
+        :
+        m_tokenizer(tokenizer)
+    {
+        if (resolver)
+        {
+            m_tokenizer.SetKnownNameMatcher([resolver](const char* text, size_t size) {
+                return resolver->MatchKnownNamePrefix(text, size);
+            });
+        }
+    }
+    ~KnownNameMatcherGuard()
+    {
+        m_tokenizer.SetKnownNameMatcher(nullptr);
+    }
+};
 
 class PoiFunctionNode :public FunctionNode
 {
@@ -776,6 +852,7 @@ orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expres
     source.GetStream() << utf8String;
     env.ResetSource(&source);
     InitTokenizer(env);
+    KnownNameMatcherGuard knownNames(env.GetTokenizer(), resolver);
 
     orthia::Token token;
     for (; env.GetNextToken(&token);)
@@ -886,6 +963,7 @@ AddressRangeExp CaptureAddressRangeExp(CExpressionTokenizerEnv& env,
     std::shared_ptr<orthia::INameResolver> resolver)
 {
     AddressRangeExp range;
+    KnownNameMatcherGuard knownNames(env.GetTokenizer(), resolver);
     std::shared_ptr<ICalcNode> rootNode = CreateRootNode(&env);
     auto currentNode = rootNode;
 

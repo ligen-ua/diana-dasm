@@ -217,6 +217,32 @@ static void test_expressions_names2()
     }
 }
 
+static void test_expressions_names_with_dash()
+{
+    auto resolver = std::make_shared< orthia::MapNameResolver>();
+    resolver->names[ORTHIA_TCSTR("a-b.dll!f")] = 0x100;
+    resolver->names[ORTHIA_TCSTR("a-b")] = 0x2000;
+    resolver->names[ORTHIA_TCSTR("e-1")] = 0x3000;
+    resolver->names[ORTHIA_TCSTR("t2")] = 0x2;
+
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b.dll!f"), resolver) == 0x100);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b.dll!f - 1"), resolver) == 0xff);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b.dll!f-t2"), resolver) == 0xfe);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b"), resolver) == 0x2000);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b+10"), resolver) == 0x2010);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("t2-a-b"), resolver) == 0x2 - 0x2000);
+    // starts with a hex char, but a known name is not a number
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("e-1"), resolver) == 0x3000);
+    // without a known dashed name '-' is still a subtraction
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("t2-1"), resolver) == 1);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("e-2"), resolver) == 0xc);
+    // a known name must end on a name boundary: 0xa - "bx"
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-bx"), resolver), orthia::NameNotFound);
+
+    auto range = orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("a-b.dll!f L2"), resolver);
+    DIANA_TEST_ASSERT(range.address == 0x100 && range.length == 2);
+}
+
 static void test_expressions_invalid()
 {
     auto resolver = std::make_shared< orthia::MapNameResolver>();
@@ -425,6 +451,7 @@ void test_expressions()
     DIANA_TEST(test_expressions_segment_prefix());
     DIANA_TEST(test_expressions_names());
     DIANA_TEST(test_expressions_names2());
+    DIANA_TEST(test_expressions_names_with_dash());
     DIANA_TEST(test_expressions_mult());
     DIANA_TEST(test_expressions_address());
     DIANA_TEST(test_expressions_summ());

@@ -64,6 +64,7 @@ namespace oui
         NameResolverOverWorkplaceItem(std::shared_ptr<orthia::IWorkPlaceItem> item_in);
         orthia::Address_type QueryAddress(const orthia::PlatformString_type& name) override;
         orthia::Address_type Dereference(orthia::Address_type address) override;
+        size_t MatchKnownNamePrefix(const char* text, size_t size) override;
     };
 
     orthia::Address_type CaptureAddress(const orthia::PlatformString_type& addressString);

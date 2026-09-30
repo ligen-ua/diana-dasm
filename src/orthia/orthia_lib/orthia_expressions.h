@@ -32,7 +32,16 @@ struct INameResolver
     virtual ~INameResolver() {}
     virtual Address_type QueryAddress(const PlatformString_type& name) = 0;
     virtual Address_type Dereference(Address_type address) = 0;
+    // size of the longest known name the utf8 text starts with, if the name can't be tokenized
+    // as is ("ext-ms-win-foo.dll" would be a subtraction), 0 otherwise
+    virtual size_t MatchKnownNamePrefix(const char* text, size_t size) { return 0; }
 };
+
+// the size of name if the utf8 text starts with it (case-insensitive) and the name isn't followed
+// by more name chars, 0 otherwise
+size_t MatchNamePrefix(const char* text, size_t size, const std::string& name);
+// true if the name has chars that end a name token ("-")
+bool HasNonNameChars(const std::string& name);
 
 struct AppendContext
 {
@@ -196,6 +205,8 @@ struct MapNameResolver:orthia::INameResolver
 
     Address_type QueryAddress(const PlatformString_type& name);
     Address_type Dereference(Address_type address);
+    // matches the module part (before '!') of the names
+    size_t MatchKnownNamePrefix(const char* text, size_t size) override;
 };
 orthia::Address_type CaptureAddressExp(const orthia::PlatformString_type& expression, 
     std::shared_ptr<orthia::INameResolver> resolver);

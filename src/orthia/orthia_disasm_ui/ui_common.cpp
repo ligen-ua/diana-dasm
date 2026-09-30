@@ -122,7 +122,33 @@ orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::P
     }
     throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
 }
-orthia::Address_type NameResolverOverWorkplaceItem::Dereference(orthia::Address_type address) 
+size_t NameResolverOverWorkplaceItem::MatchKnownNamePrefix(const char* text, size_t size)
+{
+    // module names like "ext-ms-win-foo-l1-1-0.dll", with or without the extension
+    std::vector<orthia::ModuleInfo> modules;
+    item->GetModules(modules);
+
+    size_t result = 0;
+    for (auto& mod : modules)
+    {
+        auto name = orthia::PlatformStringToUtf8(mod.name);
+        if (!orthia::HasNonNameChars(name))
+        {
+            continue;
+        }
+        result = std::max(result, orthia::MatchNamePrefix(text, size, name));
+
+        orthia::PlatformString_type extension;
+        orthia::GetExtensionOfFile(mod.name, &extension);
+        if (!extension.empty())
+        {
+            auto stem = mod.name.substr(0, mod.name.size() - extension.size() - 1);
+            result = std::max(result, orthia::MatchNamePrefix(text, size, orthia::PlatformStringToUtf8(stem)));
+        }
+    }
+    return result;
+}
+orthia::Address_type NameResolverOverWorkplaceItem::Dereference(orthia::Address_type address)
 {
     auto res = item->ReadData(address, item->GetDianaMode());
     if (res.rangeFlags & res.flags_FullValid)

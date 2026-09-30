@@ -999,7 +999,22 @@ bool CTokenizer::CaptureName(Token * pToken, int flags)
     bool hFound = false;
 
     m_tempStorageStr.clear();
-    m_tempStorageStr.push_back(m_line[m_columnPos++]);
+    size_t knownNameSize = 0;
+    if (m_windbgStyle && m_knownNameMatcher)
+    {
+        knownNameSize = m_knownNameMatcher(&m_line[m_columnPos], m_lineSize - m_columnPos);
+    }
+    if (knownNameSize)
+    {
+        // a known name is never a number, even if it starts with hex chars
+        isHexInt = false;
+        m_tempStorageStr.append(&m_line[m_columnPos], knownNameSize);
+        m_columnPos += (int)knownNameSize;
+    }
+    else
+    {
+        m_tempStorageStr.push_back(m_line[m_columnPos++]);
+    }
     while(m_columnPos < m_lineSize)
     {
         char ch = m_line[m_columnPos];

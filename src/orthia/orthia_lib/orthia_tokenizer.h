@@ -2,6 +2,7 @@
 
 #include "orthia_utils.h"
 #include <sstream>
+#include <functional>
 
 namespace orthia
 {
@@ -107,6 +108,9 @@ typedef bool (*SymbolMatcherFnc_type)(int index,
                                       bool * pResultWillbeInvalid,
                                       bool * pResultWillbeFinal);
 
+// returns the size of the longest known name the text starts with, 0 if none
+typedef std::function<size_t(const char* text, size_t size)> KnownNameMatcher_type;
+
 class CTokenizer
 {
 public:
@@ -132,6 +136,7 @@ protected:
 
     bool m_inComment;
     bool m_windbgStyle;
+    KnownNameMatcher_type m_knownNameMatcher;
     Token BuildNewToken(Token::TokenType_type type);
     char ReadOneOrDie(const std::string & error = std::string());
     char HasOneMore() const;
@@ -165,6 +170,8 @@ public:
     void ResetSource(ITokenFileSource * pTokenFileSource);
     void TestPopulateAllCaches();
     void SetWindbgStyle(bool val) { m_windbgStyle = val; }
+    // lets a known name with other symbols (module "ext-ms-win-foo.dll") be captured whole, windbg style only
+    void SetKnownNameMatcher(KnownNameMatcher_type matcher) { m_knownNameMatcher = std::move(matcher); }
     void SetSymbolStorage(CSymbolStorage * pSymbolStorage) { m_pSymbolStorage = pSymbolStorage; }
 };
 

@@ -78,12 +78,23 @@ def api_set(orthia, nt):
 
 
 @pytest.mark.parametrize("with_extension", [True, False], ids=["dll", "stem"])
-@pytest.mark.xfail(reason="B18: a module name containing '-' (ext-ms-win-*) is parsed as a subtraction: "
-                          "'Invalid token', or 'Unknown variable: ext' without the extension")
 def test_module_name_with_dash_resolves_to_base(orthia, nt, api_set, with_extension):
+    """B18: a module name containing '-' (ext-ms-win-*) was parsed as a subtraction."""
     name, base = api_set
     expression = name if with_extension else name.rsplit(".", 1)[0]
     assert orthia.resolve(expression, **nt) == base
+
+
+@pytest.mark.parametrize("with_extension", [True, False], ids=["dll", "stem"])
+def test_module_name_with_dash_and_offset(orthia, nt, api_set, with_extension):
+    name, base = api_set
+    expression = name if with_extension else name.rsplit(".", 1)[0]
+    assert orthia.resolve(f"{expression}+10", **nt) == base + 0x10
+    assert orthia.resolve(f"{expression}-10", **nt) == base - 0x10
+
+
+def test_dash_is_still_subtraction(orthia, nt):
+    assert orthia.resolve("ntoskrnl!KeBugCheck-10", **nt) == KE_BUG_CHECK - 0x10
 
 
 def test_dependency_export(orthia, nt):
