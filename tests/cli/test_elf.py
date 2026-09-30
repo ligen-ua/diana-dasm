@@ -1,10 +1,11 @@
 """ELF files (report section "ELF")."""
 import re
+import shutil
 import sys
 
 import pytest
 
-from orthia_runner import EXIT_OPEN_FAILED
+from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED
 
 pytestmark = pytest.mark.elf
 
@@ -72,7 +73,7 @@ def test_renamed_copy_uses_its_own_name(orthia, data, dmesg):
     res.assert_line(r"\bdmesg_renamed\b")
 
 
-@pytest.mark.xfail(reason="B9: lm header truncated for short module names ('module nstatus')")
+# B9: the header was cut when every module name was shorter than "module name" ('module nstatus')
 def test_lm_header(orthia, dmesg):
     orthia.run("lm", **dmesg).assert_line(r"\bmodule name\s+status\b")
 
@@ -102,3 +103,58 @@ def test_elf_with_bad_section_headers(orthia, data):
 def test_reload_reports_result(orthia_cold, dmesg):
     res = orthia_cold.run(".reload", **dmesg).assert_ok()
     assert re.search(r"(?i)symbol.*\bdmesg\b|\bdmesg\b.*symbol", res.stdout + res.stderr), res
+
+
+# DT_NEEDED of apt-mark: a library that cannot be located still gets a module row, as a PE dependency does
+APT_MARK_NEEDED = ["libapt-pkg.so.6.0", "libapt-private.so.0.0", "libc.so.6", "libgcc_s.so.1", "libstdc++.so.6"]
+_LM_ROW = re.compile(r"^([0-9a-f`]{17})\s+([0-9a-f`]{17})\s+(\S+)(?:\s+(\S+(?:, \S+)*))?[ \t]*$", re.M)
+
+
+@pytest.fixture
+def apt_mark(data, tmp_path):
+    # alone in its folder: no library sits beside the exe
+    exe = tmp_path / "alone" / "apt-mark"
+    exe.parent.mkdir()
+    shutil.copyfile(data.elf("apt-mark"), exe)
+    return {"file": exe}
+
+
+def _lm_rows(res):
+    return {m.group(3): (int(m.group(1).replace("`", ""), 16), int(m.group(2).replace("`", ""), 16), m.group(4) or "")
+            for m in _LM_ROW.finditer(res.stdout)}
+
+
+def test_lm_lists_every_needed_library(orthia_cold, apt_mark):
+    rows = _lm_rows(orthia_cold.run("lm", **apt_mark).assert_ok())
+    for lib in APT_MARK_NEEDED:
+        assert lib in rows, (lib, rows)
+        assert rows[lib][2].split(",")[0] in ("linked", "unresolved"), (lib, rows)
+        if sys.platform == "win32":
+            assert rows[lib][2] == "unresolved", (lib, rows)
+
+
+def test_lm_unresolved_elf_dependencies_get_own_ranges(orthia_cold, apt_mark):
+    rows = _lm_rows(orthia_cold.run("lm", **apt_mark).assert_ok())
+    unresolved = [(start, end) for start, end, status in rows.values() if status == "unresolved"]
+    if sys.platform == "win32":
+        assert len(unresolved) == len(APT_MARK_NEEDED), rows
+    assert all(0 < start < end for start, end in unresolved), rows
+    ranges = sorted((start, end) for start, end, _ in rows.values())
+    assert all(prev[1] <= cur[0] for prev, cur in zip(ranges, ranges[1:])), rows
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="libapt-pkg may exist on a Linux host")
+def test_modinfo_unresolved_elf_dependency(orthia_cold, apt_mark):
+    res = orthia_cold.run("modinfo libapt-pkg.so.6.0", "db libapt-pkg.so.6.0 L2", **apt_mark)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    res.assert_line(r"^Image: none \(unresolved dependency\)$")
+    assert "No image data for module: libapt-pkg.so.6.0" in res.stdout, res
+    res.assert_line(r"^[0-9a-f`]{17}  \?\? \?\?")
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="libapt-pkg may exist on a Linux host")
+def test_unresolved_elf_dependency_survives_reopen(orthia_cold, apt_mark):
+    first = _lm_rows(orthia_cold.run("lm", **apt_mark).assert_ok())
+    second = _lm_rows(orthia_cold.run("lm", **apt_mark).assert_ok())
+    assert second == first, (first, second)
+    assert second["libapt-pkg.so.6.0"][2] == "unresolved", second

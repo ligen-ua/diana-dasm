@@ -132,6 +132,11 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
     orthia::PlatformString_type columnEnd(ORTHIA_TCSTR("end"));
     orthia::PlatformString_type columnName(ORTHIA_TCSTR("module name")); 
     orthia::PlatformString_type columnStatus(ORTHIA_TCSTR("status"));
+    // the column is at least as wide as its header, or short names cut it ("module nstatus")
+    if ((int)columnName.size() > maxModuleNameSize)
+    {
+        maxModuleNameSize = (int)columnName.size();
+    }
 
     orthia::PlatformString_type column;
     // add start

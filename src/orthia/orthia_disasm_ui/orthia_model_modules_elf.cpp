@@ -46,7 +46,8 @@ namespace orthia
         std::tie(platformError, fullName) = m_pFs->SyncLocateFile(libName, m_dianaMode);
         if (platformError)
         {
-            throw orthia::CWin32Exception("Can't locate: " + orthia::PlatformStringToUtf8(libName.native), platformError);
+            // a library the host has no copy of is expected (an ELF opened on Windows), not an error
+            return oui::String();
         }
         return fullName;
     }
@@ -64,6 +65,17 @@ namespace orthia
         }
         return lastPossibleAddress;
     }
+    Address_type CElfImportsLoader::ReserveSpace(OPERAND_SIZE size)
+    {
+        OPERAND_SIZE lastPossibleAddress = GetLastPossibleAddress();
+        auto address = RoundUp(m_freeSpaceStart, 0x10000);
+        if (address < m_freeSpaceStart || address > lastPossibleAddress || size > lastPossibleAddress - address)
+        {
+            throw std::runtime_error("Can't reserve space: address space exhausted");
+        }
+        m_freeSpaceStart = address + size;
+        return address;
+    }
     bool CElfImportsLoader::CheckConflicts(std::shared_ptr<CSimpleElfFile> elfFile)
     {
         auto modAddress = elfFile->GetImageBase();
@@ -72,10 +84,18 @@ namespace orthia
             return true;
         for (auto& mod : m_mappedModules)
         {
-            if (!mod.second.elfFile->GetImpl())
+            // an unresolved dependency has no image, but its reserved range is taken
+            Address_type curAddress = mod.second.base;
+            Address_type curEnd = mod.second.base + mod.second.size;
+            if (mod.second.elfFile->GetImpl())
+            {
+                curAddress = mod.second.elfFile->GetImageBase();
+                curEnd = mod.second.elfFile->GetImageEnd();
+            }
+            else if (!mod.second.size)
+            {
                 continue;
-            auto curAddress = mod.second.elfFile->GetImageBase();
-            auto curEnd = mod.second.elfFile->GetImageEnd();
+            }
             if (curAddress > modAddress && curAddress < modEnd) return true;
             if (curEnd > modAddress && curEnd < modEnd) return true;
             if (curAddress <= modAddress && curEnd >= modEnd) return true;
@@ -100,18 +120,34 @@ namespace orthia
         catch (std::exception& e)
         {
             ORTHIA_LOG(orthia::LogSeverity::Error, "Can't load ELF dep ", libName, ": ", e.what());
-            oui::String name;
-            try { name = NormalizeName(libName); }
-            catch (...) { name = orthia::Utf8ToPlatformString(libName); }
-
-            auto it = m_mappedModules.find(name.native);
-            if (it != m_mappedModules.end())
-                return it;
-            ModuleInfo info;
-            info.fullName = name;
-            info.elfFile = std::make_shared<CSimpleElfFile>();
-            return m_mappedModules.insert({ name.native, info }).first;
+            return InsertUnresolved(libName);
         }
+    }
+    CElfImportsLoader::ModuleIterator CElfImportsLoader::InsertUnresolved(const std::string& libName)
+    {
+        oui::String name;
+        try { name = NormalizeName(libName); }
+        catch (...) { name = orthia::Utf8ToPlatformString(libName); }
+
+        auto it = m_mappedModules.find(name.native);
+        if (it != m_mappedModules.end())
+            return it;
+        ModuleInfo info;
+        info.fullName = name;
+        info.elfFile = std::make_shared<CSimpleElfFile>();
+        info.unresolved = true;
+        try
+        {
+            // one page of its own: at 0 all the unresolved dependencies would collide in tbl_modules
+            info.size = 0x1000;
+            info.base = ReserveSpace(info.size);
+        }
+        catch (std::exception& reserveError)
+        {
+            ORTHIA_LOG(orthia::LogSeverity::Error, "Can't reserve space for ", libName, ": ", reserveError.what());
+            info.size = 0;
+        }
+        return m_mappedModules.insert({ name.native, info }).first;
     }
     CElfImportsLoader::ModuleIterator CElfImportsLoader::LoadModuleImpl(const std::string& libName)
     {
@@ -123,6 +159,11 @@ namespace orthia
         }
 
         auto fullName = LocateFile(normalName);
+        if (fullName.native.empty())
+        {
+            ORTHIA_LOG(orthia::LogSeverity::Warning, "ELF dependency not found: ", libName);
+            return InsertUnresolved(libName);
+        }
 
         int platformError = 0;
         std::shared_ptr<oui::IFile2> file;
@@ -164,6 +205,8 @@ namespace orthia
         ModuleInfo info;
         info.elfFile = mappedElf;
         info.fullName = fullName;
+        info.base = mappedElf->GetImageBase();
+        info.size = mappedElf->GetMappedFile().size();
         QueryImageIdentity(*mappedElf, info.identity);
         {
             auto sha1 = CalcSha1(rawFile);
@@ -296,6 +339,8 @@ namespace orthia
         rootInfo.elfFile      = elfFile;
         rootInfo.originalFile = true;
         rootInfo.fullName     = fileName;
+        rootInfo.base         = elfFile->GetImageBase();
+        rootInfo.size         = elfFile->GetMappedFile().size();
         auto rootKey = shortFileName.native;
         m_mappedModules.insert({ rootKey, rootInfo });
 
@@ -361,7 +406,7 @@ namespace orthia
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         for (auto& name : mod.names)
         {
-            InsertName(classicDatabase, mod.elfFile->GetImageBase(), name.second, name.first);
+            InsertName(classicDatabase, mod.base, name.second, name.first);
         }
     }
 
@@ -380,27 +425,39 @@ namespace orthia
                 batch->Commit();
                 continue;
             }
-            if (!mod.second.elfFile->GetImpl())
+            if (!mod.second.size)
+            {
+                // no range could be reserved: a module at 0 would collide with the others
                 continue;
+            }
             oui::String shortName;
             orthia::UnparseFileNameFromFullFileName(mod.second.fullName.native, &shortName.native);
 
             CAutoRollbackClassicDatabase rollback;
             classicDatabase->StartSaveModule(
-                mod.second.elfFile->GetImageBase(),
-                mod.second.elfFile->GetMappedFile().size(),
+                mod.second.base,
+                mod.second.size,
                 shortName.native,
                 &rollback,
                 true);
 
+            int builtInFlags = orthia::ModuleInfo::builtInFlags_moduleTypeElf;
             ModuleSourceMeta source;
-            source.srcKind = g_meta_src_kind_linked;
-            source.identity = &mod.second.identity;
+            if (mod.second.unresolved)
+            {
+                builtInFlags |= orthia::ModuleInfo::builtInFlags_unresolved;
+                source.srcKind = g_meta_src_kind_none;
+            }
+            else
+            {
+                source.srcKind = g_meta_src_kind_linked;
+                source.identity = &mod.second.identity;
+            }
             InsertModuleMetaInfo(classicDatabase,
-                mod.second.elfFile->GetImageBase(),
+                mod.second.base,
                 mod.second.fullName.native,
                 0,
-                orthia::ModuleInfo::builtInFlags_moduleTypeElf,
+                builtInFlags,
                 &source);
 
             InsertNames(moduleManager, mod.second);
