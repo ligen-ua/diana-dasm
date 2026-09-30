@@ -11,7 +11,7 @@ Supported targets:
 - raw shellcode: files in an unknown format can be opened as raw code.
 
 Analysis results (modules, cross-references, symbols, comments) are cached in an SQLite database for each file,
-so a file opens quickly the second time.
+so a file opens quickly the second time. See [persistent-cache.md](persistent-cache.md) for what is stored where.
 
 ## Building
 
