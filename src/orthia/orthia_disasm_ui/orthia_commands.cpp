@@ -11,6 +11,25 @@ namespace orthia
 {
 
     const int g_maxLinesWithoutSync = 100;
+
+    static bool IsImageReadable(IMemoryReader* reader, const orthia::ModuleInfo& mod)
+    {
+        if (!mod.size)
+        {
+            return false;
+        }
+        char header[2] = { 0, };
+        Address_type bytesRead = 0;
+        try
+        {
+            reader->Read(mod.address, sizeof(header), header, &bytesRead, ORTHIA_MR_FLAG_READ_ABSOLUTE, 0, reg_none);
+        }
+        catch (const std::exception&)
+        {
+            return false;
+        }
+        return bytesRead == sizeof(header);
+    }
     CCommandProcessor::RequestCanceledException::RequestCanceledException()
         :   
             std::runtime_error("Request canceled")
@@ -266,6 +285,12 @@ namespace orthia
 
             auto pMemoryReader = args.item->CreateMemoryReader();
 
+            // an unresolved dependency owns an address range, but nothing is mapped there
+            if (!IsImageReadable(pMemoryReader.get(), mod))
+            {
+                throw std::runtime_error("No image data for module: " + orthia::PlatformStringToUtf8(mod.name));
+            }
+
             orthia::PlatformString_type line;
             line = ORTHIA_TCSTR("Module: ") + mod.name;
             args.ReplyLine(line);
@@ -289,7 +314,7 @@ namespace orthia
                 DIANA_UUID guid = { 0, };
                 DI_UINT32 age = 0;
                 orthia::PlatformString_type pdbName;
-                orthia::QueryModulePeDebugInfo(pMemoryReader.get(), mod, guid, age, pdbName);
+                bool haveDebugInfo = orthia::QueryModulePeDebugInfo(pMemoryReader.get(), mod, guid, age, pdbName);
 
 #ifdef WIN32
                 {
@@ -308,14 +333,22 @@ namespace orthia
                 }
 #endif
 
-                line = ORTHIA_TCSTR("Debug GUID: ") + orthia::UUIDToString(guid);
-                args.ReplyLine(line);
+                if (!haveDebugInfo)
+                {
+                    // no CodeView entry: a zero GUID would look like a real one
+                    args.ReplyLine(ORTHIA_TCSTR("Debug GUID: <none>"));
+                }
+                else
+                {
+                    line = ORTHIA_TCSTR("Debug GUID: ") + orthia::UUIDToString(guid);
+                    args.ReplyLine(line);
 
-                line = ORTHIA_TCSTR("Debug Age: ") + orthia::ObjectToString(age);
-                args.ReplyLine(line);
+                    line = ORTHIA_TCSTR("Debug Age: ") + orthia::ObjectToString(age);
+                    args.ReplyLine(line);
 
-                line = ORTHIA_TCSTR("Pdb name: ") + pdbName;
-                args.ReplyLine(line);
+                    line = ORTHIA_TCSTR("Pdb name: ") + pdbName;
+                    args.ReplyLine(line);
+                }
             }
             else
             {

@@ -129,7 +129,6 @@ def test_lm_unresolved_modules_get_own_ranges(orthia, nt):
     "unresolved",
     pytest.param("hal.dll", marks=pytest.mark.skipif(sys.platform != "win32", reason="host DLL")),
 ])
-@pytest.mark.xfail(reason="B8: modinfo on a dependency without image data prints a zero GUID and exits 0")
 def test_modinfo_dependency_without_image(orthia, nt, request, module):
     if module == "unresolved":
         module = request.getfixturevalue("unresolved")
