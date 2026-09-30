@@ -16,6 +16,7 @@ extern "C"
 #include "orthia_files.h"
 #include "orthia_processes_ex.h"
 #include "console_mode.h"
+#include "ui_help.h"
 
 int RunTests();
 
@@ -48,6 +49,12 @@ static void PrintUsage(std::ostream& out)
     out << "Environment:\n";
     out << "  ORTHIA_HOME         data folder to use instead of %APPDATA%\\Orthia\n";
     out << "  ORTHIA_SYMBOL_PATH  symbol folders separated by ';' (default C:\\Sym;C:\\Symbols)\n";
+    out << "\n";
+    out << "Commands (UI command window and --cmd):\n";
+    for (const auto& line : orthia::GetCommandReference("  "))
+    {
+        out << line << "\n";
+    }
 }
 
 static bool IsHelpSwitch(const wchar_t* arg)

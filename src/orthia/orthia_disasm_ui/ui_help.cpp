@@ -2,6 +2,52 @@
 #include "orthia_version.h"
 #include "oui_menu.h"
 #include "orthia_model_interfaces.h"
+#include <algorithm>
+#include <cstring>
+
+namespace orthia
+{
+    struct CommandHelpItem
+    {
+        const char* syntax;
+        const char* description;
+    };
+    static const CommandHelpItem g_commandHelpItems[] = {
+        { "x <mask>", "Examine symbols" },
+        { "u <address> [L<length>]", "Unassemble address" },
+        { "lm", "List loaded modules" },
+        { "d[b,w,d,q,p,ps]", "Display memory" },
+        { "threads", "Display threads" },
+        { "cls", "Clear screen" },
+        { "exit", "Exit program" },
+        { ".reload [<module>]", "Reload symbols for module" },
+        { ".analyze <module>", "Analyze module" },
+        { ".symfix [<path>]", "Set symbols directory" },
+        { "modinfo <module>", "Show PE/debug info for module" },
+        { ".database list", "List databases in the data folder" },
+        { ".database delete <id> ...", "Delete databases (id: sha1 prefix, pid or file)" },
+        { ".database cleanup", "Delete databases no longer in use" },
+    };
+
+    std::vector<std::string> GetCommandReference(const std::string& prefix)
+    {
+        size_t width = 0;
+        for (const auto& item : g_commandHelpItems)
+        {
+            width = std::max(width, strlen(item.syntax));
+        }
+        std::vector<std::string> lines;
+        for (const auto& item : g_commandHelpItems)
+        {
+            std::string line = prefix + item.syntax;
+            line.append(width - strlen(item.syntax), ' ');
+            line += " - ";
+            line += item.description;
+            lines.push_back(line);
+        }
+        return lines;
+    }
+}
 
 namespace oui
 {
@@ -92,62 +138,10 @@ namespace oui
             item.text = OUI_TCSTR("Supported Commands:");
             lines.push_back(item);
         }
+        for (const auto& line : orthia::GetCommandReference(" -  "))
         {
             MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  x <mask>                - Examine symbols");
-            lines.push_back(item);
-        }
-        {
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  u <address> [L<length>] - Unassemble address");
-            lines.push_back(item);
-        }
-        {
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  lm                      - List loaded modules");
-            lines.push_back(item);
-        }
-        {
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  d[b,w,d,q,p,ps]         - Display memory");
-            lines.push_back(item);
-        } 
-        {
-
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  threads                 - Display threads");
-            lines.push_back(item);
-        }
-        {
-
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  cls                     - Clear screen");
-            lines.push_back(item);
-        }
-        {
-
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  exit                    - Exit program");
-            lines.push_back(item);
-        }
-        {
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  .reload [<module>]      - Reload symbols for module");
-            lines.push_back(item);
-        }
-        {
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  .analyze <module>       - Analyze module");
-            lines.push_back(item);
-        }
-        {
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  .symfix [<path>]        - Set symbols directory");
-            lines.push_back(item);
-        }
-        {
-            MultiLineViewItem item;
-            item.text = OUI_TCSTR(" -  modinfo <module>       - Show PE/debug info for module");
+            item.text = orthia::Utf8ToPlatformString(line);
             lines.push_back(item);
         }
         {

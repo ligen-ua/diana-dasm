@@ -2,6 +2,14 @@
 #include "oui_modal.h"
 #include "oui_editbox.h"
 #include "oui_multiline_view.h"
+#include <string>
+#include <vector>
+
+namespace orthia
+{
+    // the commands of the command window and --cmd, one aligned line per command
+    std::vector<std::string> GetCommandReference(const std::string& prefix);
+}
 
 namespace oui
 {
