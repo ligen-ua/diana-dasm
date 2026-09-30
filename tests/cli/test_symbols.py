@@ -56,13 +56,20 @@ def test_failed_symbol_search_is_summarised(orthia_cold, data):
     assert re.search(r"(?i)symbols?\b.*not found|no matching symbol", res.stderr), res
 
 
-@pytest.mark.xfail(reason="B4: .reload loads a PDB into cng.sys, which has no image and a zero GUID")
-def test_reload_skips_module_without_image(orthia_cold, data, tmp_path):
-    # cng.sys is never found, so it is registered at 0 with size 0 and a zero debug GUID;
-    # any cng.pdb on the symbol path must not be taken for it
+@pytest.fixture(scope="module")
+def unresolved(orthia, nt):
+    # a fixture, not a call inside the xfail test: if none is left, that must error, not xfail
+    return orthia.unresolved_module(**nt)
+
+
+@pytest.mark.xfail(reason="B4: .reload loads a PDB into a dependency that has no image and a zero GUID")
+def test_reload_skips_module_without_image(orthia_cold, data, tmp_path, unresolved):
+    # the unresolved dependency is registered at 0 with size 0 and a zero debug GUID;
+    # a PDB of the same name on the symbol path must not be taken for it
+    stem = unresolved.rsplit(".", 1)[0]
     symbols = tmp_path / "symbols"
     symbols.mkdir()
-    shutil.copyfile(data.nt_symbols / "ntkrnlmp.pdb", symbols / "cng.pdb")
-    res = orthia_cold.with_(symbol_path=symbols).run(".reload", "lm", "x cng!*", file=data.ntoskrnl)
+    shutil.copyfile(data.nt_symbols / "ntkrnlmp.pdb", symbols / f"{stem}.pdb")
+    res = orthia_cold.with_(symbol_path=symbols).run(".reload", "lm", f"x {unresolved}!*", file=data.ntoskrnl)
     assert not res.symbols, res
-    assert not re.search(r"\bcng\.sys\s+.*symbols", res.stdout), res
+    assert not re.search(rf"\b{re.escape(unresolved)}\s+.*symbols", res.stdout), res

@@ -1,4 +1,5 @@
 """PE file mode on ntoskrnl.exe without a PDB (report section "PE")."""
+import re
 import sys
 
 import pytest
@@ -98,13 +99,28 @@ def test_truncated_pe_reports_reason(orthia, data):
     assert "DiException" not in res.stderr, res
 
 
-# cng.sys is never found (it lives in System32\drivers), hal.dll comes from the Windows host
+@pytest.fixture(scope="module")
+def unresolved(orthia, nt):
+    # a fixture, not a call inside the xfail tests: if none is left, that must error, not xfail
+    return orthia.unresolved_module(**nt)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="host driver")
+def test_lm_resolves_driver_import(orthia, nt):
+    # cng.sys lives in System32\drivers, outside the default DLL search order
+    m = orthia.run("lm", **nt).assert_ok().assert_line(r"^(\S+)\s+(\S+)\s+cng\.sys\b")
+    assert m.group(1) != m.group(2), m.string
+
+
+# "unresolved" is an import no host has (e.g. an ext-ms-win-* API set), hal.dll comes from the Windows host
 @pytest.mark.parametrize("module", [
-    "cng.sys",
+    "unresolved",
     pytest.param("hal.dll", marks=pytest.mark.skipif(sys.platform != "win32", reason="host DLL")),
 ])
 @pytest.mark.xfail(reason="B8: modinfo on a dependency without image data prints a zero GUID and exits 0")
-def test_modinfo_dependency_without_image(orthia, nt, module):
+def test_modinfo_dependency_without_image(orthia, nt, request, module):
+    if module == "unresolved":
+        module = request.getfixturevalue("unresolved")
     res = orthia.run(f"modinfo {module}", **nt)
     if res.code == EXIT_OK:
         guid = res.assert_line(r"^Debug GUID: (\S+)$").group(1)
@@ -121,9 +137,9 @@ def test_u_unmapped(orthia, nt):
 
 
 @pytest.mark.xfail(reason="B12: .analyze on a module without image data does nothing and exits 0")
-def test_analyze_module_without_image(orthia_cold, nt):
-    res = orthia_cold.run(".analyze cng.sys", "lm", **nt)
+def test_analyze_module_without_image(orthia_cold, nt, unresolved):
+    res = orthia_cold.run(f".analyze {unresolved}", "lm", **nt)
     if res.code == EXIT_OK:
-        res.assert_line(r"\bcng\.sys\s+analysis")
+        res.assert_line(rf"\b{re.escape(unresolved)}\s+analysis")
     else:
         assert res.code == EXIT_COMMAND_ERROR, res

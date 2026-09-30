@@ -177,6 +177,19 @@ namespace oui
         return 0;
     }
 
+    static bool SearchInDrivers(const std::wstring& fileName, std::wstring& fullName)
+    {
+        std::vector<wchar_t> buffer(MAX_PATH);
+        UINT size = GetSystemDirectoryW(buffer.data(), (UINT)buffer.size());
+        if (!size || size >= buffer.size())
+        {
+            return false;
+        }
+        std::wstring driversDir(buffer.data(), size);
+        driversDir += L"\\drivers";
+        return SearchPathW(driversDir.c_str(), fileName.c_str(), NULL, MAX_PATH, fullName.data(), NULL) != 0;
+    }
+
     class CFile:public IFile2, Noncopyable
     {
         String m_fullName;
@@ -329,7 +342,18 @@ namespace oui
             name.resize(MAX_PATH);
             if (!SearchPathW(NULL, fileName.native.c_str(), NULL, MAX_PATH, name.data(), NULL))
             {
-                return std::make_tuple(GetLastError(), result);
+                int error = GetLastError();
+                // kernel-mode imports (cng.sys, clfs.sys, ...) live in System32\drivers, which the default search order skips;
+                // GetSystemDirectoryW only points at the right drivers dir when the image matches the process bitness
+#if defined(_M_AMD64)
+                const bool searchDrivers = (dianaMode == 8);
+#else
+                const bool searchDrivers = (dianaMode == 4);
+#endif
+                if (!searchDrivers || !SearchInDrivers(fileName.native, name))
+                {
+                    return std::make_tuple(error, result);
+                }
             }
 #if defined(_M_AMD64)
             if (dianaMode == 4)
