@@ -445,16 +445,27 @@ public:
 
 class CElfExternalSymbolsLoader : public IExternalSymbolsLoader
 {
+    std::shared_ptr<CLoaderUILogger> m_logger;
 public:
+    explicit CElfExternalSymbolsLoader(std::shared_ptr<CLoaderUILogger> logger)
+        : m_logger(std::move(logger))
+    {
+    }
+
     bool CanLoad(const ModuleInfo& mod) const override
     {
         return !IsPeModule(mod);
     }
 
-    void Load(const ModuleInfo& /*mod*/, IMemoryReader* /*memoryReader*/, ModuleSymbols& /*out*/,
+    void Load(const ModuleInfo& mod, IMemoryReader* /*memoryReader*/, ModuleSymbols& /*out*/,
               OnPrivateSymbolLoaded /*onSymbol*/ = nullptr) override
     {
-        // Not yet implemented.
+        // Not yet implemented; say so, or .reload looks like it found nothing
+        if (m_logger)
+        {
+            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+            m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("symbols-elf-unsupported")), mod.name));
+        }
     }
 };
 
@@ -503,8 +514,8 @@ std::unique_ptr<IExternalSymbolsLoader> CreateExternalSymbolsLoader(
     std::shared_ptr<CLoaderUILogger> logger)
 {
     auto composite = std::make_unique<CCompositeExternalSymbolsLoader>();
-    composite->Add(std::make_unique<CPdbExternalSymbolsLoader>(symbolFolders, std::move(logger)));
-    composite->Add(std::make_unique<CElfExternalSymbolsLoader>());
+    composite->Add(std::make_unique<CPdbExternalSymbolsLoader>(symbolFolders, logger));
+    composite->Add(std::make_unique<CElfExternalSymbolsLoader>(std::move(logger)));
     return composite;
 }
 

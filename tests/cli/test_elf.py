@@ -99,7 +99,6 @@ def test_elf_with_bad_section_headers(orthia, data):
     assert "DiException" not in res.stderr, res
 
 
-@pytest.mark.xfail(reason="B12: .reload on an ELF prints nothing, not even 'no symbols'")
 def test_reload_reports_result(orthia_cold, dmesg):
     res = orthia_cold.run(".reload", **dmesg).assert_ok()
     assert re.search(r"(?i)symbol.*\bdmesg\b|\bdmesg\b.*symbol", res.stdout + res.stderr), res
