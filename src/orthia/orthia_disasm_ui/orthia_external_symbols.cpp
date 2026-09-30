@@ -32,6 +32,23 @@ bool IsPeModule(const ModuleInfo& mod)
         || ext == ORTHIA_TCSTR("sys");
 }
 
+bool IsModuleImageReadable(IMemoryReader* memoryReader, const ModuleInfo& mod)
+{
+    if (!memoryReader || !mod.size)
+        return false;
+    char header[2] = { 0, };
+    Address_type bytesRead = 0;
+    try
+    {
+        memoryReader->Read(mod.address, sizeof(header), header, &bytesRead, ORTHIA_MR_FLAG_READ_ABSOLUTE, 0, reg_none);
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+    return bytesRead == sizeof(header);
+}
+
 // Reads a module's own memory image (already mapped by memoryReader at
 // mod.address) and extracts the GUID+Age+PDB name recorded in its CodeView
 // (RSDS) debug directory entry. Same adapter the "pe_info" command uses

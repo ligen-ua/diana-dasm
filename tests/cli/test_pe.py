@@ -173,10 +173,16 @@ def test_db_across_end_of_image(orthia, nt):
     res.assert_line(r"^00000001`4081ebb0  40 ab 58 ab 60 ab 68 ab-\?\? \?\?")
 
 
-@pytest.mark.xfail(reason="B12: .analyze on a module without image data does nothing and exits 0")
-def test_analyze_module_without_image(orthia_cold, nt, unresolved):
-    res = orthia_cold.run(f".analyze {unresolved}", "lm", **nt)
+@pytest.mark.parametrize("module", [
+    "unresolved",
+    pytest.param("hal.dll", marks=pytest.mark.skipif(sys.platform != "win32", reason="host DLL")),
+])
+def test_analyze_module_without_image(orthia_cold, nt, request, module):
+    if module == "unresolved":
+        module = request.getfixturevalue("unresolved")
+    res = orthia_cold.run(f".analyze {module}", "lm", **nt)
     if res.code == EXIT_OK:
-        res.assert_line(rf"\b{re.escape(unresolved)}\s+.*\banalysis")
+        res.assert_line(rf"\b{re.escape(module)}\s+.*\banalysis")
     else:
         assert res.code == EXIT_COMMAND_ERROR, res
+        assert f"No image data for module: {module}" in res.stdout + res.stderr, res

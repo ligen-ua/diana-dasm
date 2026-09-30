@@ -11,6 +11,10 @@ namespace orthia
 
     bool IsPeModule(const ModuleInfo& mod);
 
+    // Whether the module's image can be read at mod.address: an unresolved dependency owns
+    // an address range with nothing mapped there, and so does, in file mode, any dependency
+    bool IsModuleImageReadable(IMemoryReader* memoryReader, const ModuleInfo& mod);
+
     // Reads a module's own memory image (already mapped by memoryReader at
     // mod.address, e.g. from a live process or a loaded module database) and
     // extracts the GUID+Age+PDB name recorded in its CodeView (RSDS) debug

@@ -105,13 +105,17 @@ namespace orthia
                 [mainModuleAddr](const auto& m) { return m.IsInRange(mainModuleAddr); });
             if (mainIt == modules.end())
             {
+                Cleanup(itemId);
                 return;
             }
             auto reader = item->CreateMemoryReader();
             auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
             if (op->IsCancelled())
+            {
+                Cleanup(itemId);
                 return;
+            }
             try
             {
                 // not IsModuleExists: a quick open (--cmd without --analyze) registers the module unanalyzed
@@ -135,7 +139,7 @@ namespace orthia
             }
             catch (const std::exception& e)
             {
-                oui::LogOutput(oui::LogFlags::Error, e.what());
+                WriteLog(oui::String(Utf8ToPlatformString(e.what())));
             }
 
             Cleanup(itemId);
@@ -196,6 +200,7 @@ namespace orthia
             }
             if (mainIt->flags & ModuleInfo::flags_analyzePrivateDone)
             {
+                Cleanup(itemId);
                 return;
             }
             if (!(mainIt->flags & ModuleInfo::flags_symbolsLoaded))
@@ -239,7 +244,7 @@ namespace orthia
             }
             catch (const std::exception& e)
             {
-                oui::LogOutput(oui::LogFlags::Error, e.what());
+                WriteLog(oui::String(Utf8ToPlatformString(e.what())));
             }
 
             Cleanup(itemId);
@@ -340,7 +345,7 @@ namespace orthia
                 }
                 catch (const std::exception& e)
                 {
-                    oui::LogOutput(oui::LogFlags::Error, e.what());
+                    WriteLog(oui::String(Utf8ToPlatformString(e.what())));
                 }
             }
 

@@ -12,24 +12,14 @@ namespace orthia
 
     const int g_maxLinesWithoutSync = 100;
 
-    static bool IsImageReadable(IMemoryReader* reader, const orthia::ModuleInfo& mod)
+    static void CheckImageReadable(IMemoryReader* reader, const orthia::ModuleInfo& mod)
     {
-        if (!mod.size)
+        if (!orthia::IsModuleImageReadable(reader, mod))
         {
-            return false;
+            throw std::runtime_error("No image data for module: " + orthia::PlatformStringToUtf8(mod.name));
         }
-        char header[2] = { 0, };
-        Address_type bytesRead = 0;
-        try
-        {
-            reader->Read(mod.address, sizeof(header), header, &bytesRead, ORTHIA_MR_FLAG_READ_ABSOLUTE, 0, reg_none);
-        }
-        catch (const std::exception&)
-        {
-            return false;
-        }
-        return bytesRead == sizeof(header);
     }
+
     CCommandProcessor::RequestCanceledException::RequestCanceledException()
         :   
             std::runtime_error("Request canceled")
@@ -278,6 +268,9 @@ namespace orthia
             moduleName,
             [&](orthia::ModuleInfo& mod)
             {
+                // checked here: a failure in the background analysis cannot fail the command
+                CheckImageReadable(args.item->CreateMemoryReader().get(), mod);
+
                 args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
                         args.workspaceId, []() {
                         });
@@ -321,11 +314,7 @@ namespace orthia
 
             auto pMemoryReader = args.item->CreateMemoryReader();
 
-            // an unresolved dependency owns an address range, but nothing is mapped there
-            if (!IsImageReadable(pMemoryReader.get(), mod))
-            {
-                throw std::runtime_error("No image data for module: " + orthia::PlatformStringToUtf8(mod.name));
-            }
+            CheckImageReadable(pMemoryReader.get(), mod);
 
             orthia::PlatformString_type line;
             line = ORTHIA_TCSTR("Module: ") + mod.name;
