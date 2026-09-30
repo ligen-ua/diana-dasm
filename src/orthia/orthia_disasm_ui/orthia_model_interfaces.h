@@ -247,6 +247,8 @@ namespace orthia
         virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
         virtual ModuleStorage* GetModuleStorage() { return nullptr; }
         virtual void QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out) {}
+        // the db/<sha1> or proc/ folder of this item, without a trailing slash
+        virtual PlatformString_type GetDatabaseFolder() const { return PlatformString_type(); }
     };
 
     class BaseWorkPlaceItem : public IWorkPlaceItem

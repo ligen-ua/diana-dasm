@@ -14,6 +14,7 @@ namespace orthia
     {
         std::shared_ptr<orthia::ISimpleFile> file;
         oui::String fullName, shortName;
+        PlatformString_type databaseFolder;
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;
         std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage;
@@ -50,6 +51,7 @@ namespace orthia
         void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
         void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
         void QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out) override;
+        PlatformString_type GetDatabaseFolder() const override { return databaseFolder; }
 
         // Writes the import targets recorded in the database back into the main module's IAT.
         // The first open links them while loading the dependencies; this restores the same image

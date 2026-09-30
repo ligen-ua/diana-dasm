@@ -1,6 +1,6 @@
 """Fixtures for the orthia command-line tests.
 
-Every Orthia instance gets its own ORTHIA_HOME (DB cache) and ORTHIA_SYMBOL_PATH,
+Every Orthia instance gets its own ORTHIA_HOME (databases) and ORTHIA_SYMBOL_PATH,
 so results never depend on %APPDATA%\\Orthia, ~/.local/share/Orthia or C:\\Sym.
 """
 import os
@@ -61,7 +61,7 @@ def empty_symbols(tmp_path_factory) -> Path:
     return tmp_path_factory.mktemp("no-symbols")
 
 
-# Every fixture has its own home: an --analyze open upgrades the cached DB and loaded
+# Every fixture has its own home: an --analyze open upgrades the DB and loaded
 # symbols persist in it, so sharing a home would make results depend on test order.
 
 @pytest.fixture(scope="session")

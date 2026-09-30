@@ -34,6 +34,8 @@ public:
         std::shared_ptr<orthia::CProgramModel> model;
         int workspaceId = 0;
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler;
+        // the whole command line, for commands that split their arguments themselves
+        orthia::PlatformString_type text;
 
         int linesWithoutSync = 0;
         // non-empty when the command failed, sent as the final reply
@@ -62,6 +64,10 @@ protected:
     void Handle_analyze(CommandArguments& args);
     void Handle_symfix(CommandArguments& args);
     void Handle_mod_info(CommandArguments& args);
+    void Handle_database(CommandArguments& args);
+    void Handle_database_list(CommandArguments& args);
+    void Handle_database_delete(CommandArguments& args, const std::vector<orthia::PlatformString_type>& selectors);
+    void Handle_database_cleanup(CommandArguments& args);
 
 public:
 
@@ -73,6 +79,9 @@ public:
         std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<orthia::CProgramModel> model);
     bool IsBusy() const;
+
+    // true for the commands that work on the data folder and need no open item
+    static bool IsTargetless(const orthia::PlatformString_type& text);
 };
 
 }

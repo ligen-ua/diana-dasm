@@ -34,13 +34,15 @@ static void PrintUsage(std::ostream& out)
     out << "  -h, --help, /?      show this help and exit\n";
     out << "\n";
     out << "Without --cmd the UI is started with the given files and processes opened.\n";
-    out << "--file and --pid are repeatable in UI mode, --cmd requires exactly one of them.\n";
+    out << "--file and --pid are repeatable in UI mode, --cmd requires exactly one of them,\n";
+    out << "except for the data folder commands, which run without a target:\n";
+    out << "  orthia --cmd \".database list\"   (also: delete <sha1 prefix|pid|file>, cleanup)\n";
     out << "\n";
     out << "Exit codes (--cmd mode):\n";
     out << "  0  success\n";
     out << "  1  at least one command reported an error\n";
     out << "  2  bad or incomplete argument\n";
-    out << "  3  target failed to open, or no target given\n";
+    out << "  3  target failed to open, or no target given for a command that needs one\n";
     out << "  4  unexpected error\n";
     out << "\n";
     out << "Environment:\n";

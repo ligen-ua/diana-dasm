@@ -87,7 +87,7 @@ class Result:
 
 
 class Orthia:
-    """A configured orthia binary: one data home (DB cache), one symbol path, and
+    """A configured orthia binary: one data home (databases), one symbol path, and
     whether targets are opened with --analyze (deep analysis + symbols) or quickly."""
 
     def __init__(self, exe: Path, home: Path, symbol_path: Path, analyze: bool = False,

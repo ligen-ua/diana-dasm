@@ -77,7 +77,7 @@ class DataSet:
 
     # derived files, created under the session work dir
     def fresh_copy(self, src: Path, name: str = None, subdir: str = "fresh") -> Path:
-        """Copy with one byte appended: new SHA1, so no cached DB applies."""
+        """Copy with one byte appended: new SHA1, so no existing DB applies."""
         dest = self.work_dir / subdir / (name or src.name)
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)

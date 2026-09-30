@@ -191,6 +191,21 @@ namespace orthia
         return activePos;
     }
 
+    std::map<PlatformString_type, PlatformString_type> CProgramModel::QueryOpenDatabaseFolders() const
+    {
+        std::map<PlatformString_type, PlatformString_type> result;
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+        for (const auto& item : m_items)
+        {
+            auto folder = item.second->GetDatabaseFolder();
+            if (!folder.empty())
+            {
+                result[folder] = item.second->GetShortName().native;
+            }
+        }
+        return result;
+    }
+
     int CProgramModel::RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive)
     {
         int newItemId = 0;
@@ -501,6 +516,8 @@ namespace orthia
             persistentItemStorage->CPersistentItemStorage::Init(info);
 
             info->fullName = file->GetFullFileName();
+            info->databaseFolder = dbFolder;
+            EraseLastSlash(info->databaseFolder);
             info->file = mappedExe;
             {
                 oui::String shortName;
@@ -794,6 +811,8 @@ namespace orthia
             persistentItemStorage->CPersistentItemStorage::Init(info);
 
             info->fullName = file->GetFullFileName();
+            info->databaseFolder = dbFolder;
+            EraseLastSlash(info->databaseFolder);
             info->file = mappedExe;
             {
                 oui::String shortName;

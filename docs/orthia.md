@@ -10,8 +10,9 @@ Supported targets:
 - running processes (Windows and Linux);
 - raw shellcode: files in an unknown format can be opened as raw code.
 
-Analysis results (modules, cross-references, symbols, comments) are cached in an SQLite database for each file,
-so a file opens quickly the second time. See [persistent-cache.md](persistent-cache.md) for what is stored where.
+Analysis results (modules, cross-references, symbols) and your comments are kept in an SQLite database for each file,
+so a file opens quickly the second time and comments survive restarts. See [databases.md](databases.md) for what is
+stored where, and the `.database` commands to list, delete and clean up databases.
 
 ## Building
 
@@ -45,7 +46,8 @@ orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze]
 All arguments are optional: plain `orthia` with no arguments starts the UI with an empty workspace,
 and you open files and processes from the **File** menu (*Open executable*, *Open process*).
 Without `--cmd` the UI starts with all given files and processes open.
-With `--cmd`, exactly one `--file` or `--pid` is required.
+With `--cmd`, exactly one `--file` or `--pid` is required, except when every command is a `.database` command:
+those work on the data folder and run without a target.
 
 Examples:
 ```
@@ -54,6 +56,7 @@ orthia --file C:\Windows\System32\notepad.exe
 orthia --pid 1234
 orthia --file data/elf/dmesg --cmd lm --cmd 'u dmesg!$entrypoint L5'
 orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
+orthia --cmd '.database list'
 ```
 
 ### Quick open vs `--analyze`
@@ -69,7 +72,7 @@ A database created by a quick open is upgraded in place by a later `--analyze` o
 | 0 | success |
 | 1 | at least one command reported an error |
 | 2 | bad or incomplete argument |
-| 3 | the target failed to open, or no target was given |
+| 3 | the target failed to open, or no target was given for a command that needs one |
 | 4 | unexpected error |
 
 ### Environment
@@ -94,6 +97,9 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `.reload [<module>]` | Reload symbols for a module |
 | `.analyze <module>` | Run the full analysis of a module |
 | `.symfix [<path>]` | Set the symbols directory |
+| `.database list` | List the databases in the data folder; needs no open target (see [databases.md](databases.md#managing-databases)) |
+| `.database delete <sel>...` | Delete databases, selected by a SHA-1 prefix, a pid or a file name; an open one is refused |
+| `.database cleanup` | Remove the databases of exited processes and broken or half-deleted folders |
 | `cls` | Clear the screen (UI only) |
 | `exit` | Exit the program (UI only) |
 

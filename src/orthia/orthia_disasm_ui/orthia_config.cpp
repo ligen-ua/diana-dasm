@@ -1,47 +1,7 @@
 #include "orthia_config.h"
 #include "orthia_model.h"
-#include <filesystem>
-#include <chrono>
+#include "orthia_databases.h"
 #include <stdlib.h>
-
-namespace fs = std::filesystem;
-
-static void CleanupOldProcFolders(const orthia::PlatformString_type& procFolderWithSlash)
-{
-    const auto threshold = std::chrono::hours(48);
-    const auto now = fs::file_time_type::clock::now();
-
-    std::error_code ec;
-    for (const auto& entry : fs::directory_iterator(fs::path(procFolderWithSlash), ec))
-    {
-        std::error_code ec2;
-        if (!entry.is_directory(ec2))
-            continue;
-
-        auto newestTime = fs::file_time_type::min();
-        std::error_code ec3;
-        for (const auto& fileEntry : fs::directory_iterator(entry.path(), ec3))
-        {
-            std::error_code ec4;
-            auto wt = fs::last_write_time(fileEntry, ec4);
-            if (!ec4 && wt > newestTime)
-                newestTime = wt;
-        }
-
-        if (newestTime == fs::file_time_type::min())
-        {
-            newestTime = fs::last_write_time(entry, ec2);
-            if (ec2)
-                continue;
-        }
-
-        if (newestTime < now && ((now - newestTime) > threshold))
-        {
-            std::error_code ec5;
-            fs::remove_all(entry.path(), ec5);
-        }
-    }
-}
 
 namespace orthia
 {
@@ -68,7 +28,7 @@ namespace orthia
     }
     void CConfigOptionsStorage::Init()
     {
-        // ORTHIA_HOME replaces the whole <app data>/Orthia folder (used by tests to isolate the DB cache)
+        // ORTHIA_HOME replaces the whole <app data>/Orthia folder (used by tests to isolate the databases)
         auto orthiaHome = QueryEnvironmentString(ORTHIA_TCSTR("ORTHIA_HOME"));
         if (!orthiaHome.empty())
         {
@@ -93,7 +53,7 @@ namespace orthia
         orthia::CreateAllDirectoriesForFile(m_dbDir);
         orthia::CreateAllDirectoriesForFile(m_binDir);
         orthia::CreateAllDirectoriesForFile(m_procDBDir);
-        CleanupOldProcFolders(m_procDBDir);
+        CleanupExpiredProcFolders(m_procDBDir);
 
         // ORTHIA_SYMBOL_PATH replaces the default symbol folders, same format as .symfix
         auto symbolPath = QueryEnvironmentString(ORTHIA_TCSTR("ORTHIA_SYMBOL_PATH"));
@@ -135,6 +95,10 @@ namespace orthia
     PlatformString_type CConfigOptionsStorage::GetProcDBFolder() const
     {
         return m_procDBDir;
+    }
+    PlatformString_type CConfigOptionsStorage::GetDataFolder() const
+    {
+        return m_appDir;
     }
     PlatformString_type CConfigOptionsStorage::GetBinFolder() const
     {

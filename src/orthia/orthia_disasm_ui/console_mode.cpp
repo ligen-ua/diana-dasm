@@ -288,8 +288,26 @@ namespace
         }
         if (options.files.empty() && options.pids.empty())
         {
-            WriteLine(stderr, ORTHIA_TCSTR("No target: --file or --pid is required"));
-            return consoleExit_OpenFail;
+            // the data folder commands (.database) need no target
+            bool allTargetless = true;
+            for (auto& cmdText : options.commands)
+            {
+                allTargetless = allTargetless && CCommandProcessor::IsTargetless(cmdText);
+            }
+            if (!allTargetless)
+            {
+                WriteLine(stderr, ORTHIA_TCSTR("No target: --file or --pid is required"));
+                return consoleExit_OpenFail;
+            }
+            int result = consoleExit_Ok;
+            for (auto& cmdText : options.commands)
+            {
+                if (!RunOneCommand(pump, model, nullptr, cmdText))
+                {
+                    result = consoleExit_CommandFail;
+                }
+            }
+            return result;
         }
 
         for (auto& name : options.files)

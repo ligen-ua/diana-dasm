@@ -27,7 +27,7 @@ CCommandWindow::CCommandWindow(std::function<oui::String()> getCaption,
         auto itemId = model->GetActiveItemId();
 
         auto item = model->GetActiveItem();
-        if (!item)
+        if (!item && !orthia::CCommandProcessor::IsTargetless(text.native) && text.native != ORTHIA_TCSTR("exit"))
         {
             AddLine(oui::String(OUI_TCSTR("No active workspace")));
             return;

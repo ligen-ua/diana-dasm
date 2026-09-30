@@ -13,7 +13,7 @@ Orthia opens executable files and running processes, analyzes their code, and le
 - PE (32/64-bit, including drivers and `ntoskrnl.exe`), ELF, running processes, raw shellcode;
 - runs on Windows and Linux;
 - cross-references, PDB symbols, comments, navigation history;
-- analysis results are cached in a database for each file, so files reopen quickly;
+- analysis results and comments are kept in a database for each file, so files reopen quickly; `.database list | delete | cleanup` manages them;
 - `--cmd` mode runs commands without the UI, for scripting.
 
 Path: src/orthia/orthia_disasm_ui

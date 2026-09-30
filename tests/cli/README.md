@@ -24,7 +24,7 @@ Every run sets two environment variables that the binary honours:
 
 | Variable | Replaces |
 |---|---|
-| `ORTHIA_HOME` | `%APPDATA%\Orthia` / `$XDG_DATA_HOME/Orthia` (analysis DB cache) |
+| `ORTHIA_HOME` | `%APPDATA%\Orthia` / `$XDG_DATA_HOME/Orthia` (databases) |
 | `ORTHIA_SYMBOL_PATH` | default symbol folders (`C:\Sym;C:\Symbols`, `~/sym;~/symbols`) |
 
 ## Quick open vs `--analyze`

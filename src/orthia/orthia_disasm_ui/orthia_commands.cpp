@@ -7,6 +7,9 @@
 #include "orthia_external_symbols.h"
 #include "orthia_image_source.h"
 #include "orthia_memory_cache.h"
+#include "orthia_databases.h"
+#include "orthia_helpers.h"
+#include <ctime>
 
 namespace orthia
 {
@@ -51,6 +54,14 @@ namespace orthia
         :
             m_pool(1)
     {
+    }
+    // commands that read the target: the UI and --cmd let only the data folder commands run without one
+    static void NeedItem(const CCommandProcessor::CommandArguments& args)
+    {
+        if (!args.item)
+        {
+            throw std::runtime_error("No active workspace");
+        }
     }
     void CCommandProcessor::ReportStop(CommandArguments& args)
     {
@@ -399,6 +410,345 @@ namespace orthia
         }
     }
 
+    static const PlatformString_type g_databaseCommand = ORTHIA_TCSTR(".database");
+
+    // Splits a command line on whitespace; double quotes keep a name with spaces together.
+    static std::vector<PlatformString_type> SplitCommandWords(const PlatformString_type& text)
+    {
+        std::vector<PlatformString_type> words;
+        PlatformString_type word;
+        bool inWord = false;
+        bool quoted = false;
+        for (auto ch : text)
+        {
+            if (ch == '"')
+            {
+                quoted = !quoted;
+                inWord = true;
+                continue;
+            }
+            if (!quoted && (ch == ' ' || ch == '\t'))
+            {
+                if (inWord)
+                {
+                    words.push_back(word);
+                    word.clear();
+                    inWord = false;
+                }
+                continue;
+            }
+            word.push_back(ch);
+            inWord = true;
+        }
+        if (quoted)
+        {
+            throw std::runtime_error("Unterminated quote");
+        }
+        if (inWord)
+        {
+            words.push_back(word);
+        }
+        return words;
+    }
+
+    bool CCommandProcessor::IsTargetless(const PlatformString_type& text)
+    {
+        auto begin = text.find_first_not_of(ORTHIA_TCSTR(" \t"));
+        if (begin == PlatformString_type::npos)
+        {
+            return false;
+        }
+        auto end = text.find_first_of(ORTHIA_TCSTR(" \t"), begin);
+        auto word = end == PlatformString_type::npos ? text.substr(begin) : text.substr(begin, end - begin);
+        return word == g_databaseCommand;
+    }
+
+    static PlatformString_type PadRight(PlatformString_type text, size_t width)
+    {
+        if (text.size() < width)
+        {
+            text.append(width - text.size(), ' ');
+        }
+        return text;
+    }
+
+    static PlatformString_type FormatSize(unsigned long long size)
+    {
+        const char* units[] = { "B", "KB", "MB", "GB", "TB" };
+        double value = (double)size;
+        int unit = 0;
+        while (value >= 1024 && unit < 4)
+        {
+            value /= 1024;
+            ++unit;
+        }
+        char buffer[32];
+        if (unit == 0)
+        {
+            snprintf(buffer, sizeof(buffer), "%llu B", size);
+        }
+        else
+        {
+            snprintf(buffer, sizeof(buffer), "%.1f %s", value, units[unit]);
+        }
+        return Utf8ToPlatformString(buffer);
+    }
+
+    static PlatformString_type FormatFileTime(std::filesystem::file_time_type time)
+    {
+        if (time == std::filesystem::file_time_type::min())
+        {
+            return ORTHIA_TCSTR("?");
+        }
+        // C++17 has no clock_cast: go through the distance from now
+        auto systemTime = std::chrono::system_clock::now() +
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(time - std::filesystem::file_time_type::clock::now());
+        std::time_t value = std::chrono::system_clock::to_time_t(systemTime);
+        tm local = { 0 };
+#ifdef DIANA_HAS_WIN32
+        localtime_s(&local, &value);
+#else
+        localtime_r(&value, &local);
+#endif
+        char buffer[32];
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &local);
+        return Utf8ToPlatformString(buffer);
+    }
+
+    static PlatformString_type DescribeDatabase(const DatabaseInfo& info)
+    {
+        if (info.originalName.empty() || info.originalName == info.folderName)
+        {
+            return info.folderName;
+        }
+        return info.folderName + ORTHIA_TCSTR(" ") + info.originalName;
+    }
+
+    void CCommandProcessor::Handle_database_list(CommandArguments& args)
+    {
+        auto config = args.model->GetConfig();
+        auto all = EnumerateDatabases(*config);
+        auto openFolders = args.model->QueryOpenDatabaseFolders();
+
+        auto dataFolder = config->GetDataFolder();
+        EraseLastSlash(dataFolder);
+        args.ReplyLine(ORTHIA_TCSTR("Data folder: ") + dataFolder);
+        if (all.empty())
+        {
+            args.ReplyLine(ORTHIA_TCSTR("No databases"));
+            return;
+        }
+        const size_t widths[] = { 12, 16, 10, 14, 8 };
+        auto formatRow = [&](const PlatformString_type* fields, const PlatformString_type& name) {
+            PlatformString_type line;
+            for (size_t i = 0; i < sizeof(widths) / sizeof(widths[0]); ++i)
+            {
+                line += PadRight(fields[i], widths[i]) + ORTHIA_TCSTR("  ");
+            }
+            return line + name;
+        };
+        const PlatformString_type header[] = { ORTHIA_TCSTR("Database"), ORTHIA_TCSTR("Modified"), ORTHIA_TCSTR("Size"),
+            ORTHIA_TCSTR("State"), ORTHIA_TCSTR("Comments") };
+        args.ReplyLine(formatRow(header, ORTHIA_TCSTR("Name")));
+        for (const auto& info : all)
+        {
+            PlatformString_type id;
+            if (info.kind == DatabaseInfo::Kind::File)
+            {
+                id = info.folderName.substr(0, 12);
+            }
+            else if (info.pid)
+            {
+                orthia::ObjectToString_t(info.pid, id);
+                id = ORTHIA_TCSTR("pid ") + id;
+            }
+            else
+            {
+                id = ORTHIA_TCSTR("proc");
+            }
+
+            PlatformString_type state = ORTHIA_TCSTR("?");
+            PlatformString_type comments = ORTHIA_TCSTR("?");
+            if (info.pendingDelete)
+            {
+                state = ORTHIA_TCSTR("deleting");
+            }
+            else if (!info.hasDataDb)
+            {
+                state = ORTHIA_TCSTR("empty");
+            }
+            else
+            {
+                auto details = QueryDatabaseDetails(*config, info);
+                if (details.mainModuleKnown)
+                {
+                    state = (details.mainModuleFlags & ModuleInfo::flags_analyzeDone) ? ORTHIA_TCSTR("analyzed") : ORTHIA_TCSTR("quick");
+                    if (details.mainModuleFlags & ModuleInfo::flags_symbolsLoaded)
+                    {
+                        state += ORTHIA_TCSTR("+symbols");
+                    }
+                }
+                if (details.commentsKnown)
+                {
+                    orthia::ObjectToString_t(details.comments, comments);
+                }
+            }
+
+            PlatformString_type name = info.originalName.empty() ? info.folderName : info.originalName;
+            const PlatformString_type fields[] = { id, FormatFileTime(info.lastWrite), FormatSize(info.sizeBytes), state, comments };
+            PlatformString_type line = formatRow(fields, name);
+            if (openFolders.count(info.folder))
+            {
+                line += ORTHIA_TCSTR("  (open)");
+            }
+            args.ReplyLine(line);
+        }
+    }
+
+    void CCommandProcessor::Handle_database_delete(CommandArguments& args, const std::vector<PlatformString_type>& selectors)
+    {
+        if (selectors.empty())
+        {
+            throw std::runtime_error("Database expected: a sha1 prefix, a pid or a file name");
+        }
+        auto config = args.model->GetConfig();
+        auto fileSystem = args.model->GetFileSystem();
+        auto all = EnumerateDatabases(*config);
+
+        // the file system that opens targets, so the hash is the one the folder is named by
+        auto hashFile = [&](const PlatformString_type& name) -> PlatformString_type {
+            int error = 0;
+            oui::String fullName;
+            std::tie(error, fullName) = fileSystem->SyncGetFullPathName(name);
+            std::shared_ptr<oui::IFile2> file;
+            if (!error)
+            {
+                std::tie(error, file) = fileSystem->SyncOpenFile(oui::FileUnifiedId(fullName));
+            }
+            if (!file)
+            {
+                throw std::runtime_error("Can't open file: " + PlatformStringToUtf8(name));
+            }
+            auto hash = CalcSha1(file, args.progressHandler);
+            return orthia::ToHexString(hash.data(), hash.size());
+        };
+        auto selected = ResolveDatabaseSelectors(all, selectors, hashFile);
+
+        auto openFolders = args.model->QueryOpenDatabaseFolders();
+        for (const auto& info : selected)
+        {
+            auto it = openFolders.find(info.folder);
+            if (it != openFolders.end())
+            {
+                throw std::runtime_error("Database " + PlatformStringToUtf8(info.folderName) + " is open as " +
+                    PlatformStringToUtf8(it->second) + ", close it first");
+            }
+        }
+
+        std::string lastError;
+        size_t failed = 0;
+        for (const auto& info : selected)
+        {
+            try
+            {
+                DeleteDatabaseFolder(info);
+                args.ReplyLine(ORTHIA_TCSTR("Deleted ") + DescribeDatabase(info));
+            }
+            catch (RequestCanceledException&)
+            {
+                throw;
+            }
+            catch (std::exception& e)
+            {
+                lastError = e.what();
+                ++failed;
+                if (selected.size() > 1)
+                {
+                    args.ReplyLine(ORTHIA_TCSTR("Error: ") + Utf8ToPlatformString(lastError));
+                }
+            }
+        }
+        if (failed && selected.size() == 1)
+        {
+            throw std::runtime_error(lastError);
+        }
+        if (failed)
+        {
+            throw std::runtime_error(std::to_string(failed) + " of " + std::to_string(selected.size()) + " databases were not deleted");
+        }
+    }
+
+    void CCommandProcessor::Handle_database_cleanup(CommandArguments& args)
+    {
+        auto config = args.model->GetConfig();
+        auto processSystem = args.model->GetProcessSystem();
+        auto fileSystem = args.model->GetFileSystem();
+        auto all = EnumerateDatabases(*config);
+        auto openFolders = args.model->QueryOpenDatabaseFolders();
+
+        // through the same providers that open processes and name their folders
+        auto entries = SelectDatabasesForCleanup(all, openFolders, std::filesystem::file_time_type::clock::now(),
+            [&](const DatabaseInfo& info) { return QueryProcessState(*processSystem, *fileSystem, info); });
+        if (entries.empty())
+        {
+            args.ReplyLine(ORTHIA_TCSTR("Nothing to clean up"));
+            return;
+        }
+
+        int removed = 0;
+        unsigned long long freed = 0;
+        for (const auto& entry : entries)
+        {
+            try
+            {
+                DeleteDatabaseFolder(entry.info);
+                args.ReplyLine(ORTHIA_TCSTR("Removed ") + DescribeDatabase(entry.info) + ORTHIA_TCSTR(": ") + entry.reason);
+                ++removed;
+                freed += entry.info.sizeBytes;
+            }
+            catch (RequestCanceledException&)
+            {
+                throw;
+            }
+            catch (std::exception& e)
+            {
+                // another instance may still use it: not an error of this command
+                args.ReplyLine(ORTHIA_TCSTR("Kept ") + DescribeDatabase(entry.info) + ORTHIA_TCSTR(": ") + Utf8ToPlatformString(e.what()));
+            }
+        }
+        PlatformString_type countText;
+        orthia::ObjectToString_t(removed, countText);
+        args.ReplyLine(ORTHIA_TCSTR("Removed ") + countText + ORTHIA_TCSTR(" folder(s), freed ") + FormatSize(freed));
+    }
+
+    void CCommandProcessor::Handle_database(CommandArguments& args)
+    {
+        const char* usage = "Usage: .database list | .database delete <sha1 prefix|pid|file> ... | .database cleanup";
+        auto words = SplitCommandWords(args.text);
+        if (words.size() < 2)
+        {
+            throw std::runtime_error(usage);
+        }
+        const auto& subcommand = words[1];
+        std::vector<PlatformString_type> rest(words.begin() + 2, words.end());
+        if (subcommand == ORTHIA_TCSTR("list") && rest.empty())
+        {
+            Handle_database_list(args);
+            return;
+        }
+        if (subcommand == ORTHIA_TCSTR("delete"))
+        {
+            Handle_database_delete(args, rest);
+            return;
+        }
+        if (subcommand == ORTHIA_TCSTR("cleanup") && rest.empty())
+        {
+            Handle_database_cleanup(args);
+            return;
+        }
+        throw std::runtime_error(usage);
+    }
+
     void CCommandProcessor::ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
@@ -408,26 +758,28 @@ namespace orthia
     {
         CCommandParser parser;
         CommandArguments args = { progressHandler, parser, item, model, model->GetActiveItemId(), uiCommandHandler };
+        args.text = text;
 
         oui::ScopedGuard reportStopGuard([&]() { ReportStop(args); });
 
         try
         {
             parser.SetEmptyHandler([&]() {});
-            parser.SetHandler(OUI_TCSTR("threads"), [&](CCommandParser& parser) mutable { Handle_threads(args);  });
-            parser.SetHandler(OUI_TCSTR("u"), [&](CCommandParser& parser) mutable { Handle_u(args);  });
-            parser.SetHandler(OUI_TCSTR("x"), [&](CCommandParser& parser) mutable { Handle_x(args);  });
-            parser.SetHandler(OUI_TCSTR("db"), [&](CCommandParser& parser) mutable { Handle_d(args, 1);  });
-            parser.SetHandler(OUI_TCSTR("dw"), [&](CCommandParser& parser) mutable { Handle_d(args, 2);  });
-            parser.SetHandler(OUI_TCSTR("dd"), [&](CCommandParser& parser) mutable { Handle_d(args, 4);  });
-            parser.SetHandler(OUI_TCSTR("dq"), [&](CCommandParser& parser) mutable { Handle_d(args, 8);  });
-            parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode());  });
-            parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { Handle_d(args, args.item->GetDianaMode(), true);  });
-            parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { Handle_lm(args);  });
-            parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { Handle_reload(args);  });
-            parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { Handle_analyze(args);  });
+            parser.SetHandler(OUI_TCSTR("threads"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_threads(args);  });
+            parser.SetHandler(OUI_TCSTR("u"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_u(args);  });
+            parser.SetHandler(OUI_TCSTR("x"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_x(args);  });
+            parser.SetHandler(OUI_TCSTR("db"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 1);  });
+            parser.SetHandler(OUI_TCSTR("dw"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 2);  });
+            parser.SetHandler(OUI_TCSTR("dd"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 4);  });
+            parser.SetHandler(OUI_TCSTR("dq"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 8);  });
+            parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, args.item->GetDianaMode());  });
+            parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, args.item->GetDianaMode(), true);  });
+            parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args);  });
+            parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_reload(args);  });
+            parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_analyze(args);  });
             parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });
-            parser.SetHandler(OUI_TCSTR("modinfo"), [&](CCommandParser& parser) mutable { Handle_mod_info(args);  });
+            parser.SetHandler(OUI_TCSTR("modinfo"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_mod_info(args);  });
+            parser.SetHandler(g_databaseCommand, [&](CCommandParser& parser) mutable { Handle_database(args);  });
             parser.SetHandler(OUI_TCSTR("cls"), [&](CCommandParser& parser) mutable { uiCommandHandler->Reply(uiCommandHandler, SpecialUICommands::ClearScreen);  });
 
             parser.Parse(text);

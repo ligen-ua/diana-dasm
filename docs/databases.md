@@ -1,7 +1,9 @@
-# Orthia Persistent Cache
+# Orthia Databases
 
-Orthia keeps everything it learns about a target on disk, so a file opens quickly the second time and
-comments and analysis survive restarts. This document describes what is stored, where, and how to reset it.
+Orthia keeps everything it learns about a target on disk, in one database per file or process, so a file
+opens quickly the second time and comments and analysis survive restarts. A database is not a cache:
+the analysis can be rebuilt, but your comments and the shellcode parameters cannot.
+This document describes what is stored, where, and how to list, delete and clean up databases.
 
 ## Data folder
 
@@ -11,7 +13,7 @@ comments and analysis survive restarts. This document describes what is stored, 
 | Linux | `$XDG_DATA_HOME/Orthia` (`~/.local/share/Orthia`) |
 
 The environment variable `ORTHIA_HOME` replaces the whole folder. The command-line tests use it to run
-against an empty cache.
+against an empty data folder.
 
 ```
 Orthia/
@@ -21,7 +23,7 @@ Orthia/
 ```
 
 The symbol folders (`ORTHIA_SYMBOL_PATH`, by default `C:\Sym;C:\Symbols` or `~/sym;~/symbols`) are not part of
-the cache. Orthia reads PDB files from them, it never writes there.
+the data folder. Orthia reads PDB files from them, it never writes there.
 
 ## Files: `db/<sha1>/`
 
@@ -49,6 +51,8 @@ nothing is thrown away.
 A live process gets `data.db` and `DIRINFO` in a folder named after its pid and short name.
 It is temporary: the folder is deleted when the process item is closed, and at start Orthia removes
 any `proc/` folder that has not been written for 48 hours (left behind by a crash).
+`.database cleanup` removes such folders at once, as soon as their process has exited
+(see [Managing databases](#managing-databases)).
 
 Only the code analysis of the main module and the comments go into that database. The module list,
 exports, module flags and loaded private symbols are kept in memory and rebuilt from the live process.
@@ -146,13 +150,79 @@ before the code analysis runs. On later opens the dependencies are not loaded ag
 (type 2, keyed by slot) are replayed into the image instead, so `dps` on a slot shows the same target as
 the first time. This replay is enabled for PE files; the module description marks it with `iat_slots`.
 
-## Resetting the cache
+## Managing databases
 
-- **Forget one file**: close it in Orthia and delete its `db/<sha1>` folder. The SHA-1 is printed on open
-  (`SHA1: ...`), and `DIRINFO` in each folder names the original file.
-- **Re-resolve dependencies** after a system update: delete the file's folder and open it again. The
+The `.database` commands work on the data folder, not on a target. Type them in the UI's command window,
+with or without an open item, or run them from a shell without `--file`/`--pid`:
+
+```
+orthia --cmd ".database list"
+orthia --cmd ".database delete 3f2a9c0d"
+orthia --cmd ".database cleanup"
+```
+
+### `.database list`
+
+Prints the data folder, then one row per database, the files (`db/`) first, then the processes (`proc/`):
+
+```
+Data folder: C:\Users\me\AppData\Roaming\Orthia
+Database      Modified          Size        State           Comments  Name
+b1c0f061fc02  2026-09-30 21:46  89.7 KB     quick           0         C:\work\dmesg  (open)
+pid 4242      2026-09-30 21:50  1.2 MB      analyzed        0         [4242] notepad.exe
+```
+
+| Column | Content |
+|---|---|
+| Database | the first 12 digits of the SHA-1 of a file, or the pid of a process |
+| Modified | the newest write time of the files in the folder |
+| Size | the size of the folder on disk |
+| State | from the main module's description: `quick` (headers, imports and exports only), `analyzed`, with `+symbols` when a PDB is loaded; `empty` for a folder without `data.db`, `deleting` for a delete that did not finish, `?` when `data.db` can't be read |
+| Comments | the number of comments, the part of a database that can't be rebuilt |
+| Name | the original file name from `DIRINFO` |
+
+`(open)` marks the databases of the items open in this Orthia. The databases are read with a read-only
+connection, so `list` never migrates or changes them.
+
+### `.database delete <selector>...`
+
+Deletes whole folders. Each selector must match exactly one database:
+
+| Selector | Matches |
+|---|---|
+| 6 or more hex digits | the file database whose SHA-1 starts with them, case-insensitive |
+| a decimal number | the process database of that pid (a number that is also a SHA-1 prefix must be unique across both) |
+| anything else | a file name: the file is hashed, and its database is selected. Write `./123456` for a file whose name looks like a number |
+
+A name with spaces goes in double quotes. If any selector matches nothing or more than one database,
+nothing is deleted. A database open in this Orthia is refused with its item name: close the item first.
+
+The folder is renamed before it is removed. On Windows a folder that another Orthia still has open can't be
+renamed, so it is reported and left intact. Another Orthia on Linux, or one that opens the file later,
+is not detected: close other instances before deleting their databases.
+
+### `.database cleanup`
+
+Removes what is no longer needed, and prints each folder with the reason:
+
+| Folder | Removed when |
+|---|---|
+| `proc/[pid] name` | the process has exited, or the pid now runs another program, or the folder has not been written for 48 hours |
+| `db/<sha1>` | it has no `data.db` and has not been written for an hour (a younger one may be being created) |
+| `*.deleting` | a `delete` that failed half way |
+
+A file database with a `data.db` is never removed by `cleanup`, and neither is anything open in this Orthia.
+The process check goes through the same process provider that opens processes: a process Orthia can't
+open (another user's, for example) keeps its folder until the 48 hours pass. A folder another Orthia still
+uses is reported as `Kept` and is not an error.
+
+### By hand
+
+- **Re-resolve dependencies** after a system update: delete the file's database and open the file again. The
   dependencies are located and identified anew, and the file gets a fresh analysis.
-- **Reset everything**: delete the data folder, or point `ORTHIA_HOME` at an empty one.
+- **Reset everything**: close Orthia and delete the data folder, or point `ORTHIA_HOME` at an empty one.
+- A database folder can also be deleted directly while Orthia is closed. The SHA-1 is printed on open
+  (`SHA1: ...`), and `DIRINFO` in each folder names the original file.
 
 Deleting `data.db` alone is not enough for a partial reset: the next open recreates it and treats the
 file as new, which is the same as deleting the folder.

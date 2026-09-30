@@ -12,6 +12,7 @@ set(SOURCES
     orthia_commands.cpp
     orthia_commands_display.cpp
     orthia_config.cpp
+    orthia_databases.cpp
     orthia_helpers.cpp
     orthia_external_symbols.cpp
     orthia_image_source.cpp
