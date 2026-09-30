@@ -76,11 +76,30 @@ namespace orthia
         {
             throw std::runtime_error("Length is too big");
         }
-
-        auto stream = args.item->CreateDisasmStream(targetAddress);
-        if (!stream)
+        if (!countOfInstructions)
         {
             return;
+        }
+
+        // ReadData, not CreateDisasmStream: it knows which bytes are readable, so unmapped memory
+        // is reported instead of printing nothing (file) or disassembling zeroes (process)
+        const Address_type maxInstructionSize = 15;
+        const Address_type sizeToRead = countOfInstructions * maxInstructionSize;
+        auto data = args.item->ReadData(targetAddress, sizeToRead);
+        Address_type validBytes = 0;
+        if (!(data.rangeFlags & orthia::WorkAddressData::flags_FullInvalid) && data.pDataStart)
+        {
+            validBytes = data.dataSize;
+            if (data.pDataFlags)
+            {
+                for (validBytes = 0; validBytes < data.dataSize; ++validBytes)
+                {
+                    if (data.pDataFlags[validBytes] & orthia::WorkAddressData::dataFlags_Invalid)
+                    {
+                        break;
+                    }
+                }
+            }
         }
 
         auto AddTextHandler = [&](const oui::String& text) {
@@ -114,11 +133,28 @@ namespace orthia
             oui::LimitKind::Instructions,
             args.item);
 
-        oui::MemoryPrinter::DianaPrintContext context;
-        Diana_InitContext(&context.context, args.item->GetDianaMode());
+        oui::LineIndex stopAddress(targetAddress, 0);
+        if (validBytes)
+        {
+            ::DianaMemoryStream stream;
+            Diana_InitMemoryStreamEx2(&stream, (void*)data.pDataStart, (DIANA_SIZE_T)validBytes, 0, 0);
 
-        context.pStream = stream.get();
-        printer.OnStream(&context, oui::LineIndex(targetAddress, 0), false);
+            oui::MemoryPrinter::DianaPrintContext context;
+            Diana_InitContext(&context.context, args.item->GetDianaMode());
+            context.pStream = &stream.parent.parent;
+            printer.OnStream(&context, oui::LineIndex(targetAddress, 0), false);
+
+            // undecodable bytes are not counted as commands, so fewer can be printed from readable memory too
+            if (printer.GetPrintedCommands() >= countOfInstructions || validBytes >= sizeToRead)
+            {
+                return;
+            }
+            stopAddress = printer.GetStopAddress();
+        }
+        // like WinDbg: mark where the readable memory ends and fail
+        printer.PrintCommand(oui::LineIndex(stopAddress.GetIndex(), 0), ORTHIA_TCSTR("??"), ORTHIA_TCSTR("???"));
+        throw std::runtime_error("Memory access error at " + orthia::PlatformStringToUtf8(
+            orthia::AddressToString(stopAddress.GetIndex(), args.item->GetDianaMode())));
     }
 
     void CCommandProcessor::Handle_x(CommandArguments& args)

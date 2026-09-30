@@ -140,11 +140,37 @@ def test_modinfo_dependency_without_image(orthia, nt, request, module):
         assert res.code == EXIT_COMMAND_ERROR, res
 
 
-@pytest.mark.xfail(reason="B12: u on unmapped memory prints nothing and exits 0")
+NT_IMAGE_END = 0x1_4081_EBB8
+
+
 def test_u_unmapped(orthia, nt):
-    # db prints ?? rows here; u should print something similar or fail
     res = orthia.run("u 0 L2", **nt)
-    assert res.code == EXIT_COMMAND_ERROR or res.lines, res
+    assert res.code == EXIT_COMMAND_ERROR, res
+    res.assert_line(r"^00000000`00000000\s+\?\?\s+\?\?\?$")
+    assert "Memory access error" in res.stdout + res.stderr, res
+
+
+def test_u_unresolved_module(orthia, nt, unresolved):
+    # by address: the expression parser cannot take an API set name, its '-' is a minus
+    lm = orthia.run("lm", **nt).assert_ok()
+    start = lm.assert_line(rf"^(\S+)\s+\S+\s+{re.escape(unresolved)}\s").group(1)
+    res = orthia.run(f"u {start} L2", **nt)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    res.assert_line(r"\?\?\s+\?\?\?$")
+
+
+def test_u_stops_at_end_of_image(orthia, nt):
+    res = orthia.run(f"u {NT_IMAGE_END - 0x18:x} L10", **nt)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    assert res.first_addr() == NT_IMAGE_END - 0x18, res
+    res.assert_line(r"^00000001`4081ebb8\s+\?\?\s+\?\?\?$")
+
+
+def test_db_across_end_of_image(orthia, nt):
+    # a range starting inside the image and running past its end used to be all ??
+    res = orthia.run(f"db {NT_IMAGE_END - 0x18:x} L20", **nt).assert_ok()
+    res.assert_line(r"^00000001`4081eba0  e0 aa e8 aa")
+    res.assert_line(r"^00000001`4081ebb0  40 ab 58 ab 60 ab 68 ab-\?\? \?\?")
 
 
 @pytest.mark.xfail(reason="B12: .analyze on a module without image data does nothing and exits 0")

@@ -53,6 +53,7 @@ namespace oui
         oui::LineIndex m_startAddress;
         oui::LineIndex m_endAddress;
         bool m_haveEndAddress = false;
+        oui::LineIndex m_stopAddress;
         orthia::IMarkupCache* m_referencesCache = nullptr;
         const LimitKind m_limitKind;
 
@@ -93,6 +94,9 @@ namespace oui
             bool* pPrint,
             bool* pExit) override;
         oui::LineIndex GetRealFirstAddress() const;
+        // where the last OnStream stopped, and how many commands have been printed so far
+        oui::LineIndex GetStopAddress() const { return m_stopAddress; }
+        orthia::Address_type GetPrintedCommands() const { return m_currentCommand; }
     };
 
 }

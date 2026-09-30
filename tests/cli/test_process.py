@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from orthia_runner import EXIT_OPEN_FAILED
+from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED
 
 pytestmark = pytest.mark.process
 
@@ -64,6 +64,14 @@ def test_x_without_module_skips_other_modules(orthia, runtime):
     # the runtime library is not the main module, so a bare name must not find its export
     res = orthia.run(f"x {RUNTIME_EXPORT}", **SELF).assert_ok()
     assert not res.symbols, res
+
+
+def test_u_unmapped(orthia):
+    # page 0 is never mapped; its unread bytes used to be disassembled as zeroes (add [rax], al)
+    res = orthia.run("u 0 L2", **SELF)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    assert not res.instructions() or all("??" in line for line in res.instructions()), res
+    res.assert_line(r"^00000000`00000000\s+\?\?\s+\?\?\?$")
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="pid 4 (System) is Windows-only")

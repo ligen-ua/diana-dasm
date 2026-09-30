@@ -140,6 +140,11 @@ namespace oui
 
     Diana_LinkedAdditionalGroupInfo* MemoryPrinter::GetLinkedInfo()
     {
+        // a ?? line can be printed outside OnStream, with no command decoded
+        if (!m_pDianaPrintContext)
+        {
+            return 0;
+        }
         auto pInfo = m_pDianaPrintContext->result.pInfo;
         if (!pInfo)
         {
@@ -181,11 +186,14 @@ namespace oui
         m_textMarkupBuilder.AddNextRange(m_currentBlock.size() - oldSize, m_colors.spaces);
 
         // pack command
-        Diana_AnalyzeJumps(&m_pDianaPrintContext->result,
-            address + m_pDianaPrintContext->result.iFullCmdSize,
-            &tag->newOffset,
-            &tag->absoluteAddress,
-            &tag->linksToData);
+        if (m_pDianaPrintContext)
+        {
+            Diana_AnalyzeJumps(&m_pDianaPrintContext->result,
+                address + m_pDianaPrintContext->result.iFullCmdSize,
+                &tag->newOffset,
+                &tag->absoluteAddress,
+                &tag->linksToData);
+        }
 
         PackCommand(command, tag);
         size_t lastOffset = 0;
@@ -506,6 +514,7 @@ namespace oui
             }
         }
 
+        m_stopAddress = virtualOffset;
         m_pDianaPrintContext = 0;
     }
 

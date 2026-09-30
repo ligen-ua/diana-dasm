@@ -70,13 +70,15 @@ namespace orthia
         {
             positiveAddress = address - file->GetImageBase();
         }
-        Address_type startValidBytes = (size - startInvalidBytes) - positiveAddress;
-        Address_type endInvalidBytes = 0;
-        if (startValidBytes > file->GetMappedFile().size())
+        Address_type mappedSize = file->GetMappedFile().size();
+        if (positiveAddress > mappedSize)
         {
-            endInvalidBytes = startValidBytes - file->GetMappedFile().size();
-            startValidBytes = file->GetMappedFile().size();
+            return WorkAddressData();
         }
+        // whatever of the module is left after the start, not the size minus the start offset:
+        // that underflowed for any range starting inside the module and running past its end
+        Address_type startValidBytes = std::min<Address_type>(size - startInvalidBytes, mappedSize - positiveAddress);
+        Address_type endInvalidBytes = size - startInvalidBytes - startValidBytes;
         if (startInvalidBytes + startValidBytes + endInvalidBytes != size)
         {
             // something is just plain wrong, the main assumption is broken
