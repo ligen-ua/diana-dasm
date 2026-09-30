@@ -165,6 +165,7 @@
     <ClCompile Include="orthia_exec.cpp" />
     <ClCompile Include="orthia_expressions.cpp" />
     <ClCompile Include="orthia_files.cpp" />
+    <ClCompile Include="orthia_image_identity.cpp" />
     <ClCompile Include="orthia_log.cpp" />
     <ClCompile Include="orthia_memory_cache.cpp" />
     <ClCompile Include="orthia_module_manager.cpp" />
@@ -210,6 +211,7 @@
     <ClInclude Include="orthia_exec.h" />
     <ClInclude Include="orthia_expressions.h" />
     <ClInclude Include="orthia_files.h" />
+    <ClInclude Include="orthia_image_identity.h" />
     <ClInclude Include="orthia_interfaces.h" />
     <ClInclude Include="orthia_interfaces_vm.h" />
     <ClInclude Include="orthia_json.h" />

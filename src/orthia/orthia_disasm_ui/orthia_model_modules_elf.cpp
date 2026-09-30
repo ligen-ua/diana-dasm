@@ -1,6 +1,8 @@
 #include "orthia_model_modules_elf.h"
 #include "orthia_database_saver.h"
 #include "orthia_item_file.h"
+#include "orthia_image_source.h"
+#include "orthia_helpers.h"
 #include "orthia_log.h"
 
 namespace orthia
@@ -33,6 +35,14 @@ namespace orthia
     {
         int platformError = 0;
         oui::String fullName;
+        if (!m_exeDirectory.native.empty())
+        {
+            std::tie(platformError, fullName) = m_pFs->SyncLocateFile(oui::String(m_exeDirectory.native + libName.native), m_dianaMode);
+            if (!platformError)
+            {
+                return fullName;
+            }
+        }
         std::tie(platformError, fullName) = m_pFs->SyncLocateFile(libName, m_dianaMode);
         if (platformError)
         {
@@ -154,6 +164,11 @@ namespace orthia
         ModuleInfo info;
         info.elfFile = mappedElf;
         info.fullName = fullName;
+        QueryImageIdentity(*mappedElf, info.identity);
+        {
+            auto sha1 = CalcSha1(rawFile);
+            info.identity.sha1Hex = BytesToHex(sha1.data(), sha1.size());
+        }
         return m_mappedModules.insert({ normalName.native, info }).first;
     }
 
@@ -272,6 +287,7 @@ namespace orthia
         m_pFs = pFs;
         m_dianaMode = elfFile->GetDianaMode();
         m_freeSpaceStart = elfFile->GetImageEnd();
+        m_exeDirectory = DirectoryOfFile(fileName);
 
         oui::String shortFileName;
         orthia::UnparseFileNameFromFullFileName(fileName.native, &shortFileName.native);
@@ -377,11 +393,15 @@ namespace orthia
                 &rollback,
                 true);
 
+            ModuleSourceMeta source;
+            source.srcKind = g_meta_src_kind_linked;
+            source.identity = &mod.second.identity;
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.elfFile->GetImageBase(),
                 mod.second.fullName.native,
                 0,
-                orthia::ModuleInfo::builtInFlags_moduleTypeElf);
+                orthia::ModuleInfo::builtInFlags_moduleTypeElf,
+                &source);
 
             InsertNames(moduleManager, mod.second);
             classicDatabase->DoneSave();

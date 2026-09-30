@@ -1,4 +1,5 @@
 #include "orthia_config.h"
+#include "orthia_image_source.h"
 #include "orthia_model.h"
 #include "ui_common.h"
 
@@ -149,8 +150,6 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
     line += column;
 
     // add status
-    column = columnStatus;
-    column.resize(addressTextSize + 3, ORTHIA_TCHAR(' '));
     line += columnStatus;
 
     // send header
@@ -166,28 +165,7 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
         column.resize(maxModuleNameSize + 3, ORTHIA_TCHAR(' '));
         line += column;
 
-        column = ORTHIA_TCSTR("");
-        if (mod.builtInFlags & mod.builtInFlags_unresolved)
-        {
-            column += ORTHIA_TCSTR("unresolved");
-        }
-        if (mod.flags & mod.flags_analyzeDone)
-        {
-            if (!column.empty())
-            {
-                column += ORTHIA_TCSTR(", ");
-            }
-            column += ORTHIA_TCSTR("analysis");
-        }
-        if (mod.flags & mod.flags_symbolsLoaded)
-        {
-            if (!column.empty())
-            {
-                column += ORTHIA_TCSTR(", ");
-            }
-            column += ORTHIA_TCSTR("symbols");
-        }
-        line += column;
+        line += orthia::ModuleStatusText(mod);
 
         args.ReplyLine(line);
         line.clear();

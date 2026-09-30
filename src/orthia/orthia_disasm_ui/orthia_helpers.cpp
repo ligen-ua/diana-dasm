@@ -81,6 +81,22 @@ namespace orthia
         return result;
     }
 
+    oui::String DirectoryOfFile(const oui::String& fullName)
+    {
+        PlatformString_type path = fullName.native;
+        const PlatformString_type prefix = ORTHIA_TCSTR("\\\\?\\");
+        if (path.compare(0, prefix.size(), prefix) == 0)
+        {
+            path.erase(0, prefix.size());
+        }
+        auto pos = path.find_last_of(ORTHIA_TCSTR("\\/"));
+        if (pos == PlatformString_type::npos)
+        {
+            return oui::String();
+        }
+        return oui::String(path.substr(0, pos + 1));
+    }
+
     // CMemoryReaderOverVector
     CMemoryReaderOnLoadedData::CMemoryReaderOnLoadedData(Address_type imageBase, const char* pData, size_t size)
         :

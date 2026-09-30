@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OK, EXIT_OPEN_FAILED
+from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED
 
 pytestmark = pytest.mark.pe
 
@@ -125,19 +125,23 @@ def test_lm_unresolved_modules_get_own_ranges(orthia, nt):
 
 
 # "unresolved" is an import no host has (e.g. an ext-ms-win-* API set), hal.dll comes from the Windows host
+# and is linked from disk (see test_dependencies.py)
 @pytest.mark.parametrize("module", [
     "unresolved",
     pytest.param("hal.dll", marks=pytest.mark.skipif(sys.platform != "win32", reason="host DLL")),
 ])
-def test_modinfo_dependency_without_image(orthia, nt, request, module):
+def test_modinfo_dependency(orthia, nt, request, module):
     if module == "unresolved":
         module = request.getfixturevalue("unresolved")
-    res = orthia.run(f"modinfo {module}", **nt)
-    if res.code == EXIT_OK:
+        res = orthia.run(f"modinfo {module}", **nt)
+        assert res.code == EXIT_COMMAND_ERROR, res
+        res.assert_line(r"^Image: none \(unresolved dependency\)$")
+        assert f"No image data for module: {module}" in res.stdout, res
+    else:
+        res = orthia.run(f"modinfo {module}", **nt).assert_ok()
+        res.assert_line(r"^Image: linked")
         guid = res.assert_line(r"^Debug GUID: (\S+)$").group(1)
         assert guid.strip("0-"), res
-    else:
-        assert res.code == EXIT_COMMAND_ERROR, res
 
 
 NT_IMAGE_END = 0x1_4081_EBB8
@@ -177,12 +181,12 @@ def test_db_across_end_of_image(orthia, nt):
     "unresolved",
     pytest.param("hal.dll", marks=pytest.mark.skipif(sys.platform != "win32", reason="host DLL")),
 ])
-def test_analyze_module_without_image(orthia_cold, nt, request, module):
+def test_analyze_dependency(orthia_cold, nt, request, module):
     if module == "unresolved":
         module = request.getfixturevalue("unresolved")
-    res = orthia_cold.run(f".analyze {module}", "lm", **nt)
-    if res.code == EXIT_OK:
-        res.assert_line(rf"\b{re.escape(module)}\s+.*\banalysis")
-    else:
+        res = orthia_cold.run(f".analyze {module}", "lm", **nt)
         assert res.code == EXIT_COMMAND_ERROR, res
         assert f"No image data for module: {module}" in res.stdout + res.stderr, res
+    else:
+        res = orthia_cold.run(f".analyze {module}", "lm", **nt).assert_ok()
+        res.assert_line(rf"\b{re.escape(module)}\s+linked, analysis$")

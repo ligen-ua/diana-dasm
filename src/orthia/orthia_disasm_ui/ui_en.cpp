@@ -47,6 +47,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("name"), ORTHIA_TCSTR("Name"))
         << textManager->RegisterValue(ORTHIA_TCSTR("address"), ORTHIA_TCSTR("Address"))
         << textManager->RegisterValue(ORTHIA_TCSTR("mapped-size"), ORTHIA_TCSTR("Size"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("status"), ORTHIA_TCSTR("Status"))
         << textManager->RegisterValue(ORTHIA_TCSTR("full-path"), ORTHIA_TCSTR("Path"))
         ;
     // names

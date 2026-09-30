@@ -14,6 +14,7 @@ set(SOURCES
     orthia_config.cpp
     orthia_helpers.cpp
     orthia_external_symbols.cpp
+    orthia_image_source.cpp
     orthia_item_file.cpp
     orthia_module_symbols.cpp
     orthia_item_process.cpp

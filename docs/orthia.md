@@ -87,10 +87,10 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 |---|---|
 | `x <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
-| `lm` | List loaded modules |
+| `lm` | List modules with their status: `unresolved`, `linked`, `stale`, `unlinked`, `analysis`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)) |
 | `db`, `dw`, `dd`, `dq`, `dp`, `dps` | Display memory as bytes, words, dwords, qwords, pointers, or pointers with symbols |
 | `threads` | Display threads (processes only) |
-| `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) |
+| `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from |
 | `.reload [<module>]` | Reload symbols for a module |
 | `.analyze <module>` | Run the full analysis of a module |
 | `.symfix [<path>]` | Set the symbols directory |
@@ -148,6 +148,29 @@ Disassembly view:
 | ; | Write a comment |
 | BACKSPACE | Return to the previous location |
 | CTRL+X | Open the cross-references dialog |
+
+## Dependencies in file mode
+
+When a file is opened for the first time, its imports are resolved like a loader would: each imported
+module is looked up in the directory of the opened file first, then in the system search path
+(`System32` and `System32\drivers` on Windows), mapped, and placed after the main image in a synthetic
+address space. Their exports go into the database, and the main module's import table is linked to them,
+so `dps` on an import slot shows the target and `u kernel32!CreateFileW` disassembles the dependency.
+
+The dependency files themselves are not copied. What is recorded is their path and identity: for PE the
+`TimeDateStamp`, `SizeOfImage` and the debug GUID, for ELF the GNU build id. A dependency is read from disk
+only when its bytes are first needed, and only if the file at the recorded path is still the same build.
+`lm` shows the outcome per module:
+
+| Status | Meaning |
+|---|---|
+| `linked` | the file is available and matches the recorded identity; bytes are read on demand |
+| `stale` | the file is missing or is another build (for example after a Windows update); names still work, bytes do not. `modinfo` says why |
+| `unresolved` | the import could not be found at first open (API sets such as `api-ms-win-*`); a range is reserved for it, nothing is mapped |
+| `unlinked` | recorded by an older Orthia version without identity; names only |
+
+The layout is fixed by the database: a file always reopens with the same module addresses, whether or not
+the dependencies are still readable.
 
 ## Symbols
 

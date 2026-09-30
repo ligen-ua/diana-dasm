@@ -23,5 +23,6 @@ namespace orthia
         DI_UINT64 GetEntryPoint() const override;
         int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
+        bool WriteImage(DI_UINT64 address, const void* pData, size_t size) override;
     };
 }

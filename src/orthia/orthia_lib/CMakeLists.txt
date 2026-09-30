@@ -22,6 +22,7 @@ add_library(${PROJECT_NAME} SHARED
     orthia_exec.cpp
     orthia_expressions.cpp
     orthia_files_linux.cpp
+    orthia_image_identity.cpp
     orthia_log.cpp
     orthia_memory_cache.cpp
     orthia_module_manager.cpp

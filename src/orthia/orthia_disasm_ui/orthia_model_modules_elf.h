@@ -5,6 +5,7 @@
 #include "oui_filesystem.h"
 #include "orthia_elf.h"
 #include "orthia_model.h"
+#include "orthia_image_identity.h"
 
 namespace orthia
 {
@@ -16,10 +17,12 @@ namespace orthia
             bool originalFile = false;
             oui::String fullName;
             std::unordered_map<Address_type, orthia::NameInfo> names;
+            ImageIdentity identity;
         };
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
+        oui::String m_exeDirectory;   // searched first, like the dynamic loader's rpath of the binary
         std::shared_ptr<oui::IFileSystem> m_pFs;
         std::shared_ptr<oui::BaseOperation> m_operation;
 

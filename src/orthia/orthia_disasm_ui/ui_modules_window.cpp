@@ -2,6 +2,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "ui_modules_window.h"
+#include "orthia_image_source.h"
 #include "oui_menu.h"
 #include <ctime>
 
@@ -67,6 +68,7 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
     m_modulesBox->InitColumns(oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("name"));  }, 25),
         oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("address"));  }, 19, oui::ColumnFormat::ctCenter),
         oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("mapped-size"));  }, 11, oui::ColumnFormat::ctCenter),
+        oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("status"));  }, 20, oui::ColumnFormat::ctLeft),
         oui::ColumnParam([=] { return columnsNode->QueryValue(ORTHIA_TCSTR("full-path"));  }, 55, oui::ColumnFormat::ctLeft)
 
     );
@@ -258,6 +260,7 @@ void CModulesWindow::UpdateVisibleItems()
         vit->text.push_back(it->name);
         vit->text.push_back(orthia::ToWideStringAsHex(it->address));
         vit->text.push_back(orthia::ToWideStringAsHex((unsigned int)it->size));
+        vit->text.push_back(orthia::ModuleStatusText(*it));
         vit->text.push_back(it->fullName);
         vit->tag = std::make_shared<ModuleItemContextTag>(it->address, it->name);
 

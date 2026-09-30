@@ -6,6 +6,7 @@
 #include "orthia_model.h"
 #include "orthia_pe.h"
 #include "orthia_model_modules_elf.h"
+#include "orthia_image_identity.h"
 #include "diana_executable.h"
 
 
@@ -24,11 +25,14 @@ namespace orthia
             Address_type base = 0;
             Address_type size = 0;
             bool unresolved = false;
+            // recorded in the database so the file can be checked before it is mapped again
+            ImageIdentity identity;
         };
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
         decltype(m_mappedModules)::iterator m_currentModule;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
+        oui::String m_exeDirectory;   // searched before the system paths, like the real loader
 
         using ModuleIterator = decltype(m_mappedModules)::iterator;
         std::shared_ptr<oui::IFileSystem> m_pFs;

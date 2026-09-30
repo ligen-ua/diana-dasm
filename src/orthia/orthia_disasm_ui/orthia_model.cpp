@@ -571,18 +571,28 @@ namespace orthia
                 const int builtInTypeFlag =
                     (executableType == DIANA_EXECUTABLE_TYPE_ELF) ? ModuleInfo::builtInFlags_moduleTypeElf :
                     (executableType == DIANA_EXECUTABLE_TYPE_PE)  ? ModuleInfo::builtInFlags_moduleTypePe : 0;
+                ModuleSourceMeta source;
+                // PE only: the ELF GOT slot keys are not verified for the replay yet
+                source.iatSlots = (executableType == DIANA_EXECUTABLE_TYPE_PE);
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     imageBase,
                     info->fullName.native,
                     deepAnalysis ? ModuleInfo::flags_analyzeDone : 0,
-                    builtInTypeFlag);
+                    builtInTypeFlag,
+                    &source);
             }
-            else if (needsAnalysis)
+            else
             {
-                // opened before without --analyze
-                info->moduleManager->AnalyzeRegisteredModule(imageBase, &reader, info->shortName.native, 0);
-                info->UpdateModuleFlags(imageBase, ModuleInfo::flags_analyzeDone, 0);
+                // the dependencies are not loaded again: the linked IAT comes from the database
+                info->ApplyLinkedImports();
+                if (needsAnalysis)
+                {
+                    // opened before without --analyze
+                    info->moduleManager->AnalyzeRegisteredModule(imageBase, &reader, info->shortName.native, 0);
+                    info->UpdateModuleFlags(imageBase, ModuleInfo::flags_analyzeDone, 0);
+                }
             }
+            info->InitImageSources(executableType);
 
             auto workspaceId = RegisterItem(info, false);
             result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
@@ -825,6 +835,7 @@ namespace orthia
                     ModuleInfo::flags_analyzeDone,
                     0);
             }
+            info->InitImageSources(DIANA_EXECUTABLE_TYPE_NONE);
 
             auto workspaceId = RegisterItem(info, false);
             result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);

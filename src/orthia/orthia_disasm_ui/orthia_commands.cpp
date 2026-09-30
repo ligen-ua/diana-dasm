@@ -5,6 +5,7 @@
 #include "orthia_match.h"
 #include "orthia_model.h"
 #include "orthia_external_symbols.h"
+#include "orthia_image_source.h"
 #include "orthia_memory_cache.h"
 
 namespace orthia
@@ -314,14 +315,22 @@ namespace orthia
 
             auto pMemoryReader = args.item->CreateMemoryReader();
 
-            CheckImageReadable(pMemoryReader.get(), mod);
-
             orthia::PlatformString_type line;
             line = ORTHIA_TCSTR("Module: ") + mod.name;
             args.ReplyLine(line);
 
             line = ORTHIA_TCSTR("Full name: ") + mod.fullName;
             args.ReplyLine(line);
+
+            auto imageSource = orthia::ModuleImageSourceText(mod);
+            if (!imageSource.empty())
+            {
+                // said before the failure below, so a stale dependency explains itself
+                line = ORTHIA_TCSTR("Image: ") + imageSource;
+                args.ReplyLine(line);
+            }
+
+            CheckImageReadable(pMemoryReader.get(), mod);
 
             if (mod.builtInFlags & orthia::ModuleInfo::builtInFlags_moduleTypeElf)
             {

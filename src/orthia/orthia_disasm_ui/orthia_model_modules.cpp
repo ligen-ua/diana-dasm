@@ -6,6 +6,8 @@
 #include "orthia_memory_cache.h"
 #include "orthia_database_saver.h"
 #include "orthia_item_file.h"
+#include "orthia_image_source.h"
+#include "orthia_helpers.h"
 #include "orthia_log.h"
 
 namespace orthia
@@ -43,6 +45,14 @@ namespace orthia
     {
         int platformError = 0;
         oui::String normalName;
+        if (!m_exeDirectory.native.empty())
+        {
+            std::tie(platformError, normalName) = m_pFs->SyncLocateFile(oui::String(m_exeDirectory.native + dllName.native), m_dianaMode);
+            if (!platformError)
+            {
+                return normalName;
+            }
+        }
         std::tie(platformError, normalName) = m_pFs->SyncLocateFile(dllName, m_dianaMode);
         if (platformError)
         {
@@ -233,6 +243,11 @@ namespace orthia
         info.fullName = fullName;
         info.base = mappedPE->GetImageBase();
         info.size = mappedPE->GetMappedPeFile().size();
+        QueryImageIdentity(*mappedPE, info.identity);
+        {
+            auto sha1 = CalcSha1(binPeFile);
+            info.identity.sha1Hex = BytesToHex(sha1.data(), sha1.size());
+        }
         if (m_freeSpaceStart < mappedPE->GetImageEnd())
         {
             m_freeSpaceStart = mappedPE->GetImageEnd();
@@ -426,6 +441,7 @@ namespace orthia
             throw std::runtime_error("Unknown filesystem");
         }
         m_dianaMode = peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+        m_exeDirectory = DirectoryOfFile(fileName);
 
         oui::String shortFileName;
         orthia::UnparseFileNameFromFullFileName(fileName.native, &shortFileName.native);
@@ -442,19 +458,9 @@ namespace orthia
             m_freeSpaceStart = peFile->GetImageEnd();
         }
 
-        auto imageBase = peFile->GetImageBase();
-
-        orthia::CReaderOverVector reader(imageBase, peFile->GetMappedPeFile());
-        orthia::CMemoryStorageOfModifiedData mappedFile(&reader);
-        orthia::DianaAnalyzerReadWriteStream writeStream(&mappedFile);
-
-        std::vector<char> page(4096);
-        DI_CHECK_CPP(DianaPeFile_LinkImports(&peFile->GetImpl()->mappedPE,
-            imageBase,
-            &writeStream,
-            &page.front(),
-            (DI_UINT32)page.size(),
-            GetParent()));
+        // the resolved slots go into the served image itself: `dps` on the IAT and the analysis
+        // see the linked values, and the database keeps slot -> target for the reopen replay
+        DI_CHECK_CPP(peFile->LinkImports(this));
 
         for (auto& pair: m_mappedModules)
         {
@@ -521,15 +527,23 @@ namespace orthia
                 true);
 
             int builtInFlags = orthia::ModuleInfo::builtInFlags_moduleTypePe;
+            ModuleSourceMeta source;
             if (mod.second.unresolved)
             {
                 builtInFlags |= orthia::ModuleInfo::builtInFlags_unresolved;
+                source.srcKind = g_meta_src_kind_none;
+            }
+            else
+            {
+                source.srcKind = g_meta_src_kind_linked;
+                source.identity = &mod.second.identity;
             }
             InsertModuleMetaInfo(classicDatabase,
                 mod.second.base,
                 mod.second.fullName.native,
                 0,
-                builtInFlags);
+                builtInFlags,
+                &source);
 
             InsertNames(moduleManager, mod.second);
 

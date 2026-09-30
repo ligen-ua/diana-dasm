@@ -52,6 +52,13 @@ namespace orthia
         int flags = 0;
         int builtInFlags = 0;
         PlatformString_type name;
+
+        // where the bytes come from (orthia::ImageSourceKind / ImageState as ints; 0 for process items).
+        // imageSourceKnown: the item has an image source table, so kind None means "unlinked"
+        bool imageSourceKnown = false;
+        int imageSourceKind = 0;
+        int imageState = 0;
+        PlatformString_type imageStateReason;
     };
 
     struct WorkAddressData :oui::Noncopyable

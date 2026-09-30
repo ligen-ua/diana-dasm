@@ -7,6 +7,8 @@ namespace orthia
 {
     class CCommonFormatParser;
     class CCommonFormatBuilder;
+    class ImageSourceTable;
+    struct IImageSource;
 
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, BaseWorkPlaceItem
     {
@@ -15,8 +17,14 @@ namespace orthia
         std::shared_ptr<CModuleManager> moduleManager;
         Address_type moduleLastValidAddress = 0;
         std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage;
+        // one source per module in tbl_modules; built once after the database is ready
+        std::shared_ptr<const ImageSourceTable> imageSources;
 
         FileWorkplaceItem(std::shared_ptr<CFilePersistentItemStorage> peristentItemStorage_in);
+
+        // Builds imageSources from tbl_modules and the module metainfo (identity, src_kind).
+        // Runs the cheap header pre-check of linked PE dependencies, so call it off the UI thread.
+        void InitImageSources(int executableType);
 
         // public interface
         WorkAddressData ReadData(Address_type address, Address_type size) override;
@@ -43,13 +51,27 @@ namespace orthia
         void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
         void QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out) override;
 
+        // Writes the import targets recorded in the database back into the main module's IAT.
+        // The first open links them while loading the dependencies; this restores the same image
+        // on reopen without touching the dependency files. Returns the number of slots written.
+        int ApplyLinkedImports();
+
     private:
         NameInfo QueryAddressNameImpl(Address_type address) const;
 
     };
 
     class CClassicDatabase;
-    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String & fullName, int moduleFlags, int builtInModuleFlags = 0);
+    struct ImageIdentity;
+
+    // extra module metainfo describing the image source (see orthia_image_source.h)
+    struct ModuleSourceMeta
+    {
+        const char* srcKind = nullptr;            // g_meta_src_kind_* or nullptr to omit
+        const ImageIdentity* identity = nullptr;  // written as id_* attributes when set
+        bool iatSlots = false;                    // main module: import rows are keyed by IAT slot
+    };
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String & fullName, int moduleFlags, int builtInModuleFlags = 0, const ModuleSourceMeta* source = nullptr);
     void UpdateModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, std::function<bool(CCommonFormatParser&, CCommonFormatBuilder&)> handler);
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo& info, Address_type metaInfoAddres);
 }

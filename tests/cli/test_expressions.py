@@ -1,7 +1,7 @@
 """Name resolution in expressions without a PDB (regression tests for B3).
 
 Addresses are checked with `db <expr> L1`, which prints the resolved address
-even where `u` cannot read memory (dependency modules in file mode).
+even where `u` cannot read memory (unresolved or stale dependencies in file mode).
 """
 import re
 

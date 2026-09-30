@@ -53,4 +53,10 @@ namespace orthia
     {
         return 0;
     }
+
+    bool CSimpleShellcodeFile::WriteImage(DI_UINT64, const void*, size_t)
+    {
+        // raw code has no imports to link
+        return false;
+    }
 }

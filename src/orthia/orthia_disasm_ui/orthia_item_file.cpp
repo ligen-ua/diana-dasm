@@ -1,5 +1,11 @@
 #include "orthia_item_file.h"
+#include "orthia_image_source.h"
 #include "orthia_helpers.h"
+#include <map>
+extern "C"
+{
+#include "diana_executable.h"
+}
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
@@ -13,6 +19,19 @@ namespace orthia
     {
     }
     // FileWorkplaceItem
+    static WorkAddressData MakeInvalidData(Address_type size)
+    {
+        std::vector<char> buffer((size_t)size);
+        auto* pBufferStart = buffer.data();
+        return WorkAddressData(
+            pBufferStart,
+            size,
+            nullptr,
+            WorkAddressData::flags_FullInvalid,
+            [buffer = std::move(buffer)](WorkAddressData*) {
+        }
+        );
+    }
     WorkAddressData FileWorkplaceItem::ReadData(Address_type address, Address_type size)
     {
         if (!size)
@@ -24,77 +43,80 @@ namespace orthia
         {
             return WorkAddressData();
         }
-        // check fast cases
-        if (lastValid < file->GetImageBase() ||
-            address > moduleLastValidAddress)
+        if (!imageSources)
         {
-            // the entire range is inaccessible
-            std::vector<char> buffer(size);
-            auto* pBufferStart = buffer.data();
-            return WorkAddressData(
-                pBufferStart,
-                size,
-                nullptr,
-                WorkAddressData::flags_FullInvalid,
-                [buffer = std::move(buffer)](WorkAddressData*) {
-            }
-            );
+            return MakeInvalidData(size);
         }
 
-        if (address >= file->GetImageBase() &&
-            lastValid <= moduleLastValidAddress)
+        // fast case: the entire range is inside one module
+        if (auto* source = imageSources->Find(address))
         {
-            // the entire range is good
-            auto offset = address - file->GetImageBase();
-            auto pBufferStart = file->GetMappedFile().data() + offset;
-            auto sharedThis = shared_from_this();
-            return WorkAddressData(
-                pBufferStart,
-                size,
-                nullptr,
-                WorkAddressData::flags_FullValid,
-                [sharedThis = std::move(sharedThis)](WorkAddressData*) mutable {
-                sharedThis.reset();
+            if (lastValid <= source->GetLastValidAddress())
+            {
+                auto image = source->GetImage();
+                if (!image)
+                {
+                    // a stale or unresolved dependency owns the range with nothing mapped there
+                    return MakeInvalidData(size);
+                }
+                auto offset = address - image->GetImageBase();
+                auto pBufferStart = image->GetMappedFile().data() + offset;
+                return WorkAddressData(
+                    pBufferStart,
+                    size,
+                    nullptr,
+                    WorkAddressData::flags_FullValid,
+                    [image = std::move(image)](WorkAddressData*) mutable {
+                    image.reset();
+                }
+                );
             }
-            );
-        }
-        // damn, the range is partially inaccessible, it will be slow
-        // [startInvalidBytes][module itself][endInvalidBytes]
-        Address_type startInvalidBytes = 0;
-        Address_type positiveAddress = 0;
-        if (address < file->GetImageBase())
-        {
-            startInvalidBytes = file->GetImageBase() - address;
-        }
-        else
-        {
-            positiveAddress = address - file->GetImageBase();
-        }
-        Address_type mappedSize = file->GetMappedFile().size();
-        if (positiveAddress > mappedSize)
-        {
-            return WorkAddressData();
-        }
-        // whatever of the module is left after the start, not the size minus the start offset:
-        // that underflowed for any range starting inside the module and running past its end
-        Address_type startValidBytes = std::min<Address_type>(size - startInvalidBytes, mappedSize - positiveAddress);
-        Address_type endInvalidBytes = size - startInvalidBytes - startValidBytes;
-        if (startInvalidBytes + startValidBytes + endInvalidBytes != size)
-        {
-            // something is just plain wrong, the main assumption is broken
-            return WorkAddressData();
         }
 
-        // ok here we go, prepare the final data
-        std::vector<char> buffer(size);
+        // the range spans module boundaries: copy what is mapped, flag the rest
+        std::vector<char> buffer((size_t)size);
+        std::vector<char> flags((size_t)size, WorkAddressData::dataFlags_Invalid);
+        bool anyValid = false;
+        Address_type pos = address;
+        for (;;)
+        {
+            auto* source = imageSources->Find(pos);
+            if (!source)
+            {
+                source = imageSources->FindNext(pos);
+                if (!source || source->GetBase() > lastValid)
+                {
+                    break;
+                }
+                pos = source->GetBase();
+            }
+            const Address_type sourceLast = source->GetLastValidAddress();
+            const Address_type chunkLast = std::min(sourceLast, lastValid);
+            if (auto image = source->GetImage())
+            {
+                const auto& data = image->GetMappedFile();
+                const Address_type imageOffset = pos - image->GetImageBase();
+                if (imageOffset < data.size())
+                {
+                    const Address_type available = std::min<Address_type>(chunkLast - pos + 1, data.size() - imageOffset);
+                    const size_t bufferOffset = (size_t)(pos - address);
+                    memcpy(buffer.data() + bufferOffset, data.data() + imageOffset, (size_t)available);
+                    memset(flags.data() + bufferOffset, 0, (size_t)available);
+                    anyValid = true;
+                }
+            }
+            if (chunkLast >= lastValid)
+            {
+                break;
+            }
+            pos = chunkLast + 1;
+        }
+        if (!anyValid)
+        {
+            return MakeInvalidData(size);
+        }
         auto* pBufferStart = buffer.data();
-        memcpy(pBufferStart + startInvalidBytes, file->GetMappedFile().data() + positiveAddress, startValidBytes);
-
-        std::vector<char> flags(size);
         auto* pFlagsStart = flags.data();
-        memset(pFlagsStart + 0, WorkAddressData::dataFlags_Invalid, startInvalidBytes);
-        memset(pFlagsStart + startInvalidBytes + startValidBytes, WorkAddressData::dataFlags_Invalid, endInvalidBytes);
-
         return WorkAddressData(
             pBufferStart,
             size,
@@ -108,6 +130,19 @@ namespace orthia
 
     WorkAddressRangeInfo FileWorkplaceItem::GetRangeInfo(Address_type address) const
     {
+        // the module owning the address; the main module when the address is in no module,
+        // so the initial view (address 0) lands on the main entry point
+        IImageSource* source = imageSources ? imageSources->Find(address) : nullptr;
+        if (source && source->GetKind() != ImageSourceKind::Main)
+        {
+            return {
+                source->GetBase(),
+                source->GetLastValidAddress(),
+                source->GetBase(),
+                source->GetSize(),
+                file->GetDianaMode()
+            };
+        }
         return {
             file->GetImageBase(),
             moduleLastValidAddress,
@@ -290,6 +325,19 @@ namespace orthia
             return true;
         });
 
+        if (imageSources)
+        {
+            for (auto& mod : modules)
+            {
+                mod.imageSourceKnown = true;
+                if (auto* source = imageSources->Find(mod.address))
+                {
+                    mod.imageSourceKind = (int)source->GetKind();
+                    mod.imageState = (int)source->GetState();
+                    mod.imageStateReason = source->GetStateReason();
+                }
+            }
+        }
 
         return count;
     }
@@ -542,31 +590,40 @@ namespace orthia
     {
         struct DianaReadStreamAdapter
         {
-            std::shared_ptr<orthia::ISimpleFile> file;
+            std::shared_ptr<const orthia::ISimpleFile> file;
             ::DianaMemoryStream stream;
 
-            DianaReadStreamAdapter(std::shared_ptr<orthia::ISimpleFile> file_in)
+            DianaReadStreamAdapter(std::shared_ptr<const orthia::ISimpleFile> file_in)
                 :
-                file(file_in)
+                file(std::move(file_in))
             {
             }
         };
 
-        if (addressStart < file->GetImageBase() || addressStart >= file->GetImageEnd())
+        IImageSource* source = imageSources ? imageSources->Find(addressStart) : nullptr;
+        if (!source)
+        {
+            return nullptr;
+        }
+        auto image = source->GetImage();
+        if (!image || addressStart < image->GetImageBase() || addressStart >= image->GetImageEnd())
         {
             return nullptr;
         }
 
-        auto streamAdapter = std::make_shared<DianaReadStreamAdapter>(file);
-        auto diff = addressStart - file->GetImageBase();
-
-        auto& data = file->GetMappedFile();
+        auto diff = addressStart - image->GetImageBase();
+        auto& data = image->GetMappedFile();
+        auto streamAdapter = std::make_shared<DianaReadStreamAdapter>(std::move(image));
         Diana_InitMemoryStreamEx2(&streamAdapter->stream, (char*)data.data()+diff, data.size()-diff, 0, 0);
 
         return std::shared_ptr<::DianaMovableReadStream>(streamAdapter, &streamAdapter->stream.parent.parent);
     }
     std::shared_ptr<IMemoryReader> FileWorkplaceItem::CreateMemoryReader()
     {
+        if (imageSources)
+        {
+            return std::make_shared<CCompositeMemoryReader>(imageSources);
+        }
         const auto& mapped = file->GetMappedFile();
         return std::make_shared<CMemoryReaderOnLoadedData>(
             file->GetImageBase(), mapped.data(), mapped.size());
@@ -589,12 +646,27 @@ namespace orthia
             });
     }
     // InsertModuleMetaInfo
-    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName, int moduleFlags, int builtInModuleFlags)
+    void InsertModuleMetaInfo(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const oui::String& fullName, int moduleFlags, int builtInModuleFlags, const ModuleSourceMeta* source)
     {
         orthia::CCommonFormatBuilder builder;
         builder.AddMetadata(ORTHIA_TCSTR("fullname"), fullName.native);
         builder.AddMetadata("flags", moduleFlags);
         builder.AddMetadata("builtinflags", builtInModuleFlags);
+        if (source)
+        {
+            if (source->srcKind)
+            {
+                builder.AddMetadata(std::string(g_meta_src_kind), std::string(source->srcKind));
+            }
+            if (source->identity)
+            {
+                WriteImageIdentity(builder, *source->identity);
+            }
+            if (source->iatSlots)
+            {
+                builder.AddMetadata(std::string(g_meta_iat_slots), 1);
+            }
+        }
         std::string metaInfo;
         builder.Produce(&metaInfo);
 
@@ -623,6 +695,132 @@ namespace orthia
             database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress, true);
         }
     }
+    void FileWorkplaceItem::InitImageSources(int executableType)
+    {
+        auto table = std::make_shared<ImageSourceTable>();
+        table->SetMain(std::make_shared<CMainImageSource>(file));
+
+        // identity and source kind per dependency, from the module metainfo
+        struct SourceRecord
+        {
+            std::string srcKind;
+            ImageIdentity identity;
+            PlatformString_type fullName;
+            int builtInFlags = 0;
+        };
+        std::map<Address_type, SourceRecord> records;
+        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        classicDatabase->QueryMetaInfo(g_database_type_moduleMetaInfo,
+            [&](Address_type moduleAddress, int, const std::string& text, Address_type)
+        {
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            SourceRecord record;
+            parser.QueryMetadata(std::string(g_meta_src_kind), &record.srcKind);
+            parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &record.fullName);
+            parser.QueryMetadata("builtinflags", &record.builtInFlags);
+            ReadImageIdentity(parser, record.identity);
+            records[moduleAddress] = std::move(record);
+            return true;
+        });
+
+        std::vector<CommonModuleInfo> dbModules;
+        classicDatabase->QueryModules(&dbModules);
+        const Address_type mainBase = file->GetImageBase();
+        std::vector<std::shared_ptr<CLinkedFileImageSource>> linked;
+        for (auto& dbm : dbModules)
+        {
+            if (dbm.address == mainBase || !dbm.size)
+            {
+                continue;
+            }
+            auto recordIt = records.find(dbm.address);
+            if (recordIt == records.end() || recordIt->second.srcKind.empty())
+            {
+                // recorded before image sources existed: names only
+                table->Add(std::make_shared<CNullImageSource>(dbm.address, dbm.size, ORTHIA_TCSTR("recorded without identity")));
+                continue;
+            }
+            const auto& record = recordIt->second;
+            if (record.srcKind != g_meta_src_kind_linked || !record.identity.IsValid())
+            {
+                table->Add(std::make_shared<CNullImageSource>(dbm.address, dbm.size, PlatformString_type()));
+                continue;
+            }
+            int moduleType = executableType;
+            if (record.builtInFlags & ModuleInfo::builtInFlags_moduleTypeElf)
+            {
+                moduleType = DIANA_EXECUTABLE_TYPE_ELF;
+            }
+            else if (record.builtInFlags & ModuleInfo::builtInFlags_moduleTypePe)
+            {
+                moduleType = DIANA_EXECUTABLE_TYPE_PE;
+            }
+            auto source = std::make_shared<CLinkedFileImageSource>(dbm.address,
+                dbm.size,
+                record.fullName,
+                record.identity,
+                moduleType,
+                file->GetDianaMode());
+            linked.push_back(source);
+            table->Add(source);
+        }
+        table->Sort();
+
+        // headers only: `lm` shows stale dependencies right after open without mapping anything
+        for (auto& source : linked)
+        {
+            source->PreCheckHeader();
+        }
+        imageSources = table;
+    }
+
+    int FileWorkplaceItem::ApplyLinkedImports()
+    {
+        auto database = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        const Address_type mainBase = file->GetImageBase();
+
+        // old databases keyed the import rows by the module address, nothing to replay there
+        bool slotsRecorded = false;
+        database->QueryMetaInfoModule2(mainBase, g_database_type_moduleMetaInfo, -1,
+            [&](Address_type, int, const std::string& text, Address_type)
+        {
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            int value = 0;
+            slotsRecorded = parser.QueryMetadata(std::string(g_meta_iat_slots), &value) && value != 0;
+            return false;
+        });
+        if (!slotsRecorded)
+        {
+            return 0;
+        }
+
+        const int pointerSize = file->GetDianaMode();
+        if (pointerSize != 4 && pointerSize != 8)
+        {
+            return 0;
+        }
+        int applied = 0;
+        database->QueryMetaInfoModule2(mainBase, g_database_type_fnc_Import, -1,
+            [&](Address_type, int, const std::string& text, Address_type slot)
+        {
+            CCommonFormatParser parser;
+            parser.Parse(text);
+            Address_type target = 0;
+            parser.QueryMetadata("address", &target);
+
+            // little-endian, like the image itself
+            DI_UINT64 value = target;
+            if (file->WriteImage(slot, &value, (size_t)pointerSize))
+            {
+                ++applied;
+            }
+            return true;
+        });
+        return applied;
+    }
+
     void FileWorkplaceItem::QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out)
     {
         auto reader = CreateMemoryReader();
@@ -644,7 +842,8 @@ namespace orthia
         }
         if (info.flags & orthia::NameInfo::flags_Import)
         {
-            database->InsertMetaInfo(moduleAddress, g_database_type_fnc_Import, metaInfo, moduleAddress);
+            // keyed by the IAT slot, so the linked value can be replayed on reopen (g_meta_iat_slots)
+            database->InsertMetaInfo(moduleAddress, g_database_type_fnc_Import, metaInfo, metaInfoAddres);
             return;
         }
         if (info.flags & orthia::NameInfo::flags_PrivateSymbol)

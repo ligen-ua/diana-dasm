@@ -195,6 +195,25 @@ namespace orthia
             0,
             DIANA_LINK_IMPORT_READ_FULL_INFO);
     }
+    int CSimplePeFile::LinkImports(diana::CBasePeLinkImportsObserver* observer)
+    {
+        if (m_mappedPeFile.empty() || !m_dianaContext.get())
+        {
+            return DI_ERROR;
+        }
+
+        // a writable stream over the image itself, as Relocate does: the resolved slots stay in the image
+        std::vector<char> page(4096);
+        ::DianaMemoryStream rwStream;
+        Diana_InitMemoryStreamEx2(&rwStream, m_mappedPeFile.data(), m_mappedPeFile.size(), 1, m_imageBase);
+
+        return DianaPeFile_LinkImports(&m_dianaContext->mappedPE,
+            m_imageBase,
+            &rwStream.parent,
+            page.data(),
+            (DI_UINT32)page.size(),
+            observer->GetParent());
+    }
     int CSimplePeFile::QueryExports(diana::CBasePeLinkImportsObserver* observer)
     {
         if (m_mappedPeFile.empty() || !m_dianaContext.get())
@@ -282,5 +301,15 @@ namespace orthia
         DI_UINT64 ep = m_imageBase;
         Diana_SafeAdd(&ep, m_dianaContext->mappedPE.pImpl->addressOfEntryPoint);
         return ep;
+    }
+    bool CSimplePeFile::WriteImage(DI_UINT64 address, const void* pData, size_t size)
+    {
+        if (!pData || address < m_imageBase)
+            return false;
+        const DI_UINT64 offset = address - m_imageBase;
+        if (offset > m_mappedPeFile.size() || size > m_mappedPeFile.size() - offset)
+            return false;
+        memcpy(m_mappedPeFile.data() + offset, pData, size);
+        return true;
     }
 }

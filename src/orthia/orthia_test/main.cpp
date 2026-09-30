@@ -84,6 +84,7 @@ void test_shuttle_utils();
 void test_tokenizer();
 void test_expressions();
 void test_elf();
+void test_image_identity();
 
 int main(int argc, char * argv[])
 {
@@ -111,6 +112,7 @@ int main(int argc, char * argv[])
     orthia::InitEnvironmentPaths(paths);
 #endif
     test_elf();
+    test_image_identity();
 
     test_expressions();
     test_tokenizer();
