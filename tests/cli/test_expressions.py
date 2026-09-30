@@ -3,6 +3,8 @@
 Addresses are checked with `db <expr> L1`, which prints the resolved address
 even where `u` cannot read memory (dependency modules in file mode).
 """
+import re
+
 import pytest
 
 from orthia_runner import EXIT_COMMAND_ERROR
@@ -64,6 +66,24 @@ def test_unknown_name(orthia, nt, expression):
     res = orthia.run(f"db {expression} L1", **nt)
     assert res.code == EXIT_COMMAND_ERROR, res
     res.assert_line(r"^Error: Unknown variable: ")
+
+
+@pytest.fixture(scope="module")
+def api_set(orthia, nt):
+    """(name, base) of an unresolved API set dependency, whose name contains '-'."""
+    name = orthia.unresolved_module(**nt)
+    lm = orthia.run("lm", **nt).assert_ok()
+    start = lm.assert_line(rf"^(\S+)\s+\S+\s+{re.escape(name)}\s").group(1)
+    return name, int(start.replace("`", ""), 16)
+
+
+@pytest.mark.parametrize("with_extension", [True, False], ids=["dll", "stem"])
+@pytest.mark.xfail(reason="B18: a module name containing '-' (ext-ms-win-*) is parsed as a subtraction: "
+                          "'Invalid token', or 'Unknown variable: ext' without the extension")
+def test_module_name_with_dash_resolves_to_base(orthia, nt, api_set, with_extension):
+    name, base = api_set
+    expression = name if with_extension else name.rsplit(".", 1)[0]
+    assert orthia.resolve(expression, **nt) == base
 
 
 def test_dependency_export(orthia, nt):
