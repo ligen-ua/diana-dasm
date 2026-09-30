@@ -64,7 +64,7 @@ def unresolved(orthia, nt):
 
 @pytest.mark.xfail(reason="B4: .reload loads a PDB into a dependency that has no image and a zero GUID")
 def test_reload_skips_module_without_image(orthia_cold, data, tmp_path, unresolved):
-    # the unresolved dependency is registered at 0 with size 0 and a zero debug GUID;
+    # the unresolved dependency owns a reserved range but has no image, so no debug GUID;
     # a PDB of the same name on the symbol path must not be taken for it
     stem = unresolved.rsplit(".", 1)[0]
     symbols = tmp_path / "symbols"

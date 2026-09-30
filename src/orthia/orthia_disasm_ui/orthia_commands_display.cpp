@@ -167,8 +167,16 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
         line += column;
 
         column = ORTHIA_TCSTR("");
+        if (mod.builtInFlags & mod.builtInFlags_unresolved)
+        {
+            column += ORTHIA_TCSTR("unresolved");
+        }
         if (mod.flags & mod.flags_analyzeDone)
         {
+            if (!column.empty())
+            {
+                column += ORTHIA_TCSTR(", ");
+            }
             column += ORTHIA_TCSTR("analysis");
         }
         if (mod.flags & mod.flags_symbolsLoaded)

@@ -19,6 +19,11 @@ namespace orthia
             bool originalFile = false;
             oui::String fullName;
             std::unordered_map<Address_type, orthia::NameInfo> names;
+            // the range the module occupies: an unresolved dependency has no image, but like an empty
+            // struct it still gets a range of its own, so every module keeps a unique address
+            Address_type base = 0;
+            Address_type size = 0;
+            bool unresolved = false;
         };
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
         decltype(m_mappedModules)::iterator m_currentModule;
@@ -37,6 +42,7 @@ namespace orthia
         ModuleIterator LoadModule(const std::string& dllName);
         void RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile);
         OPERAND_SIZE GetLastPossibleAddress();
+        Address_type ReserveSpace(OPERAND_SIZE size);
 
         void QueryFunctionImpl(const char* pDllName,
             const char* pFunctionName,

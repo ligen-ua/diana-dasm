@@ -112,6 +112,18 @@ def test_lm_resolves_driver_import(orthia, nt):
     assert m.group(1) != m.group(2), m.string
 
 
+def test_lm_unresolved_modules_get_own_ranges(orthia, nt):
+    # they used to share address 0, and all but one were overwritten in the module table
+    res = orthia.run("lm", **nt).assert_ok()
+    rows = [(int(m.group(1).replace("`", ""), 16), int(m.group(2).replace("`", ""), 16), bool(m.group(3)))
+            for m in re.finditer(r"^([0-9a-f`]{17})\s+([0-9a-f`]{17})\s+\S+(\s+unresolved\b)?", res.stdout, re.M)]
+    unresolved = [(start, end) for start, end, flag in rows if flag]
+    assert len(unresolved) > 1, res
+    assert all(0 < start < end for start, end in unresolved), res
+    ranges = sorted((start, end) for start, end, _ in rows)
+    assert all(prev[1] <= cur[0] for prev, cur in zip(ranges, ranges[1:])), res
+
+
 # "unresolved" is an import no host has (e.g. an ext-ms-win-* API set), hal.dll comes from the Windows host
 @pytest.mark.parametrize("module", [
     "unresolved",
@@ -140,6 +152,6 @@ def test_u_unmapped(orthia, nt):
 def test_analyze_module_without_image(orthia_cold, nt, unresolved):
     res = orthia_cold.run(f".analyze {unresolved}", "lm", **nt)
     if res.code == EXIT_OK:
-        res.assert_line(rf"\b{re.escape(unresolved)}\s+analysis")
+        res.assert_line(rf"\b{re.escape(unresolved)}\s+.*\banalysis")
     else:
         assert res.code == EXIT_COMMAND_ERROR, res

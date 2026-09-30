@@ -136,11 +136,11 @@ class Orthia:
         return self.raw(*args, timeout=timeout)
 
     def unresolved_module(self, **target) -> str:
-        """Name of a dependency that could not be located: `lm` lists it at 0 with size 0.
-        Unresolved dependencies all share address 0 and only one of them survives, so which
-        name that is depends on hash order; ask for it rather than hard-coding one."""
+        """Name of a dependency that could not be located: `lm` marks it `unresolved`.
+        Takes an API set (api-ms-*/ext-ms-*), which is never a file on any host, rather
+        than hard-coding one whose presence depends on the Windows version."""
         res = self.run("lm", **target).assert_ok()
-        return res.assert_line(r"^00000000`00000000\s+00000000`00000000\s+(\S+)").group(1)
+        return res.assert_line(r"\s((?:api|ext)-ms-\S+)\s+unresolved\b").group(1)
 
     def resolve(self, expression: str, **target) -> int:
         """Address an expression evaluates to, via `db <expr> L1` (works even where `u` can't read memory)."""

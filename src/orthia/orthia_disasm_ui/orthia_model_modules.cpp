@@ -61,8 +61,9 @@ namespace orthia
         }
         for (auto& mod : m_mappedModules)
         {
-            auto curAddress = mod.second.peFile->GetImageBase();
-            auto curEnd = mod.second.peFile->GetImageEnd();
+            // ranges, not images: reservations of unresolved dependencies are occupied too
+            auto curAddress = mod.second.base;
+            auto curEnd = mod.second.base + mod.second.size;
 
             if (curAddress > modAddress &&
                 curAddress < modEnd)
@@ -129,6 +130,17 @@ namespace orthia
         auto possibleAddress = RoundUp(m_freeSpaceStart, 0x10000);
         peFile->Relocate(possibleAddress);
     }
+    Address_type CPEImportsLoader::ReserveSpace(OPERAND_SIZE size)
+    {
+        OPERAND_SIZE lastPossibleAddress = GetLastPossibleAddress();
+        auto address = RoundUp(m_freeSpaceStart, 0x10000);
+        if (address < m_freeSpaceStart || address > lastPossibleAddress || size > lastPossibleAddress - address)
+        {
+            throw std::runtime_error("Can't reserve space: address space exhausted");
+        }
+        m_freeSpaceStart = address + size;
+        return address;
+    }
     CPEImportsLoader::ModuleIterator CPEImportsLoader::LoadModule(const std::string& dllName)
     {
         try
@@ -144,6 +156,18 @@ namespace orthia
             ModuleInfo info;
             info.fullName = orthia::Utf8ToPlatformString(dllName);
             info.peFile = std::make_shared <orthia::CSimplePeFile> ();
+            info.unresolved = true;
+            try
+            {
+                // one page of its own: at 0 all the unresolved dependencies would collide in tbl_modules
+                info.size = 0x1000;
+                info.base = ReserveSpace(info.size);
+            }
+            catch (std::exception& reserveError)
+            {
+                ORTHIA_LOG(orthia::LogSeverity::Error, "Can't reserve space for ", dllName, " Error: ", reserveError.what());
+                info.size = 0;
+            }
             return m_mappedModules.insert({ name.native, info }).first;
         }
     }
@@ -155,6 +179,19 @@ namespace orthia
             if (it != m_mappedModules.end())
             {
                 return it;
+            }
+        }
+        if (dllName.find('.') == std::string::npos)
+        {
+            // a forwarder names its module without an extension ("ntoskrnl.KeFoo"): NormalizeName guessed .dll,
+            // but it may be an already loaded .exe or .sys
+            auto stem = name.native.substr(0, name.native.rfind('.'));
+            for (auto it = m_mappedModules.begin(); it != m_mappedModules.end(); ++it)
+            {
+                if (it->first.rfind('.') == stem.size() && it->first.compare(0, stem.size(), stem) == 0)
+                {
+                    return it;
+                }
             }
         }
         auto fullName = LocateFile(name);
@@ -194,6 +231,8 @@ namespace orthia
         ModuleInfo info;
         info.peFile = mappedPE;
         info.fullName = fullName;
+        info.base = mappedPE->GetImageBase();
+        info.size = mappedPE->GetMappedPeFile().size();
         if (m_freeSpaceStart < mappedPE->GetImageEnd())
         {
             m_freeSpaceStart = mappedPE->GetImageEnd();
@@ -394,6 +433,8 @@ namespace orthia
         info.peFile = peFile;
         info.originalFile = true;
         info.fullName = fileName;
+        info.base = peFile->GetImageBase();
+        info.size = peFile->GetMappedPeFile().size();
         auto res = m_mappedModules.insert(std::make_pair(NormalizeName(shortFileName).native, info));
         m_currentModule = res.first;
         if (m_freeSpaceStart < peFile->GetImageEnd())
@@ -444,7 +485,7 @@ namespace orthia
         auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
         for (auto& name : mod.names)
         {
-            InsertName(classicDatabase, mod.peFile->GetImageBase(), name.second, name.first);
+            InsertName(classicDatabase, mod.base, name.second, name.first);
         }
     }
 
@@ -464,21 +505,31 @@ namespace orthia
                 batch->Commit();
                 continue;
             }
+            if (!mod.second.size)
+            {
+                // no range could be reserved: a module at 0 would collide with the others
+                continue;
+            }
             oui::String shortName;
             orthia::UnparseFileNameFromFullFileName(mod.second.fullName.native, &shortName.native);
 
             CAutoRollbackClassicDatabase rollback;
-            classicDatabase->StartSaveModule(mod.second.peFile->GetImageBase(),
-                mod.second.peFile->GetMappedPeFile().size(),
+            classicDatabase->StartSaveModule(mod.second.base,
+                mod.second.size,
                 shortName.native,
                 &rollback,
                 true);
 
+            int builtInFlags = orthia::ModuleInfo::builtInFlags_moduleTypePe;
+            if (mod.second.unresolved)
+            {
+                builtInFlags |= orthia::ModuleInfo::builtInFlags_unresolved;
+            }
             InsertModuleMetaInfo(classicDatabase,
-                mod.second.peFile->GetImageBase(),
+                mod.second.base,
                 mod.second.fullName.native,
                 0,
-                orthia::ModuleInfo::builtInFlags_moduleTypePe);
+                builtInFlags);
 
             InsertNames(moduleManager, mod.second);
 
