@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED
+from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED, check_x_sort_orders
 
 pytestmark = pytest.mark.process
 
@@ -51,6 +51,12 @@ def test_module_resolves_to_base(orthia, runtime):
     res = orthia.run("lm", **SELF).assert_ok()
     base = res.assert_line(rf"^(\S+)\s+\S+\s+{re.escape(module)}\b").group(1)
     assert orthia.resolve(module, **SELF) == int(base.replace("`", ""), 16)
+
+
+def test_x_sort_orders(orthia, runtime):
+    module, _ = runtime
+    rows = check_x_sort_orders(orthia, f"{module}!{RUNTIME_EXPORT[:2]}*", **SELF)
+    assert any(symbol.endswith(f"!{RUNTIME_EXPORT}") for _, _, symbol in rows), rows
 
 
 def test_unknown_name(orthia, runtime):

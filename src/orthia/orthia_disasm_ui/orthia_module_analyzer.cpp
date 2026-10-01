@@ -134,6 +134,11 @@ namespace orthia
                             moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
                         }
                         item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
+                        // the analysis rewrites the names of the module and of its dependencies
+                        for (const auto& mod : modules)
+                        {
+                            item->InvalidateNames(mod.address);
+                        }
                     }
                 }
             }
@@ -222,9 +227,7 @@ namespace orthia
                             break;
                         for (const auto& info : page)
                             hints.push_back(info.address);
-                        key.flags |= NameSelectionKey::flags_ContinueFrom;
-                        key.address = page.back().address;
-                        key.continueMarkNameFlag = page.back().flags;
+                        key.offset += (int)page.size();
                     }
                 }
 
@@ -237,6 +240,7 @@ namespace orthia
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols")), mainIt->name));
 
                         moduleManager->ReloadModuleWithHints(mainIt->address, reader.get(), mainIt->name, 0, hints);
+                        item->InvalidateNames(mainIt->address);
                         item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzePrivateDone, 0);
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols-done")), mainIt->name));
                     }
@@ -337,6 +341,8 @@ namespace orthia
                             storage->Store(mod.address, std::move(syms));
                         else
                             syms.FlushToDB(mod.address, db);
+                        // OnModuleSymbolsLoaded came with the first symbol, before they were stored
+                        item->InvalidateNames(mod.address);
                     }
                     if (onProgress)
                     {

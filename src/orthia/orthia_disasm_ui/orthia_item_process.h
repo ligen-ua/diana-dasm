@@ -1,6 +1,7 @@
 #pragma once
 #include "oui_processes.h"
 #include "orthia_module_symbols.h"
+#include "orthia_module_names.h"
 
 namespace orthia
 {
@@ -21,8 +22,10 @@ namespace orthia
         std::shared_ptr<CModuleManager> m_moduleManager;
         mutable std::shared_ptr<IPeristentItemStorage> m_persistentStorage;
         std::shared_ptr<ModuleStorage> m_moduleStorage;
+        mutable ModuleNamesStorage m_moduleNames;
 
-        void QueryNamesEx(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names, int* totalCount) const;
+        void BuildModuleNames(Address_type moduleAddress, ModuleNames& names) const;
+        std::shared_ptr<const ModuleNames> QueryModuleNames(Address_type moduleAddress) const;
         NameInfo QueryAddressNameNoLock(Address_type address) const;
         NameInfo QueryAddressNameImpl(Address_type address, orthia::ModuleInfo& moduleInfo) const;
 
@@ -50,6 +53,7 @@ namespace orthia
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
+        void InvalidateNames(Address_type moduleAddress) override;
         MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const override;
         void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const override;
         bool QueryAddressModule(Address_type address, orthia::ModuleInfo& result) const;

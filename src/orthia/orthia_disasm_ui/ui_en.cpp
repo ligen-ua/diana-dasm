@@ -91,6 +91,11 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules.contextmenu"))
         << textManager->RegisterValue(ORTHIA_TCSTR("show_sections"), ORTHIA_TCSTR("Show &Sections"))
         ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.names.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("sort_by_type"),    ORTHIA_TCSTR("Sort by &Type"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("sort_by_name"),    ORTHIA_TCSTR("Sort by &Name"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("sort_by_address"), ORTHIA_TCSTR("Sort by &Address"))
+        ;
 
     // workspace
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.workspace"))

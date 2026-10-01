@@ -13,7 +13,7 @@ namespace orthia
         const char* description;
     };
     static const CommandHelpItem g_commandHelpItems[] = {
-        { "x <mask>", "Examine symbols" },
+        { "x [/a|/n] [/v] <mask>", "Examine symbols (/a: by address, /n: by name, /v: show type)" },
         { "u <address> [L<length>]", "Unassemble address" },
         { "lm", "List loaded modules" },
         { "d[b,w,d,q,p,ps]", "Display memory" },

@@ -25,6 +25,7 @@ const int CModulesWindow::field_namesBox_Offset;
 const int CModulesWindow::field_cachedNamesPage_size;
 const int CModulesWindow::field_modulesBox_Offset;
 const int CModulesWindow::field_modulesBox_Position;
+const int CModulesWindow::field_namesSortOrder;
 
 oui::String NameInfoFlagsToString(int flags)
 {
@@ -85,6 +86,7 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
 
     m_namesOwner.getTotalCount = [this]() { return Names_GetTotalCount(); };
     m_namesOwner.shiftViewWindow = [this](int newOffset) { return Names_ShiftViewWindow(newOffset); };
+    m_namesOwner.prepareContextMenu = [this](std::vector<oui::PopupItem>& items) { Names_OnContextMenu(items); };
 
     m_namesBox = std::make_shared<oui::CListBox>(m_colorProfile, &m_namesOwner);
     m_namesBox->InitColumns(
@@ -176,6 +178,7 @@ bool CModulesWindow::ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext&
             {
                 if (m_selectedModuleAddress)
                 {
+                    activeItem->InvalidateNames(m_selectedModuleAddress);
                     SelectModule(m_selectedModuleAddress, m_selectedModuleName);
                 }
                 else
@@ -220,9 +223,44 @@ int CModulesWindow::Names_GetTotalCount() const
     std::vector<orthia::ModuleInfo> items;
     if (activeItem)
     {
-        return activeItem->QueryNamesCount(m_selectedModuleAddress, orthia::NameSelectionKey());
+        return activeItem->QueryNamesCount(m_selectedModuleAddress, MakeNamesKey(0));
     }
     return 0;
+}
+orthia::NameSelectionKey CModulesWindow::MakeNamesKey(int offset) const
+{
+    orthia::NameSelectionKey key;
+    key.offset = offset;
+    key.sortOrder = m_namesSortOrder;
+    return key;
+}
+void CModulesWindow::SetNamesSortOrder(orthia::NameSortOrder sortOrder)
+{
+    if (m_namesSortOrder == sortOrder)
+    {
+        return;
+    }
+    m_namesSortOrder = sortOrder;
+    m_cachedNamesPage.clear();
+    m_namesBox->SetOffset(0);
+    UpdateVisibleItems();
+    Invalidate();
+}
+void CModulesWindow::Names_OnContextMenu(std::vector<oui::PopupItem>& items)
+{
+    auto contextMenuNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.panels.names.contextmenu"));
+    auto addItem = [&](const orthia::PlatformString_type& textId, orthia::NameSortOrder sortOrder)
+    {
+        oui::PopupItem item;
+        item.text = contextMenuNode->QueryValue(textId);
+        item.handler = [this, sortOrder]() { SetNamesSortOrder(sortOrder); };
+        // the current order is shown disabled
+        item.isEnabled = [this, sortOrder]() { return m_namesSortOrder != sortOrder; };
+        items.push_back(item);
+    };
+    addItem(ORTHIA_TCSTR("sort_by_type"), orthia::NameSortOrder::Type);
+    addItem(ORTHIA_TCSTR("sort_by_name"), orthia::NameSortOrder::Name);
+    addItem(ORTHIA_TCSTR("sort_by_address"), orthia::NameSortOrder::Address);
 }
 
 void CModulesWindow::UpdateVisibleItems()
@@ -275,7 +313,7 @@ void CModulesWindow::UpdateVisibleItems()
         if (firstRunAfterReload)
         {
             // first run after reload state
-            activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), m_requiredNamesCacheSize, m_cachedNamesPage);
+            activeItem->QueryNames(m_selectedModuleAddress, MakeNamesKey(0), m_requiredNamesCacheSize, m_cachedNamesPage);
             m_namesBox->SetOffset(m_requiredNamesOffset);
             m_namesBox->SetSelectedPosition(0);
 
@@ -287,7 +325,12 @@ void CModulesWindow::UpdateVisibleItems()
         {
             // usual first run
             m_namesBox->SetSelectedPosition(0);
-            activeItem->QueryNames(m_selectedModuleAddress, orthia::NameSelectionKey(), g_nameCacheSize, m_cachedNamesPage);
+            activeItem->QueryNames(m_selectedModuleAddress, MakeNamesKey(0), g_nameCacheSize, m_cachedNamesPage);
+        }
+        else if (!m_selectedModuleAddress)
+        {
+            // an item without a selected module: drop the rows left from the previous item
+            m_cachedNamesPage.clear();
         }
         else if (!m_cachedNamesPage.empty())
         {
@@ -298,13 +341,8 @@ void CModulesWindow::UpdateVisibleItems()
             if (itemsHandled > (int)m_cachedNamesPage.size() && itemsHandled < m_lastTotalNamesCount)
             {
                 // reload more data
-                orthia::NameSelectionKey key;
-                key.flags = key.flags_ContinueFrom;
-                key.address = m_cachedNamesPage.back().address;
-                key.continueMarkNameFlag = m_cachedNamesPage.back().flags;
-
                 std::vector<orthia::NameInfo> newPage;
-                activeItem->QueryNames(m_selectedModuleAddress, key, g_nameCacheSize, newPage);
+                activeItem->QueryNames(m_selectedModuleAddress, MakeNamesKey((int)m_cachedNamesPage.size()), g_nameCacheSize, newPage);
                 m_cachedNamesPage.insert(m_cachedNamesPage.end(), newPage.begin(), newPage.end());
             }
         }
@@ -471,6 +509,10 @@ void CModulesWindow::ReloadState(const UIState& state)
         [&](auto& value) { m_requiredModulesBoxPosition = (int)value; },
         [&]() { m_requiredModulesBoxPosition = 0; }
     );
+    Apply(state.addresses, field_namesSortOrder,
+        [&](auto& value) { m_namesSortOrder = (orthia::NameSortOrder)value; },
+        [&]() { m_namesSortOrder = orthia::NameSortOrder::Type; }
+    );
     m_needUpdateModulesBox = true;
     Invalidate();
 }
@@ -481,6 +523,7 @@ void CModulesWindow::SaveState(UIState& state)
     state.addresses[field_namesBox_Offset] = m_namesBox->GetOffset();
     state.addresses[field_cachedNamesPage_size] = m_cachedNamesPage.size();
     state.strings[field_selectedModuleName] = m_selectedModuleName;
+    state.addresses[field_namesSortOrder] = (orthia::Address_type)m_namesSortOrder;
 
     if (m_needUpdateModulesBox)
     {

@@ -108,9 +108,7 @@ orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::P
                         return false;
                     }
                 }
-                key.flags |= key.flags_ContinueFrom;
-                key.address = page.back().address;
-                key.continueMarkNameFlag = page.back().flags;
+                key.offset += (int)page.size();
             }
             return true;
         });

@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED
+from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED, check_x_sort_orders
 
 pytestmark = pytest.mark.elf
 
@@ -35,6 +35,12 @@ def test_modinfo(orthia, dmesg):
 def test_x_entrypoint(orthia, dmesg):
     res = orthia.run("x dmesg!*", **dmesg).assert_ok()
     assert res.symbols["dmesg!$entrypoint"] == [0xB0E0]
+
+
+@pytest.mark.parametrize("name, mask", [("dmesg", "dmesg!*"), ("apt-mark", "apt-mark!*")])
+def test_x_sort_orders(orthia, data, name, mask):
+    rows = check_x_sort_orders(orthia, mask, file=data.elf(name))
+    assert any(symbol.endswith("!$entrypoint") for _, _, symbol in rows), rows
 
 
 def test_u_entrypoint(orthia, dmesg):

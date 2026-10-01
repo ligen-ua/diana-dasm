@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED
+from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED, check_x_sort_orders
 
 pytestmark = pytest.mark.pe
 
@@ -84,6 +84,18 @@ def test_db_lowercase_length(orthia, nt):
 def test_u_invalid_length(orthia, nt, length):
     res = orthia.run(f"u ntoskrnl!KeBugCheck {length}", **nt)
     assert res.code == EXIT_COMMAND_ERROR, res
+
+
+def test_x_sort_orders(orthia, nt):
+    rows = check_x_sort_orders(orthia, "ntoskrnl!Ke*", **nt)
+    assert {kind for kind, _, _ in rows} == {"exp"}, rows
+
+
+@pytest.mark.parametrize("cmd", ["x /q ntoskrnl!Ke*", "x /a", "x /a ntoskrnl!Ke* extra"])
+def test_x_usage_errors(orthia, nt, cmd):
+    res = orthia.run(cmd, **nt)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    res.assert_line(r"^Error: Usage: x \[/a\|/n\] \[/v\] \[module!\]name$")
 
 
 def test_x_without_module_searches_main_module(orthia, nt):

@@ -2,6 +2,7 @@
 
 #include "orthia_model_interfaces.h"
 #include "orthia_simple_file.h"
+#include "orthia_module_names.h"
 
 namespace orthia
 {
@@ -40,6 +41,7 @@ namespace orthia
         int GetDianaMode() const override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
+        void InvalidateNames(Address_type moduleAddress) override;
 
         int GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const;
         MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const override;
@@ -59,7 +61,10 @@ namespace orthia
         int ApplyLinkedImports();
 
     private:
+        mutable ModuleNamesStorage moduleNames;
+
         NameInfo QueryAddressNameImpl(Address_type address) const;
+        std::shared_ptr<const ModuleNames> QueryModuleNames(Address_type moduleAddress) const;
 
     };
 

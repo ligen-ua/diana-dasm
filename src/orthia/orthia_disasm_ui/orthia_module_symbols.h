@@ -20,11 +20,7 @@ namespace orthia
         void ForEach(std::function<void(Address_type, const NameInfo&)> fn) const;
         void FlushToDB(Address_type moduleAddress, intrusive_ptr<CClassicDatabase> db) const;
         const NameInfo* QueryNearest(Address_type address) const;
-        void QueryPrivateSymbols(const NameSelectionKey& filter,
-                                 int count,
-                                 std::vector<NameInfo>& names,
-                                 int* totalCount,
-                                 bool& markFound) const;
+        void CollectPrivateSymbols(std::function<void(NameInfo)> fn) const;
     };
 
     // Owns both storage layers for a process item's private symbols.
@@ -44,11 +40,7 @@ namespace orthia
                                        NameInfo& nameInfo) const;
 
         // In-memory if the module was loaded this session; DB otherwise.
-        void QueryModulePrivateSymbols(Address_type moduleAddress,
-                                       const NameSelectionKey& filter,
-                                       int count,
-                                       std::vector<NameInfo>& names,
-                                       int* totalCount,
-                                       bool& markFound) const;
+        void CollectModulePrivateSymbols(Address_type moduleAddress,
+                                         std::function<void(NameInfo)> fn) const;
     };
 }

@@ -160,9 +160,42 @@ namespace orthia
             orthia::AddressToString(stopAddress.GetIndex(), args.item->GetDianaMode())));
     }
 
+    static std::vector<PlatformString_type> SplitCommandWords(const PlatformString_type& text);
+
+    static const PlatformString_type::value_type* NameTypeTag(const orthia::NameInfo& name)
+    {
+        if (name.flags & orthia::NameInfo::flags_Export)
+            return ORTHIA_TCSTR("exp");
+        if (name.flags & orthia::NameInfo::flags_Import)
+            return ORTHIA_TCSTR("imp");
+        return ORTHIA_TCSTR("prv");
+    }
+
     void CCommandProcessor::Handle_x(CommandArguments& args)
     {
-        auto mask = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
+        const char* usage = "Usage: x [/a|/n] [/v] [module!]name";
+        auto words = SplitCommandWords(args.text);
+        // like WinDbg: /a sorts by address, /n by name, /v shows the symbol type
+        orthia::NameSortOrder sortOrder = orthia::NameSortOrder::Type;
+        bool verbose = false;
+        size_t first = 1;
+        for (; first < words.size() && !words[first].empty() && words[first][0] == '/'; ++first)
+        {
+            const auto& option = words[first];
+            if (option == ORTHIA_TCSTR("/a"))
+                sortOrder = orthia::NameSortOrder::Address;
+            else if (option == ORTHIA_TCSTR("/n"))
+                sortOrder = orthia::NameSortOrder::Name;
+            else if (option == ORTHIA_TCSTR("/v"))
+                verbose = true;
+            else
+                throw std::runtime_error(usage);
+        }
+        if (words.size() != first + 1)
+        {
+            throw std::runtime_error(usage);
+        }
+        auto mask = words[first];
         auto maskDowncase = orthia::Downcase(mask);
 
         std::vector<StringInfo> parts;
@@ -208,7 +241,9 @@ namespace orthia
                 const int c_pageSize = 5000;
                 orthia::NameSelectionKey key;
                 key.excludeImports = true;
+                key.sortOrder = sortOrder;
                 // an export also has a PDB record with the same name and address; exports come first
+                // in every order (the type breaks ties)
                 std::set<std::pair<Address_type, orthia::PlatformString_type>> printed;
 
                 for (;;)
@@ -226,6 +261,11 @@ namespace orthia
                             printed.emplace(name.address, name.name.native).second)
                         {
                             text.clear();
+                            if (verbose)
+                            {
+                                text.append(NameTypeTag(name));
+                                text.append(ORTHIA_TCSTR("  "));
+                            }
                             text.append(orthia::AddressToString(name.address, dianaMode));
                             text.append(ORTHIA_TCSTR("  "));
                             text.append(mod.name);
@@ -234,9 +274,7 @@ namespace orthia
                             args.ReplyLine(text);
                         }
                     }
-                    key.flags |= key.flags_ContinueFrom;
-                    key.address = names.back().address;
-                    key.continueMarkNameFlag = names.back().flags;
+                    key.offset += (int)names.size();
                 }
             }
         }

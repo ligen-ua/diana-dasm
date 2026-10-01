@@ -164,107 +164,58 @@ namespace orthia
     {
         // do nothing
     }
+    std::shared_ptr<const ModuleNames> FileWorkplaceItem::QueryModuleNames(Address_type moduleAddress) const
+    {
+        return moduleNames.Query(moduleAddress, [&](ModuleNames& result) {
+            auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            auto handler = [&](Address_type, int metaType, const std::string& text, Address_type)
+            {
+                std::string name;
+                Address_type target = 0;
+                CCommonFormatParser parser;
+                parser.Parse(text);
+                parser.QueryMetadata("address", &target);
+                parser.QueryMetadata("name", &name);
+
+                NameInfo info;
+                info.name = orthia::Utf8ToPlatformString(name);
+                info.address = target;
+                if (metaType == g_database_type_fnc_Import)
+                {
+                    info.flags = NameInfo::flags_Import;
+                }
+                else if (metaType == g_database_type_fnc_Export)
+                {
+                    info.flags = NameInfo::flags_Export;
+                }
+                else if (metaType == g_database_type_fnc_PrivateSymbol)
+                {
+                    info.flags = NameInfo::flags_PrivateSymbol;
+                }
+                result.Add(std::move(info));
+                return true;
+            };
+            classicDatabase->QueryMetaInfoModule2(moduleAddress, g_database_type_fnc_Export, -1, handler);
+            classicDatabase->QueryMetaInfoModule2(moduleAddress, g_database_type_fnc_Import, -1, handler);
+            classicDatabase->QueryMetaInfoModule2(moduleAddress, g_database_type_fnc_PrivateSymbol, -1, handler);
+        });
+    }
     void FileWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& nameFilter, int count, std::vector<NameInfo>& names) const
     {
-        if (!count)
+        names.clear();
+        if (count <= 0)
         {
             return;
         }
-        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-        names.clear();
-        names.reserve(1024);
-
-        bool pageFound = false;
-        auto handler = [&](Address_type moduleAddress, int metaType, const std::string& text, Address_type metaAddress)
-        {
-            if ((int)names.size() >= count)
-            {
-                return false;
-            }
-            std::string name;
-            Address_type target = 0;
-            CCommonFormatParser parser;
-            parser.Parse(text);
-            parser.QueryMetadata("address", &target);
-            parser.QueryMetadata("name", &name);
-
-            NameInfo info;
-            info.name = orthia::Utf8ToPlatformString(name);
-            info.address = target;
-            if (metaType == g_database_type_fnc_Import)
-            {
-                info.flags = NameInfo::flags_Import;
-            }
-            else if (metaType == g_database_type_fnc_Export)
-            {
-                info.flags = NameInfo::flags_Export;
-            }
-            else if (metaType == g_database_type_fnc_PrivateSymbol)
-            {
-                info.flags = NameInfo::flags_PrivateSymbol;
-            }
-            if (nameFilter.flags & nameFilter.flags_ContinueFrom)
-            {
-                if (nameFilter.address == target)
-                {
-                    pageFound = true;
-                    return true;
-                }
-                if (!pageFound)
-                {
-                    return true;
-                }
-            }
-            names.push_back(info);
-            if ((int)names.size() >= count)
-            {
-                return false;
-            }
-            return true;
-        };
-
-        bool continueFromPrivate = (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
-                                   nameFilter.continueMarkNameFlag == NameInfo::flags_PrivateSymbol;
-        if (!nameFilter.privateSymbolsOnly)
-        {
-            if (!continueFromPrivate)
-            {
-                if (nameFilter.excludeImports)
-                {
-                    classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                        g_database_type_fnc_Export, -1,
-                        handler);
-                }
-                else
-                {
-                    classicDatabase->QueryMetaInfoModule2(moduleAddress,
-                        g_database_type_fnc_Import, g_database_type_fnc_Export,
-                        handler);
-                }
-            }
-            if ((int)names.size() >= count)
-            {
-                return;
-            }
-            if (!pageFound &&
-                (nameFilter.flags & nameFilter.flags_ContinueFrom) &&
-                nameFilter.continueMarkNameFlag != 0 &&
-                nameFilter.continueMarkNameFlag != NameInfo::flags_PrivateSymbol)
-            {
-                pageFound = true;
-                continueFromPrivate = false;
-            }
-        }
-        classicDatabase->QueryMetaInfoModule2(moduleAddress,
-            g_database_type_fnc_PrivateSymbol, -1,
-            handler,
-            continueFromPrivate ? nameFilter.address : 0);
+        QueryModuleNames(moduleAddress)->QueryPage(nameFilter, count, names);
     }
     int FileWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {
-        auto classicDatabase = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
-        return classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_Import, g_database_type_fnc_Export)
-             + classicDatabase->QueryMetaInfoModule2_Count(moduleAddress, g_database_type_fnc_PrivateSymbol, -1);
+        return QueryModuleNames(moduleAddress)->QueryCount(name);
+    }
+    void FileWorkplaceItem::InvalidateNames(Address_type moduleAddress)
+    {
+        moduleNames.Invalidate(moduleAddress);
     }
     int FileWorkplaceItem::GetModulesEx(bool calcCount, std::vector<orthia::ModuleInfo>& modules) const
     {
@@ -630,6 +581,7 @@ namespace orthia
     }
     void FileWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
     {
+        moduleNames.Invalidate(moduleAddress);
         UpdateModuleFlags(moduleAddress, ModuleInfo::flags_symbolsLoaded, 0);
     }
     void FileWorkplaceItem::UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove)

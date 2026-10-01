@@ -4,6 +4,8 @@ import shutil
 
 import pytest
 
+from orthia_runner import check_x_sort_orders
+
 pytestmark = [pytest.mark.pe, pytest.mark.symbols]
 
 KI_SYSTEM_CALL64 = 0x1_4016_F600
@@ -44,6 +46,14 @@ def test_x_has_no_duplicates(orthia_pdb, nt):
     names = orthia_pdb.run("x ntoskrnl!KeBugCheck*", **nt).assert_ok().symbols
     duplicates = {name: addrs for name, addrs in names.items() if len(addrs) > 1}
     assert not duplicates
+
+
+def test_x_sort_orders(orthia_pdb, nt):
+    rows = check_x_sort_orders(orthia_pdb, "ntoskrnl!Ke*", **nt)
+    kinds = [kind for kind, _, _ in rows]
+    # exports first, then the private symbols that are not exports
+    assert "exp" in kinds and "prv" in kinds, rows
+    assert kinds == sorted(kinds, key=["exp", "imp", "prv"].index), rows
 
 
 @pytest.mark.xfail(reason="B10: failed symbol search prints a line per candidate and no summary")

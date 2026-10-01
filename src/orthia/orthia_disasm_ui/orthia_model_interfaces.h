@@ -120,13 +120,17 @@ namespace orthia
 
     using SectionInfo = ImageSection;
 
+    enum class NameSortOrder
+    {
+        Type,       // exports, imports, private symbols; each group by address
+        Name,       // case-insensitive, then by address
+        Address     // then by type, then by name
+    };
+
     struct NameSelectionKey
     {
-        static const int flags_ContinueFrom = 1;
-        Address_type address = 0;
-        oui::String name;
-        int flags = 0;
-        int continueMarkNameFlag = 0;
+        int offset = 0;
+        NameSortOrder sortOrder = NameSortOrder::Type;
         bool excludeImports = false;
         bool privateSymbolsOnly = false;
     };
@@ -229,6 +233,8 @@ namespace orthia
         virtual int GetDianaMode() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
+        // drops the cached names of the module, the next QueryNames reads them again
+        virtual void InvalidateNames(Address_type /*moduleAddress*/) {}
         virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const = 0;
         virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const = 0;
         virtual NameInfo QueryAddressName(Address_type address) const = 0;
