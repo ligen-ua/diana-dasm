@@ -10,6 +10,7 @@
 #include "orthia_databases.h"
 #include "orthia_helpers.h"
 #include <ctime>
+#include <set>
 
 namespace orthia
 {
@@ -207,6 +208,8 @@ namespace orthia
                 const int c_pageSize = 5000;
                 orthia::NameSelectionKey key;
                 key.excludeImports = true;
+                // an export also has a PDB record with the same name and address; exports come first
+                std::set<std::pair<Address_type, orthia::PlatformString_type>> printed;
 
                 for (;;)
                 {
@@ -219,7 +222,8 @@ namespace orthia
                     for (auto& name : names)
                     {
                         auto nameDowncased = orthia::Downcase(name.name.native);
-                        if (utils::match(parts[1].ToString(), nameDowncased))
+                        if (utils::match(parts[1].ToString(), nameDowncased) &&
+                            printed.emplace(name.address, name.name.native).second)
                         {
                             text.clear();
                             text.append(orthia::AddressToString(name.address, dianaMode));

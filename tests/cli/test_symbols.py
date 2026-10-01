@@ -40,7 +40,6 @@ def test_u_shows_private_symbol(orthia_pdb, nt):
     assert any("swapgs" in line for line in res.instructions()), res
 
 
-@pytest.mark.xfail(reason="B7: x lists exported names twice when a PDB is loaded")
 def test_x_has_no_duplicates(orthia_pdb, nt):
     names = orthia_pdb.run("x ntoskrnl!KeBugCheck*", **nt).assert_ok().symbols
     duplicates = {name: addrs for name, addrs in names.items() if len(addrs) > 1}
