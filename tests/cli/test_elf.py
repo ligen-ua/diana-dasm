@@ -158,3 +158,50 @@ def test_unresolved_elf_dependency_survives_reopen(orthia_cold, apt_mark):
     second = _lm_rows(orthia_cold.run("lm", **apt_mark).assert_ok())
     assert second == first, (first, second)
     assert second["libapt-pkg.so.6.0"][2] == "unresolved", second
+
+
+# ELF section headers are not loaded: they come from the opened file (dmesg is mapped at 0x4000)
+def test_sections(orthia, dmesg):
+    res = orthia.run("sections dmesg", **dmesg).assert_ok()
+    res.assert_line(r"^Module: dmesg$")
+    res.assert_line(r"^Section headers: .*dmesg$")
+    rows = res.sections()
+    assert len(rows) == 30, res
+    assert rows[".text"] == [(0x8D80, 0x6692, "R-X")], res
+    assert rows[".interp"] == [(0x4318, 0x1C, "R--")], res
+    assert rows[".bss"] == [(0x14920, 0x3A8, "RW-")], res
+    # not loaded: no address
+    assert rows[".shstrtab"] == [(None, 0x12F, "---")], res
+
+
+def test_sections_by_address(orthia, dmesg):
+    expected = orthia.run("sections dmesg", **dmesg).assert_ok().sections()
+    res = orthia.run("sections dmesg!$entrypoint + 10", **dmesg).assert_ok()
+    res.assert_line(r"^Module: dmesg$")
+    assert res.sections() == expected, res
+
+
+def test_sections_verbose(orthia, dmesg):
+    res = orthia.run("sections -v dmesg", **dmesg).assert_ok()
+    text = res.stdout.splitlines()
+    start = text.index(next(line for line in text if line.startswith(".text ")))
+    details = text[start + 1:start + 4]
+    assert details == ["    sh_type: SHT_PROGBITS", "    sh_flags: 0000000000000006", "    ALLOC EXECINSTR"], res
+
+
+@pytest.mark.parametrize("cmd, error", [
+    ("sections", r"^Error: Usage: sections \[-v\] <module\|address>$"),
+    ("sections nosuchmodule", r"^Error: Module not found: nosuchmodule$"),
+    ("sections 1", r"^Error: No module at 00000000`00000001$"),
+])
+def test_sections_errors(orthia, dmesg, cmd, error):
+    res = orthia.run(cmd, **dmesg)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    res.assert_line(error)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="libapt-pkg may exist on a Linux host")
+def test_sections_unresolved_elf_dependency(orthia_cold, apt_mark):
+    res = orthia_cold.run("sections libapt-pkg.so.6.0", **apt_mark)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    res.assert_line(r"^Error: No image data for module: libapt-pkg.so.6.0$")

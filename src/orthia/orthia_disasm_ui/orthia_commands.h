@@ -64,6 +64,7 @@ protected:
     void Handle_analyze(CommandArguments& args);
     void Handle_symfix(CommandArguments& args);
     void Handle_mod_info(CommandArguments& args);
+    void Handle_sections(CommandArguments& args);
     void Handle_database(CommandArguments& args);
     void Handle_database_list(CommandArguments& args);
     void Handle_database_delete(CommandArguments& args, const std::vector<orthia::PlatformString_type>& selectors);

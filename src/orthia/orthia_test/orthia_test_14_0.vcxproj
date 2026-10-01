@@ -186,6 +186,7 @@
     <ClCompile Include="ot_image_identity_test.cpp" />
     <ClCompile Include="ot_memory_manager.cpp" />
     <ClCompile Include="ot_pe_test.cpp" />
+    <ClCompile Include="ot_sections_test.cpp" />
     <ClCompile Include="ot_shuttle_utils_test.cpp" />
     <ClCompile Include="ot_tokenizer.cpp" />
     <ClCompile Include="ot_utils.cpp" />

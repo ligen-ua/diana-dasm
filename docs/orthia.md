@@ -94,6 +94,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `db`, `dw`, `dd`, `dq`, `dp`, `dps` | Display memory as bytes, words, dwords, qwords, pointers, or pointers with symbols |
 | `threads` | Display threads (processes only) |
 | `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from |
+| `sections [-v] <module\|address>` | List the sections of a module: name, address, size and `RWX` flags; `-v` adds every header field (see [Sections](#sections)) |
 | `.reload [<module>]` | Reload symbols for a module |
 | `.analyze <module>` | Run the full analysis of a module |
 | `.symfix [<path>]` | Set the symbols directory |
@@ -110,6 +111,7 @@ In the UI, press CTRL+C in the command edit box to stop a running command.
 The address of `u` and of the `db`/`dw`/`dd`/`dq`/`dp`/`dps` commands is an expression, not just a number.
 The same expressions work in the UI's *Go to address* dialog (G).
 The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`, `.reload` and `.analyze` take a module name.
+`sections` takes a module name or an expression, and lists the module that contains the address.
 
 | Syntax | Meaning |
 |---|---|
@@ -131,6 +133,15 @@ db ntdll L 40
 ```
 The length is a count of instructions for `u` and a count of elements for the `d*` commands.
 `L?` and negative lengths are not supported.
+
+### Sections
+
+PE section headers are mapped with the image, so `sections` reads them from memory.
+ELF section headers are not part of any loaded segment: in a process the memory at `e_shoff` holds something else.
+They are read from the module's file on disk instead, and only if the file's ELF and program headers match the loaded image.
+When there is no such file, `sections` lists the program headers (segments) from memory and says why.
+An ELF section that is not loaded (no `SHF_ALLOC`, e.g. `.comment` or `.symtab`) shows `-` as its address.
+The flags are `R` (loaded), `W` (writable) and `X` (executable), for both formats.
 
 ## UI hotkeys
 

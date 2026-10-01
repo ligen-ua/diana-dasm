@@ -62,7 +62,7 @@ namespace orthia
         std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
         void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
         ModuleStorage* GetModuleStorage() override;
-        void QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out) override;
+        void QuerySections(Address_type moduleBase, ImageSections& sections) override;
         PlatformString_type GetDatabaseFolder() const override { return m_procFolder; }
     };
 

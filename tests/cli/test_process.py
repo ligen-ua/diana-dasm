@@ -80,3 +80,17 @@ def test_open_failure_reports_reason(orthia):
     res = orthia.raw("--pid", "4", "--cmd", "lm")
     assert res.code == EXIT_OPEN_FAILED, res
     assert re.search(r"(?i)access is denied", res.stderr), res
+
+
+def test_sections_of_runtime_library(orthia, runtime):
+    module, export = runtime
+    res = orthia.run(f"sections {module}", "lm", **SELF).assert_ok()
+    base, end = (int(a.replace("`", ""), 16) for a in
+                 res.assert_line(rf"^(\S+)\s+(\S+)\s+{re.escape(module)}\b").groups())
+    rows = res.sections()
+    if sys.platform != "win32":
+        # ELF section headers are not in process memory: read from the library's file
+        res.assert_line(rf"^Section headers: /.*{re.escape(module)}$")
+    (text_address, text_size, text_flags), = rows[".text"]
+    assert text_flags == "R-X", res
+    assert base < text_address <= export < text_address + text_size <= end + 1, res

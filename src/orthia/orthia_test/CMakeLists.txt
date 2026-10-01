@@ -20,6 +20,7 @@ ot_memory_manager.cpp
 ot_utils.cpp
 ot_elf_test.cpp
 ot_image_identity_test.cpp
+ot_sections_test.cpp
 )
 
 add_executable(${PROJECT_NAME} 

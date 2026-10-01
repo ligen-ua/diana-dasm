@@ -190,3 +190,20 @@ def test_analyze_dependency(orthia_cold, nt, request, module):
     else:
         res = orthia_cold.run(f".analyze {module}", "lm", **nt).assert_ok()
         res.assert_line(rf"\b{re.escape(module)}\s+linked, analysis$")
+
+
+def test_sections(orthia, nt):
+    res = orthia.run("sections ntoskrnl", **nt).assert_ok()
+    rows = res.sections()
+    assert len(rows) == 25, res
+    assert rows[".text"] == [(0x1_4000_1000, 0x23D993, "R-X")], res
+    assert rows[".data"] == [(0x1_402F_2000, 0x662D8, "RW-")], res
+    assert rows[".reloc"] == [(0x1_4081_B000, 0x3BB8, "R--")], res
+    # PE section headers are read from the image itself
+    assert not any(line.startswith(("Section headers:", "No section headers:")) for line in res.lines), res
+
+
+def test_sections_verbose(orthia, nt):
+    res = orthia.run("sections -v ntoskrnl", **nt).assert_ok()
+    res.assert_line(r"^    VirtualAddress: 0000000140001000$")
+    res.assert_line(r"^    CODE EXECUTE READ$")

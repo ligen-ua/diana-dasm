@@ -10,7 +10,7 @@ extern "C"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
 #include "orthia_common_print.h"
-#include "orthia_model_sections.h"
+#include "orthia_sections.h"
 
 namespace orthia
 {
@@ -821,10 +821,28 @@ namespace orthia
         return applied;
     }
 
-    void FileWorkplaceItem::QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out)
+    void FileWorkplaceItem::QuerySections(Address_type moduleBase, ImageSections& sections)
     {
+        if (!moduleBase)
+        {
+            moduleBase = file->GetImageBase();
+        }
+        // the file the image was mapped from: ELF section headers are not in the mapped image
+        PlatformString_type imageFile;
+        if (moduleBase == file->GetImageBase())
+        {
+            imageFile = fullName.native;
+        }
+        else if (imageSources)
+        {
+            auto source = imageSources->Find(moduleBase);
+            if (source && source->GetBase() == moduleBase && source->GetKind() == ImageSourceKind::LinkedFile)
+            {
+                imageFile = static_cast<CLinkedFileImageSource*>(source)->GetPath();
+            }
+        }
         auto reader = CreateMemoryReader();
-        QuerySectionsImpl(reader.get(), moduleBase ? moduleBase : file->GetImageBase(), sections_out);
+        QueryImageSections(reader.get(), moduleBase, imageFile, sections);
     }
 
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)

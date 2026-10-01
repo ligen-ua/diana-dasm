@@ -23,7 +23,6 @@ set(SOURCES
     orthia_model_interfaces.cpp
     orthia_model_modules.cpp
     orthia_model_modules_elf.cpp
-    orthia_model_sections.cpp
     orthia_module_analyzer.cpp
     orthia_process_adapter.cpp
     oui_disasm_colors.cpp

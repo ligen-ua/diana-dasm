@@ -30,6 +30,7 @@ add_library(${PROJECT_NAME} SHARED
     orthia_elf.cpp
     orthia_pdb_symbols.cpp
     orthia_pe.cpp
+    orthia_sections.cpp
     orthia_shellcode.cpp
     orthia_plugin_interfaces.cpp
     orthia_sha1.c

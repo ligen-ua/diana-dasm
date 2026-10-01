@@ -749,6 +749,119 @@ namespace orthia
         throw std::runtime_error(usage);
     }
 
+    void CCommandProcessor::Handle_sections(CommandArguments& args)
+    {
+        const char* usage = "Usage: sections [-v] <module|address>";
+        auto words = SplitCommandWords(args.text);
+        bool verbose = false;
+        size_t first = 1;
+        if (words.size() > first && words[first] == ORTHIA_TCSTR("-v"))
+        {
+            verbose = true;
+            ++first;
+        }
+        if (words.size() <= first)
+        {
+            throw std::runtime_error(usage);
+        }
+        // an expression may contain spaces
+        PlatformString_type target;
+        for (size_t i = first; i < words.size(); ++i)
+        {
+            target += (i == first ? ORTHIA_TCSTR("") : ORTHIA_TCSTR(" ")) + words[i];
+        }
+
+        orthia::ModuleInfo module;
+        bool moduleFound = false;
+        oui::EnumModulesByName(args.item, target, [&](orthia::ModuleInfo& mod) {
+            module = mod;
+            moduleFound = true;
+            return false;
+        });
+        if (!moduleFound)
+        {
+            // not a module name: the module that contains the address
+            Address_type address = 0;
+            try
+            {
+                address = oui::CaptureAddressExp(target, args.item);
+            }
+            catch (std::exception&)
+            {
+                throw std::runtime_error("Module not found: " + orthia::PlatformStringToUtf8(target));
+            }
+            std::vector<orthia::ModuleInfo> modules;
+            args.item->GetModules(modules);
+            for (auto& mod : modules)
+            {
+                if (address >= mod.address && address <= mod.lastValidAddress)
+                {
+                    module = mod;
+                    moduleFound = true;
+                    break;
+                }
+            }
+            if (!moduleFound)
+            {
+                throw std::runtime_error("No module at " + orthia::PlatformStringToUtf8(
+                    orthia::AddressToString(address, args.item->GetDianaMode())));
+            }
+        }
+
+        args.ReplyLine(ORTHIA_TCSTR("Module: ") + module.name);
+        CheckImageReadable(args.item->CreateMemoryReader().get(), module);
+
+        orthia::ImageSections result;
+        args.item->QuerySections(module.address, result);
+        if (result.sections.empty())
+        {
+            throw std::runtime_error("No sections found in module: " + orthia::PlatformStringToUtf8(module.name));
+        }
+        if (result.segments)
+        {
+            // said first: the rows below are segments, not sections
+            args.ReplyLine(ORTHIA_TCSTR("No section headers: ") + result.reason);
+            args.ReplyLine(ORTHIA_TCSTR("Showing program headers (segments) from memory"));
+        }
+        else if (!result.source.empty())
+        {
+            args.ReplyLine(ORTHIA_TCSTR("Section headers: ") + result.source);
+        }
+
+        size_t nameWidth = 4;
+        size_t sizeWidth = 4;
+        for (const auto& section : result.sections)
+        {
+            nameWidth = std::max(nameWidth, section.name.size());
+            sizeWidth = std::max(sizeWidth, orthia::ToWideStringAsHex_Short(section.size).size());
+        }
+        auto dianaMode = args.item->GetDianaMode();
+        size_t addressWidth = orthia::AddressToString(0, dianaMode).size();
+        args.ReplyLine(PadRight(ORTHIA_TCSTR("Name"), nameWidth) + ORTHIA_TCSTR("  ") +
+            PadRight(ORTHIA_TCSTR("Address"), addressWidth) + ORTHIA_TCSTR("  ") +
+            PadRight(ORTHIA_TCSTR("Size"), sizeWidth) + ORTHIA_TCSTR("  Flags"));
+        for (const auto& section : result.sections)
+        {
+            // an ELF section that is not loaded has no address
+            PlatformString_type address = section.address ? orthia::AddressToString(section.address, dianaMode) : ORTHIA_TCSTR("-");
+            args.ReplyLine(PadRight(section.name, nameWidth) + ORTHIA_TCSTR("  ") +
+                PadRight(address, addressWidth) + ORTHIA_TCSTR("  ") +
+                PadRight(orthia::ToWideStringAsHex_Short(section.size), sizeWidth) + ORTHIA_TCSTR("  ") +
+                section.flagsShort);
+            if (verbose)
+            {
+                for (const auto& attribute : section.attributes)
+                {
+                    // the unnamed one is the decoded flags, a list with a trailing space
+                    auto value = attribute.second;
+                    value.erase(value.find_last_not_of(ORTHIA_TCSTR(" ")) + 1);
+                    args.ReplyLine(ORTHIA_TCSTR("    ") +
+                        (attribute.first.empty() ? value : attribute.first + ORTHIA_TCSTR(": ") + value));
+                }
+            }
+        }
+    }
+
     void CCommandProcessor::ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
@@ -779,6 +892,7 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_analyze(args);  });
             parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });
             parser.SetHandler(OUI_TCSTR("modinfo"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_mod_info(args);  });
+            parser.SetHandler(OUI_TCSTR("sections"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_sections(args);  });
             parser.SetHandler(g_databaseCommand, [&](CCommandParser& parser) mutable { Handle_database(args);  });
             parser.SetHandler(OUI_TCSTR("cls"), [&](CCommandParser& parser) mutable { uiCommandHandler->Reply(uiCommandHandler, SpecialUICommands::ClearScreen);  });
 

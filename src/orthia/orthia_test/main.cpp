@@ -85,6 +85,7 @@ void test_tokenizer();
 void test_expressions();
 void test_elf();
 void test_image_identity();
+void test_sections();
 
 int main(int argc, char * argv[])
 {
@@ -113,6 +114,7 @@ int main(int argc, char * argv[])
 #endif
     test_elf();
     test_image_identity();
+    test_sections();
 
     test_expressions();
     test_tokenizer();

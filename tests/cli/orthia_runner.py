@@ -8,7 +8,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 # Exit codes documented in `orthia --help`
 EXIT_OK = 0
@@ -20,6 +20,7 @@ EXIT_UNEXPECTED = 4
 ADDR = r"[0-9a-fA-F]{8}`[0-9a-fA-F]{8}|[0-9a-fA-F]{8}"
 _X_LINE = re.compile(rf"^({ADDR})\s+(\S+!\S+)$")
 _ADDR_PREFIX = re.compile(rf"^({ADDR})\s")
+_SECTION_ROW = re.compile(rf"^(\S+)\s+({ADDR}|-)\s+([0-9a-f]+)\s+([R-][W-][X-])[ \t]*$", re.M)
 
 
 def parse_addr(text: str) -> int:
@@ -64,6 +65,14 @@ class Result:
         """`u` output lines that are instructions, not '; label' annotations."""
         return [line for line in self.lines
                 if _ADDR_PREFIX.match(line) and not re.match(rf"^({ADDR})\s+;", line)]
+
+    def sections(self) -> Dict[str, List[Tuple[Optional[int], int, str]]]:
+        """`sections` rows: name -> [(address or None when not loaded, size, flags)]; a name may repeat (LOAD)."""
+        rows: Dict[str, List[Tuple[Optional[int], int, str]]] = {}
+        for m in _SECTION_ROW.finditer(self.stdout):
+            address = None if m.group(2) == "-" else parse_addr(m.group(2))
+            rows.setdefault(m.group(1), []).append((address, int(m.group(3), 16), m.group(4)))
+        return rows
 
     def assert_ok(self) -> "Result":
         assert self.code == EXIT_OK and not self.errors, f"expected success\n{self}"

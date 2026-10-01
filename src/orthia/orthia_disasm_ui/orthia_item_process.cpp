@@ -8,7 +8,7 @@
 #include "orthia_common_print.h"
 #include "orthia_common_format.h"
 #include "orthia_module_manager.h"
-#include "orthia_model_sections.h"
+#include "orthia_sections.h"
 
 namespace orthia
 {
@@ -776,10 +776,20 @@ namespace orthia
         return NameInfo();
     }
 
-    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out)
+    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, ImageSections& sections)
     {
+        // the file the module was mapped from: ELF section headers are not in memory
+        PlatformString_type imageFile;
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            auto it = m_modulesIndex.find(moduleBase);
+            if (it != m_modulesIndex.end())
+            {
+                imageFile = m_modules[it->second].fullName;
+            }
+        }
         auto reader = CreateMemoryReader();
-        QuerySectionsImpl(reader.get(), moduleBase, sections_out);
+        QueryImageSections(reader.get(), moduleBase, imageFile, sections);
     }
 
 }

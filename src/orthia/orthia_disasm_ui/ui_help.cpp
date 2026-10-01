@@ -24,6 +24,7 @@ namespace orthia
         { ".analyze <module>", "Analyze module" },
         { ".symfix [<path>]", "Set symbols directory" },
         { "modinfo <module>", "Show PE/debug info for module" },
+        { "sections [-v] <module|address>", "List sections of module (-v: all header fields)" },
         { ".database list", "List databases in the data folder" },
         { ".database delete <id> ...", "Delete databases (id: sha1 prefix, pid or file)" },
         { ".database cleanup", "Delete databases no longer in use" },

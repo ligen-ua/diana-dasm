@@ -195,7 +195,9 @@ void CSectionsWindow::UpdateSections()
             return;
         }
     }
-    activeItem->QuerySections(address, m_cachedSections);
+    orthia::ImageSections sections;
+    activeItem->QuerySections(address, sections);
+    m_cachedSections = std::move(sections.sections);
 
     m_sectionsBox->SetOffset(0);
     m_sectionsBox->SetSelectedPosition(0);
@@ -215,7 +217,7 @@ void CSectionsWindow::UpdateSectionsVisibleItems()
         {
             vit->text.clear();
             vit->text.push_back(it->name);
-            vit->text.push_back(orthia::ToWideStringAsHex(it->virtualAddress));
+            vit->text.push_back(orthia::ToWideStringAsHex(it->address));
             vit->text.push_back(orthia::ToWideStringAsHex(it->size));
             vit->text.push_back(it->flagsShort);
 
@@ -261,7 +263,9 @@ void CSectionsWindow::NavigateTo(orthia::Address_type moduleBase, const oui::Str
     auto activeItem = m_model->GetActiveItem();
     if (activeItem && moduleBase)
     {
-        activeItem->QuerySections(moduleBase, m_cachedSections);
+        orthia::ImageSections sections;
+        activeItem->QuerySections(moduleBase, sections);
+        m_cachedSections = std::move(sections.sections);
         m_sectionsBox->SetOffset(0);
         m_sectionsBox->SetSelectedPosition(0);
         if (!m_cachedSections.empty())
