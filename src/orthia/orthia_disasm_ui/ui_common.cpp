@@ -15,7 +15,8 @@ void EnumModulesByName(std::shared_ptr<orthia::IWorkPlaceItem> item,
     std::vector<orthia::ModuleInfo> modules;
     item->GetModules(modules);
 
-    orthia::PlatformString_type text;
+    // the full name, or without its last extension: ntdll.dll -> ntdll, libc.so.6 -> libc.so
+    bool anyMatch = false;
     for (auto& mod : modules)
     {
         auto modDowncased = orthia::Downcase(mod.name);
@@ -34,9 +35,29 @@ void EnumModulesByName(std::shared_ptr<orthia::IWorkPlaceItem> item,
         {
             continue;
         }
+        anyMatch = true;
         if (!handler(mod))
         {
-            break;
+            return;
+        }
+    }
+    if (anyMatch || moduleNameDowncased.find('.') != orthia::PlatformString_type::npos)
+    {
+        return;
+    }
+    // fallback: the name up to the first dot, for versioned ELF names (libc.so.6 -> libc)
+    for (auto& mod : modules)
+    {
+        auto modDowncased = orthia::Downcase(mod.name);
+        auto dot = modDowncased.find('.');
+        if (dot == orthia::PlatformString_type::npos || modDowncased.compare(0, dot, moduleNameDowncased) != 0 ||
+            dot != moduleNameDowncased.size())
+        {
+            continue;
+        }
+        if (!handler(mod))
+        {
+            return;
         }
     }
 }
@@ -142,6 +163,12 @@ size_t NameResolverOverWorkplaceItem::MatchKnownNamePrefix(const char* text, siz
         {
             auto stem = mod.name.substr(0, mod.name.size() - extension.size() - 1);
             result = std::max(result, orthia::MatchNamePrefix(text, size, orthia::PlatformStringToUtf8(stem)));
+        }
+        // the name up to the first dot, as EnumModulesByName falls back to (ld-linux-x86-64.so.2)
+        auto dot = mod.name.find('.');
+        if (dot != orthia::PlatformString_type::npos && dot != 0)
+        {
+            result = std::max(result, orthia::MatchNamePrefix(text, size, orthia::PlatformStringToUtf8(mod.name.substr(0, dot))));
         }
     }
     return result;

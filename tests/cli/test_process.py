@@ -46,11 +46,13 @@ def test_lm_lists_self_analyze(orthia_full):
 
 def test_export_resolves(orthia, runtime):
     module, offset = runtime
-    # the last extension may be omitted: ntdll.dll -> ntdll, libc.so.6 -> libc.so
-    stem = module.rsplit(".", 1)[0]
-    for expression in (f"{module}!{RUNTIME_EXPORT}",
-                       f"{stem}!{RUNTIME_EXPORT}",
-                       f"{module.upper()}!{RUNTIME_EXPORT.lower()}"):
+    # the module name may drop its last extension (ntdll.dll -> ntdll, libc.so.6 -> libc.so)
+    # or, when nothing else matches, everything from the first dot (libc.so.6 -> libc)
+    expressions = dict.fromkeys((f"{module}!{RUNTIME_EXPORT}",
+                                 f"{module.rsplit('.', 1)[0]}!{RUNTIME_EXPORT}",
+                                 f"{module.split('.')[0]}!{RUNTIME_EXPORT}",
+                                 f"{module.upper()}!{RUNTIME_EXPORT.lower()}"))
+    for expression in expressions:
         # db first: first_addr() takes the first address line
         res = orthia.run(f"db {expression} L1", "lm", **SELF).assert_ok()
         assert res.first_addr() - module_base(res, module) == offset, expression
@@ -60,6 +62,22 @@ def test_module_resolves_to_base(orthia, runtime):
     module, _ = runtime
     res = orthia.run(f"db {module} L1", "lm", **SELF).assert_ok()
     assert res.first_addr() == module_base(res, module), res
+
+
+def test_module_resolves_by_name_before_first_dot(orthia):
+    # versioned ELF names (libc.so.6, ld-linux-x86-64.so.2) resolve by the part before the
+    # first dot, including names with '-' that the expression tokenizer must keep whole
+    res = orthia.run("lm", **SELF).assert_ok()
+    names = [m.group(1) for m in (re.match(r"^\S+\s+\S+\s+(\S+)", line) for line in res.lines[1:]) if m]
+    stems = [name.split(".")[0] for name in names]
+    candidates = [name for name, stem in zip(names, stems)
+                  if name.count(".") >= 2 and stems.count(stem) == 1 and re.fullmatch(r"[\w-]+", stem)]
+    if not candidates:
+        pytest.skip("no module with a multi-dot name")
+    for name in candidates:
+        stem = name.split(".")[0]
+        res = orthia.run(f"db {stem} L1", "lm", **SELF).assert_ok()
+        assert res.first_addr() == module_base(res, name), stem
 
 
 def test_x_sort_orders(orthia, runtime):
