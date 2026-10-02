@@ -98,6 +98,10 @@ namespace oui
             int flags) = 0;
 
         virtual std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) = 0;
+
+        // "[pid] name", the same as IProcess::GetFullFileNameForUI() of an opened process,
+        // but needs no memory access: works for processes that can't be opened as reader
+        virtual std::tuple<int, String> SyncQueryProcessName(unsigned long long pid) = 0;
     };
 
     // default filesystem
@@ -115,6 +119,7 @@ namespace oui
             int flags) override;
 
         std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) override;
+        std::tuple<int, String> SyncQueryProcessName(unsigned long long pid) override;
     };
 
     std::shared_ptr<IProcessSystem> CreateDefaultProcessProvider();

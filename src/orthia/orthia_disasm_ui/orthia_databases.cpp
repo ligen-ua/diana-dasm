@@ -441,14 +441,14 @@ namespace orthia
             return ProcessState::Unknown;
         }
         int error = 0;
-        std::shared_ptr<oui::IProcess> process;
-        std::tie(error, process) = processSystem.SyncOpenProcess(oui::ProcessUnifiedId(info.pid));
-        if (!process)
+        oui::String processName;
+        std::tie(error, processName) = processSystem.SyncQueryProcessName(info.pid);
+        if (error)
         {
             return IsNoSuchProcessError(error) ? ProcessState::Gone : ProcessState::Unknown;
         }
         // the folder was named the same way when the process was opened
-        auto name = fileSystem.SyncSanitizeName(process->GetFullFileNameForUI());
+        auto name = fileSystem.SyncSanitizeName(processName);
         return name.native == info.folderName ? ProcessState::Alive : ProcessState::Reused;
     }
 

@@ -778,6 +778,38 @@ namespace oui
             return std::make_tuple(error, proc);
         }
 
+        std::tuple<int, String> SyncQueryProcessName(unsigned long long pid) override
+        {
+            HANDLE hProc = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)pid);
+            if (!hProc)
+            {
+                int error = GetLastError();
+                if (error != ERROR_ACCESS_DENIED)
+                {
+                    return std::make_tuple(error, String());
+                }
+                // the open process plugin may still get through
+                std::shared_ptr<IProcess> proc;
+                std::tie(error, proc) = SyncOpenProcess(oui::ProcessUnifiedId(pid));
+                return std::make_tuple(error, proc ? proc->GetFullFileNameForUI() : String());
+            }
+            oui::ScopedGuard handlerGuard([&]() {
+                CloseHandle(hProc);
+            });
+
+            std::vector<wchar_t> buf(4096);
+            if (!GetProcessImageFileNameW(hProc, buf.data(), (DWORD)(buf.size() - 1)))
+            {
+                return std::make_tuple((int)GetLastError(), String());
+            }
+            oui::String shortName;
+            orthia::UnparseFileNameFromFullFileName<oui::String::string_type>(buf.data(), &shortName.native);
+
+            oui::String::StringStream_type res;
+            res << OUI_TCSTR("[") << pid << OUI_TCSTR("] ") << shortName.native;
+            return std::make_tuple(0, String(res.str()));
+        }
+
         void AsyncStartQueryProcess(ThreadPtr_type targetThread,
             const ProcessUnifiedId& fileId,
             ProcessRecipientHandler_type openHandler,

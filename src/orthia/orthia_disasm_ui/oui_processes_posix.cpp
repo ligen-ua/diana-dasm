@@ -108,6 +108,21 @@ namespace oui
         return name;
     }
 
+    // "[pid] comm"
+    static String FormatProcessName(pid_t pid)
+    {
+        std::string commName = ReadProcessComm(pid);
+        if (commName.empty())
+            commName = std::to_string((unsigned long long)pid);
+
+        String name;
+        oui::String::StringStream_type ss;
+        ss << OUI_TCSTR("[") << (unsigned long long)pid << OUI_TCSTR("] ")
+           << orthia::Utf8ToPlatformString(commName).c_str();
+        name.native = ss.str();
+        return name;
+    }
+
     // -------------------------------------------------------------------------
     // PosixThread
     // -------------------------------------------------------------------------
@@ -483,20 +498,19 @@ namespace oui
             int pointerSize = DetectPointerSize(pid);
             bool is32bit    = (pointerSize == 4);
 
-            std::string commName = ReadProcessComm(pid);
-            if (commName.empty())
-                commName = std::to_string((unsigned long long)pid);
-
-            String name;
-            {
-                oui::String::StringStream_type ss;
-                ss << OUI_TCSTR("[") << (unsigned long long)pid << OUI_TCSTR("] ")
-                   << orthia::Utf8ToPlatformString(commName).c_str();
-                name.native = ss.str();
-            }
-
-            auto proc = std::make_shared<CPosixProcess>(pid, name, is32bit);
+            auto proc = std::make_shared<CPosixProcess>(pid, FormatProcessName(pid), is32bit);
             return { 0, proc };
+        }
+
+        std::tuple<int, String> SyncQueryProcessName(unsigned long long pid) override
+        {
+            // reading comm needs no ptrace access, unlike /proc/<pid>/mem
+            char path[64];
+            snprintf(path, sizeof(path), "/proc/%d", (int)pid);
+            struct stat st;
+            if (stat(path, &st) != 0)
+                return { errno, String() };
+            return { 0, FormatProcessName((pid_t)pid) };
         }
 
         void AsyncStartQueryProcess(ThreadPtr_type targetThread,
