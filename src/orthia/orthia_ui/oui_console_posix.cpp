@@ -677,17 +677,59 @@ void CConsoleDrawAdapter::CopyRectWindow(const Rect& rect,
 // CConsoleStateSaver
 // ---------------------------------------------------------
 
+// A signal that ends the process skips the destructor below, and would leave the shell
+// in raw mode on the alternate screen with no cursor. These handlers restore the terminal
+// first, then let the signal do what it would have done (terminate, dump core).
+static struct termios g_signalTermios;
+static volatile sig_atomic_t g_signalTermiosValid = 0;
+static const int g_fatalSignals[] = { SIGTERM, SIGHUP, SIGQUIT, SIGABRT, SIGSEGV, SIGBUS, SIGFPE, SIGILL };
+static struct sigaction g_previousActions[sizeof(g_fatalSignals) / sizeof(g_fatalSignals[0])];
+
+static void RestoreTerminal(const struct termios* termios)
+{
+    // async-signal-safe calls only: this also runs in a signal handler
+    if (termios)
+    {
+        tcsetattr(STDIN_FILENO, TCSANOW, termios);
+    }
+    // leave alternate buffer, show cursor
+    static const char seq[] = "\x1B[?1049l\x1B[?25h";
+    WriteToStdout(seq, sizeof(seq) - 1);
+}
+
+static void OnFatalSignal(int signalNumber)
+{
+    RestoreTerminal(g_signalTermiosValid ? &g_signalTermios : nullptr);
+    // SA_RESETHAND has put back the default action; it runs once this handler returns
+    raise(signalNumber);
+}
+
 CConsoleStateSaver::CConsoleStateSaver()
 {
-    tcgetattr(STDIN_FILENO, &m_originalTermios);
+    if (tcgetattr(STDIN_FILENO, &m_originalTermios) == 0)
+    {
+        g_signalTermios = m_originalTermios;
+        g_signalTermiosValid = 1;
+    }
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = OnFatalSignal;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_RESETHAND;
+    for (size_t i = 0; i < sizeof(g_fatalSignals) / sizeof(g_fatalSignals[0]); ++i)
+    {
+        sigaction(g_fatalSignals[i], &action, &g_previousActions[i]);
+    }
 }
 
 CConsoleStateSaver::~CConsoleStateSaver()
 {
-    // Restore terminal settings, leave alternate buffer, show cursor
-    tcsetattr(STDIN_FILENO, TCSANOW, &m_originalTermios);
-    const char* seq = "\x1B[?1049l\x1B[?25h";
-    WriteToStdout(seq, strlen(seq));
+    for (size_t i = 0; i < sizeof(g_fatalSignals) / sizeof(g_fatalSignals[0]); ++i)
+    {
+        sigaction(g_fatalSignals[i], &g_previousActions[i], nullptr);
+    }
+    g_signalTermiosValid = 0;
+    RestoreTerminal(&m_originalTermios);
 }
 
 // ---------------------------------------------------------

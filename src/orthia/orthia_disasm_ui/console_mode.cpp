@@ -7,6 +7,7 @@
 #include <climits>
 #ifndef WIN32
 #include <unistd.h>
+#include <cerrno>
 #endif
 
 extern "C"
@@ -70,6 +71,43 @@ namespace
             text.pop_back();
         }
         return ORTHIA_TCSTR(": ") + text;
+    }
+
+    // Why a process can't be read and what to do about it, or nothing
+    PlatformString_type ProcessAccessHint(int platformError)
+    {
+#ifdef WIN32
+        (void)platformError;
+        return PlatformString_type();
+#else
+        if ((platformError != EPERM && platformError != EACCES) || geteuid() == 0)
+        {
+            return PlatformString_type();
+        }
+        // Yama (Ubuntu, Fedora, ...): 1 = only descendants, 2 = only root, 3 = nobody
+        int scope = -1;
+        if (FILE* file = fopen("/proc/sys/kernel/yama/ptrace_scope", "r"))
+        {
+            if (fscanf(file, "%d", &scope) != 1)
+            {
+                scope = -1;
+            }
+            fclose(file);
+        }
+        PlatformString_type hint = "Reading the memory of another process needs ptrace access";
+        switch (scope)
+        {
+        case 1:
+            return hint + ": run orthia with sudo, or, for processes of your own user,"
+                          " allow it until reboot with: sudo sysctl kernel.yama.ptrace_scope=0";
+        case 2:
+            return hint + ": kernel.yama.ptrace_scope is 2, so only root has it; run orthia with sudo";
+        case 3:
+            return hint + ": kernel.yama.ptrace_scope is 3, which disables it until reboot";
+        default:
+            return hint + ": run orthia with sudo to open processes of other users";
+        }
+#endif
     }
 
     // Model and analyzer progress goes to stderr, so that stdout stays parseable.
@@ -225,6 +263,11 @@ namespace
             PlatformString_type pidStr;
             orthia::ObjectToString_t(pid, pidStr);
             WriteLine(stderr, ORTHIA_TCSTR("Can't open process: ") + pidStr + ReasonSuffix(platformError));
+            const PlatformString_type hint = ProcessAccessHint(platformError);
+            if (!hint.empty())
+            {
+                WriteLine(stderr, hint);
+            }
             return false;
         }
         return OpenTargetAndWait<oui::fsui::ProcessCompleteHandler_type>(pump, model,

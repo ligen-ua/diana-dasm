@@ -1,4 +1,5 @@
 """Process mode on orthia's own process (--pid self)."""
+import os
 import re
 import sys
 
@@ -127,3 +128,14 @@ def test_sections_of_runtime_library(orthia, runtime):
     assert text_flags == "R-X", res
     export = base + offset
     assert base < text_address <= export < text_address + text_size <= end + 1, res
+
+
+@pytest.mark.skipif(sys.platform != "linux" or os.geteuid() == 0, reason="Linux, run as a normal user")
+def test_process_of_another_user_explains_ptrace(orthia):
+    # pid 1 belongs to root: without ptrace access its memory can't be read
+    res = orthia.raw("--pid", "1", "--cmd", "lm")
+    if res.code == 0:
+        pytest.skip("pid 1 is readable here (a container that runs it as this user)")
+    assert res.code == EXIT_OPEN_FAILED, res
+    assert re.search(r"^Can't open process: 1: ", res.stderr, re.M), res
+    assert "needs ptrace access" in res.stderr and "sudo" in res.stderr, res

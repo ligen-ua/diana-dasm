@@ -201,3 +201,11 @@ def test_several_targetless_commands(orthia_cold, target):
     res = orthia_cold.raw("--cmd", f".database delete {sha1[:8]}", "--cmd", ".database list")
     assert res.code == EXIT_OK, res
     res.assert_line(r"^No databases$")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
+def test_folders_are_private(orthia_cold, target):
+    # comments and a copy of every opened file: other local users must not read them
+    sha1 = opened(orthia_cold, target)
+    for folder in (orthia_cold.home / "db", orthia_cold.home / "proc", orthia_cold.home / "db" / sha1):
+        assert folder.stat().st_mode & 0o077 == 0, (folder, oct(folder.stat().st_mode))

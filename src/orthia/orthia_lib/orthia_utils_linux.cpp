@@ -35,7 +35,9 @@ void CreateAllDirectoriesForFile(const PlatformString_type& fullFileName)
         if (fullFileName[i] == '/')
         {
             PlatformString_type path = fullFileName.substr(0, i + 1);
-            mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
+            // owner only: the data folder keeps comments and a copy of every opened file
+            // (and XDG wants $XDG_DATA_HOME itself 0700 when it has to be created)
+            mkdir(path.c_str(), S_IRWXU);
         }
     }
 }
