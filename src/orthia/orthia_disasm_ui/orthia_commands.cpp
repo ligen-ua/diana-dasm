@@ -372,7 +372,7 @@ namespace orthia
             line = ORTHIA_TCSTR("Module: ") + mod.name;
             args.ReplyLine(line);
 
-            line = ORTHIA_TCSTR("Full name: ") + mod.fullName;
+            line = ORTHIA_TCSTR("Full name: ") + orthia::StripLongPathPrefix(mod.fullName);
             args.ReplyLine(line);
 
             auto imageSource = orthia::ModuleImageSourceText(mod);

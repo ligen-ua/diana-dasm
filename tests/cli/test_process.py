@@ -108,7 +108,6 @@ def test_u_unmapped(orthia):
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="pid 4 (System) is Windows-only")
-@pytest.mark.xfail(reason="B16: open failure doesn't say why ('Can't open process: 4')")
 def test_open_failure_reports_reason(orthia):
     res = orthia.raw("--pid", "4", "--cmd", "lm")
     assert res.code == EXIT_OPEN_FAILED, res

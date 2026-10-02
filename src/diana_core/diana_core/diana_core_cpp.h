@@ -38,7 +38,15 @@ class CException:public std::runtime_error
                        const std::string & text)
     {
         std::stringstream res;
-        res<<text<<", errorCode = "<<errorCode;
+        res<<text<<", errorCode = ";
+        if (const char * pName = Diana_QueryErrorText_Silent(errorCode))
+        {
+            res<<pName<<" ("<<errorCode<<")";
+        }
+        else
+        {
+            res<<errorCode;
+        }
         return res.str();
     }
 public:
@@ -48,6 +56,10 @@ public:
             std::runtime_error(ToText(errorCode, text)),
             m_errorCode(errorCode)
     {
+    }
+    int GetErrorCode() const
+    {
+        return m_errorCode;
     }
 };
 

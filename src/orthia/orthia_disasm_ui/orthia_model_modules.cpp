@@ -595,19 +595,44 @@ namespace orthia
         }
     }
 
+    static std::string DescribeMapError(int errorCode)
+    {
+        switch (errorCode)
+        {
+        case DI_END_OF_STREAM:
+            return "file is truncated";
+        case DI_INVALID_INPUT:
+            return "malformed or truncated headers";
+        case DI_UNSUPPORTED:
+        case DI_UNSUPPORTED_COMMAND:
+            return "unsupported format feature";
+        }
+        return diana::QueryErrorCode(errorCode);
+    }
+
     // MakeSimpleFile factory
     std::shared_ptr<ISimpleFile> MakeSimpleFile(int executableType,
         const std::vector<char>& data,
         const MapFileParameters& params)
     {
-        if (executableType == DIANA_EXECUTABLE_TYPE_ELF)
+        const bool isElf = executableType == DIANA_EXECUTABLE_TYPE_ELF;
+        try
         {
-            auto elfFile = std::make_shared<CSimpleElfFile>();
-            elfFile->MapFile(data, params);
-            return elfFile;
+            if (isElf)
+            {
+                auto elfFile = std::make_shared<CSimpleElfFile>();
+                elfFile->MapFile(data, params);
+                return elfFile;
+            }
+            auto peFile = std::make_shared<CSimplePeFile>();
+            peFile->MapFile(data, params);
+            return peFile;
         }
-        auto peFile = std::make_shared<CSimplePeFile>();
-        peFile->MapFile(data, params);
-        return peFile;
+        catch (const diana::CException& e)
+        {
+            // the parser's error code means nothing to the user
+            throw std::runtime_error(std::string("Invalid ") + (isElf ? "ELF" : "PE") +
+                " image: " + DescribeMapError(e.GetErrorCode()));
+        }
     }
 }

@@ -39,10 +39,10 @@ static void PrintUsage(std::ostream& out)
     out << "except for the data folder commands, which run without a target:\n";
     out << "  orthia --cmd \".database list\"   (also: delete <sha1 prefix|pid|file>, cleanup)\n";
     out << "\n";
-    out << "Exit codes (--cmd mode):\n";
+    out << "Exit codes:\n";
     out << "  0  success\n";
     out << "  1  at least one command reported an error\n";
-    out << "  2  bad or incomplete argument\n";
+    out << "  2  bad or incomplete argument, or the UI started without a console\n";
     out << "  3  target failed to open, or no target given for a command that needs one\n";
     out << "  4  unexpected error\n";
     out << "\n";
@@ -183,9 +183,12 @@ int wmain(int argc, const wchar_t* argv[])
                 {
                     pid = GetCurrentProcessId();
                 }
-                else
+                else if (!orthia::ParsePidArgument(text, &pid))
                 {
-                    orthia::StringToObject(text, &pid);
+                    std::cerr << "Invalid value for --pid: " << orthia::ToAnsiString_Silent(text)
+                              << " (expected a decimal or 0x-prefixed hex number, or \"self\")\n\n";
+                    PrintUsage(std::cerr);
+                    return orthia::consoleExit_Usage;
                 }
                 processesToOpen.push_back(pid);
                 nextIsPid = false;
@@ -242,6 +245,12 @@ int wmain(int argc, const wchar_t* argv[])
         const bool consoleMode = !commandsToRun.empty();
         if (!consoleMode)
         {
+            if (!orthia::HasInteractiveConsole())
+            {
+                std::cerr << "The UI needs an interactive console (stdin/stdout are redirected);"
+                             " use --cmd to run commands without the UI\n";
+                return orthia::consoleExit_Usage;
+            }
             // would pollute the command output otherwise
             std::cout << "Welcome to Orthia Disasm\n\n";
             std::cout.flush();

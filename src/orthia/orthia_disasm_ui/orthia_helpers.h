@@ -32,5 +32,9 @@ namespace orthia
     // empty when the name has no directory part.
     oui::String DirectoryOfFile(const oui::String& fullName);
 
+    // For display: "\\?\C:\x" -> "C:\x", "\\?\UNC\srv\x" -> "\\srv\x". The stored name keeps
+    // the prefix, file access needs it for long paths.
+    PlatformString_type StripLongPathPrefix(const PlatformString_type& fullName);
+
 
 }

@@ -3,6 +3,7 @@
 
 #include "ui_modules_window.h"
 #include "orthia_image_source.h"
+#include "orthia_helpers.h"
 #include "oui_menu.h"
 #include <ctime>
 
@@ -299,7 +300,7 @@ void CModulesWindow::UpdateVisibleItems()
         vit->text.push_back(orthia::ToWideStringAsHex(it->address));
         vit->text.push_back(orthia::ToWideStringAsHex((unsigned int)it->size));
         vit->text.push_back(orthia::ModuleStatusText(*it));
-        vit->text.push_back(it->fullName);
+        vit->text.push_back(orthia::StripLongPathPrefix(it->fullName));
         vit->tag = std::make_shared<ModuleItemContextTag>(it->address, it->name);
 
         vit->openHandler = [this, address = it->address, name = it->name] {

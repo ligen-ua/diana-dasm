@@ -81,14 +81,24 @@ namespace orthia
         return result;
     }
 
+    PlatformString_type StripLongPathPrefix(const PlatformString_type& fullName)
+    {
+        const PlatformString_type uncPrefix = ORTHIA_TCSTR("\\\\?\\UNC\\");
+        if (fullName.compare(0, uncPrefix.size(), uncPrefix) == 0)
+        {
+            return ORTHIA_TCSTR("\\\\") + fullName.substr(uncPrefix.size());
+        }
+        const PlatformString_type prefix = ORTHIA_TCSTR("\\\\?\\");
+        if (fullName.compare(0, prefix.size(), prefix) == 0)
+        {
+            return fullName.substr(prefix.size());
+        }
+        return fullName;
+    }
+
     oui::String DirectoryOfFile(const oui::String& fullName)
     {
-        PlatformString_type path = fullName.native;
-        const PlatformString_type prefix = ORTHIA_TCSTR("\\\\?\\");
-        if (path.compare(0, prefix.size(), prefix) == 0)
-        {
-            path.erase(0, prefix.size());
-        }
+        const PlatformString_type path = StripLongPathPrefix(fullName.native);
         auto pos = path.find_last_of(ORTHIA_TCSTR("\\/"));
         if (pos == PlatformString_type::npos)
         {

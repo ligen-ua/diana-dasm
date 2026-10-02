@@ -104,11 +104,11 @@ def test_x_without_module_searches_main_module(orthia, nt):
     assert all(n.startswith("ntoskrnl.exe!") for n in names), names
 
 
-@pytest.mark.xfail(reason="B5: truncated PE rejected with 'DiException, errorCode = -11'")
 def test_truncated_pe_reports_reason(orthia, data):
     res = orthia.run("lm", file=data.truncated(data.ntoskrnl, 1024, "trunc_pe.exe"))
     assert res.code == EXIT_OPEN_FAILED, res
     assert "DiException" not in res.stderr, res
+    assert re.search(r"(?i)invalid pe image: .*truncated", res.stderr), res
 
 
 @pytest.fixture(scope="module")

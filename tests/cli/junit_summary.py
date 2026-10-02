@@ -1,7 +1,7 @@
 """One-line summary of a pytest JUnit XML report, for run_tests.cmd / cmake-test.sh.
 
     python tests/cli/junit_summary.py tests/cli/_out/junit.xml
-    -> 70 passed, 11 known bugs: B1 B2 B6 B7 B9 B11 B12 B13 B14 B17
+    -> 172 passed, 1 skipped, 3 known bugs (3 tests): B2 B4 B10
 
 Known bugs are the xfail tests; their reason starts with the bug ID from
 testing/cmdline-exploratory-test-report.md ("B7: ...").

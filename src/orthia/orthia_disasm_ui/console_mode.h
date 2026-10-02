@@ -30,4 +30,10 @@ namespace orthia
     // Headless entry point: opens the targets, runs the commands and returns an exit code.
     // Creates no windows and no oui::CConsoleApp.
     int RunConsoleMode(std::shared_ptr<CProgramModel> model, const ConsoleModeOptions& options);
+
+    // --pid value: decimal, or hex with a 0x prefix. Rejects signs, junk and overflow.
+    bool ParsePidArgument(const PlatformString_type& text, unsigned long long* pid);
+
+    // The UI needs stdin and stdout attached to a terminal.
+    bool HasInteractiveConsole();
 }

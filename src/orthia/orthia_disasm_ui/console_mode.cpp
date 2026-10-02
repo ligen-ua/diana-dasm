@@ -4,6 +4,10 @@
 #include "orthia_commands.h"
 #include "diana_core_cpp.h"
 #include <cstdio>
+#include <climits>
+#ifndef WIN32
+#include <unistd.h>
+#endif
 
 extern "C"
 {
@@ -47,6 +51,25 @@ namespace
 #endif
         fwrite(utf8.data(), 1, utf8.size(), stream);
         fputc('\n', stream);
+    }
+
+    // ": <OS reason>", or nothing when there is no error code
+    PlatformString_type ReasonSuffix(int platformError)
+    {
+        if (!platformError)
+        {
+            return PlatformString_type();
+        }
+        PlatformString_type text = oui::GetErrorText(platformError);
+        // FormatMessage ends the text with CRLF
+        while (!text.empty() && (text.back() == ORTHIA_TCHAR('\r') ||
+                                 text.back() == ORTHIA_TCHAR('\n') ||
+                                 text.back() == ORTHIA_TCHAR(' ') ||
+                                 text.back() == ORTHIA_TCHAR('.')))
+        {
+            text.pop_back();
+        }
+        return ORTHIA_TCSTR(": ") + text;
     }
 
     // Model and analyzer progress goes to stderr, so that stdout stays parseable.
@@ -179,7 +202,7 @@ namespace
         std::tie(platformError, file) = model->GetFileSystem()->SyncOpenFile(oui::FileUnifiedId(name));
         if (!file)
         {
-            WriteLine(stderr, ORTHIA_TCSTR("Can't open file: ") + name);
+            WriteLine(stderr, ORTHIA_TCSTR("Can't open file: ") + name + ReasonSuffix(platformError));
             return false;
         }
         return OpenTargetAndWait<oui::fsui::FileCompleteHandler_type>(pump, model,
@@ -201,7 +224,7 @@ namespace
         {
             PlatformString_type pidStr;
             orthia::ObjectToString_t(pid, pidStr);
-            WriteLine(stderr, ORTHIA_TCSTR("Can't open process: ") + pidStr);
+            WriteLine(stderr, ORTHIA_TCSTR("Can't open process: ") + pidStr + ReasonSuffix(platformError));
             return false;
         }
         return OpenTargetAndWait<oui::fsui::ProcessCompleteHandler_type>(pump, model,
@@ -342,5 +365,61 @@ namespace
             }
         }
         return result;
+    }
+
+    bool ParsePidArgument(const PlatformString_type& text, unsigned long long* pid)
+    {
+        size_t pos = 0;
+        unsigned int base = 10;
+        if (text.size() > 2 && text[0] == ORTHIA_TCHAR('0') &&
+            (text[1] == ORTHIA_TCHAR('x') || text[1] == ORTHIA_TCHAR('X')))
+        {
+            pos = 2;
+            base = 16;
+        }
+        if (pos >= text.size())
+        {
+            return false;
+        }
+        unsigned long long value = 0;
+        for (; pos < text.size(); ++pos)
+        {
+            const auto ch = text[pos];
+            unsigned int digit = 0;
+            if (ch >= ORTHIA_TCHAR('0') && ch <= ORTHIA_TCHAR('9'))
+            {
+                digit = (unsigned int)(ch - ORTHIA_TCHAR('0'));
+            }
+            else if (base == 16 && ch >= ORTHIA_TCHAR('a') && ch <= ORTHIA_TCHAR('f'))
+            {
+                digit = (unsigned int)(ch - ORTHIA_TCHAR('a')) + 10;
+            }
+            else if (base == 16 && ch >= ORTHIA_TCHAR('A') && ch <= ORTHIA_TCHAR('F'))
+            {
+                digit = (unsigned int)(ch - ORTHIA_TCHAR('A')) + 10;
+            }
+            else
+            {
+                return false;
+            }
+            if (value > (ULLONG_MAX - digit) / base)
+            {
+                return false;
+            }
+            value = value * base + digit;
+        }
+        *pid = value;
+        return true;
+    }
+
+    bool HasInteractiveConsole()
+    {
+#ifdef WIN32
+        DWORD mode = 0;
+        return ::GetConsoleMode(::GetStdHandle(STD_INPUT_HANDLE), &mode) &&
+               ::GetConsoleMode(::GetStdHandle(STD_OUTPUT_HANDLE), &mode);
+#else
+        return isatty(STDIN_FILENO) && isatty(STDOUT_FILENO);
+#endif
     }
 }
