@@ -88,4 +88,6 @@ The command-line tests use pytest; see [tests/cli/README.md](tests/cli/README.md
 
 # Links
 
-Original SVN repo: https://sourceforge.net/projects/diana-dasm/
+Source code and issues: https://github.com/ligen-ua/diana-dasm
+
+The old SourceForge SVN repository (https://sourceforge.net/projects/diana-dasm/) is no longer updated.
