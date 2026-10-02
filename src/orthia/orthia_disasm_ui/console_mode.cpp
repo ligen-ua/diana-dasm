@@ -8,6 +8,7 @@
 #ifndef WIN32
 #include <unistd.h>
 #include <cerrno>
+#include "oui_privileges_posix.h"
 #endif
 
 extern "C"
@@ -80,7 +81,8 @@ namespace
         (void)platformError;
         return PlatformString_type();
 #else
-        if ((platformError != EPERM && platformError != EACCES) || geteuid() == 0)
+        // started as root: CAP_SYS_PTRACE was kept, sudo would not help
+        if ((platformError != EPERM && platformError != EACCES) || GetPrivilegeState().startedAsRoot)
         {
             return PlatformString_type();
         }
@@ -110,8 +112,7 @@ namespace
             hint += ": run orthia with sudo to open processes of other users";
             break;
         }
-        // sudo resets HOME and drops ORTHIA_* (sudo -E keeps HOME and leaves root-owned files there)
-        return hint + "\nUnder sudo orthia uses root's data folder; pass ORTHIA_SYMBOL_PATH explicitly, and avoid sudo -E";
+        return hint;
 #endif
     }
 

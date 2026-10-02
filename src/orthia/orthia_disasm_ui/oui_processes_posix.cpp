@@ -39,18 +39,18 @@ namespace oui
         return true;
     }
 
-    static bool CheckReadAccess(int pid)
+    // 0 when the memory of the process can be read, errno-style error otherwise.
+    // The same ptrace-attach check as the reads themselves: opening /proc/<pid>/mem
+    // also needs DAC access, which root has no more once orthia drops CAP_DAC_OVERRIDE.
+    static int CheckReadAccess(int pid)
     {
-        bool result = false; 
-        char memPath[64];
-        snprintf(memPath, sizeof(memPath), "/proc/%d/mem", (int)pid);
-        int fd = open(memPath, O_RDONLY);
-        if (fd >= 0)
-        { 
-            result = true;
-            close(fd);
-        }
-        return result;
+        // the kernel checks access before touching the page: EFAULT means allowed
+        char byte = 0;
+        struct iovec local  = { &byte, 1 };
+        struct iovec remote = { nullptr, 1 };
+        if (process_vm_readv((pid_t)pid, &local, 1, &remote, 1, 0) >= 0 || errno == EFAULT)
+            return 0;
+        return errno;
     }
 
     // Returns 0 on success, errno-style error on failure.
@@ -492,8 +492,8 @@ namespace oui
             if (stat(path, &st) != 0)
                 return { errno, nullptr };
 
-            if (!CheckReadAccess((int)pid)) 
-                return { EPERM, nullptr };
+            if (int error = CheckReadAccess((int)pid))
+                return { error, nullptr };
 
             int pointerSize = DetectPointerSize(pid);
             bool is32bit    = (pointerSize == 4);
@@ -504,7 +504,7 @@ namespace oui
 
         std::tuple<int, String> SyncQueryProcessName(unsigned long long pid) override
         {
-            // reading comm needs no ptrace access, unlike /proc/<pid>/mem
+            // reading comm needs no ptrace access, unlike the memory
             char path[64];
             snprintf(path, sizeof(path), "/proc/%d", (int)pid);
             struct stat st;
@@ -585,7 +585,7 @@ namespace oui
                 if (flags & IProcessSystem::queryFlags_TryOpenProcessAsReader)
                 {
                     // Check we can open process memory                    
-                    if (CheckReadAccess((int)pid)) 
+                    if (!CheckReadAccess((int)pid))
                     {
                         info.flags |= ProcessInfo::flag_hasReaderAccess;
                     }

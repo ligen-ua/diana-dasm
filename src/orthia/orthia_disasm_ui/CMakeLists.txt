@@ -50,6 +50,7 @@ if(UNIX)
     list(APPEND SOURCES
         main_posix.cpp
         oui_processes_posix.cpp
+        oui_privileges_posix.cpp
     )
 else()
     list(APPEND SOURCES

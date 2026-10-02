@@ -45,18 +45,27 @@ child processes, so `--pid` and *Open process* fail with "Operation not permitte
 
 `--pid self` always works. With `--cmd` the error is followed by a hint for the current `ptrace_scope`.
 
-Running under `sudo`:
-- sudo sets `HOME=/root` and drops `XDG_DATA_HOME`, so Orthia uses root's data folder
-  (`/root/.local/share/Orthia`): its own databases and comments, separate from yours and owned by root.
-- The default symbol folders `~/sym;~/symbols` are root's too, and sudo drops `ORTHIA_SYMBOL_PATH` and
-  `ORTHIA_HOME`. Pass them on the command line:
-  ```
-  sudo ORTHIA_SYMBOL_PATH="$HOME/sym" ORTHIA_HOME="$HOME/.local/share/Orthia-root" orthia --pid 1234
-  ```
-  A separate `ORTHIA_HOME` keeps root-owned files out of your own data folder.
-- Don't use `sudo -E`: it keeps your `HOME`, so root-owned files end up in `~/.local/share/Orthia`
-  and later runs without sudo fail to open them.
-- Everything, including the file parsers, then runs as root: open only what you trust.
+### Linux: what Orthia keeps of root
+
+Reading memory is the only thing Orthia needs root for. When started as root, it drops everything
+else before it opens anything:
+- **Under `sudo`** (or `pkexec`) it switches back to your user (`SUDO_UID`), so it uses your
+  data folder (`~/.local/share/Orthia`) and symbol folders, and the files it creates are yours.
+  sudo drops `ORTHIA_SYMBOL_PATH` and `ORTHIA_HOME`, so pass them on the command line if you need them:
+  `sudo ORTHIA_SYMBOL_PATH="$HOME/sym" orthia --pid 1234`.
+- **Logged in as root** (`su`, a root shell) it stays uid 0 and uses `/root/.local/share/Orthia`.
+- Either way only the `CAP_SYS_PTRACE` capability is kept: it can read any process, but it can't
+  read or write files your user (or, as root, their owner) can't, and it can't regain root.
+  Orthia can't be attached to by your user either (it is not dumpable).
+- A seccomp filter denies what `CAP_SYS_PTRACE` would allow besides reading memory (`ptrace`,
+  `process_vm_writev`, `pidfd_getfd`, ...), new namespaces, and kernel interfaces Orthia has no
+  use for (module loading, `bpf`, `mount`, `io_uring`, ...). Normal runs without sudo get the same filter.
+- If the drop fails, Orthia exits instead of going on as root.
+
+Don't install Orthia setuid root or with `setcap cap_sys_ptrace`: every local user could then read
+any process's memory. Orthia refuses to run setuid.
+
+The parsers still run with `CAP_SYS_PTRACE`: open only files you trust under sudo.
 
 ## Command line
 

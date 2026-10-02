@@ -66,8 +66,8 @@ namespace orthia
         m_symbolFolders.push_back(L"C:\\Sym");
         m_symbolFolders.push_back(L"C:\\Symbols");
 #else
-        m_symbolFolders.push_back("~/sym");
-        m_symbolFolders.push_back("~/symbols");
+        m_symbolFolders.push_back(ExpandHomeFolder("~/sym", QueryEnvironmentString("HOME")));
+        m_symbolFolders.push_back(ExpandHomeFolder("~/symbols", QueryEnvironmentString("HOME")));
 #endif
     }
     PlatformString_type CConfigOptionsStorage::GetReadmeFileName() const
@@ -105,9 +105,37 @@ namespace orthia
         return m_binDir;
     }
 
+    PlatformString_type ExpandHomeFolder(const PlatformString_type& path, const PlatformString_type& home)
+    {
+#ifdef DIANA_HAS_WIN32
+        (void)home;
+        return path;
+#else
+        // only "~" and "~/...": "~user" would need a passwd lookup
+        if (home.empty() || path.empty() || path[0] != '~' || (path.size() > 1 && path[1] != '/'))
+        {
+            return path;
+        }
+        PlatformString_type result = home;
+        while (!result.empty() && result.back() == '/')
+        {
+            result.pop_back();
+        }
+        if (path.size() == 1)
+        {
+            return result.empty() ? PlatformString_type("/") : result;
+        }
+        return result + path.substr(1);
+#endif
+    }
     void CConfigOptionsStorage::SetSymbolsFolders(const PlatformString_type& names)
     {
         orthia::SplitStringWithoutWhitespace(names, orthia::StringInfo(ORTHIA_TCSTR(";")), &m_symbolFolders);
+        const auto home = QueryEnvironmentString(ORTHIA_TCSTR("HOME"));
+        for (auto& folder : m_symbolFolders)
+        {
+            folder = ExpandHomeFolder(folder, home);
+        }
     }
     std::vector<PlatformString_type> CConfigOptionsStorage::GetSymbolsFolders() const
     {

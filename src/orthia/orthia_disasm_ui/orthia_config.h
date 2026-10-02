@@ -4,6 +4,9 @@
 
 namespace orthia
 {
+    // "~" and "~/..." against the given home folder (Linux; unchanged on Windows or without a home)
+    PlatformString_type ExpandHomeFolder(const PlatformString_type& path, const PlatformString_type& home);
+
     class CConfigOptionsStorage
     {
         PlatformString_type m_appDir;

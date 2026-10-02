@@ -14,6 +14,7 @@ extern "C"
 #include "console_mode.h"
 #include "ui_help.h"
 #include "orthia_version.h"
+#include "oui_privileges_posix.h"
 #include <unistd.h>
 
 int RunTests();
@@ -89,6 +90,7 @@ int main(int argc, const char* argv[])
         bool nextIsPid = false;
         bool nextIsCmd = false;
         bool nextIsFile = false;
+        bool dropPrivileges = true;
         for (int i = 1; i < argc; ++i)
         {
             // checked first, so that a value starting with -- is taken as a value
@@ -148,6 +150,12 @@ int main(int argc, const char* argv[])
                 analyze = true;
                 continue;
             }
+            if (strcmp(argv[i], "--no-privilege-drop") == 0)
+            {
+                // undocumented, for debugging: keeps full root rights and no sandbox
+                dropPrivileges = false;
+                continue;
+            }
             if (IsHelpSwitch(argv[i]))
             {
                 PrintUsage(std::cout, programName);
@@ -190,7 +198,36 @@ int main(int argc, const char* argv[])
             std::cout.flush();
         }
 
+        if (dropPrivileges)
+        {
+            // before InitAppCore: the data folder is created as the user that ran sudo
+            orthia::DropRootPrivileges();
+        }
+        else if (geteuid() == 0)
+        {
+            std::cerr << "Warning: running with full root rights and no sandbox (--no-privilege-drop)\n";
+        }
+
         auto config = orthia::InitAppCore();
+
+        if (dropPrivileges)
+        {
+            // still before the model starts its threads: both apply to the calling thread only
+            std::vector<std::string> warnings;
+            orthia::ApplySandbox(&warnings);
+            for (const auto& warning : warnings)
+            {
+                // only root runs depend on it
+                if (orthia::GetPrivilegeState().startedAsRoot)
+                {
+                    std::cerr << "Warning: " << warning << "\n";
+                }
+                else
+                {
+                    ORTHIA_DEV_LOG(orthia::LogSeverity::Info, warning);
+                }
+            }
+        }
 
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 

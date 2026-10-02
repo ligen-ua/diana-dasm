@@ -4,6 +4,10 @@
 #include "oui_layouts_calc.h"
 #include "orthia_databases.h"
 #include "orthia_module_names.h"
+#include "orthia_config.h"
+#ifndef _WIN32
+#include "oui_privileges_posix.h"
+#endif
 #include <map>
 #include <set>
 
@@ -434,6 +438,39 @@ TEST(ModuleNames, Storage)
     query(4);
     EXPECT_EQ(2, builds[4]);
 }
+
+#ifndef _WIN32
+TEST(Config, ExpandHomeFolder)
+{
+    EXPECT_EQ("/home/u/sym", orthia::ExpandHomeFolder("~/sym", "/home/u"));
+    EXPECT_EQ("/home/u/sym", orthia::ExpandHomeFolder("~/sym", "/home/u/"));
+    EXPECT_EQ("/home/u", orthia::ExpandHomeFolder("~", "/home/u"));
+    EXPECT_EQ("/sym", orthia::ExpandHomeFolder("~/sym", "/"));
+    EXPECT_EQ("~other/sym", orthia::ExpandHomeFolder("~other/sym", "/home/u"));
+    EXPECT_EQ("/opt/~/sym", orthia::ExpandHomeFolder("/opt/~/sym", "/home/u"));
+    EXPECT_EQ("~/sym", orthia::ExpandHomeFolder("~/sym", ""));
+}
+
+TEST(Privileges, ParseIdText)
+{
+    unsigned int id = 7;
+    EXPECT_TRUE(orthia::ParseIdText("1000", &id));
+    EXPECT_EQ(1000u, id);
+    EXPECT_TRUE(orthia::ParseIdText("0", &id));
+    EXPECT_EQ(0u, id);
+    EXPECT_TRUE(orthia::ParseIdText("4294967294", &id));
+    EXPECT_EQ(4294967294u, id);
+    // (uid_t)-1 means "unchanged" to setresuid
+    EXPECT_FALSE(orthia::ParseIdText("4294967295", &id));
+    EXPECT_FALSE(orthia::ParseIdText("99999999999", &id));
+    EXPECT_FALSE(orthia::ParseIdText("", &id));
+    EXPECT_FALSE(orthia::ParseIdText(nullptr, &id));
+    EXPECT_FALSE(orthia::ParseIdText("-1", &id));
+    EXPECT_FALSE(orthia::ParseIdText(" 1000", &id));
+    EXPECT_FALSE(orthia::ParseIdText("1000x", &id));
+    EXPECT_FALSE(orthia::ParseIdText("0x10", &id));
+}
+#endif
 
 int RunTests()
 {
