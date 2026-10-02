@@ -9,8 +9,9 @@ from orthia_runner import (EXIT_BAD_ARGUMENT, EXIT_COMMAND_ERROR, EXIT_OK,
 
 
 @pytest.fixture(scope="module")
-def dmesg(data):
-    return data.elf("dmesg")
+def target(data):
+    """The binary under test as a file: the target here doesn't matter, only that it opens."""
+    return data.self_file
 
 
 @pytest.mark.parametrize("flag", ["--help", "-h"])
@@ -56,33 +57,33 @@ def test_bad_arguments(orthia, args):
     assert res.code == EXIT_BAD_ARGUMENT, res
 
 
-def test_file_and_pid_together(orthia, dmesg):
-    res = orthia.raw("--file", str(dmesg), "--pid", "self", "--cmd", "lm")
+def test_file_and_pid_together(orthia, target):
+    res = orthia.raw("--file", str(target), "--pid", "self", "--cmd", "lm")
     assert res.code == EXIT_BAD_ARGUMENT, res
 
 
-def test_unknown_command(orthia, dmesg):
-    res = orthia.run("nosuchcommand", file=dmesg)
+def test_unknown_command(orthia, target):
+    res = orthia.run("nosuchcommand", file=target)
     assert res.code == EXIT_COMMAND_ERROR, res
     res.assert_line(r"^Error: Command not found: nosuchcommand")
 
 
-def test_error_does_not_stop_later_commands(orthia, dmesg):
-    res = orthia.run("nosuchcommand", "lm", file=dmesg)
+def test_error_does_not_stop_later_commands(orthia, target):
+    res = orthia.run("nosuchcommand", "lm", file=target)
     assert res.code == EXIT_COMMAND_ERROR, res
-    res.assert_line(r"\bdmesg\b")
+    res.assert_line(rf"\b{re.escape(target.name)}\b")
 
 
-def test_empty_command_is_noop(orthia, dmesg):
-    assert orthia.run("", file=dmesg).code == EXIT_OK
+def test_empty_command_is_noop(orthia, target):
+    assert orthia.run("", file=target).code == EXIT_OK
 
 
-def test_whitespace_command_is_noop(orthia, dmesg):
-    orthia.run("   ", file=dmesg).assert_ok()
+def test_whitespace_command_is_noop(orthia, target):
+    orthia.run("   ", file=target).assert_ok()
 
 
-def test_cmd_error_echoes_whole_token(orthia, dmesg):
-    res = orthia.run("--file", file=dmesg)
+def test_cmd_error_echoes_whole_token(orthia, target):
+    res = orthia.run("--file", file=target)
     res.assert_line(r"Command not found: --file")
 
 
@@ -107,9 +108,9 @@ def test_hex_pid(orthia):
         assert res.code == EXIT_BAD_ARGUMENT, res
 
 
-def test_ui_mode_without_console_fails(orthia_cold, dmesg):
+def test_ui_mode_without_console_fails(orthia_cold, target):
     # stdin/stdout are not a console here, as in a script or CI. orthia_cold: the UI does a full open
-    res = orthia_cold.raw("--file", str(dmesg), timeout=30)
+    res = orthia_cold.raw("--file", str(target), timeout=30)
     assert res.code != EXIT_OK, res
 
 

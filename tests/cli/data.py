@@ -1,4 +1,9 @@
-"""Test inputs: committed files under data/, unpacked zips, and derived files."""
+"""Test inputs: committed files under data/, private files, the binary under test, and derived files.
+
+data/private/ (gitignored) holds third-party binaries that can't be published (dmesg, apt-mark, ls.bin,
+ntoskrnl with its PDB). The tests that use them skip when the folder is absent; the *_self tests
+cover the same ground with the freshly built Orthia binary.
+"""
 import hashlib
 import os
 import shutil
@@ -6,12 +11,23 @@ import struct
 import zipfile
 from pathlib import Path
 
+import pytest
+
+from images import PeInfo
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 OUT_DIR = Path(__file__).resolve().parent / "_out"
 
 ELF_DIR = DATA_DIR / "elf"
-NT_ZIP = DATA_DIR / "pe" / "nt.zip"
+PRIVATE_DIR = DATA_DIR / "private"
+NT_ZIP = PRIVATE_DIR / "pe" / "nt.zip"
+
+
+def private_file(path: Path) -> Path:
+    if not path.is_file():
+        pytest.skip(f"private test file not present: {path.relative_to(DATA_DIR)}")
+    return path
 
 
 def _sha1(path: Path) -> str:
@@ -50,21 +66,23 @@ def unpack_zip(zip_path: Path) -> Path:
 
 
 class DataSet:
-    def __init__(self, work_dir: Path):
+    def __init__(self, work_dir: Path, orthia_exe: Path):
         self.work_dir = work_dir
+        self.orthia_exe = orthia_exe
         self._nt = None
 
-    # committed ELF files
+    # ELF files: committed, or private (skips when absent)
     def elf(self, name: str) -> Path:
         path = ELF_DIR / name
-        assert path.is_file(), f"missing test file {path}"
-        return path
+        if path.is_file():
+            return path
+        return private_file(PRIVATE_DIR / "elf" / name)
 
     # data/pe/nt.zip: ntoskrnl.exe 10.0.14393.9512 + matching ntkrnlmp.pdb
     @property
     def nt_dir(self) -> Path:
         if self._nt is None:
-            self._nt = unpack_zip(NT_ZIP)
+            self._nt = unpack_zip(private_file(NT_ZIP))
         return self._nt
 
     @property
@@ -74,6 +92,44 @@ class DataSet:
     @property
     def nt_symbols(self) -> Path:
         return self.nt_dir / "symbols"
+
+    # the binary under test, opened as a file: the file counterpart of --pid self
+    @property
+    def self_is_pe(self) -> bool:
+        return self.orthia_exe.read_bytes()[:2] == b"MZ"
+
+    @property
+    def self_name(self) -> str:
+        """Fixed name of the copy, so tests can say orthia!... whatever the build calls it."""
+        return "orthia.exe" if self.self_is_pe else "orthia"
+
+    @property
+    def self_dir(self) -> Path:
+        """self/bin/<binary> alone and self/symbols/<pdb>: siblings, as unpack_zip lays them out,
+        so the PDB next to the build output never reaches the tests that run without symbols."""
+        target = self.work_dir / "self"
+        if not target.is_dir():
+            staging = target.with_name("self.tmp")
+            shutil.rmtree(staging, ignore_errors=True)
+            (staging / "bin").mkdir(parents=True)
+            (staging / "symbols").mkdir()
+            shutil.copyfile(self.orthia_exe, staging / "bin" / self.self_name)
+            pdb = self.orthia_exe.with_suffix(".pdb")
+            if self.self_is_pe and pdb.is_file():
+                shutil.copyfile(pdb, staging / "symbols" / pdb.name)
+            staging.rename(target)
+        return target
+
+    @property
+    def self_file(self) -> Path:
+        return self.self_dir / "bin" / self.self_name
+
+    @property
+    def self_symbols(self) -> Path:
+        symbols = self.self_dir / "symbols"
+        if not any(symbols.iterdir()):
+            pytest.skip(f"no PDB next to {self.orthia_exe}")
+        return symbols
 
     # derived files, created under the session work dir
     def fresh_copy(self, src: Path, name: str = None, subdir: str = "fresh") -> Path:
@@ -99,9 +155,8 @@ class DataSet:
         dest = self.work_dir / "derived" / name
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
-            image = bytearray(src.read_bytes())
-            image[image.index(b"RSDS") + 4] ^= 0xFF
-            dest.write_bytes(image)
+            shutil.copyfile(src, dest)
+            flip_rsds_guid(dest)
         return dest
 
     def copy_with_dependency(self, exe: Path, dep_name: str, dest_dir: Path) -> "tuple[Path, Path]":
@@ -152,8 +207,9 @@ def patch_pe_timestamp(path: Path) -> None:
 
 def flip_rsds_guid(path: Path) -> None:
     """Flip one byte of the RSDS debug GUID in place; the headers stay the same."""
+    offset = PeInfo(path).rsds_offset + 4
     image = bytearray(path.read_bytes())
-    image[image.index(b"RSDS") + 4] ^= 0xFF
+    image[offset] ^= 0xFF
     path.write_bytes(image)
 
 
@@ -200,3 +256,20 @@ def iat_slot(exe: Path, dll: str, func: str) -> int:
                 index += 1
         descriptor += 20
     raise AssertionError(f"{dll}!{func} is not imported by {exe}")
+
+
+def host_import(pe: PeInfo, preferred=("USER32.dll", "GDI32.dll", "KERNEL32.dll")) -> "tuple[str, str]":
+    """(dll, function): a function the image imports whose export in the host's System32 copy
+    is real code, not a forwarder, so it can be disassembled through the linked dependency."""
+    system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
+    imports = {dll.lower(): functions for dll, functions in pe.imports.items()}
+    for dll in preferred:
+        functions = imports.get(dll.lower(), [])
+        host = system32 / dll
+        if not functions or not host.is_file():
+            continue
+        exports = PeInfo(host).exports
+        for function in sorted(functions):
+            if function in exports:
+                return dll.lower(), function
+    pytest.skip("no imported function with a non-forwarded host export")

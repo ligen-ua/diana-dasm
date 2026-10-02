@@ -6,7 +6,7 @@ import pytest
 
 from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED, check_x_sort_orders
 
-pytestmark = pytest.mark.pe
+pytestmark = [pytest.mark.pe, pytest.mark.private]
 
 KE_BUG_CHECK = 0x1_4015_DAE0
 

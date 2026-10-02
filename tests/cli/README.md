@@ -11,11 +11,12 @@ pip install -r tests/cli/requirements.txt     # once; only pytest
 run_cli_tests.cmd                             # Windows
 ./run_cli_tests.sh                            # Linux
 python -m pytest tests/cli -k expressions     # a subset
-python -m pytest tests/cli -m "not slow"      # skip the cold ntoskrnl analysis
+python -m pytest tests/cli -m "not slow"      # skip the cold analysis of large binaries
+python -m pytest tests/cli -m "not private"   # only what runs in a public clone
 python -m pytest tests/cli --orthia path/to/orthia   # a specific binary (or set ORTHIA_BIN)
 ```
 
-Without `--orthia`, the binary is looked up in `bin/Release/amd64/orthia.exe`, then in `cmake-release/…/orthia_disasm_ui`.
+Without `--orthia`, the binary is looked up in `bin/Release/amd64/orthia.exe`, then in `cmake-release/…/orthia`.
 `run_tests.cmd` and `cmake-test.sh` run this suite after the C++ tests when pytest is installed.
 
 ## Isolation
@@ -39,7 +40,8 @@ Fixtures in `conftest.py`:
 |---|---|---|---|
 | `orthia` | quick | shared across the session (warm) | none |
 | `orthia_full` | `--analyze` | its own, shared across the session | none |
-| `orthia_pdb` | `--analyze` | its own, shared across the session | `ntkrnlmp.pdb` from `data/pe/nt.zip` |
+| `orthia_pdb` | `--analyze` | its own, shared across the session | `ntkrnlmp.pdb` from `data/private/pe/nt.zip` |
+| `orthia_self_pdb` | `--analyze` | its own, shared across the session | the PDB of the binary under test (Windows) |
 | `orthia_cold` | quick | new for each test | none |
 
 `orthia_cold.with_(analyze=True)` or `.with_(symbol_path=…)` gives a variant that uses the same home.
@@ -48,20 +50,34 @@ After the session, every test DB is checked with `PRAGMA foreign_key_check`.
 
 ## Test data
 
-- `data/elf/*` is used as is.
-- `data/pe/nt.zip` is unpacked once into `tests/cli/_out/data/`, with binaries in `bin/` and PDBs in `symbols/`.
+Most tests open **the binary under test itself** as a file: the file counterpart of `--pid self`.
+Nothing is stored for them; every run checks the current build. `data.self_file` is a copy named `orthia.exe` (Windows)
+or `orthia` (Linux) in `_out/.../self/bin/`, with the PDB in the sibling `self/symbols/`, so the "no symbols" tests never
+see it. Each host builds its own format, so the `*_self` PE tests run on Windows and the ELF tests on Linux
+(fixtures `self_pe` / `self_elf` skip otherwise).
+
+The expected values of the self tests are never taken from Orthia's output. `images.py` reads them from the file
+(`PeInfo`, `ElfInfo`: headers, sections, exports, imports, Build ID, DT_NEEDED), and private PDB symbols come
+from `dbghelp.dll` (`dbghelp_symbols`).
+
+Other data:
+- `data/elf/libexports_*.so` are committed; they are built from `data/elf/exports_lib` (our own source).
+- `data/private/` is **gitignored**: third-party binaries that can't be published (`dmesg`, `apt-mark`, `ls.bin`,
+  and `nt.zip`, ntoskrnl with its PDB). The tests marked `private` use them and skip when the folder is absent.
+  `nt.zip` is unpacked once into `tests/cli/_out/data/`, with binaries in `bin/` and PDBs in `symbols/`.
   The folders must stay siblings: the PDB loader also searches the module's folder and its subfolders.
 - Derived files are generated per session: fresh-SHA1 copies, truncated files, non-ASCII paths (see `data.py`).
 
 ## Writing a test
 
 ```python
-def test_something(orthia, data):
-    res = orthia.run("lm", "x dmesg!*", file=data.elf("dmesg"))   # one --cmd per argument
+def test_something(orthia, data, self_pe):
+    res = orthia.run("lm", "x orthia!*", file=data.self_file)   # one --cmd per argument
     res.assert_ok()                                   # exit 0 and no "Error:" lines
-    res.assert_line(r"dmesg\s+analysis")              # regex against stdout lines
-    assert res.symbols["dmesg!$entrypoint"] == [0xB0E0]   # parsed `x` output
-    assert orthia.resolve("dmesg+10", file=data.elf("dmesg")) == 0x4010   # expression -> address
+    res.assert_line(r"orthia\.exe$")                  # regex against stdout lines
+    entry = self_pe.image_base + self_pe.entry_rva    # expected value read from the file
+    assert res.symbols["orthia.exe!$entrypoint"] == [entry]   # parsed `x` output
+    assert orthia.resolve("orthia+10", file=data.self_file) == self_pe.image_base + 0x10   # expression -> address
 ```
 
 Assert on addresses, names and exit codes, not on whole screens of output, so tests survive formatting changes.

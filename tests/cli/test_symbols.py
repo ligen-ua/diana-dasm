@@ -6,7 +6,7 @@ import pytest
 
 from orthia_runner import check_x_sort_orders
 
-pytestmark = [pytest.mark.pe, pytest.mark.symbols]
+pytestmark = [pytest.mark.pe, pytest.mark.symbols, pytest.mark.private]
 
 KI_SYSTEM_CALL64 = 0x1_4016_F600
 KE_BUG_CHECK = 0x1_4015_DAE0

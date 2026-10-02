@@ -7,7 +7,7 @@ import pytest
 
 from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED, check_x_sort_orders
 
-pytestmark = pytest.mark.elf
+pytestmark = [pytest.mark.elf, pytest.mark.private]
 
 DMESG_BUILD_ID = "21342db32e32e961622c0d19322ad591d56a65a8"
 

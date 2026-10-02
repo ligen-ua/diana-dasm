@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.pe
+pytestmark = [pytest.mark.pe, pytest.mark.private]
 
 NT_BASE = 0x1_4000_0000
 KE_BUG_CHECK = 0x1_4015_DAE0

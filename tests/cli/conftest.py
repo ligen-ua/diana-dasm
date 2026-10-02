@@ -13,13 +13,14 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from data import REPO_ROOT, DataSet  # noqa: E402
+from images import ElfInfo, PeInfo  # noqa: E402
 from orthia_runner import Orthia  # noqa: E402
 
 # Where the two build systems put the binary. Override with --orthia or ORTHIA_BIN.
 BINARY_CANDIDATES = [
     "bin/Release/amd64/orthia.exe",                                   # MSBuild, orthia_14_0.sln
-    "cmake-release/src/orthia/orthia_disasm_ui/orthia_disasm_ui",     # cmake-build.sh
-    "cmake-debug/src/orthia/orthia_disasm_ui/orthia_disasm_ui",
+    "cmake-release/src/orthia/orthia_disasm_ui/orthia",               # cmake-build.sh
+    "cmake-debug/src/orthia/orthia_disasm_ui/orthia",
 ]
 
 
@@ -52,8 +53,25 @@ def orthia_exe(pytestconfig) -> Path:
 
 
 @pytest.fixture(scope="session")
-def data(tmp_path_factory) -> DataSet:
-    return DataSet(tmp_path_factory.mktemp("files"))
+def data(tmp_path_factory, orthia_exe) -> DataSet:
+    return DataSet(tmp_path_factory.mktemp("files"), orthia_exe)
+
+
+# The binary under test opened as a file. Each host builds its own format, so PE tests
+# run on Windows and ELF tests on Linux.
+
+@pytest.fixture(scope="session")
+def self_pe(data) -> PeInfo:
+    if not data.self_is_pe:
+        pytest.skip("the binary under test is not a PE file")
+    return PeInfo(data.self_file)
+
+
+@pytest.fixture(scope="session")
+def self_elf(data) -> ElfInfo:
+    if data.self_is_pe:
+        pytest.skip("the binary under test is not an ELF file")
+    return ElfInfo(data.self_file)
 
 
 @pytest.fixture(scope="session")
@@ -80,6 +98,12 @@ def orthia_full(orthia_exe, tmp_path_factory, empty_symbols) -> Orthia:
 def orthia_pdb(orthia_exe, tmp_path_factory, data) -> Orthia:
     """--analyze with the ntoskrnl PDB on the symbol path."""
     return Orthia(orthia_exe, tmp_path_factory.mktemp("home-pdb"), data.nt_symbols, analyze=True)
+
+
+@pytest.fixture(scope="session")
+def orthia_self_pdb(orthia_exe, tmp_path_factory, data) -> Orthia:
+    """--analyze with the PDB of the binary under test on the symbol path (Windows builds)."""
+    return Orthia(orthia_exe, tmp_path_factory.mktemp("home-self-pdb"), data.self_symbols, analyze=True)
 
 
 @pytest.fixture

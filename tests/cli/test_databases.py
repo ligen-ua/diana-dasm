@@ -11,8 +11,9 @@ from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OK, EXIT_OPEN_FAILED
 
 
 @pytest.fixture(scope="module")
-def dmesg(data):
-    return data.elf("dmesg")
+def target(data):
+    """The binary under test as a file: the target here doesn't matter, only that it opens."""
+    return data.self_file
 
 
 def db_folders(orthia):
@@ -62,24 +63,24 @@ def test_list_empty(orthia_cold):
     res.assert_line(r"^No databases$")
 
 
-def test_list_shows_opened_file(orthia_cold, dmesg):
-    sha1 = opened(orthia_cold, dmesg)
+def test_list_shows_opened_file(orthia_cold, target):
+    sha1 = opened(orthia_cold, target)
     res = orthia_cold.raw("--cmd", ".database list").assert_ok()
     line = res.assert_line(rf"^{sha1[:12]}\s").string
-    assert str(dmesg) in line, res
+    assert str(target) in line, res
     assert re.search(r"\bquick\b", line), res
     assert "(open)" not in line, res
 
 
-def test_list_marks_open_item(orthia_cold, dmesg):
-    sha1 = opened(orthia_cold, dmesg)
-    res = orthia_cold.run(".database list", file=dmesg).assert_ok()
+def test_list_marks_open_item(orthia_cold, target):
+    sha1 = opened(orthia_cold, target)
+    res = orthia_cold.run(".database list", file=target).assert_ok()
     assert res.assert_line(rf"^{sha1[:12]}\s").string.endswith("(open)"), res
 
 
-def test_list_counts_comments(orthia_cold, dmesg):
+def test_list_counts_comments(orthia_cold, target):
     import sqlite3
-    sha1 = opened(orthia_cold, dmesg)
+    sha1 = opened(orthia_cold, target)
     con = sqlite3.connect(orthia_cold.home / "db" / sha1 / "data.db")
     try:
         con.execute("INSERT INTO tbl_comments(com_address, com_text) VALUES (16, 'x'), (32, 'y')")
@@ -90,16 +91,16 @@ def test_list_counts_comments(orthia_cold, dmesg):
     assert re.search(r"\s2\s", res.assert_line(rf"^{sha1[:12]}\s").string), res
 
 
-def test_delete_by_prefix(orthia_cold, dmesg):
-    sha1 = opened(orthia_cold, dmesg)
+def test_delete_by_prefix(orthia_cold, target):
+    sha1 = opened(orthia_cold, target)
     res = orthia_cold.raw("--cmd", f".database delete {sha1[:8].upper()}").assert_ok()
     res.assert_line(rf"^Deleted {sha1}\b")
     assert db_folders(orthia_cold) == []
 
 
-def test_delete_by_file_name(orthia_cold, dmesg):
-    opened(orthia_cold, dmesg)
-    orthia_cold.raw("--cmd", f'.database delete "{dmesg}"').assert_ok()
+def test_delete_by_file_name(orthia_cold, target):
+    opened(orthia_cold, target)
+    orthia_cold.raw("--cmd", f'.database delete "{target}"').assert_ok()
     assert db_folders(orthia_cold) == []
 
 
@@ -114,17 +115,17 @@ def test_delete_by_pid(orthia_cold):
     ("abc", r"at least 6 hex digits"),
     ("no-such-file.bin", r"Can't open file"),
 ])
-def test_delete_bad_selector(orthia_cold, dmesg, selector, message):
-    opened(orthia_cold, dmesg)
+def test_delete_bad_selector(orthia_cold, target, selector, message):
+    opened(orthia_cold, target)
     res = orthia_cold.raw("--cmd", f".database delete {selector}")
     assert res.code == EXIT_COMMAND_ERROR, res
     res.assert_line(rf"^Error: .*{message}")
     assert len(db_folders(orthia_cold)) == 1
 
 
-def test_delete_file_without_database(orthia_cold, dmesg, data):
-    opened(orthia_cold, dmesg)
-    res = orthia_cold.raw("--cmd", f".database delete {data.elf('apt-mark')}")
+def test_delete_file_without_database(orthia_cold, target, data):
+    opened(orthia_cold, target)
+    res = orthia_cold.raw("--cmd", f".database delete {data.elf('libexports_gnu.so')}")
     assert res.code == EXIT_COMMAND_ERROR, res
     res.assert_line(r"^Error: No database for file")
 
@@ -138,23 +139,23 @@ def test_delete_ambiguous_prefix(orthia_cold):
     assert len(db_folders(orthia_cold)) == 2
 
 
-def test_delete_is_all_or_nothing(orthia_cold, dmesg):
-    sha1 = opened(orthia_cold, dmesg)
+def test_delete_is_all_or_nothing(orthia_cold, target):
+    sha1 = opened(orthia_cold, target)
     res = orthia_cold.raw("--cmd", f".database delete {sha1[:8]} ffffff")
     assert res.code == EXIT_COMMAND_ERROR, res
     assert db_folders(orthia_cold) == [sha1]
 
 
-def test_delete_open_item_is_refused(orthia_cold, dmesg):
-    sha1 = opened(orthia_cold, dmesg)
-    res = orthia_cold.run(f".database delete {sha1[:8]}", file=dmesg)
+def test_delete_open_item_is_refused(orthia_cold, target):
+    sha1 = opened(orthia_cold, target)
+    res = orthia_cold.run(f".database delete {sha1[:8]}", file=target)
     assert res.code == EXIT_COMMAND_ERROR, res
-    res.assert_line(r"^Error: Database \w+ is open as dmesg, close it first")
+    res.assert_line(rf"^Error: Database \w+ is open as {re.escape(target.name)}, close it first")
     assert db_folders(orthia_cold) == [sha1]
 
 
-def test_cleanup(orthia_cold, dmesg):
-    sha1 = opened(orthia_cold, dmesg)
+def test_cleanup(orthia_cold, target):
+    sha1 = opened(orthia_cold, target)
     proc = orthia_cold.home / "proc"
     db = orthia_cold.home / "db"
     live = f"[{os.getpid()}] {own_process_name()}"
@@ -195,8 +196,8 @@ def test_item_commands_still_need_a_target(orthia_cold):
     assert res.lines == [], res
 
 
-def test_several_targetless_commands(orthia_cold, dmesg):
-    sha1 = opened(orthia_cold, dmesg)
+def test_several_targetless_commands(orthia_cold, target):
+    sha1 = opened(orthia_cold, target)
     res = orthia_cold.raw("--cmd", f".database delete {sha1[:8]}", "--cmd", ".database list")
     assert res.code == EXIT_OK, res
     res.assert_line(r"^No databases$")

@@ -34,7 +34,7 @@ orthia --pid 1234
 
 Run commands without the UI:
 ```
-orthia --file data/elf/dmesg --cmd lm --cmd 'u dmesg!$entrypoint L5'
+orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
 orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
 ```
 

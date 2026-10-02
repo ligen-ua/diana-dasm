@@ -14,7 +14,7 @@ import pytest
 from data import flip_rsds_guid, iat_slot, patch_pe_timestamp
 from orthia_runner import EXIT_COMMAND_ERROR
 
-pytestmark = pytest.mark.pe
+pytestmark = [pytest.mark.pe, pytest.mark.private]
 
 windows_only = pytest.mark.skipif(sys.platform != "win32", reason="host DLL")
 linux_only = pytest.mark.skipif(sys.platform != "linux", reason="host shared object")

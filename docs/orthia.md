@@ -54,7 +54,7 @@ Examples:
 orthia
 orthia --file C:\Windows\System32\notepad.exe
 orthia --pid 1234
-orthia --file data/elf/dmesg --cmd lm --cmd 'u dmesg!$entrypoint L5'
+orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
 orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
 orthia --cmd '.database list'
 ```
@@ -120,7 +120,7 @@ The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`
 | `0n15` | decimal number |
 | `ntdll!LdrLoadDll` | symbol: an export or a private (PDB) symbol of the module |
 | `ntdll`, `ntdll+1000` | module base (name without extension), module base plus offset |
-| `dmesg!$entrypoint` | module entry point |
+| `ls!$entrypoint` | module entry point |
 | `+`, `-`, `*`, `/`, `( )` | arithmetic with the usual precedence, unary `+`/`-` included |
 | `poi(<expr>)` | the pointer-sized value stored at `<expr>` |
 | `DS:[7ff769486040h]` | a memory operand as the disassembler prints it; evaluates to the address in the brackets, so you can paste it from the disassembly |

@@ -9,7 +9,7 @@ import pytest
 
 from orthia_runner import EXIT_COMMAND_ERROR
 
-pytestmark = pytest.mark.pe
+pytestmark = [pytest.mark.pe, pytest.mark.private]
 
 KE_BUG_CHECK = 0x1_4015_DAE0
 NT_BASE = 0x1_4000_0000
