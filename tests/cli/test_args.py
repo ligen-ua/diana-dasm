@@ -98,7 +98,7 @@ def test_cmd_error_echoes_whole_token(orthia, target):
     res.assert_line(r"Command not found: --file")
 
 
-@pytest.mark.parametrize("pid", ["abc", "12abc"])
+@pytest.mark.parametrize("pid", ["abc", "12abc", "0x", "0xzz"])
 def test_non_numeric_pid(orthia, pid):
     res = orthia.raw("--pid", pid, "--cmd", "lm")
     assert res.code == EXIT_BAD_ARGUMENT, res
@@ -111,12 +111,15 @@ def test_negative_pid(orthia):
 
 @pytest.mark.process
 def test_hex_pid(orthia):
-    # the test runner's own process: hex should open it, or be rejected as a bad argument
-    res = orthia.raw("--pid", hex(os.getpid()), "--cmd", "lm")
+    # the test runner's own process. Hex must be parsed as that pid: it opens, or (Linux Yama
+    # ptrace_scope >= 1: orthia is the runner's child, not its parent) fails to open by that pid
+    pid = os.getpid()
+    res = orthia.raw("--pid", hex(pid), "--cmd", "lm")
     if res.code == EXIT_OK:
         res.assert_line(r"(?i)\bpython")
     else:
-        assert res.code == EXIT_BAD_ARGUMENT, res
+        assert res.code == EXIT_OPEN_FAILED, res
+        assert re.search(rf"^Can't open process: {pid}: ", res.stderr, re.M), res
 
 
 def test_ui_mode_without_console_fails(orthia_cold, target):
