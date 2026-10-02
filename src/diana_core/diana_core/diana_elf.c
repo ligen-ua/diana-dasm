@@ -522,6 +522,11 @@ void DianaElfFile_Free(Diana_ElfFile* pElfFile)
 #define DI_ELF_DT_FINI_ARRAY  26
 #define DI_ELF_DT_INIT_ARRAYSZ 27
 #define DI_ELF_DT_FINI_ARRAYSZ 28
+#define DI_ELF_DT_VERSYM      0x6ffffff0
+
+#define DI_ELF_STT_GNU_IFUNC  10
+#define DI_ELF_VERSYM_HIDDEN  0x8000     // non-default version (name@VER, not name@@VER)
+#define DI_ELF_MAX_DYN_SYMBOLS 0x100000  // sanity limit for malformed hash tables
 
 
 typedef struct _DI_ELF_DYN64
@@ -806,7 +811,8 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
         {
             DI_UINT32 chainValLE;
             DI_UINT32 chainVal;
-            OPERAND_SIZE chainEntryAddr = chainBaseAddr + (OPERAND_SIZE)idx * sizeof(DI_UINT32);
+            // the chain array starts at symbol index symoffset
+            OPERAND_SIZE chainEntryAddr = chainBaseAddr + (OPERAND_SIZE)(idx - symoffset) * sizeof(DI_UINT32);
             DI_ELF_SYM64 sym;
             OPERAND_SIZE symEntryAddr;
             OPERAND_SIZE nameAddr;
@@ -1121,6 +1127,161 @@ static int DianaElf_Write32(DianaReadWriteRandomStream* pOut,
     int          isLE);
 
 
+// Number of .dynsym entries. The dynamic section does not record it, so it comes from
+// DT_HASH (nchain) or, for DT_GNU_HASH, from the end of the chain of the highest bucket.
+static int DianaElf_CountDynSymbols(DianaMovableReadStream* pStream,
+    int readFlags,
+    OPERAND_SIZE hashAddr,
+    OPERAND_SIZE gnuHashAddr,
+    int is64bit,
+    int isLE,
+    DI_UINT32* pCount)
+{
+    int status = DI_ERROR;
+    OPERAND_SIZE readBytes = 0;
+    unsigned char raw[16];
+    unsigned char* buckets = 0;
+
+    *pCount = 0;
+    if (gnuHashAddr)
+    {
+        DI_UINT32 nbuckets, symoffset, bloomsize, i;
+        DI_UINT32 maxIdx = 0;
+        OPERAND_SIZE bucketsAddr, chainBaseAddr;
+
+        DI_CHECK_GOTO(pStream->pRandomRead(pStream, gnuHashAddr, raw, 16, &readBytes, readFlags));
+        DI_CHECK_CONDITION_GOTO(readBytes == 16, DI_ERROR);
+        nbuckets = DianaElf_rd32(raw + 0, isLE);
+        symoffset = DianaElf_rd32(raw + 4, isLE);
+        bloomsize = DianaElf_rd32(raw + 8, isLE);
+        DI_CHECK_CONDITION_GOTO(nbuckets && nbuckets <= DI_ELF_MAX_DYN_SYMBOLS &&
+            bloomsize <= DI_ELF_MAX_DYN_SYMBOLS && symoffset <= DI_ELF_MAX_DYN_SYMBOLS, DI_INVALID_INPUT);
+
+        // bloom words are ELF-class sized
+        bucketsAddr = gnuHashAddr + 16 + (OPERAND_SIZE)bloomsize * (is64bit ? 8 : 4);
+        chainBaseAddr = bucketsAddr + (OPERAND_SIZE)nbuckets * 4;
+
+        buckets = (unsigned char*)DIANA_MALLOC((DIANA_SIZE_T)nbuckets * 4);
+        DI_CHECK_ALLOC_GOTO(buckets);
+        DI_CHECK_GOTO(pStream->pRandomRead(pStream, bucketsAddr, buckets, nbuckets * 4, &readBytes, readFlags));
+        DI_CHECK_CONDITION_GOTO(readBytes == (OPERAND_SIZE)nbuckets * 4, DI_ERROR);
+        for (i = 0; i < nbuckets; ++i)
+        {
+            DI_UINT32 idx = DianaElf_rd32(buckets + i * 4, isLE);
+            if (idx > maxIdx)
+                maxIdx = idx;
+        }
+        if (maxIdx < symoffset)
+        {
+            // no hashed symbols: only the unhashed ones below symoffset
+            *pCount = symoffset;
+            status = DI_SUCCESS;
+            goto cleanup;
+        }
+        // the chain of the highest bucket ends at the last symbol (low bit set)
+        for (;;)
+        {
+            DI_CHECK_CONDITION_GOTO(maxIdx < DI_ELF_MAX_DYN_SYMBOLS, DI_INVALID_INPUT);
+            DI_CHECK_GOTO(pStream->pRandomRead(pStream,
+                chainBaseAddr + (OPERAND_SIZE)(maxIdx - symoffset) * 4,
+                raw, 4, &readBytes, readFlags));
+            DI_CHECK_CONDITION_GOTO(readBytes == 4, DI_ERROR);
+            if (DianaElf_rd32(raw, isLE) & 1)
+                break;
+            ++maxIdx;
+        }
+        *pCount = maxIdx + 1;
+        status = DI_SUCCESS;
+        goto cleanup;
+    }
+    if (hashAddr)
+    {
+        DI_CHECK_GOTO(pStream->pRandomRead(pStream, hashAddr, raw, 8, &readBytes, readFlags));
+        DI_CHECK_CONDITION_GOTO(readBytes == 8, DI_ERROR);
+        *pCount = DianaElf_rd32(raw + 4, isLE); // nchain == number of symbols
+        DI_CHECK_CONDITION_GOTO(*pCount <= DI_ELF_MAX_DYN_SYMBOLS, DI_INVALID_INPUT);
+        status = DI_SUCCESS;
+        goto cleanup;
+    }
+    status = DI_NOT_FOUND;
+
+cleanup:
+    if (buckets)
+        DIANA_FREE(buckets);
+    return status;
+}
+
+// Reports every defined global/weak function or object in .dynsym. Hidden (non-default)
+// versions are skipped, as dlsym does, so each name is reported once.
+static int DianaElf_QueryDynamicExports(DianaMovableReadStream* pStream,
+    int readFlags,
+    DianaPeFile_LinkImports_Observer* pObserver,
+    OPERAND_SIZE symtabAddr,
+    OPERAND_SIZE strtabAddr,
+    OPERAND_SIZE versymAddr,
+    DI_UINT32 count,
+    int is64bit,
+    int isLE)
+{
+    DI_UINT32 idx;
+    // index 0 is the reserved undefined symbol
+    for (idx = 1; idx < count; ++idx)
+    {
+        DI_ELF_SYM64 sym;
+        char funcName[256];
+        OPERAND_SIZE readBytes = 0;
+        OPERAND_SIZE symNameAddr = 0;
+        OPERAND_SIZE stValue = 0;
+        int bind, type;
+
+        DI_CHECK(DianaElf_ReadSymNormalized(pStream,
+            symtabAddr + (OPERAND_SIZE)idx * (is64bit ? 24 : 16),
+            is64bit,
+            isLE,
+            &sym,
+            readFlags));
+
+        if (sym.st_shndx == 0 || sym.st_value == 0)
+            continue;
+        bind = DI_ELF_ST_BIND(sym.st_info);
+        type = DI_ELF_ST_TYPE(sym.st_info);
+        if ((bind != DIANA_STB_GLOBAL && bind != DIANA_STB_WEAK) ||
+            (type != DIANA_STT_FUNC && type != DIANA_STT_OBJECT && type != DI_ELF_STT_GNU_IFUNC))
+        {
+            continue;
+        }
+        if (versymAddr)
+        {
+            unsigned char ver[2];
+            DI_CHECK(pStream->pRandomRead(pStream,
+                versymAddr + (OPERAND_SIZE)idx * 2, ver, 2, &readBytes, readFlags));
+            if (readBytes == 2 && (DianaElf_rd16(ver, isLE) & DI_ELF_VERSYM_HIDDEN))
+                continue;
+        }
+
+        symNameAddr = strtabAddr + sym.st_name;
+        if (pObserver->reportInfo_fnc)
+        {
+            DI_CHECK(pObserver->reportInfo_fnc(pObserver, symNameAddr));
+        }
+        DI_CHECK(pStream->pRandomRead(pStream,
+            symNameAddr,
+            funcName,
+            sizeof(funcName) - 1,
+            &readBytes,
+            readFlags));
+        if (!readBytes)
+            return DI_ERROR;
+        funcName[readBytes < sizeof(funcName) - 1 ? readBytes : sizeof(funcName) - 1] = 0;
+        if (!funcName[0])
+            continue;
+
+        stValue = sym.st_value;
+        DI_CHECK(pObserver->queryFunctionByName(pObserver, 0, funcName, 0, &stValue));
+    }
+    return DI_SUCCESS;
+}
+
 static
 int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
     OPERAND_SIZE baseAddress,
@@ -1147,6 +1308,9 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
     DI_UINT64    jmprelSize = 0;
     DI_UINT64    relaEntSize = 0;
     DI_UINT64    pltRelType = 0; // DT_PLTREL: REL or RELA
+    OPERAND_SIZE hashAddr = 0;
+    OPERAND_SIZE gnuHashAddr = 0;
+    OPERAND_SIZE versymAddr = 0;
     DI_ELF_DYN64* pEntry = 0;
     DI_ELF_DYN64* pDynEnd = 0;
 
@@ -1205,6 +1369,9 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
         case DI_ELF_DT_STRTAB:
             strtabAddr = pEntry->d_val;
             break;
+        case DI_ELF_DT_HASH:
+            hashAddr = pEntry->d_val;
+            break;
         case DI_ELF_DT_JMPREL:
             jmprelAddr = pEntry->d_val;
             break;
@@ -1219,8 +1386,26 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
             pltRelType = pEntry->d_val; // DT_REL or DT_RELA
             break;
         default:
+            if ((DI_UINT64)pEntry->d_tag == DI_ELF_DT_GNU_HASH)
+                gnuHashAddr = pEntry->d_val;
+            else if ((DI_UINT64)pEntry->d_tag == DI_ELF_DT_VERSYM)
+                versymAddr = pEntry->d_val;
             break;
         }
+    }
+
+    // Exports: every defined symbol in .dynsym. Without a hash table the symbol count
+    // is unknown, so fall back to the defined symbols referenced by PLT relocations.
+    if (!bImports && symtabAddr && strtabAddr && (hashAddr || gnuHashAddr))
+    {
+        DI_UINT32 symCount = 0;
+        int readFlags = streamFlags | DIANA_ANALYZE_RANDOM_READ_ABSOLUTE;
+        DI_CHECK_GOTO(DianaElf_CountDynSymbols(pOutStream, readFlags,
+            hashAddr, gnuHashAddr, is64bit, isLE, &symCount));
+        DI_CHECK_GOTO(DianaElf_QueryDynamicExports(pOutStream, readFlags, pObserver,
+            symtabAddr, strtabAddr, versymAddr, symCount, is64bit, isLE));
+        status = DI_SUCCESS;
+        goto cleanup;
     }
 
     if (!symtabAddr || !strtabAddr || !jmprelAddr || !jmprelSize)
@@ -2054,7 +2239,8 @@ int DianaElfFile_Relocate(/* in */    Diana_ElfFile* pElfFile,
                     isPtrTag = 1;
                     break;
                 default:
-                    if ((DI_UINT64)d_tag == DI_ELF_DT_GNU_HASH)
+                    if ((DI_UINT64)d_tag == DI_ELF_DT_GNU_HASH ||
+                        (DI_UINT64)d_tag == DI_ELF_DT_VERSYM)
                         isPtrTag = 1;
                     break;
                 }

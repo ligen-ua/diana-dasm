@@ -16,14 +16,21 @@ else:
     RUNTIME_MODULE, RUNTIME_EXPORT = "libc", "malloc"
 
 
+def module_base(res, module):
+    """Base address of `module` in the `lm` output of the same run."""
+    return int(res.assert_line(rf"^(\S+)\s+\S+\s+{re.escape(module)}\b").group(1).replace("`", ""), 16)
+
+
 @pytest.fixture(scope="module")
 def runtime(orthia):
-    """(module file name, export address) of a system library loaded in every process."""
+    """(module file name, export offset from the module base) of a system library loaded in
+    every process. Each --pid self run is a new process, and with per-process ASLR (Linux)
+    the library gets a new base each time, so only offsets compare across runs."""
     res = orthia.run("lm", f"x {RUNTIME_MODULE}*!{RUNTIME_EXPORT}", **SELF).assert_ok()
     for name, addrs in res.symbols.items():
         module, export = name.split("!")
         if export == RUNTIME_EXPORT:
-            return module, addrs[0]
+            return module, addrs[0] - module_base(res, module)
     pytest.fail(f"{RUNTIME_MODULE}*!{RUNTIME_EXPORT} not listed by x\n{res}")
 
 
@@ -38,19 +45,21 @@ def test_lm_lists_self_analyze(orthia_full):
 
 
 def test_export_resolves(orthia, runtime):
-    module, address = runtime
-    stem = module.split(".")[0]
+    module, offset = runtime
+    # the last extension may be omitted: ntdll.dll -> ntdll, libc.so.6 -> libc.so
+    stem = module.rsplit(".", 1)[0]
     for expression in (f"{module}!{RUNTIME_EXPORT}",
                        f"{stem}!{RUNTIME_EXPORT}",
                        f"{module.upper()}!{RUNTIME_EXPORT.lower()}"):
-        assert orthia.resolve(expression, **SELF) == address, expression
+        # db first: first_addr() takes the first address line
+        res = orthia.run(f"db {expression} L1", "lm", **SELF).assert_ok()
+        assert res.first_addr() - module_base(res, module) == offset, expression
 
 
 def test_module_resolves_to_base(orthia, runtime):
     module, _ = runtime
-    res = orthia.run("lm", **SELF).assert_ok()
-    base = res.assert_line(rf"^(\S+)\s+\S+\s+{re.escape(module)}\b").group(1)
-    assert orthia.resolve(module, **SELF) == int(base.replace("`", ""), 16)
+    res = orthia.run(f"db {module} L1", "lm", **SELF).assert_ok()
+    assert res.first_addr() == module_base(res, module), res
 
 
 def test_x_sort_orders(orthia, runtime):
@@ -89,7 +98,7 @@ def test_open_failure_reports_reason(orthia):
 
 
 def test_sections_of_runtime_library(orthia, runtime):
-    module, export = runtime
+    module, offset = runtime
     res = orthia.run(f"sections {module}", "lm", **SELF).assert_ok()
     base, end = (int(a.replace("`", ""), 16) for a in
                  res.assert_line(rf"^(\S+)\s+(\S+)\s+{re.escape(module)}\b").groups())
@@ -99,4 +108,5 @@ def test_sections_of_runtime_library(orthia, runtime):
         res.assert_line(rf"^Section headers: /.*{re.escape(module)}$")
     (text_address, text_size, text_flags), = rows[".text"]
     assert text_flags == "R-X", res
+    export = base + offset
     assert base < text_address <= export < text_address + text_size <= end + 1, res
