@@ -7,16 +7,8 @@
 #include <filesystem>
 
 std::vector<char> LoadElfTestFile(const orthia::PlatformString_type& name);
-
-static orthia::PlatformString_type ElfTestFilePath(const orthia::PlatformString_type& name)
-{
-    auto moduleDir = orthia::GetCurrentProcessDir();
-#ifdef DIANA_HAS_WIN32
-    return moduleDir + ORTHIA_TCSTR("../../../data/elf/") + name;
-#else
-    return moduleDir + ORTHIA_TCSTR("../../../../data/elf/") + name;
-#endif
-}
+orthia::PlatformString_type ElfTestFilePath(const orthia::PlatformString_type& name);
+bool ElfTestFilesPresent(const char* testName, std::initializer_list<orthia::PlatformString_type> names);
 
 static const orthia::ImageSection* FindSection(const orthia::ImageSections& result, const char* name)
 {
@@ -231,9 +223,12 @@ static void test_sections_elf32_big_endian()
 
 void test_sections()
 {
-    DIANA_TEST(test_sections_process_dump_lists_segments());
-    DIANA_TEST(test_sections_process_dump_ignores_garbage_section_headers());
-    DIANA_TEST(test_sections_mapped_file_reads_section_headers_from_disk());
-    DIANA_TEST(test_sections_other_file_is_rejected());
+    if (ElfTestFilesPresent("test_sections", { ORTHIA_TCSTR("ls.bin"), ORTHIA_TCSTR("dmesg"), ORTHIA_TCSTR("apt-mark") }))
+    {
+        DIANA_TEST(test_sections_process_dump_lists_segments());
+        DIANA_TEST(test_sections_process_dump_ignores_garbage_section_headers());
+        DIANA_TEST(test_sections_mapped_file_reads_section_headers_from_disk());
+        DIANA_TEST(test_sections_other_file_is_rejected());
+    }
     DIANA_TEST(test_sections_elf32_big_endian());
 }

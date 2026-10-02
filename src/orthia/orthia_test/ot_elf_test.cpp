@@ -13,18 +13,43 @@ extern "C"
 #include "diana_pe_cpp.h"
 #include "ot_common.h"
 
-std::vector<char> LoadElfTestFile(const orthia::PlatformString_type& name)
+// data/elf/ is committed. data/private/elf/ is gitignored: third-party binaries that can't be
+// published (dmesg, apt-mark, ls.bin); the tests that need them are skipped when they are absent.
+orthia::PlatformString_type ElfTestFilePath(const orthia::PlatformString_type& name)
 {
     auto moduleDir = orthia::GetCurrentProcessDir();
-
 #ifdef DIANA_HAS_WIN32
-    auto fileName = moduleDir + ORTHIA_TCSTR("../../../data/elf/") + name;
+    const auto dataDir = moduleDir + ORTHIA_TCSTR("../../../data/");
 #else
-    auto fileName = moduleDir + ORTHIA_TCSTR("../../../../data/elf/") + name;
+    const auto dataDir = moduleDir + ORTHIA_TCSTR("../../../../data/");
 #endif
+    const auto committed = dataDir + ORTHIA_TCSTR("elf/") + name;
+    const auto privateFile = dataDir + ORTHIA_TCSTR("private/elf/") + name;
+    if (!orthia::IsFileExists(committed) && orthia::IsFileExists(privateFile))
+    {
+        return privateFile;
+    }
+    return committed;
+}
 
+bool ElfTestFilesPresent(const char* testName, std::initializer_list<orthia::PlatformString_type> names)
+{
+    for (const auto& name : names)
+    {
+        if (!orthia::IsFileExists(ElfTestFilePath(name)))
+        {
+            std::cout << "[SKIP: " << testName << "] private test file not present: data/private/elf/"
+                      << orthia::PlatformStringToUtf8(name) << "\n";
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<char> LoadElfTestFile(const orthia::PlatformString_type& name)
+{
     std::vector<char> data;
-    orthia::LoadFileToVector(fileName, data);
+    orthia::LoadFileToVector(ElfTestFilePath(name), data);
     return data;
 }
 
@@ -260,12 +285,15 @@ static void test_elf_exports(const orthia::PlatformString_type& fileName)
 
 void test_elf()
 {
-    DIANA_TEST(test_elf1());
-    DIANA_TEST(test_simple_elf_map());
-    DIANA_TEST(test_simple_elf_needed_libs());
-    DIANA_TEST(test_simple_elf_imports());
-    DIANA_TEST(test_simple_elf_relocate());
-    DIANA_TEST(test_elf_build_id());
+    if (ElfTestFilesPresent("test_elf", { ORTHIA_TCSTR("ls.bin"), ORTHIA_TCSTR("dmesg") }))
+    {
+        DIANA_TEST(test_elf1());
+        DIANA_TEST(test_simple_elf_map());
+        DIANA_TEST(test_simple_elf_needed_libs());
+        DIANA_TEST(test_simple_elf_imports());
+        DIANA_TEST(test_simple_elf_relocate());
+        DIANA_TEST(test_elf_build_id());
+    }
     DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_gnu.so")));
     DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_sysv.so")));
 }

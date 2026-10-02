@@ -13,6 +13,7 @@ extern "C"
 #include "diana_pdb.h"
 
 std::vector<char> LoadElfTestFile(const orthia::PlatformString_type& name);
+bool ElfTestFilesPresent(const char* testName, std::initializer_list<orthia::PlatformString_type> names);
 
 // These structs overlay on-disk data, so their size must not depend on the platform
 // (long is 64 bits on LP64 Linux). Sizes are the packed CodeView/RSDS layouts.
@@ -298,5 +299,8 @@ void test_image_identity()
 #ifdef WIN32
     DIANA_TEST(test_pe_identity_of_running_exe());
 #endif
-    DIANA_TEST(test_elf_identity());
+    if (ElfTestFilesPresent("test_elf_identity", { ORTHIA_TCSTR("dmesg") }))
+    {
+        DIANA_TEST(test_elf_identity());
+    }
 }
