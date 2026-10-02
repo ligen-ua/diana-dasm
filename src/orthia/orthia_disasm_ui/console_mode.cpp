@@ -98,15 +98,20 @@ namespace
         switch (scope)
         {
         case 1:
-            return hint + ": run orthia with sudo, or, for processes of your own user,"
-                          " allow it until reboot with: sudo sysctl kernel.yama.ptrace_scope=0";
+            hint += ": run orthia with sudo, or, for processes of your own user,"
+                    " allow it until reboot with: sudo sysctl kernel.yama.ptrace_scope=0";
+            break;
         case 2:
-            return hint + ": kernel.yama.ptrace_scope is 2, so only root has it; run orthia with sudo";
+            hint += ": kernel.yama.ptrace_scope is 2, so only root has it; run orthia with sudo";
+            break;
         case 3:
             return hint + ": kernel.yama.ptrace_scope is 3, which disables it until reboot";
         default:
-            return hint + ": run orthia with sudo to open processes of other users";
+            hint += ": run orthia with sudo to open processes of other users";
+            break;
         }
+        // sudo resets HOME and drops ORTHIA_* (sudo -E keeps HOME and leaves root-owned files there)
+        return hint + "\nUnder sudo orthia uses root's data folder; pass ORTHIA_SYMBOL_PATH explicitly, and avoid sudo -E";
 #endif
     }
 

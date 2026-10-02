@@ -39,9 +39,24 @@ Orthia reads a process's memory through `/proc/<pid>/mem`, which needs ptrace ac
 With Yama's default `kernel.yama.ptrace_scope=1` (Ubuntu, Fedora, ...) a normal user only has it for its own
 child processes, so `--pid` and *Open process* fail with "Operation not permitted" for anything else. Either:
 - run Orthia with `sudo`; or
-- for processes of your own user, `sudo sysctl kernel.yama.ptrace_scope=0` (until reboot).
+- for processes of your own user, `sudo sysctl kernel.yama.ptrace_scope=0` (until reboot; to keep it,
+  `echo 'kernel.yama.ptrace_scope = 0' | sudo tee /etc/sysctl.d/10-ptrace.conf`). This applies to every
+  program on the system, not only Orthia.
 
 `--pid self` always works. With `--cmd` the error is followed by a hint for the current `ptrace_scope`.
+
+Running under `sudo`:
+- sudo sets `HOME=/root` and drops `XDG_DATA_HOME`, so Orthia uses root's data folder
+  (`/root/.local/share/Orthia`): its own databases and comments, separate from yours and owned by root.
+- The default symbol folders `~/sym;~/symbols` are root's too, and sudo drops `ORTHIA_SYMBOL_PATH` and
+  `ORTHIA_HOME`. Pass them on the command line:
+  ```
+  sudo ORTHIA_SYMBOL_PATH="$HOME/sym" ORTHIA_HOME="$HOME/.local/share/Orthia-root" orthia --pid 1234
+  ```
+  A separate `ORTHIA_HOME` keeps root-owned files out of your own data folder.
+- Don't use `sudo -E`: it keeps your `HOME`, so root-owned files end up in `~/.local/share/Orthia`
+  and later runs without sudo fail to open them.
+- Everything, including the file parsers, then runs as root: open only what you trust.
 
 ## Command line
 

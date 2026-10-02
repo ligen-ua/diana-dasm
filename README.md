@@ -45,6 +45,8 @@ Analysis databases and comments go to `~/.local/share/Orthia` (`$XDG_DATA_HOME/O
 Opening a process (`--pid`, *File > Open process*) reads its memory and needs ptrace access.
 Most distributions (Yama `kernel.yama.ptrace_scope=1`) only allow that for your own child processes,
 so run Orthia with `sudo`, or allow it for your user's processes until reboot with `sudo sysctl kernel.yama.ptrace_scope=0`.
+Under sudo Orthia uses root's data folder and symbol paths, and `sudo -E` leaves root-owned files in yours;
+see [docs/orthia.md](docs/orthia.md#linux-opening-processes).
 
 Open a file or a process in the UI:
 ```
