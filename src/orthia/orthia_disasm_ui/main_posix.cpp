@@ -13,6 +13,7 @@ extern "C"
 #include "orthia_files.h"
 #include "console_mode.h"
 #include "ui_help.h"
+#include "orthia_version.h"
 #include <unistd.h>
 
 int RunTests();
@@ -40,6 +41,7 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "                    (default: headers, modules, imports and exports only)\n";
     out << "  --run-tests       run the built-in tests and exit\n";
     out << "  -h, --help        show this help and exit\n";
+    out << "  --version         show the version and exit\n";
     out << "\n";
     out << "Without --cmd the UI is started with the given files and processes opened.\n";
     out << "--file and --pid are repeatable in UI mode, --cmd requires exactly one of them,\n";
@@ -149,6 +151,11 @@ int main(int argc, const char* argv[])
             if (IsHelpSwitch(argv[i]))
             {
                 PrintUsage(std::cout, programName);
+                return orthia::consoleExit_Ok;
+            }
+            if (strcmp(argv[i], "--version") == 0)
+            {
+                std::cout << "orthia " ORTHIA_UI_VERSION "\n";
                 return orthia::consoleExit_Ok;
             }
             if (strncmp(argv[i], "--", 2) == 0)

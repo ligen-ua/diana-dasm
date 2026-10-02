@@ -36,6 +36,9 @@ def _find_binary(config) -> Path:
             pytest.exit(f"orthia binary not found: {path}", returncode=4)
         return path.resolve()
     for candidate in BINARY_CANDIDATES:
+        # under WSL the Windows build would run too, through interop: test the host's own build
+        if candidate.endswith(".exe") != (sys.platform == "win32"):
+            continue
         path = REPO_ROOT / candidate
         if path.is_file():
             return path

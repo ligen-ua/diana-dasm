@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(orthia_disasm_ui)
 
 include_directories("../../diana_core/diana_core")
@@ -69,4 +69,4 @@ if(UNIX)
     target_link_libraries(${PROJECT_NAME} pthread)
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME orthia)

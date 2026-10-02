@@ -4,6 +4,7 @@ import re
 
 import pytest
 
+from data import REPO_ROOT
 from orthia_runner import (EXIT_BAD_ARGUMENT, EXIT_COMMAND_ERROR, EXIT_OK,
                            EXIT_OPEN_FAILED)
 
@@ -20,6 +21,16 @@ def test_help(orthia, flag):
     assert res.code == EXIT_OK, res
     for option in ("--file", "--pid", "--cmd", "--analyze", "Exit codes", "ORTHIA_HOME", "ORTHIA_SYMBOL_PATH"):
         assert option in res.stdout, res
+
+
+def test_version(orthia):
+    header = (REPO_ROOT / "src/orthia/orthia_disasm_ui/orthia_version.h").read_text()
+    parts = [re.search(rf'#define ORTHIA_UI_VER_{name}_STR\s+"(\d+)"', header).group(1)
+             for name in ("MAJOR", "MINOR", "PATCH", "REVISION")]
+    res = orthia.raw("--version")
+    assert res.code == EXIT_OK, res
+    assert res.stdout == f"orthia {'.'.join(parts)}\n", res
+    assert "--version" in orthia.raw("--help").stdout
 
 
 def test_missing_file(orthia, tmp_path):
