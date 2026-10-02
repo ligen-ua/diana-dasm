@@ -20,11 +20,31 @@ Path: src/orthia/orthia_disasm_ui
 
 ## Quick start
 
-Build (the binary is `bin\Release\amd64\orthia.exe` on Windows, `cmake-release/src/orthia/orthia_disasm_ui/orthia_disasm_ui` on Linux):
+Build (the binary is `bin\Release\amd64\orthia.exe` on Windows, `cmake-release/src/orthia/orthia_disasm_ui/orthia` on Linux):
 ```
 build-release-vs.cmd          # Windows, Visual Studio 2022
 ./cmake-build.sh              # Linux
 ```
+
+### Linux
+
+Needs CMake 3.16+, a C++17 compiler (GCC 9+ or Clang 10+) and make; x86-64. On Ubuntu/Debian:
+```
+sudo apt install build-essential cmake
+./cmake-build.sh
+sudo cmake --install cmake-release --strip                    # /usr/local
+cmake --install cmake-release --strip --prefix ~/.local       # or just for you, no sudo
+```
+This installs `bin/orthia`, its private libraries in `lib/orthia/` and the docs in `share/doc/orthia/`.
+The binary finds its libraries relative to itself, so the installed tree can be moved anywhere.
+To uninstall: `xargs rm < cmake-release/install_manifest.txt`.
+`cpack` in `cmake-release/` makes the same tree as a `.tar.gz`.
+
+Analysis databases and comments go to `~/.local/share/Orthia` (`$XDG_DATA_HOME/Orthia`); see [docs/databases.md](docs/databases.md).
+
+Opening a process (`--pid`, *File > Open process*) reads its memory and needs ptrace access.
+Most distributions (Yama `kernel.yama.ptrace_scope=1`) only allow that for your own child processes,
+so run Orthia with `sudo`, or allow it for your user's processes until reboot with `sudo sysctl kernel.yama.ptrace_scope=0`.
 
 Open a file or a process in the UI:
 ```

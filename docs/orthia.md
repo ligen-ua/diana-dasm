@@ -26,7 +26,22 @@ Linux:
 ```
 ./cmake-build.sh
 ```
-The binary is `cmake-release/src/orthia/orthia_disasm_ui/orthia_disasm_ui`.
+The binary is `cmake-release/src/orthia/orthia_disasm_ui/orthia`. To install it (into `/usr/local`, or `--prefix <dir>`):
+```
+sudo cmake --install cmake-release --strip
+```
+This gives `bin/orthia`, its private libraries in `lib/orthia/` (found through RUNPATH `$ORIGIN/../lib/orthia`,
+so the tree is relocatable) and the docs in `share/doc/orthia/`.
+
+### Linux: opening processes
+
+Orthia reads a process's memory through `/proc/<pid>/mem`, which needs ptrace access to the process.
+With Yama's default `kernel.yama.ptrace_scope=1` (Ubuntu, Fedora, ...) a normal user only has it for its own
+child processes, so `--pid` and *Open process* fail with "Operation not permitted" for anything else. Either:
+- run Orthia with `sudo`; or
+- for processes of your own user, `sudo sysctl kernel.yama.ptrace_scope=0` (until reboot).
+
+`--pid self` always works. With `--cmd` the error is followed by a hint for the current `ptrace_scope`.
 
 ## Command line
 
@@ -42,6 +57,7 @@ orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze]
 | `--analyze` | with `--cmd`: deep code analysis and symbol loading on open |
 | `--run-tests` | run the built-in tests and exit |
 | `-h`, `--help`, `/?` | show help and exit |
+| `--version` | show the version (`orthia 1.1.0.14`) and exit |
 
 All arguments are optional: plain `orthia` with no arguments starts the UI with an empty workspace,
 and you open files and processes from the **File** menu (*Open executable*, *Open process*).
