@@ -35,9 +35,7 @@
 
 #include "cvconst.h"
 
-#if defined(__unix__)
 #include <stdint.h>
-#endif
 
 #ifdef  __cplusplus
 #pragma warning ( disable: 4200 )
@@ -73,7 +71,7 @@ typedef uint32_t CV_pubsymflag_t;    // must be same as CV_typ_t.
 typedef uint16_t _2BYTEPAD;
 typedef uint32_t CV_tkn_t;
 
-typedef int16_t __int64;    // Workaround for Microsoft-specific type
+typedef int64_t __int64;    // Workaround for Microsoft-specific type
 #else
 #error Unknown compilation target
 #endif
@@ -106,7 +104,7 @@ typedef struct FLOAT10
 #define GUID_DEFINED
 
 typedef struct _GUID {          // size is 16
-    unsigned long   Data1;
+    uint32_t        Data1;
     unsigned short  Data2;
     unsigned short  Data3;
     unsigned char   Data4[8];
@@ -1526,18 +1524,18 @@ typedef struct lfPointer {
         unsigned short      leaf;           // LF_POINTER
         CV_typ_t            utype;          // type index of the underlying type
         struct lfPointerAttr {
-            unsigned long   ptrtype     :5; // ordinal specifying pointer type (CV_ptrtype_e)
-            unsigned long   ptrmode     :3; // ordinal specifying pointer mode (CV_ptrmode_e)
-            unsigned long   isflat32    :1; // true if 0:32 pointer
-            unsigned long   isvolatile  :1; // TRUE if volatile pointer
-            unsigned long   isconst     :1; // TRUE if const pointer
-            unsigned long   isunaligned :1; // TRUE if unaligned pointer
-            unsigned long   isrestrict  :1; // TRUE if restricted pointer (allow agressive opts)
-            unsigned long   size        :6; // size of pointer (in bytes)
-            unsigned long   ismocom     :1; // TRUE if it is a MoCOM pointer (^ or %)
-            unsigned long   islref      :1; // TRUE if it is this pointer of member function with & ref-qualifier
-            unsigned long   isrref      :1; // TRUE if it is this pointer of member function with && ref-qualifier
-            unsigned long   unused      :10;// pad out to 32-bits for following cv_typ_t's
+            uint32_t        ptrtype     :5; // ordinal specifying pointer type (CV_ptrtype_e)
+            uint32_t        ptrmode     :3; // ordinal specifying pointer mode (CV_ptrmode_e)
+            uint32_t        isflat32    :1; // true if 0:32 pointer
+            uint32_t        isvolatile  :1; // TRUE if volatile pointer
+            uint32_t        isconst     :1; // TRUE if const pointer
+            uint32_t        isunaligned :1; // TRUE if unaligned pointer
+            uint32_t        isrestrict  :1; // TRUE if restricted pointer (allow agressive opts)
+            uint32_t        size        :6; // size of pointer (in bytes)
+            uint32_t        ismocom     :1; // TRUE if it is a MoCOM pointer (^ or %)
+            uint32_t        islref      :1; // TRUE if it is this pointer of member function with & ref-qualifier
+            uint32_t        isrref      :1; // TRUE if it is this pointer of member function with && ref-qualifier
+            uint32_t        unused      :10;// pad out to 32-bits for following cv_typ_t's
         } attr;
 #if (defined(__cplusplus) || defined(_MSC_VER)) // for C++ and MS compilers that support unnamed unions
     };
@@ -1587,7 +1585,7 @@ typedef struct lfStridedArray {
     unsigned short  leaf;           // LF_STRIDED_ARRAY
     CV_typ_t        elemtype;       // type index of element type
     CV_typ_t        idxtype;        // type index of indexing type
-    unsigned long   stride;
+    uint32_t        stride;
     unsigned char   data[CV_ZEROLEN];         // variable length data specifying
                                     // size in bytes and name
 } lfStridedArray;
@@ -1601,7 +1599,7 @@ typedef struct lfStridedArray {
 typedef struct lfVector {
     unsigned short  leaf;           // LF_VECTOR
     CV_typ_t        elemtype;       // type index of element type
-    unsigned long   count;          // number of elements in the vector
+    uint32_t        count;          // number of elements in the vector
     unsigned char   data[CV_ZEROLEN];         // variable length data specifying
                                     // size in bytes and name
 } lfVector;
@@ -1615,9 +1613,9 @@ typedef struct lfVector {
 typedef struct lfMatrix {
     unsigned short  leaf;           // LF_MATRIX
     CV_typ_t        elemtype;       // type index of element type
-    unsigned long   rows;           // number of rows
-    unsigned long   cols;           // number of columns
-    unsigned long   majorStride;
+    uint32_t        rows;           // number of rows
+    uint32_t        cols;           // number of columns
+    uint32_t        majorStride;
     CV_matrixattr_t matattr;        // attributes
     unsigned char   data[CV_ZEROLEN];         // variable length data specifying
                                     // size in bytes and name
@@ -1715,14 +1713,14 @@ typedef struct lfUdtSrcLine {
     unsigned short leaf;        // LF_UDT_SRC_LINE
     CV_typ_t       type;        // UDT's type index
     CV_ItemId      src;         // index to LF_STRING_ID record where source file name is saved
-    unsigned long  line;        // line number
+    uint32_t       line;        // line number
 } lfUdtSrcLine;
 
 typedef struct lfUdtModSrcLine {
     unsigned short leaf;        // LF_UDT_MOD_SRC_LINE
     CV_typ_t       type;        // UDT's type index
     CV_ItemId      src;         // index into string table where source file name is saved
-    unsigned long  line;        // line number
+    uint32_t       line;        // line number
     unsigned short imod;        // module that contributes this UDT definition
 } lfUdtModSrcLine;
 
@@ -1809,7 +1807,7 @@ typedef struct lfMFunc_16t {
     CV_funcattr_t   funcattr;       // attributes
     unsigned short  parmcount;      // number of parameters
     CV_typ16_t      arglist;        // type index of argument list
-    long            thisadjust;     // this adjuster (long because pad required anyway)
+    int32_t            thisadjust;     // this adjuster (long because pad required anyway)
 } lfMFunc_16t;
 
 typedef struct lfMFunc {
@@ -1821,7 +1819,7 @@ typedef struct lfMFunc {
     CV_funcattr_t   funcattr;       // attributes
     unsigned short  parmcount;      // number of parameters
     CV_typ_t        arglist;        // type index of argument list
-    long            thisadjust;     // this adjuster (long because pad required anyway)
+    int32_t            thisadjust;     // this adjuster (long because pad required anyway)
 } lfMFunc;
 
 
@@ -1841,8 +1839,8 @@ typedef struct lfVftable {
     unsigned short  leaf;             // LF_VFTABLE
     CV_typ_t        type;             // class/structure that owns the vftable
     CV_typ_t        baseVftable;      // vftable from which this vftable is derived
-    unsigned long   offsetInObjectLayout; // offset of the vfptr to this table, relative to the start of the object layout.
-    unsigned long   len;              // length of the Names array below in bytes.
+    uint32_t        offsetInObjectLayout; // offset of the vfptr to this table, relative to the start of the object layout.
+    uint32_t        len;              // length of the Names array below in bytes.
     unsigned char   Names[1];         // array of names.
                                       // The first is the name of the vtable.
                                       // The others are the names of the methods.
@@ -1932,7 +1930,7 @@ typedef struct lfVFTPath_16t {
 
 typedef struct lfVFTPath {
     unsigned short  leaf;       // LF_VFTPATH
-    unsigned long   count;      // count of number of bases in path
+    uint32_t        count;      // count of number of bases in path
     CV_typ_t        base[1];    // bases from root to leaf
 } lfVFTPath;
 
@@ -1944,15 +1942,15 @@ typedef struct lfPreComp_16t {
     unsigned short  leaf;       // LF_PRECOMP_16t
     unsigned short  start;      // starting type index included
     unsigned short  count;      // number of types in inclusion
-    unsigned long   signature;  // signature
+    uint32_t        signature;  // signature
     unsigned char   name[CV_ZEROLEN];     // length prefixed name of included type file
 } lfPreComp_16t;
 
 typedef struct lfPreComp {
     unsigned short  leaf;       // LF_PRECOMP
-    unsigned long   start;      // starting type index included
-    unsigned long   count;      // number of types in inclusion
-    unsigned long   signature;  // signature
+    uint32_t        start;      // starting type index included
+    uint32_t        count;      // number of types in inclusion
+    uint32_t        signature;  // signature
     unsigned char   name[CV_ZEROLEN];     // length prefixed name of included type file
 } lfPreComp;
 
@@ -1964,7 +1962,7 @@ typedef struct lfPreComp {
 
 typedef struct lfEndPreComp {
     unsigned short  leaf;       // LF_ENDPRECOMP
-    unsigned long   signature;  // signature
+    uint32_t        signature;  // signature
 } lfEndPreComp;
 
 
@@ -1987,7 +1985,7 @@ typedef struct lfOEM {
     unsigned short  leaf;       // LF_OEM
     unsigned short  cvOEM;      // MS assigned OEM identified
     unsigned short  recOEM;     // OEM assigned type identifier
-    unsigned long   count;      // count of type indices to follow
+    uint32_t        count;      // count of type indices to follow
     CV_typ_t        index[CV_ZEROLEN];  // array of type indices followed
                                 // by OEM defined data
 } lfOEM;
@@ -2000,7 +1998,7 @@ typedef struct lfOEM {
 typedef struct lfOEM2 {
     unsigned short  leaf;       // LF_OEM2
     unsigned char   idOem[16];  // an oem ID (GUID)
-    unsigned long   count;      // count of type indices to follow
+    uint32_t        count;      // count of type indices to follow
     CV_typ_t        index[CV_ZEROLEN];  // array of type indices followed
                                 // by OEM defined data
 } lfOEM2;
@@ -2009,8 +2007,8 @@ typedef struct lfOEM2 {
 
 typedef struct lfTypeServer {
     unsigned short  leaf;       // LF_TYPESERVER
-    unsigned long   signature;  // signature
-    unsigned long   age;        // age of database used by this module
+    uint32_t        signature;  // signature
+    uint32_t        age;        // age of database used by this module
     unsigned char   name[CV_ZEROLEN];     // length prefixed name of PDB
 } lfTypeServer;
 
@@ -2019,7 +2017,7 @@ typedef struct lfTypeServer {
 typedef struct lfTypeServer2 {
     unsigned short  leaf;       // LF_TYPESERVER2
     SIG70           sig70;      // guid signature
-    unsigned long   age;        // age of database used by this module
+    uint32_t        age;        // age of database used by this module
     unsigned char   name[CV_ZEROLEN];     // length prefixed name of PDB
 } lfTypeServer2;
 
@@ -2056,7 +2054,7 @@ typedef struct lfArgList_16t {
 
 typedef struct lfArgList {
     unsigned short  leaf;           // LF_ARGLIST, LF_SUBSTR_LIST
-    unsigned long   count;          // number of arguments
+    uint32_t        count;          // number of arguments
     CV_typ_t        arg[CV_ZEROLEN];      // number of arguments
 } lfArgList;
 
@@ -2074,7 +2072,7 @@ typedef struct lfDerived_16t {
 
 typedef struct lfDerived {
     unsigned short  leaf;           // LF_DERIVED
-    unsigned long   count;          // number of arguments
+    uint32_t        count;          // number of arguments
     CV_typ_t        drvdcls[CV_ZEROLEN];      // type indices of derived classes
 } lfDerived;
 
@@ -2139,14 +2137,14 @@ typedef struct lfFieldList {
 typedef struct mlMethod_16t {
     CV_fldattr_t   attr;           // method attribute
     CV_typ16_t     index;          // index to type record for procedure
-    unsigned long  vbaseoff[CV_ZEROLEN];    // offset in vfunctable if intro virtual
+    uint32_t       vbaseoff[CV_ZEROLEN];    // offset in vfunctable if intro virtual
 } mlMethod_16t;
 
 typedef struct mlMethod {
     CV_fldattr_t    attr;           // method attribute
     _2BYTEPAD       pad0;           // internal padding, must be 0
     CV_typ_t        index;          // index to type record for procedure
-    unsigned long   vbaseoff[CV_ZEROLEN];    // offset in vfunctable if intro virtual
+    uint32_t        vbaseoff[CV_ZEROLEN];    // offset in vfunctable if intro virtual
 } mlMethod;
 
 
@@ -2223,7 +2221,7 @@ typedef struct lfDimVar_16t {
 
 typedef struct lfDimVar {
     unsigned short  leaf;           // LF_DIMVARU or LF_DIMVARLU
-    unsigned long   rank;           // number of dimensions
+    uint32_t        rank;           // number of dimensions
     CV_typ_t        typ;            // type of index
     CV_typ_t        dim[CV_ZEROLEN];          // array of type indices for either
                                     // variable upper bound or variable
@@ -2320,7 +2318,7 @@ typedef struct lfUShort {
 
 typedef struct lfLong {
     unsigned short  leaf;           // LF_LONG
-    long            val;            // signed 32-bit value
+    int32_t            val;            // signed 32-bit value
 } lfLong;
 
 
@@ -2330,7 +2328,7 @@ typedef struct lfLong {
 
 typedef struct lfULong {
     unsigned short  leaf;           // LF_ULONG
-    unsigned long   val;            // unsigned 32-bit value
+    uint32_t        val;            // unsigned 32-bit value
 } lfULong;
 
 
@@ -2677,7 +2675,7 @@ typedef struct lfOneMethod_16t {
     unsigned short leaf;            // LF_ONEMETHOD_16t
     CV_fldattr_t   attr;            // method attribute
     CV_typ16_t     index;           // index to type record for procedure
-    unsigned long  vbaseoff[CV_ZEROLEN];    // offset in vfunctable if
+    uint32_t       vbaseoff[CV_ZEROLEN];    // offset in vfunctable if
                                     // intro virtual followed by
                                     // length prefixed name of method
 } lfOneMethod_16t;
@@ -2686,7 +2684,7 @@ typedef struct lfOneMethod {
     unsigned short leaf;            // LF_ONEMETHOD
     CV_fldattr_t   attr;            // method attribute
     CV_typ_t       index;           // index to type record for procedure
-    unsigned long  vbaseoff[CV_ZEROLEN];    // offset in vfunctable if
+    uint32_t       vbaseoff[CV_ZEROLEN];    // offset in vfunctable if
                                     // intro virtual followed by
                                     // length prefixed name of method
 } lfOneMethod;
@@ -3160,9 +3158,9 @@ typedef struct CV_GENERIC_FLAG {
 // flag bitfields for separated code attributes
 
 typedef struct CV_SEPCODEFLAGS {
-    unsigned long fIsLexicalScope : 1;     // S_SEPCODE doubles as lexical scope
-    unsigned long fReturnsToParent : 1;    // code frag returns to parent
-    unsigned long pad : 30;                // must be zero
+    uint32_t      fIsLexicalScope : 1;     // S_SEPCODE doubles as lexical scope
+    uint32_t      fReturnsToParent : 1;    // code frag returns to parent
+    uint32_t      pad : 30;                // must be zero
 } CV_SEPCODEFLAGS;
 
 // Generic layout for symbol records
@@ -3301,7 +3299,7 @@ typedef struct MANTYPREF {
 typedef struct SEARCHSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_SSEARCH
-    unsigned long   startsym;   // offset of the procedure
+    uint32_t        startsym;   // offset of the procedure
     unsigned short  seg;        // segment of symbol
 } SEARCHSYM;
 
@@ -3328,17 +3326,17 @@ typedef struct COMPILESYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_COMPILE2
     struct {
-        unsigned long   iLanguage       :  8;   // language index
-        unsigned long   fEC             :  1;   // compiled for E/C
-        unsigned long   fNoDbgInfo      :  1;   // not compiled with debug info
-        unsigned long   fLTCG           :  1;   // compiled with LTCG
-        unsigned long   fNoDataAlign    :  1;   // compiled with -Bzalign
-        unsigned long   fManagedPresent :  1;   // managed code/data present
-        unsigned long   fSecurityChecks :  1;   // compiled with /GS
-        unsigned long   fHotPatch       :  1;   // compiled with /hotpatch
-        unsigned long   fCVTCIL         :  1;   // converted with CVTCIL
-        unsigned long   fMSILModule     :  1;   // MSIL netmodule
-        unsigned long   pad             : 15;   // reserved, must be 0
+        uint32_t        iLanguage       :  8;   // language index
+        uint32_t        fEC             :  1;   // compiled for E/C
+        uint32_t        fNoDbgInfo      :  1;   // not compiled with debug info
+        uint32_t        fLTCG           :  1;   // compiled with LTCG
+        uint32_t        fNoDataAlign    :  1;   // compiled with -Bzalign
+        uint32_t        fManagedPresent :  1;   // managed code/data present
+        uint32_t        fSecurityChecks :  1;   // compiled with /GS
+        uint32_t        fHotPatch       :  1;   // compiled with /hotpatch
+        uint32_t        fCVTCIL         :  1;   // converted with CVTCIL
+        uint32_t        fMSILModule     :  1;   // MSIL netmodule
+        uint32_t        pad             : 15;   // reserved, must be 0
     } flags;
     unsigned short  machine;    // target processor
     unsigned short  verFEMajor; // front end major version #
@@ -3356,20 +3354,20 @@ typedef struct COMPILESYM3 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_COMPILE3
     struct {
-        unsigned long   iLanguage       :  8;   // language index
-        unsigned long   fEC             :  1;   // compiled for E/C
-        unsigned long   fNoDbgInfo      :  1;   // not compiled with debug info
-        unsigned long   fLTCG           :  1;   // compiled with LTCG
-        unsigned long   fNoDataAlign    :  1;   // compiled with -Bzalign
-        unsigned long   fManagedPresent :  1;   // managed code/data present
-        unsigned long   fSecurityChecks :  1;   // compiled with /GS
-        unsigned long   fHotPatch       :  1;   // compiled with /hotpatch
-        unsigned long   fCVTCIL         :  1;   // converted with CVTCIL
-        unsigned long   fMSILModule     :  1;   // MSIL netmodule
-        unsigned long   fSdl            :  1;   // compiled with /sdl
-        unsigned long   fPGO            :  1;   // compiled with /ltcg:pgo or pgu
-        unsigned long   fExp            :  1;   // .exp module
-        unsigned long   pad             : 12;   // reserved, must be 0
+        uint32_t        iLanguage       :  8;   // language index
+        uint32_t        fEC             :  1;   // compiled for E/C
+        uint32_t        fNoDbgInfo      :  1;   // not compiled with debug info
+        uint32_t        fLTCG           :  1;   // compiled with LTCG
+        uint32_t        fNoDataAlign    :  1;   // compiled with -Bzalign
+        uint32_t        fManagedPresent :  1;   // managed code/data present
+        uint32_t        fSecurityChecks :  1;   // compiled with /GS
+        uint32_t        fHotPatch       :  1;   // compiled with /hotpatch
+        uint32_t        fCVTCIL         :  1;   // converted with CVTCIL
+        uint32_t        fMSILModule     :  1;   // MSIL netmodule
+        uint32_t        fSdl            :  1;   // compiled with /sdl
+        uint32_t        fPGO            :  1;   // compiled with /ltcg:pgo or pgu
+        uint32_t        fExp            :  1;   // .exp module
+        uint32_t        pad             : 12;   // reserved, must be 0
     } flags;
     unsigned short  machine;    // target processor
     unsigned short  verFEMajor; // front end major version #
@@ -3396,7 +3394,7 @@ typedef struct ENVBLOCKSYM {
 typedef struct OBJNAMESYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_OBJNAME
-    unsigned long   signature;  // signature
+    uint32_t        signature;  // signature
     unsigned char   name[1];    // Length-prefixed name
 } OBJNAMESYM;
 
@@ -3449,9 +3447,9 @@ typedef DATASYM16 PUBSYM16;
 typedef struct PROCSYM16 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GPROC16 or S_LPROC16
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
     unsigned short  len;        // Proc length
     unsigned short  DbgStart;   // Debug start offset
     unsigned short  DbgEnd;     // Debug end offset
@@ -3466,9 +3464,9 @@ typedef struct PROCSYM16 {
 typedef struct THUNKSYM16 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_THUNK
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
     CV_uoff16_t     off;        // offset of symbol
     unsigned short  seg;        // segment of symbol
     unsigned short  len;        // length of thunk
@@ -3490,8 +3488,8 @@ typedef struct LABELSYM16 {
 typedef struct BLOCKSYM16 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_BLOCK16
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
     unsigned short  len;        // Block length
     CV_uoff16_t     off;        // offset of symbol
     unsigned short  seg;        // segment of symbol
@@ -3502,8 +3500,8 @@ typedef struct BLOCKSYM16 {
 typedef struct WITHSYM16 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_WITH16
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
     unsigned short  len;        // Block length
     CV_uoff16_t     off;        // offset of symbol
     unsigned short  seg;        // segment of symbol
@@ -3607,7 +3605,7 @@ typedef FRAMERELSYM ATTRFRAMERELSYM;
 typedef struct SLOTSYM32 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_LOCALSLOT or S_PARAMSLOT
-    unsigned long   iSlot;      // slot index
+    uint32_t        iSlot;      // slot index
     CV_typ_t        typind;     // Type index or Metadata token
     unsigned char   name[1];    // Length-prefixed name
 } SLOTSYM32;
@@ -3615,7 +3613,7 @@ typedef struct SLOTSYM32 {
 typedef struct ATTRSLOTSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_MANSLOT
-    unsigned long   iSlot;      // slot index
+    uint32_t        iSlot;      // slot index
     CV_typ_t        typind;     // Type index or Metadata token
     CV_lvar_attr    attr;       // local var attributes
     unsigned char   name[1];    // Length-prefixed name
@@ -3666,11 +3664,11 @@ typedef struct DATASYMHLSL32 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GDATA_HLSL32, S_LDATA_HLSL32
     CV_typ_t        typind;     // Type index
-    unsigned long   dataslot;   // Base data (cbuffer, groupshared, etc.) slot
-    unsigned long   dataoff;    // Base data byte offset start
-    unsigned long   texslot;    // Texture slot start
-    unsigned long   sampslot;   // Sampler slot start
-    unsigned long   uavslot;    // UAV slot start
+    uint32_t        dataslot;   // Base data (cbuffer, groupshared, etc.) slot
+    uint32_t        dataoff;    // Base data byte offset start
+    uint32_t        texslot;    // Texture slot start
+    uint32_t        sampslot;   // Sampler slot start
+    uint32_t        uavslot;    // UAV slot start
     unsigned short  regType;    // register type from CV_HLSLREG_e
     unsigned char   name[1];    // name
 } DATASYMHLSL32;
@@ -3679,10 +3677,10 @@ typedef struct DATASYMHLSL32_EX {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GDATA_HLSL32_EX, S_LDATA_HLSL32_EX
     CV_typ_t        typind;     // Type index
-    unsigned long   regID;      // Register index
-    unsigned long   dataoff;    // Base data byte offset start
-    unsigned long   bindSpace;  // Binding space
-    unsigned long   bindSlot;   // Lower bound in binding space
+    uint32_t        regID;      // Register index
+    uint32_t        dataoff;    // Base data byte offset start
+    uint32_t        bindSpace;  // Binding space
+    uint32_t        bindSlot;   // Lower bound in binding space
     unsigned short  regType;    // register type from CV_HLSLREG_e
     unsigned char   name[1];    // name
 } DATASYMHLSL32_EX;
@@ -3720,12 +3718,12 @@ typedef struct PUBSYM32 {
 typedef struct PROCSYM32_16t {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GPROC32_16t or S_LPROC32_16t
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
-    unsigned long   len;        // Proc length
-    unsigned long   DbgStart;   // Debug start offset
-    unsigned long   DbgEnd;     // Debug end offset
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
+    uint32_t        len;        // Proc length
+    uint32_t        DbgStart;   // Debug start offset
+    uint32_t        DbgEnd;     // Debug end offset
     CV_uoff32_t     off;
     unsigned short  seg;
     CV_typ16_t      typind;     // Type index
@@ -3736,12 +3734,12 @@ typedef struct PROCSYM32_16t {
 typedef struct PROCSYM32 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GPROC32, S_LPROC32, S_GPROC32_ID, S_LPROC32_ID, S_LPROC32_DPC or S_LPROC32_DPC_ID
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
-    unsigned long   len;        // Proc length
-    unsigned long   DbgStart;   // Debug start offset
-    unsigned long   DbgEnd;     // Debug end offset
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
+    uint32_t        len;        // Proc length
+    uint32_t        DbgStart;   // Debug start offset
+    uint32_t        DbgEnd;     // Debug end offset
     CV_typ_t        typind;     // Type index or ID
     CV_uoff32_t     off;
     unsigned short  seg;
@@ -3752,12 +3750,12 @@ typedef struct PROCSYM32 {
 typedef struct MANPROCSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GMANPROC, S_LMANPROC, S_GMANPROCIA64 or S_LMANPROCIA64
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
-    unsigned long   len;        // Proc length
-    unsigned long   DbgStart;   // Debug start offset
-    unsigned long   DbgEnd;     // Debug end offset
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
+    uint32_t        len;        // Proc length
+    uint32_t        DbgStart;   // Debug start offset
+    uint32_t        DbgEnd;     // Debug end offset
     CV_tkn_t        token;      // COM+ metadata token for method
     CV_uoff32_t     off;
     unsigned short  seg;
@@ -3769,14 +3767,14 @@ typedef struct MANPROCSYM {
 typedef struct MANPROCSYMMIPS {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GMANPROCMIPS or S_LMANPROCMIPS
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
-    unsigned long   len;        // Proc length
-    unsigned long   DbgStart;   // Debug start offset
-    unsigned long   DbgEnd;     // Debug end offset
-    unsigned long   regSave;    // int register save mask
-    unsigned long   fpSave;     // fp register save mask
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
+    uint32_t        len;        // Proc length
+    uint32_t        DbgStart;   // Debug start offset
+    uint32_t        DbgEnd;     // Debug end offset
+    uint32_t        regSave;    // int register save mask
+    uint32_t        fpSave;     // fp register save mask
     CV_uoff32_t     intOff;     // int register save offset
     CV_uoff32_t     fpOff;      // fp register save offset
     CV_tkn_t        token;      // COM+ token type
@@ -3790,9 +3788,9 @@ typedef struct MANPROCSYMMIPS {
 typedef struct THUNKSYM32 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_THUNK32
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
     CV_uoff32_t     off;
     unsigned short  seg;
     unsigned short  len;        // length of thunk
@@ -3830,9 +3828,9 @@ typedef struct LABELSYM32 {
 typedef struct BLOCKSYM32 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_BLOCK32
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   len;        // Block length
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        len;        // Block length
     CV_uoff32_t     off;        // Offset in code segment
     unsigned short  seg;        // segment of label
     unsigned char   name[1];    // Length-prefixed name
@@ -3842,9 +3840,9 @@ typedef struct BLOCKSYM32 {
 typedef struct WITHSYM32 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_WITH32
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   len;        // Block length
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        len;        // Block length
     CV_uoff32_t     off;        // Offset in code segment
     unsigned short  seg;        // segment of label
     unsigned char   expr[1];    // Length-prefixed expression string
@@ -3949,7 +3947,7 @@ typedef struct THREADSYM32 {
 typedef struct SLINK32 {
     unsigned short  reclen;     // record length
     unsigned short  rectyp;     // S_SLINK32
-    unsigned long   framesize;  // frame size of parent procedure
+    uint32_t        framesize;  // frame size of parent procedure
     CV_off32_t      off;        // signed offset where the static link was saved relative to the value of reg
     unsigned short  reg;
 } SLINK32;
@@ -3957,14 +3955,14 @@ typedef struct SLINK32 {
 typedef struct PROCSYMMIPS_16t {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GPROCMIPS_16t or S_LPROCMIPS_16t
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
-    unsigned long   len;        // Proc length
-    unsigned long   DbgStart;   // Debug start offset
-    unsigned long   DbgEnd;     // Debug end offset
-    unsigned long   regSave;    // int register save mask
-    unsigned long   fpSave;     // fp register save mask
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
+    uint32_t        len;        // Proc length
+    uint32_t        DbgStart;   // Debug start offset
+    uint32_t        DbgEnd;     // Debug end offset
+    uint32_t        regSave;    // int register save mask
+    uint32_t        fpSave;     // fp register save mask
     CV_uoff32_t     intOff;     // int register save offset
     CV_uoff32_t     fpOff;      // fp register save offset
     CV_uoff32_t     off;        // Symbol offset
@@ -3978,14 +3976,14 @@ typedef struct PROCSYMMIPS_16t {
 typedef struct PROCSYMMIPS {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GPROCMIPS or S_LPROCMIPS
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
-    unsigned long   len;        // Proc length
-    unsigned long   DbgStart;   // Debug start offset
-    unsigned long   DbgEnd;     // Debug end offset
-    unsigned long   regSave;    // int register save mask
-    unsigned long   fpSave;     // fp register save mask
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
+    uint32_t        len;        // Proc length
+    uint32_t        DbgStart;   // Debug start offset
+    uint32_t        DbgEnd;     // Debug end offset
+    uint32_t        regSave;    // int register save mask
+    uint32_t        fpSave;     // fp register save mask
     CV_uoff32_t     intOff;     // int register save offset
     CV_uoff32_t     fpOff;      // fp register save offset
     CV_typ_t        typind;     // Type index
@@ -3999,12 +3997,12 @@ typedef struct PROCSYMMIPS {
 typedef struct PROCSYMIA64 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GPROCIA64 or S_LPROCIA64
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
-    unsigned long   len;        // Proc length
-    unsigned long   DbgStart;   // Debug start offset
-    unsigned long   DbgEnd;     // Debug end offset
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
+    uint32_t        len;        // Proc length
+    uint32_t        DbgStart;   // Debug start offset
+    uint32_t        DbgEnd;     // Debug end offset
     CV_typ_t        typind;     // Type index
     CV_uoff32_t     off;        // Symbol offset
     unsigned short  seg;        // Symbol segment
@@ -4016,8 +4014,8 @@ typedef struct PROCSYMIA64 {
 typedef struct REFSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_PROCREF_ST, S_DATAREF_ST, or S_LPROCREF_ST
-    unsigned long   sumName;    // SUC of the name
-    unsigned long   ibSym;      // Offset of actual symbol in $$Symbols
+    uint32_t        sumName;    // SUC of the name
+    uint32_t        ibSym;      // Offset of actual symbol in $$Symbols
     unsigned short  imod;       // Module containing the actual symbol
     unsigned short  usFill;     // align this record
 } REFSYM;
@@ -4025,8 +4023,8 @@ typedef struct REFSYM {
 typedef struct REFSYM2 {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_PROCREF, S_DATAREF, or S_LPROCREF
-    unsigned long   sumName;    // SUC of the name
-    unsigned long   ibSym;      // Offset of actual symbol in $$Symbols
+    uint32_t        sumName;    // SUC of the name
+    uint32_t        ibSym;      // Offset of actual symbol in $$Symbols
     unsigned short  imod;       // Module containing the actual symbol
     unsigned char   name[1];    // hidden name made a first class member
 } REFSYM2;
@@ -4041,7 +4039,7 @@ typedef struct OEMSYMBOL {
     unsigned short  rectyp;     // S_OEM
     unsigned char   idOem[16];  // an oem ID (GUID)
     CV_typ_t        typind;     // Type index
-    unsigned long   rgl[];      // user data, force 4-byte alignment
+    uint32_t        rgl[];      // user data, force 4-byte alignment
 } OEMSYMBOL;
 
 //  generic block definition symbols
@@ -4051,69 +4049,69 @@ typedef struct OEMSYMBOL {
 typedef struct PROCSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_GPROC16 or S_LPROC16
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
 } PROCSYM;
 
 
 typedef struct THUNKSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_THUNK
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
-    unsigned long   pNext;      // pointer to next symbol
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
+    uint32_t        pNext;      // pointer to next symbol
 } THUNKSYM;
 
 typedef struct BLOCKSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_BLOCK16
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
 } BLOCKSYM;
 
 
 typedef struct WITHSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_WITH16
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this blocks end
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this blocks end
 } WITHSYM;
 
 typedef struct FRAMEPROCSYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_FRAMEPROC
-    unsigned long   cbFrame;    // count of bytes of total frame of procedure
-    unsigned long   cbPad;      // count of bytes of padding in the frame
+    uint32_t        cbFrame;    // count of bytes of total frame of procedure
+    uint32_t        cbPad;      // count of bytes of padding in the frame
     CV_uoff32_t     offPad;     // offset (relative to frame poniter) to where
                                 //  padding starts
-    unsigned long   cbSaveRegs; // count of bytes of callee save registers
+    uint32_t        cbSaveRegs; // count of bytes of callee save registers
     CV_uoff32_t     offExHdlr;  // offset of exception handler
     unsigned short  sectExHdlr; // section id of exception handler
 
     struct {
-        unsigned long   fHasAlloca  :  1;   // function uses _alloca()
-        unsigned long   fHasSetJmp  :  1;   // function uses setjmp()
-        unsigned long   fHasLongJmp :  1;   // function uses longjmp()
-        unsigned long   fHasInlAsm  :  1;   // function uses inline asm
-        unsigned long   fHasEH      :  1;   // function has EH states
-        unsigned long   fInlSpec    :  1;   // function was speced as inline
-        unsigned long   fHasSEH     :  1;   // function has SEH
-        unsigned long   fNaked      :  1;   // function is __declspec(naked)
-        unsigned long   fSecurityChecks :  1;   // function has buffer security check introduced by /GS.
-        unsigned long   fAsyncEH    :  1;   // function compiled with /EHa
-        unsigned long   fGSNoStackOrdering :  1;   // function has /GS buffer checks, but stack ordering couldn't be done
-        unsigned long   fWasInlined :  1;   // function was inlined within another function
-        unsigned long   fGSCheck    :  1;   // function is __declspec(strict_gs_check)
-        unsigned long   fSafeBuffers : 1;   // function is __declspec(safebuffers)
-        unsigned long   encodedLocalBasePointer : 2;  // record function's local pointer explicitly.
-        unsigned long   encodedParamBasePointer : 2;  // record function's parameter pointer explicitly.
-        unsigned long   fPogoOn      : 1;   // function was compiled with PGO/PGU
-        unsigned long   fValidCounts : 1;   // Do we have valid Pogo counts?
-        unsigned long   fOptSpeed    : 1;  // Did we optimize for speed?
-        unsigned long   fGuardCF    :  1;   // function contains CFG checks (and no write checks)
-        unsigned long   fGuardCFW   :  1;   // function contains CFW checks and/or instrumentation
-        unsigned long   pad          : 9;   // must be zero
+        uint32_t        fHasAlloca  :  1;   // function uses _alloca()
+        uint32_t        fHasSetJmp  :  1;   // function uses setjmp()
+        uint32_t        fHasLongJmp :  1;   // function uses longjmp()
+        uint32_t        fHasInlAsm  :  1;   // function uses inline asm
+        uint32_t        fHasEH      :  1;   // function has EH states
+        uint32_t        fInlSpec    :  1;   // function was speced as inline
+        uint32_t        fHasSEH     :  1;   // function has SEH
+        uint32_t        fNaked      :  1;   // function is __declspec(naked)
+        uint32_t        fSecurityChecks :  1;   // function has buffer security check introduced by /GS.
+        uint32_t        fAsyncEH    :  1;   // function compiled with /EHa
+        uint32_t        fGSNoStackOrdering :  1;   // function has /GS buffer checks, but stack ordering couldn't be done
+        uint32_t        fWasInlined :  1;   // function was inlined within another function
+        uint32_t        fGSCheck    :  1;   // function is __declspec(strict_gs_check)
+        uint32_t        fSafeBuffers : 1;   // function is __declspec(safebuffers)
+        uint32_t        encodedLocalBasePointer : 2;  // record function's local pointer explicitly.
+        uint32_t        encodedParamBasePointer : 2;  // record function's parameter pointer explicitly.
+        uint32_t        fPogoOn      : 1;   // function was compiled with PGO/PGU
+        uint32_t        fValidCounts : 1;   // Do we have valid Pogo counts?
+        uint32_t        fOptSpeed    : 1;  // Did we optimize for speed?
+        uint32_t        fGuardCF    :  1;   // function contains CFG checks (and no write checks)
+        uint32_t        fGuardCFW   :  1;   // function contains CFW checks and/or instrumentation
+        uint32_t        pad          : 9;   // must be zero
     } flags;
 } FRAMEPROCSYM;
 
@@ -4162,9 +4160,9 @@ typedef struct UNAMESPACE {
 typedef struct SEPCODESYM {
     unsigned short  reclen;     // Record length
     unsigned short  rectyp;     // S_SEPCODE
-    unsigned long   pParent;    // pointer to the parent
-    unsigned long   pEnd;       // pointer to this block's end
-    unsigned long   length;     // count of bytes of this block
+    uint32_t        pParent;    // pointer to the parent
+    uint32_t        pEnd;       // pointer to this block's end
+    uint32_t        length;     // count of bytes of this block
     CV_SEPCODEFLAGS scf;        // flags
     CV_uoff32_t     off;        // sect:off of the separated code
     CV_uoff32_t     offParent;  // sectParent:offParent of the enclosing scope
@@ -4181,8 +4179,8 @@ typedef struct BUILDINFOSYM {
 typedef struct INLINESITESYM {
     unsigned short  reclen;    // Record length
     unsigned short  rectyp;    // S_INLINESITE
-    unsigned long   pParent;   // pointer to the inliner
-    unsigned long   pEnd;      // pointer to this block's end
+    uint32_t        pParent;   // pointer to the inliner
+    uint32_t        pEnd;      // pointer to this block's end
     CV_ItemId       inlinee;   // CV_ItemId of inlinee
     unsigned char   binaryAnnotations[CV_ZEROLEN];   // an array of compressed binary annotations.
 } INLINESITESYM;
@@ -4190,10 +4188,10 @@ typedef struct INLINESITESYM {
 typedef struct INLINESITESYM2 {
     unsigned short  reclen;         // Record length
     unsigned short  rectyp;         // S_INLINESITE2
-    unsigned long   pParent;        // pointer to the inliner
-    unsigned long   pEnd;           // pointer to this block's end
+    uint32_t        pParent;        // pointer to the inliner
+    uint32_t        pEnd;           // pointer to this block's end
     CV_ItemId       inlinee;        // CV_ItemId of inlinee
-    unsigned long   invocations;    // entry count
+    uint32_t        invocations;    // entry count
     unsigned char   binaryAnnotations[CV_ZEROLEN];   // an array of compressed binary annotations.
 } INLINESITESYM2;
 
@@ -4397,7 +4395,7 @@ typedef struct FUNCTIONLIST {
     unsigned short  reclen;             // Record length
     unsigned short  rectyp;             // S_CALLERS or S_CALLEES
 
-    unsigned long   count;              // Number of functions
+    uint32_t        count;              // Number of functions
     CV_typ_t        funcs[CV_ZEROLEN];  // List of functions, dim == count
     // unsigned long   invocations[CV_ZEROLEN]; Followed by a parallel array of
     // invocation counts. Counts > reclen are assumed to be zero
@@ -4407,10 +4405,10 @@ typedef struct POGOINFO {
     unsigned short  reclen;             // Record length
     unsigned short  rectyp;             // S_POGODATA
 
-    unsigned long   invocations;        // Number of times function was called
+    uint32_t        invocations;        // Number of times function was called
     __int64         dynCount;           // Dynamic instruction count
-    unsigned long   numInstrs;          // Static instruction count
-    unsigned long   staInstLive;        // Final static instruction count (post inlining)
+    uint32_t        numInstrs;          // Static instruction count
+    uint32_t        staInstLive;        // Final static instruction count (post inlining)
 } POGOINFO;
 
 typedef struct ARMSWITCHTABLE {
@@ -4424,20 +4422,20 @@ typedef struct ARMSWITCHTABLE {
     CV_uoff32_t     offsetTable;        // Section-relative offset to the start of the table
     unsigned short  sectBranch;         // Section index of the table branch instruction
     unsigned short  sectTable;          // Section index of the table
-    unsigned long   cEntries;           // number of switch table entries
+    uint32_t        cEntries;           // number of switch table entries
 } ARMSWITCHTABLE;
 
 typedef struct MODTYPEREF {
     unsigned short  reclen;             // Record length
     unsigned short  rectyp;             // S_MOD_TYPEREF
 
-    unsigned long   fNone     : 1;      // module doesn't reference any type
-    unsigned long   fRefTMPCT : 1;      // reference /Z7 PCH types
-    unsigned long   fOwnTMPCT : 1;      // module contains /Z7 PCH types
-    unsigned long   fOwnTMR   : 1;      // module contains type info (/Z7)
-    unsigned long   fOwnTM    : 1;      // module contains type info (/Zi or /ZI)
-    unsigned long   fRefTM    : 1;      // module references type info owned by other module
-    unsigned long   reserved  : 9;
+    uint32_t        fNone     : 1;      // module doesn't reference any type
+    uint32_t        fRefTMPCT : 1;      // reference /Z7 PCH types
+    uint32_t        fOwnTMPCT : 1;      // module contains /Z7 PCH types
+    uint32_t        fOwnTMR   : 1;      // module contains type info (/Z7)
+    uint32_t        fOwnTM    : 1;      // module contains type info (/Zi or /ZI)
+    uint32_t        fRefTM    : 1;      // module references type info owned by other module
+    uint32_t        reserved  : 9;
 
     unsigned short  word0;              // these two words contain SN or module index depending
     unsigned short  word1;              // on above flags
@@ -4450,9 +4448,9 @@ typedef struct SECTIONSYM {
     unsigned short  isec;               // Section number
     unsigned char   align;              // Alignment of this section (power of 2)
     unsigned char   bReserved;          // Reserved.  Must be zero.
-    unsigned long   rva;
-    unsigned long   cb;
-    unsigned long   characteristics;
+    uint32_t        rva;
+    uint32_t        cb;
+    uint32_t        characteristics;
     unsigned char   name[1];            // name
 } SECTIONSYM;
 
@@ -4460,8 +4458,8 @@ typedef struct COFFGROUPSYM {
     unsigned short  reclen;             // Record length
     unsigned short  rectyp;             // S_COFFGROUP
 
-    unsigned long   cb;
-    unsigned long   characteristics;
+    uint32_t        cb;
+    uint32_t        characteristics;
     CV_uoff32_t     off;                // Symbol offset
     unsigned short  seg;                // Symbol segment
     unsigned char   name[1];            // name
@@ -4552,10 +4550,10 @@ typedef enum CV_DISCARDED_e
 typedef struct DISCARDEDSYM {
     unsigned short  reclen;             // Record length
     unsigned short  rectyp;             // S_DISCARDED
-    unsigned long   discarded : 8;      // CV_DISCARDED_e
-    unsigned long   reserved : 24;      // Unused
-    unsigned long   fileid;             // First FILEID if line number info present
-    unsigned long   linenum;            // First line number
+    uint32_t        discarded : 8;      // CV_DISCARDED_e
+    uint32_t        reserved : 24;      // Unused
+    uint32_t        fileid;             // First FILEID if line number info present
+    uint32_t        linenum;            // First line number
     char            data[CV_ZEROLEN];   // Original record(s) with invalid type indices
 } DISCARDEDSYM;
 
@@ -4563,7 +4561,7 @@ typedef struct REFMINIPDB {
     unsigned short  reclen;             // Record length
     unsigned short  rectyp;             // S_REF_MINIPDB
     union {
-        unsigned long  isectCoff;       // coff section
+        uint32_t       isectCoff;       // coff section
         CV_typ_t       typind;          // type index
     };
     unsigned short  imod;               // mod index
@@ -4633,10 +4631,10 @@ struct CV_DebugSLinesFileBlockHeader_t {
 #define CV_LINES_HAVE_COLUMNS 0x0001
 
 struct CV_Line_t {
-        unsigned long   offset;             // Offset to start of code bytes for line number
-        unsigned long   linenumStart:24;    // line where statement/expression starts
-        unsigned long   deltaLineEnd:7;     // delta to line where statement ends (optional)
-        unsigned long   fStatement:1;       // true if a statement linenumber, else an expression line num
+        uint32_t        offset;             // Offset to start of code bytes for line number
+        uint32_t        linenumStart:24;    // line where statement/expression starts
+        uint32_t        deltaLineEnd:7;     // delta to line where statement ends (optional)
+        uint32_t        fStatement:1;       // true if a statement linenumber, else an expression line num
 };
 
 typedef unsigned short CV_columnpos_t;    // byte offset in a source line
@@ -4647,18 +4645,18 @@ struct CV_Column_t {
 };
 
 struct tagFRAMEDATA {
-    unsigned long   ulRvaStart;
-    unsigned long   cbBlock;
-    unsigned long   cbLocals;
-    unsigned long   cbParams;
-    unsigned long   cbStkMax;
-    unsigned long   frameFunc;
+    uint32_t        ulRvaStart;
+    uint32_t        cbBlock;
+    uint32_t        cbLocals;
+    uint32_t        cbParams;
+    uint32_t        cbStkMax;
+    uint32_t        frameFunc;
     unsigned short  cbProlog;
     unsigned short  cbSavedRegs;
-    unsigned long   fHasSEH:1;
-    unsigned long   fHasEH:1;
-    unsigned long   fIsFunctionStart:1;
-    unsigned long   reserved:29;
+    uint32_t        fHasSEH:1;
+    uint32_t        fHasEH:1;
+    uint32_t        fIsFunctionStart:1;
+    uint32_t        reserved:29;
 };
 
 typedef struct tagFRAMEDATA FRAMEDATA, * PFRAMEDATA;
@@ -4666,8 +4664,8 @@ typedef struct tagFRAMEDATA FRAMEDATA, * PFRAMEDATA;
 typedef struct tagXFIXUP_DATA {
    unsigned short wType;
    unsigned short wExtra;
-   unsigned long rva;
-   unsigned long rvaTarget;
+   uint32_t      rva;
+   uint32_t      rvaTarget;
 } XFIXUP_DATA;
 
 // Those cross scope IDs are private convention,

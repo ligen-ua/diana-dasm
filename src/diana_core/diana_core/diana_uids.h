@@ -3,7 +3,7 @@
 
 typedef struct _DIANA_UUID 
 {
-    unsigned long  Data1;
+    unsigned int   Data1; // 32 bits: overlays on-disk CodeView data, so not long (64 bits on LP64)
     unsigned short Data2;
     unsigned short Data3;
     unsigned char  Data4[ 8 ];
