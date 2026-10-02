@@ -10,8 +10,20 @@ extern "C"
 {
 #include "diana_pe_defs.h"
 }
+#include "diana_pdb.h"
 
 std::vector<char> LoadElfTestFile(const orthia::PlatformString_type& name);
+
+// These structs overlay on-disk data, so their size must not depend on the platform
+// (long is 64 bits on LP64 Linux). Sizes are the packed CodeView/RSDS layouts.
+static_assert(sizeof(DIANA_UUID) == 16, "DIANA_UUID overlays the RSDS GUID");
+static_assert(sizeof(SIG70) == 16, "cvinfo GUID");
+static_assert(sizeof(DATASYM32) == 15, "DATASYM32");
+static_assert(sizeof(PROCSYM32) == 40, "PROCSYM32");
+static_assert(sizeof(PROCSYM16) == 30, "PROCSYM16");
+static_assert(sizeof(COMPILESYM) == 23, "COMPILESYM");
+static_assert(sizeof(lfMFunc) == 26, "lfMFunc");
+static_assert(sizeof(POGOINFO) == 24, "POGOINFO (__int64 dynCount)");
 
 static orthia::ImageIdentity MakePeIdentity()
 {

@@ -620,6 +620,37 @@ static int DianaElf_ReadSymNormalized(DianaMovableReadStream* pStream,
     }
     return DI_SUCCESS;
 }
+
+// A defined global/weak function or object: what a library exports and dlsym finds.
+static int DianaElf_IsExportedDefinition(const DI_ELF_SYM64* pSym)
+{
+    int bind = DI_ELF_ST_BIND(pSym->st_info);
+    int type = DI_ELF_ST_TYPE(pSym->st_info);
+    return pSym->st_shndx != 0 && pSym->st_value != 0 &&
+        (bind == DIANA_STB_GLOBAL || bind == DIANA_STB_WEAK) &&
+        (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT || type == DI_ELF_STT_GNU_IFUNC);
+}
+
+// True for a hidden (non-default) version, name@VER rather than name@@VER: dlsym skips it.
+// Without DT_VERSYM, or when the entry can't be read, every symbol counts as default.
+static int DianaElf_IsHiddenVersion(DianaMovableReadStream* pStream,
+    int readFlags,
+    OPERAND_SIZE versymAddr,
+    DI_UINT32 symIndex,
+    int isLE)
+{
+    unsigned char ver[2];
+    OPERAND_SIZE readBytes = 0;
+    if (!versymAddr)
+        return 0;
+    if (pStream->pRandomRead(pStream, versymAddr + (OPERAND_SIZE)symIndex * 2, ver, 2, &readBytes, readFlags) ||
+        readBytes != 2)
+    {
+        return 0;
+    }
+    return (DianaElf_rd16(ver, isLE) & DI_ELF_VERSYM_HIDDEN) != 0;
+}
+
 static
 int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     DianaMovableReadStream* pStream,
@@ -641,6 +672,7 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     OPERAND_SIZE strtabAddr = 0;
     OPERAND_SIZE gnuHashAddr = 0;
     OPERAND_SIZE hashAddr = 0;
+    OPERAND_SIZE versymAddr = 0;
     DI_ELF_DYN64* pEntry = 0;
     DI_ELF_DYN64* pDynEnd = 0;
 
@@ -701,6 +733,8 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
                 hashAddr = pEntry->d_val;
             break;
         default:
+            if ((DI_UINT64)pEntry->d_tag == DI_ELF_DT_VERSYM)
+                versymAddr = pEntry->d_val;
             break;
         }
     }
@@ -852,19 +886,13 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
             }
             nameBuf[sizeof(nameBuf) - 1] = 0;
 
-            if (DIANA_STRNCMP(nameBuf, symbolName, sizeof(nameBuf)) == 0)
+            if (DIANA_STRNCMP(nameBuf, symbolName, sizeof(nameBuf)) == 0 &&
+                DianaElf_IsExportedDefinition(&sym) &&
+                !DianaElf_IsHiddenVersion(pStream, DIANA_ANALYZE_RANDOM_READ_ABSOLUTE, versymAddr, idx, isLE))
             {
-                int bind = DI_ELF_ST_BIND(sym.st_info);
-                int type = DI_ELF_ST_TYPE(sym.st_info);
-
-                if ((bind == DIANA_STB_GLOBAL || bind == DIANA_STB_WEAK) &&
-                    (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT) &&
-                    sym.st_value != 0)
-                {
-                    *pSymbolAddress = sym.st_value;
-                    status = DI_SUCCESS;
-                    goto cleanup;
-                }
+                *pSymbolAddress = sym.st_value;
+                status = DI_SUCCESS;
+                goto cleanup;
             }
 
             if (chainVal & 1)
@@ -957,19 +985,13 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
             }
             nameBuf[sizeof(nameBuf) - 1] = 0;
 
-            if (DIANA_STRNCMP(nameBuf, symbolName, sizeof(nameBuf)) == 0)
+            if (DIANA_STRNCMP(nameBuf, symbolName, sizeof(nameBuf)) == 0 &&
+                DianaElf_IsExportedDefinition(&sym) &&
+                !DianaElf_IsHiddenVersion(pStream, DIANA_ANALYZE_RANDOM_READ_ABSOLUTE, versymAddr, idx, isLE))
             {
-                int bind = DI_ELF_ST_BIND(sym.st_info);
-                int type = DI_ELF_ST_TYPE(sym.st_info);
-
-                if ((bind == DIANA_STB_GLOBAL || bind == DIANA_STB_WEAK) &&
-                    (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT) &&
-                    sym.st_value != 0)
-                {
-                    *pSymbolAddress = sym.st_value;
-                    status = DI_SUCCESS;
-                    goto cleanup;
-                }
+                *pSymbolAddress = sym.st_value;
+                status = DI_SUCCESS;
+                goto cleanup;
             }
 
             chainEntryAddr = chainsAddr + (OPERAND_SIZE)idx * sizeof(DI_UINT32);
@@ -1079,18 +1101,11 @@ int DianaElfFile_GetSymbolAddress_File(Diana_ElfFile* pElfFile,
 
             name = &strings[sym.st_name];
 
-            if (DIANA_STRNCMP(name, symbolName, 255) == 0)
+            if (DIANA_STRNCMP(name, symbolName, 255) == 0 && DianaElf_IsExportedDefinition(&sym))
             {
-                int binding = DI_ELF_ST_BIND(sym.st_info);
-                int type = DI_ELF_ST_TYPE(sym.st_info);
-
-                if ((binding == DIANA_STB_GLOBAL || binding == DIANA_STB_WEAK) &&
-                    (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT))
-                {
-                    *pSymbolAddress = sym.st_value;
-                    status = DI_SUCCESS;
-                    break;
-                }
+                *pSymbolAddress = sym.st_value;
+                status = DI_SUCCESS;
+                break;
             }
         }
     cleanup:
@@ -1232,7 +1247,6 @@ static int DianaElf_QueryDynamicExports(DianaMovableReadStream* pStream,
         OPERAND_SIZE readBytes = 0;
         OPERAND_SIZE symNameAddr = 0;
         OPERAND_SIZE stValue = 0;
-        int bind, type;
 
         DI_CHECK(DianaElf_ReadSymNormalized(pStream,
             symtabAddr + (OPERAND_SIZE)idx * (is64bit ? 24 : 16),
@@ -1241,22 +1255,10 @@ static int DianaElf_QueryDynamicExports(DianaMovableReadStream* pStream,
             &sym,
             readFlags));
 
-        if (sym.st_shndx == 0 || sym.st_value == 0)
-            continue;
-        bind = DI_ELF_ST_BIND(sym.st_info);
-        type = DI_ELF_ST_TYPE(sym.st_info);
-        if ((bind != DIANA_STB_GLOBAL && bind != DIANA_STB_WEAK) ||
-            (type != DIANA_STT_FUNC && type != DIANA_STT_OBJECT && type != DI_ELF_STT_GNU_IFUNC))
+        if (!DianaElf_IsExportedDefinition(&sym) ||
+            DianaElf_IsHiddenVersion(pStream, readFlags, versymAddr, idx, isLE))
         {
             continue;
-        }
-        if (versymAddr)
-        {
-            unsigned char ver[2];
-            DI_CHECK(pStream->pRandomRead(pStream,
-                versymAddr + (OPERAND_SIZE)idx * 2, ver, 2, &readBytes, readFlags));
-            if (readBytes == 2 && (DianaElf_rd16(ver, isLE) & DI_ELF_VERSYM_HIDDEN))
-                continue;
         }
 
         symNameAddr = strtabAddr + sym.st_name;

@@ -3,6 +3,8 @@
 #include "orthia_files.h"
 #include "orthia_streams.h"
 #include "orthia_elf.h"
+#include <map>
+#include <set>
 
 extern "C"
 {
@@ -195,6 +197,67 @@ static void test_elf_build_id()
     DIANA_TEST_ASSERT(memcmp(buildId, expected, sizeof(expected)) == 0);
 }
 
+class ExportsMapObserver : public diana::CBasePeLinkImportsObserver
+{
+public:
+    std::map<std::string, OPERAND_SIZE> exports;
+    int reports = 0;
+
+    void QueryFunctionByOrdinal(const char*, DI_UINT32, OPERAND_SIZE*)
+    {
+    }
+    void QueryFunctionByName(const char*, const char* pFunctionName, DI_UINT32, OPERAND_SIZE* pAddress)
+    {
+        ++reports;
+        exports[pFunctionName] = *pAddress;
+    }
+};
+
+// data/elf/libexports_{gnu,sysv}.so, built from data/elf/exports_lib: the same exports
+// behind a GNU and a SysV hash table, with a symbol in two versions (vfunc@VER_1 hidden,
+// vfunc@@VER_2 default) and undefined imports in front of the hashed symbols
+static void test_elf_exports(const orthia::PlatformString_type& fileName)
+{
+    std::vector<char> data = LoadElfTestFile(fileName);
+
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    elf.MapFile(data, params);
+
+    ExportsMapObserver observer;
+    DI_CHECK_CPP(elf.QueryExports(&observer));
+
+    std::set<std::string> expected = { "exp_data_object", "exp_weak_func", "exp_ifunc",
+        "vfunc", "vfunc_v1", "vfunc_v2" };
+    for (int i = 0; i < 40; ++i)
+    {
+        char name[32];
+        snprintf(name, sizeof(name), "exp_func_%02d", i);
+        expected.insert(name);
+    }
+    std::set<std::string> actual;
+    for (auto& entry : observer.exports)
+    {
+        actual.insert(entry.first);
+    }
+    // no static, hidden-visibility, undefined or version-definition symbols; each name once
+    DIANA_TEST_ASSERT(actual == expected);
+    DIANA_TEST_ASSERT(observer.reports == (int)expected.size());
+
+    // the default version wins, as with dlsym
+    DIANA_TEST_ASSERT(observer.exports["vfunc"] == observer.exports["vfunc_v2"]);
+    DIANA_TEST_ASSERT(observer.exports["vfunc"] != observer.exports["vfunc_v1"]);
+
+    // the hash-table lookup finds every export at the enumerated address
+    for (auto& entry : observer.exports)
+    {
+        DIANA_TEST_ASSERT(elf.DiGetProcAddress(entry.first.c_str()) == entry.second);
+    }
+    DIANA_TEST_ASSERT(elf.DiGetProcAddress("hidden_func") == 0);
+    DIANA_TEST_ASSERT(elf.DiGetProcAddress("ext_import_1") == 0);
+    DIANA_TEST_ASSERT(elf.DiGetProcAddress("no_such_export") == 0);
+}
+
 void test_elf()
 {
     DIANA_TEST(test_elf1());
@@ -203,4 +266,6 @@ void test_elf()
     DIANA_TEST(test_simple_elf_imports());
     DIANA_TEST(test_simple_elf_relocate());
     DIANA_TEST(test_elf_build_id());
+    DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_gnu.so")));
+    DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_sysv.so")));
 }
