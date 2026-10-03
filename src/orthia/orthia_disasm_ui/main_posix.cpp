@@ -40,6 +40,7 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "                    (repeatable, one command per --cmd, executed in order)\n";
     out << "  --analyze         with --cmd: deep code analysis and symbol loading on open\n";
     out << "                    (default: headers, modules, imports and exports only)\n";
+    out << "  --no-sandbox      no privilege drop under sudo and no syscall filter\n";
     out << "  --run-tests       run the built-in tests and exit\n";
     out << "  -h, --help        show this help and exit\n";
     out << "  --version         show the version and exit\n";
@@ -150,9 +151,10 @@ int main(int argc, const char* argv[])
                 analyze = true;
                 continue;
             }
-            if (strcmp(argv[i], "--no-privilege-drop") == 0)
+            // --no-privilege-drop: the old name, kept as an undocumented alias
+            if (strcmp(argv[i], "--no-sandbox") == 0 || strcmp(argv[i], "--no-privilege-drop") == 0)
             {
-                // undocumented, for debugging: keeps full root rights and no sandbox
+                // keeps full root rights and no sandbox
                 dropPrivileges = false;
                 continue;
             }
@@ -205,7 +207,7 @@ int main(int argc, const char* argv[])
         }
         else if (geteuid() == 0)
         {
-            std::cerr << "Warning: running with full root rights and no sandbox (--no-privilege-drop)\n";
+            std::cerr << "Warning: running with full root rights and no sandbox (--no-sandbox)\n";
         }
 
         auto config = orthia::InitAppCore();

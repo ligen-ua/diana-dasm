@@ -56,6 +56,7 @@ else()
     list(APPEND SOURCES
         main.cpp
         oui_processes_win32.cpp
+        oui_sandbox_win32.cpp
     )
 endif()
 

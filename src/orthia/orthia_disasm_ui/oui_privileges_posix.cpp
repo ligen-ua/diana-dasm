@@ -55,7 +55,7 @@ namespace
     std::runtime_error Error(const std::string& what, int error)
     {
         return std::runtime_error("can't drop root privileges: " + what + ": " + strerror(error) +
-                                  " (--no-privilege-drop runs orthia with full root rights)");
+                                  " (--no-sandbox runs orthia with full root rights)");
     }
 
     void Check(int result, const char* what)

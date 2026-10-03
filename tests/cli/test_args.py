@@ -19,8 +19,14 @@ def target(data):
 def test_help(orthia, flag):
     res = orthia.raw(flag)
     assert res.code == EXIT_OK, res
-    for option in ("--file", "--pid", "--cmd", "--analyze", "Exit codes", "ORTHIA_HOME", "ORTHIA_SYMBOL_PATH"):
+    for option in ("--file", "--pid", "--cmd", "--analyze", "--no-sandbox", "Exit codes", "ORTHIA_HOME",
+                   "ORTHIA_SYMBOL_PATH"):
         assert option in res.stdout, res
+
+
+def test_no_sandbox(orthia):
+    res = orthia.raw("--no-sandbox", "--cmd", ".database list")
+    assert res.code == EXIT_OK, res
 
 
 def test_version(orthia):

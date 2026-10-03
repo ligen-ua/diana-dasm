@@ -18,6 +18,7 @@ extern "C"
 #include "console_mode.h"
 #include "ui_help.h"
 #include "orthia_version.h"
+#include "oui_sandbox_win32.h"
 
 int RunTests();
 
@@ -32,6 +33,7 @@ static void PrintUsage(std::ostream& out)
     out << "                      (repeatable, one command per --cmd, executed in order)\n";
     out << "  --analyze           with --cmd: deep code analysis and symbol loading on open\n";
     out << "                      (default: headers, modules, imports and exports only)\n";
+    out << "  --no-sandbox        don't restrict orthia (needed for orthia_proc_win32.dll)\n";
     out << "  --run-tests         run the built-in tests and exit\n";
     out << "  -h, --help, /?      show this help and exit\n";
     out << "  --version           show the version and exit\n";
@@ -162,6 +164,7 @@ int wmain(int argc, const wchar_t* argv[])
         bool nextIsPid = false;
         bool nextIsCmd = false;
         bool nextIsFile = false;
+        bool sandbox = true;
         for (int i = 1; i < argc; ++i)
         {
             // checked first, so that a value starting with -- is taken as a value
@@ -221,6 +224,11 @@ int wmain(int argc, const wchar_t* argv[])
                 analyze = true;
                 continue;
             }
+            if (wcscmp(argv[i], L"--no-sandbox") == 0)
+            {
+                sandbox = false;
+                continue;
+            }
             if (IsHelpSwitch(argv[i]))
             {
                 PrintUsage(std::cout);
@@ -270,6 +278,35 @@ int wmain(int argc, const wchar_t* argv[])
 #if defined(_M_AMD64)
         SetupWin32FSHandlers(config);
 #endif //  M_AMD64
+
+        // after the executable heap and the host exe, before the first process open loads the plugin
+        if (sandbox)
+        {
+            std::vector<std::string> warnings;
+            const bool signedOnly = orthia::ApplySandbox(&warnings);
+            const bool elevated = orthia::IsElevated();
+            for (const auto& warning : warnings)
+            {
+                // only elevated runs depend on it
+                if (elevated)
+                {
+                    std::cerr << "Warning: " << warning << "\n";
+                }
+                else
+                {
+                    ORTHIA_DEV_LOG(orthia::LogSeverity::Info, warning);
+                }
+            }
+            if (signedOnly && orthia::IsFileExists(orthia::GetCurrentModuleDir() + L"orthia_proc_win32.dll"))
+            {
+                std::cerr << "Warning: orthia_proc_win32.dll is not loaded in the sandbox;"
+                             " run with --no-sandbox to use it\n";
+            }
+        }
+        else if (orthia::IsElevated())
+        {
+            std::cerr << "Warning: running elevated with no sandbox (--no-sandbox)\n";
+        }
 
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 

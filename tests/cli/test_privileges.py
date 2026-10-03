@@ -3,7 +3,6 @@
 The root cases need root or passwordless sudo; they are skipped otherwise.
 """
 import os
-import pty
 import re
 import shutil
 import subprocess
@@ -21,7 +20,8 @@ CAP_SYS_PTRACE = 1 << 19
 
 
 def _can_sudo() -> bool:
-    if os.geteuid() == 0:
+    # evaluated on import: the module is still collected on Windows
+    if sys.platform != "linux" or os.geteuid() == 0:
         return False
     if not shutil.which("sudo"):
         return False
@@ -48,15 +48,16 @@ def _status(pid: int) -> Dict[str, str]:
     return result
 
 
-def _ui_status(command: List[str]) -> Dict[str, str]:
-    """Starts the UI on a pty (it needs a console), reads its /proc status, stops it"""
+def _ui_status(command: List[str], timeout: float = 10) -> Dict[str, str]:
+    """Starts the UI on a pty (it needs a console), reads its /proc status, stops it.
+    Waits for seccomp, the last step of the drop, at most timeout seconds"""
+    import pty  # Linux only: the module is still collected on Windows
     master, slave = pty.openpty()
     proc = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
     os.close(slave)
     try:
-        # orthia is a child of sudo (or sudo's monitor process): the newest process named orthia;
-        # seccomp is the last step of the drop
-        deadline = time.time() + 10
+        # orthia is a child of sudo (or sudo's monitor process): the newest process named orthia
+        deadline = time.time() + timeout
         status = None
         while time.time() < deadline and not (status and status.get("Seccomp") == "2"):
             time.sleep(0.2)
@@ -101,6 +102,15 @@ def test_normal_run_is_sandboxed(orthia_exe, tmp_path, empty_symbols):
     assert status["NoNewPrivs"] == "1", status
     assert status["Seccomp"] == "2", status
     assert _caps(status, "CapEff") == 0, status
+
+
+def test_no_sandbox(orthia_exe, tmp_path, empty_symbols):
+    if os.geteuid() == 0:
+        pytest.skip("run as a normal user")
+    # nothing marks the end of the startup without a sandbox: give it the time a sandbox would take
+    status = _ui_status(["env", f"ORTHIA_HOME={tmp_path}", f"ORTHIA_SYMBOL_PATH={empty_symbols}",
+                         str(orthia_exe), "--no-sandbox"], timeout=3)
+    assert status["Seccomp"] == "0", status
 
 
 @needs_sudo
