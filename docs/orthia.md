@@ -16,7 +16,7 @@ stored where, and the `.database` commands to list, delete and clean up database
 
 ## Building
 
-Windows (Visual Studio 2022, Release x64 — the Debug configuration does not build):
+Windows (Visual Studio 2022, Release x64):
 ```
 build-release-vs.cmd
 ```
@@ -61,27 +61,49 @@ else before it opens anything:
   `process_vm_writev`, `pidfd_getfd`, ...), new namespaces, and kernel interfaces Orthia has no
   use for (module loading, `bpf`, `mount`, `io_uring`, ...). Normal runs without sudo get the same filter.
 - If the drop fails, Orthia exits instead of going on as root.
+- `--no-sandbox` turns all of this off: Orthia keeps full root rights and no seccomp filter, and says so with
+  `Warning: running with full root rights and no sandbox`.
 
 Don't install Orthia setuid root or with `setcap cap_sys_ptrace`: every local user could then read
 any process's memory. Orthia refuses to run setuid.
 
 The parsers still run with `CAP_SYS_PTRACE`: open only files you trust under sudo.
 
+### Windows: sandbox
+
+Before it opens anything, Orthia restricts its own process:
+- Every privilege is removed from its token except `SeDebugPrivilege` (the counterpart of `CAP_SYS_PTRACE`;
+  kept as it is, not enabled) and `SeChangeNotifyPrivilege`. On XP before SP2, where privileges can't be
+  removed, they are disabled instead.
+- On Windows 8 and later it also sets process mitigation policies: no dynamic code; no AppInit DLLs,
+  legacy IMEs or window hooks; no DLLs from remote shares or with a low integrity label, System32 searched
+  first; and, where Windows supports it, only DLLs signed by Microsoft. Windows XP to 7 get the privilege
+  removal only.
+
+The signature policy also keeps out `orthia_proc_win32.dll`, the optional open-process plugin placed next
+to `orthia.exe`. If it is there, Orthia warns that it is not loaded; run with `--no-sandbox` to use it.
+
+Problems setting up the sandbox are reported as warnings only when Orthia runs elevated.
+`--no-sandbox` turns the sandbox off; an elevated run then warns `running elevated with no sandbox`.
+
 ## Command line
 
 ```
-orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze]
+orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] [--no-sandbox]
 ```
 
 | Option | Meaning |
 |---|---|
 | `--file <filename>` | open the given executable file |
-| `--pid <pid>` | open the process with the given id (`self` for Orthia's own process) |
+| `--pid <pid>` | open the process with the given id: decimal, `0x`-prefixed hex, or `self` for Orthia's own process |
 | `--cmd <command>` | run `<command>` without the UI and exit; repeat it for more commands, they run in order |
 | `--analyze` | with `--cmd`: deep code analysis and symbol loading on open |
+| `--no-sandbox` | don't restrict Orthia: on Linux no privilege drop and no seccomp filter (see [what Orthia keeps of root](#linux-what-orthia-keeps-of-root)), on Windows no privilege removal and no mitigation policies (see [sandbox](#windows-sandbox)) |
 | `--run-tests` | run the built-in tests and exit |
-| `-h`, `--help`, `/?` | show help and exit |
+| `-h`, `--help` | show help and exit; on Windows also `/?` and `-?` |
 | `--version` | show the version (`orthia 1.1.0.14`) and exit |
+
+The value after `--file`, `--pid` or `--cmd` is taken as it is, even if it starts with `--`.
 
 All arguments are optional: plain `orthia` with no arguments starts the UI with an empty workspace,
 and you open files and processes from the **File** menu (*Open executable*, *Open process*).
@@ -111,7 +133,7 @@ A database created by a quick open is upgraded in place by a later `--analyze` o
 |---|---|
 | 0 | success |
 | 1 | at least one command reported an error |
-| 2 | bad or incomplete argument |
+| 2 | bad or incomplete argument, or the UI was started without an interactive console (stdin or stdout redirected; use `--cmd`) |
 | 3 | the target failed to open, or no target was given for a command that needs one |
 | 4 | unexpected error |
 
@@ -128,7 +150,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 
 | Command | Description |
 |---|---|
-| `x <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched |
+| `x [/a\|/n] [/v] <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched. `/a` sorts by address, `/n` by name (default: by type), `/v` shows the symbol type |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
 | `lm` | List modules with their status: `unresolved`, `linked`, `stale`, `unlinked`, `analysis`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)) |
 | `db`, `dw`, `dd`, `dq`, `dp`, `dps` | Display memory as bytes, words, dwords, qwords, pointers, or pointers with symbols |
