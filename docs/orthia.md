@@ -101,7 +101,7 @@ orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] 
 | `--no-sandbox` | don't restrict Orthia: on Linux no privilege drop and no seccomp filter (see [what Orthia keeps of root](#linux-what-orthia-keeps-of-root)), on Windows no privilege removal and no mitigation policies (see [sandbox](#windows-sandbox)) |
 | `--run-tests` | run the built-in tests and exit |
 | `-h`, `--help` | show help and exit; on Windows also `/?` and `-?` |
-| `--version` | show the version (`orthia 1.1.0.14`) and exit |
+| `--version` | show the version (`orthia 1.x.x.xx`) and exit |
 
 The value after `--file`, `--pid` or `--cmd` is taken as it is, even if it starts with `--`.
 
