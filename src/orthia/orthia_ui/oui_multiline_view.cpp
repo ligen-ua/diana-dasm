@@ -294,8 +294,9 @@ namespace oui
         {
             m_editBox->SetLastMousePoint(Point());
         }
-        if (m_cursorOutOfText)
+        if (m_cursorOutOfText && !m_editBox->GetText().native.empty())
         {
+            // SetText invalidates, do it only on change to not repaint forever
             m_editBox->SetText(String());
         }
         if (SelectionIsActiveImpl())

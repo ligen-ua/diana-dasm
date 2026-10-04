@@ -112,12 +112,7 @@ void COutputWindow::OnContextMenu(const oui::Point& point)
     items.push_back({ contextMenuNode->QueryValue(ORTHIA_TCSTR("copy")),
         [this]() { m_view->CopySelected(); } });
 
-    oui::Point pointToUse{ point.x + 1, point.y + 1 };
-    auto parent = GetPool()->GetRootWindow();
-    auto popup = parent->AddChild_t(std::make_shared<oui::CMenuPopup>(std::move(items)));
-    popup->Init(parent->GetPtr());
-    popup->Dock(pointToUse);
-    popup->SetFocus();
+    oui::ShowContextMenu(this, std::move(items), point);
 }
 
 std::shared_ptr<oui::CMultiLineView> COutputWindow::SF_GetView()

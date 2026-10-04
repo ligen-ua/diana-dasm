@@ -57,15 +57,7 @@ namespace oui
                 }});
         }
 
-        if (items.empty())
-            return;
-
-        Point pointToUse{ point.x + 1, point.y + 1 };
-        auto parent = GetPool()->GetRootWindow();
-        auto popup = parent->AddChild_t(std::make_shared<CMenuPopup>(std::move(items)));
-        popup->Init(parent->GetPtr());
-        popup->Dock(pointToUse);
-        popup->SetFocus();
+        ShowContextMenu(this, std::move(items), point);
     }
 
     CEditBox::CEditBox(std::shared_ptr<DialogColorProfile> colorProfile)
@@ -973,7 +965,15 @@ namespace oui
             console->HideCursor();
         }
 
-        if (m_behavior & BehaviorFlags_CancelSelectionOnFocusLost)
+        bool newIsPopup = false;
+        if (auto pool = this->GetPool())
+        {
+            if (auto focus = pool->GetFocus())
+            {
+                newIsPopup = focus->IsPopup();
+            }
+        }
+        if ((m_behavior & BehaviorFlags_CancelSelectionOnFocusLost) && !newIsPopup)
         {
             ResetSelection();
         }

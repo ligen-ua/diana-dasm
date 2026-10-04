@@ -139,18 +139,31 @@ void CConsole::PaintRect(const Rect& /*rect*/, Color /*background*/, bool /*keep
 
 void CConsole::ShowCursor()
 {
+    m_cursorVisible = true;
     const char* seq = "\x1B[?25h";
     WriteToStdout(seq, strlen(seq));
 }
 
 void CConsole::HideCursor()
 {
+    m_cursorVisible = false;
     const char* seq = "\x1B[?25l";
     WriteToStdout(seq, strlen(seq));
 }
 
+bool CConsole::IsCursorVisible() const
+{
+    return m_cursorVisible;
+}
+
+Point CConsole::GetCursorPosition() const
+{
+    return m_cursorPos;
+}
+
 void CConsole::SetCursorPositon(const Point& pt)
 {
+    m_cursorPos = pt;
     char buf[32];
     int len = snprintf(buf, sizeof(buf), "\x1B[%d;%dH", pt.y + 1, pt.x + 1);
     WriteToStdout(buf, len);
@@ -416,16 +429,16 @@ void CConsoleDrawAdapter::StartDraw(Size size, CConsole* console)
 {
     m_console = console;
 
+    // The back buffer persists between frames: windows repaint only when invalidated,
+    // so a frame where nothing is invalid must leave the previous picture untouched
     if (m_size.width != size.width || m_size.height != size.height)
     {
         m_size = size;
-        m_backBuffer.resize(size.width * size.height);
+        TerminalCell defaultCell;
+        m_backBuffer.assign(size.width * size.height, defaultCell);
         m_frontBuffer.resize(size.width * size.height);
         m_fullRedraw = true;
     }
-
-    TerminalCell defaultCell;
-    std::fill(m_backBuffer.begin(), m_backBuffer.end(), defaultCell);
 }
 
 std::string CConsoleDrawAdapter::ExtractUtf8Char(const std::string& str, size_t& i)
@@ -646,7 +659,15 @@ void CConsoleDrawAdapter::FinishDraw()
     }
 
     if (!out.empty())
+    {
+        // cell writes moved the terminal cursor, put it back where the focused edit box wants it
+        if (m_console && m_console->IsCursorVisible())
+        {
+            const Point cursorPos = m_console->GetCursorPosition();
+            AppendMoveCursor(out, cursorPos.x, cursorPos.y);
+        }
         WriteToStdout(out.data(), out.size());
+    }
 
     m_fullRedraw = false;
 }

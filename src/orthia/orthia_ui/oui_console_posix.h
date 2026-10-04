@@ -7,6 +7,8 @@ namespace oui
     class CConsole
     {
         std::unique_ptr<ISymbolsAnalyzer> m_symbolsAnalyzer;
+        Point m_cursorPos;
+        bool m_cursorVisible = false;
     public:
         CConsole();
         void SetTitle(const String& caption);
@@ -24,6 +26,8 @@ namespace oui
         int TranslateColorEx(const Color& color, bool background);
 
         void SetCursorPositon(const Point& pt);
+        Point GetCursorPosition() const;
+        bool IsCursorVisible() const;
 
         bool CopyTextToClipboard(const String& text);
         String PasteTextFromClipboard();

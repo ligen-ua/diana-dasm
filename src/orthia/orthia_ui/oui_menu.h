@@ -76,6 +76,12 @@ namespace oui
 
     };
 
+    // Opens a context menu next to the mouse point. Any popup that currently
+    // owns the focus is closed first, so only one context menu exists at a time
+    std::shared_ptr<CMenuPopup> ShowContextMenu(CWindow* owner,
+        std::vector<PopupItem>&& items,
+        const Point& mousePoint);
+
     class CMenuWindow:public oui::SimpleBrush<CWindow>
     {
         using Parent_type = oui::SimpleBrush<CWindow>;
