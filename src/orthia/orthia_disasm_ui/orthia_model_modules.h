@@ -6,6 +6,7 @@
 #include "orthia_model.h"
 #include "orthia_pe.h"
 #include "orthia_model_modules_elf.h"
+#include "orthia_image_identity.h"
 #include "diana_executable.h"
 
 
@@ -19,11 +20,19 @@ namespace orthia
             bool originalFile = false;
             oui::String fullName;
             std::unordered_map<Address_type, orthia::NameInfo> names;
+            // the range the module occupies: an unresolved dependency has no image, but like an empty
+            // struct it still gets a range of its own, so every module keeps a unique address
+            Address_type base = 0;
+            Address_type size = 0;
+            bool unresolved = false;
+            // recorded in the database so the file can be checked before it is mapped again
+            ImageIdentity identity;
         };
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
         decltype(m_mappedModules)::iterator m_currentModule;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
+        oui::String m_exeDirectory;   // searched before the system paths, like the real loader
 
         using ModuleIterator = decltype(m_mappedModules)::iterator;
         std::shared_ptr<oui::IFileSystem> m_pFs;
@@ -37,6 +46,7 @@ namespace orthia
         ModuleIterator LoadModule(const std::string& dllName);
         void RelocateModule(std::shared_ptr<orthia::CSimplePeFile> peFile);
         OPERAND_SIZE GetLastPossibleAddress();
+        Address_type ReserveSpace(OPERAND_SIZE size);
 
         void QueryFunctionImpl(const char* pDllName,
             const char* pFunctionName,

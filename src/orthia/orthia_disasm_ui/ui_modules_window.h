@@ -40,6 +40,7 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     std::vector<orthia::NameInfo> m_cachedNamesPage;
     static const int g_nameCacheSize = 100;
     int m_lastTotalNamesCount = 0;
+    orthia::NameSortOrder m_namesSortOrder = orthia::NameSortOrder::Type;
     int m_modulesWidthPercent = 42;
 
     static const int field_selectedModuleAddress = 1;
@@ -48,6 +49,7 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
     static const int field_cachedNamesPage_size = 4;
     static const int field_modulesBox_Offset = 5;
     static const int field_modulesBox_Position = 6;
+    static const int field_namesSortOrder = 7;
 
     std::function<void(orthia::Address_type address)> m_onGotoAddress;
     std::function<void(orthia::Address_type address, const oui::String& name)> m_onShowSections;
@@ -66,6 +68,9 @@ class CModulesWindow:public oui::ChildSwitcher<oui::SimpleBrush<oui::CPanelWindo
 
     int Names_GetTotalCount() const;
     void Names_ShiftViewWindow(int newOffset);
+    void Names_OnContextMenu(std::vector<oui::PopupItem>& items);
+    void SetNamesSortOrder(orthia::NameSortOrder sortOrder);
+    orthia::NameSelectionKey MakeNamesKey(int offset) const;
 
     void UpdateVisibleItems();
 

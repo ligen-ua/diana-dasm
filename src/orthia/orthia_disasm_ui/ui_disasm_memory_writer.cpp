@@ -38,18 +38,20 @@ namespace oui
     MemoryPrinter::MemoryPrinter(DisasmWriter* pTextPrinter,
         int dianaMode,
         const oui::LineIndex& startAddress,
-        orthia::Address_type sizeInCommands,
+        orthia::Address_type limit,
+        LimitKind limitKind,
         std::shared_ptr<orthia::IWorkPlaceItem> workspaceItem)
         :
         Parent_type(pTextPrinter,
             dianaMode,
             startAddress.GetIndex(),
-            sizeInCommands),
+            limit),
         m_writer(*pTextPrinter),
         m_firstVirtualOffset(startAddress),
         m_pTextPrinter(pTextPrinter),
         m_workspaceItem(workspaceItem),
-        m_startAddress(startAddress)
+        m_startAddress(startAddress),
+        m_limitKind(limitKind)
     {
         QueryDefaultColorProfile(m_colors);
         m_bytesIdent += 10;
@@ -138,6 +140,11 @@ namespace oui
 
     Diana_LinkedAdditionalGroupInfo* MemoryPrinter::GetLinkedInfo()
     {
+        // a ?? line can be printed outside OnStream, with no command decoded
+        if (!m_pDianaPrintContext)
+        {
+            return 0;
+        }
         auto pInfo = m_pDianaPrintContext->result.pInfo;
         if (!pInfo)
         {
@@ -179,11 +186,14 @@ namespace oui
         m_textMarkupBuilder.AddNextRange(m_currentBlock.size() - oldSize, m_colors.spaces);
 
         // pack command
-        Diana_AnalyzeJumps(&m_pDianaPrintContext->result,
-            address + m_pDianaPrintContext->result.iFullCmdSize,
-            &tag->newOffset,
-            &tag->absoluteAddress,
-            &tag->linksToData);
+        if (m_pDianaPrintContext)
+        {
+            Diana_AnalyzeJumps(&m_pDianaPrintContext->result,
+                address + m_pDianaPrintContext->result.iFullCmdSize,
+                &tag->newOffset,
+                &tag->absoluteAddress,
+                &tag->linksToData);
+        }
 
         PackCommand(command, tag);
         size_t lastOffset = 0;
@@ -395,13 +405,18 @@ namespace oui
             }
             if (!(virtualOffset < m_startAddress))
             {
-                auto commandsToDeliver = m_sizeInCommands - m_currentCommand;
-                m_workspaceItem->QueryMarkupRange(virtualOffset.GetIndex(), virtualOffset.GetSubIndex(), (int)commandsToDeliver, markupRange, m_referencesCache);
+                // annotation lines count against a line limit only
+                const bool countLines = m_limitKind == LimitKind::Lines;
+                int linesToDeliver = countLines ? (int)(m_sizeInCommands - m_currentCommand) : INT_MAX;
+                m_workspaceItem->QueryMarkupRange(virtualOffset.GetIndex(), virtualOffset.GetSubIndex(), linesToDeliver, markupRange, m_referencesCache);
                 for (auto& line : markupRange.lines)
                 {
                     PrintMetaInfo(virtualOffset, line);
                     virtualOffset.IncSubIndex();
-                    ++m_currentCommand;
+                    if (countLines)
+                    {
+                        ++m_currentCommand;
+                    }
                 }
                 if (m_currentCommand >= m_sizeInCommands)
                 {
@@ -499,6 +514,7 @@ namespace oui
             }
         }
 
+        m_stopAddress = virtualOffset;
         m_pDianaPrintContext = 0;
     }
 

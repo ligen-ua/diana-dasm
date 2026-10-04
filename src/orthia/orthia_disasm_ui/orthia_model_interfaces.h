@@ -3,6 +3,7 @@
 #include <atomic>
 #include "orthia_utils.h"
 #include "orthia_interfaces.h"
+#include "orthia_sections.h"
 #include "orthia_text_manager.h"
 #include "oui_string.h"
 #include "oui_text_markup.h"
@@ -45,11 +46,20 @@ namespace orthia
 
         static const int builtInFlags_moduleTypePe  = 1;
         static const int builtInFlags_moduleTypeElf = 2;
+        // a dependency that could not be located: it owns an address range but has no image data
+        static const int builtInFlags_unresolved    = 4;
 
         PlatformString_type fullName;
         int flags = 0;
         int builtInFlags = 0;
         PlatformString_type name;
+
+        // where the bytes come from (orthia::ImageSourceKind / ImageState as ints; 0 for process items).
+        // imageSourceKnown: the item has an image source table, so kind None means "unlinked"
+        bool imageSourceKnown = false;
+        int imageSourceKind = 0;
+        int imageState = 0;
+        PlatformString_type imageStateReason;
     };
 
     struct WorkAddressData :oui::Noncopyable
@@ -108,22 +118,19 @@ namespace orthia
     oui::String GetPreferredName(const NameInfo& nameInfo);
     oui::String GetPreferredComment(const NameInfo& nameInfo);
 
-    struct SectionInfo
+    using SectionInfo = ImageSection;
+
+    enum class NameSortOrder
     {
-        oui::String name;
-        Address_type virtualAddress = 0;
-        Address_type size = 0;
-        oui::String flagsShort;
-        std::vector<std::pair<oui::String, oui::String>> attributes;
+        Type,       // exports, imports, private symbols; each group by address
+        Name,       // case-insensitive, then by address
+        Address     // then by type, then by name
     };
 
     struct NameSelectionKey
     {
-        static const int flags_ContinueFrom = 1;
-        Address_type address = 0;
-        oui::String name;
-        int flags = 0;
-        int continueMarkNameFlag = 0;
+        int offset = 0;
+        NameSortOrder sortOrder = NameSortOrder::Type;
         bool excludeImports = false;
         bool privateSymbolsOnly = false;
     };
@@ -221,10 +228,13 @@ namespace orthia
         virtual void ReloadModules() = 0;
         virtual void GetModules(std::vector<orthia::ModuleInfo>& modules) const = 0;
         virtual int GetModulesCount() const = 0;
+        virtual Address_type GetMainModuleAddress() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
         virtual int GetDianaMode() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
+        // drops the cached names of the module, the next QueryNames reads them again
+        virtual void InvalidateNames(Address_type /*moduleAddress*/) {}
         virtual MarkupRangeInfo QueryMarkupRange(Address_type address, IMarkupCache* cache = nullptr) const = 0;
         virtual void QueryMarkupRange(Address_type address, int index, int count, MarkupRange& range, IMarkupCache* cache = nullptr) const = 0;
         virtual NameInfo QueryAddressName(Address_type address) const = 0;
@@ -236,7 +246,9 @@ namespace orthia
         virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
         virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
         virtual ModuleStorage* GetModuleStorage() { return nullptr; }
-        virtual void QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out) {}
+        virtual void QuerySections(Address_type moduleBase, ImageSections& sections) {}
+        // the db/<sha1> or proc/ folder of this item, without a trailing slash
+        virtual PlatformString_type GetDatabaseFolder() const { return PlatformString_type(); }
     };
 
     class BaseWorkPlaceItem : public IWorkPlaceItem

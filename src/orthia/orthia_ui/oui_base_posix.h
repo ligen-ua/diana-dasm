@@ -3,6 +3,7 @@
 #pragma once
 
 #include "assert.h"
+#include <system_error>
 
 #define OUI_DEBUG_BREAK   assert(0)
 #define OUI_INFINITE      ((unsigned int)-1)
@@ -98,9 +99,8 @@ namespace oui
 
     inline std::string GetErrorText(int dwError)
     {
-        std::stringstream res;
-        res<<"Error, code "<<dwError;
-        return res.str();
+        // posix platform errors are errno values
+        return std::generic_category().message(dwError);
     }
 
 

@@ -21,5 +21,8 @@ namespace orthia
         virtual DI_UINT64 GetEntryPoint() const = 0;
         virtual int QueryImports(diana::CBasePeLinkImportsObserver* observer) = 0;
         virtual int QueryExports(diana::CBasePeLinkImportsObserver* observer) = 0;
+        // Patches the mapped image in place (e.g. replaying linked import slots). The range
+        // must lie inside the image; returns false otherwise or when the format is read-only.
+        virtual bool WriteImage(DI_UINT64 address, const void* pData, size_t size) = 0;
     };
 }

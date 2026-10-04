@@ -112,6 +112,7 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
         rangeInfo.dianaMode,
         m_peAddress,
         requiredLinesCount,
+        oui::LimitKind::Lines,
         item);
 
     // determine final size
@@ -235,6 +236,7 @@ void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1_in, const oui:
         item->GetDianaMode(),
         p1.y,
         DI_MAX_OPERAND_SIZE,
+        oui::LimitKind::Lines,
         item);
 
     printer.SetEndAddress(p2.y);
@@ -789,6 +791,7 @@ void CDisasmWindow::CopySelectedAssembler(const oui::MultiLineSelPoint& p1_in, c
         item->GetDianaMode(),
         p1.y,
         DI_MAX_OPERAND_SIZE,
+        oui::LimitKind::Lines,
         item);
 
     printer.SetEndAddress(p2.y);

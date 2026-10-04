@@ -81,6 +81,32 @@ namespace orthia
         return result;
     }
 
+    PlatformString_type StripLongPathPrefix(const PlatformString_type& fullName)
+    {
+        const PlatformString_type uncPrefix = ORTHIA_TCSTR("\\\\?\\UNC\\");
+        if (fullName.compare(0, uncPrefix.size(), uncPrefix) == 0)
+        {
+            return ORTHIA_TCSTR("\\\\") + fullName.substr(uncPrefix.size());
+        }
+        const PlatformString_type prefix = ORTHIA_TCSTR("\\\\?\\");
+        if (fullName.compare(0, prefix.size(), prefix) == 0)
+        {
+            return fullName.substr(prefix.size());
+        }
+        return fullName;
+    }
+
+    oui::String DirectoryOfFile(const oui::String& fullName)
+    {
+        const PlatformString_type path = StripLongPathPrefix(fullName.native);
+        auto pos = path.find_last_of(ORTHIA_TCSTR("\\/"));
+        if (pos == PlatformString_type::npos)
+        {
+            return oui::String();
+        }
+        return oui::String(path.substr(0, pos + 1));
+    }
+
     // CMemoryReaderOverVector
     CMemoryReaderOnLoadedData::CMemoryReaderOnLoadedData(Address_type imageBase, const char* pData, size_t size)
         :

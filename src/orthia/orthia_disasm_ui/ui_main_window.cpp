@@ -1,4 +1,5 @@
 #include "ui_main_window.h"
+#include <cerrno>
 
 CMainWindow::CMainWindow(std::shared_ptr<orthia::CProgramModel> model)
     :
@@ -115,6 +116,44 @@ void CMainWindow::OnWorkspaceItemChanged(const oui::fsui::OpenResult& result)
 void CMainWindow::AddInitialArgument(const InitialOpenFileInfo& info)
 {
     m_fileToOpen.push_back(info);
+}
+// Never throws: a target that fails to open is reported in the output window by OnAfterInit
+void CMainWindow::AddInitialTargets(const std::vector<orthia::PlatformString_type>& files,
+    const std::vector<unsigned long long>& pids)
+{
+#ifdef WIN32
+    const int notFoundError = ERROR_FILE_NOT_FOUND;
+#else
+    const int notFoundError = ENOENT;
+#endif
+    auto fileSystem = m_model->GetFileSystem();
+    for (const auto& name_in : files)
+    {
+        // on error the name is returned as given, SyncOpenFile reports the real problem
+        const oui::String name = std::get<1>(fileSystem->SyncGetFullPathName(name_in));
+        int platformError = 0;
+        std::shared_ptr<oui::IFile2> file;
+        std::tie(platformError, file) = fileSystem->SyncOpenFile(oui::FileUnifiedId(name));
+        if (!file && !platformError)
+        {
+            platformError = notFoundError;
+        }
+        AddInitialArgument({ platformError, name, file, nullptr });
+    }
+    for (auto pid : pids)
+    {
+        int platformError = 0;
+        std::shared_ptr<oui::IProcess> process;
+        std::tie(platformError, process) = m_model->GetProcessSystem()->SyncOpenProcess(oui::ProcessUnifiedId(pid));
+        if (!process)
+        {
+            orthia::PlatformString_type pidText;
+            orthia::ObjectToString_t(pid, pidText);
+            AddInitialArgument({ platformError ? platformError : notFoundError, pidText, nullptr, nullptr });
+            continue;
+        }
+        AddInitialArgument({ platformError, process->GetFullFileNameForUI(), nullptr, process });
+    }
 }
 void CMainWindow::AddInitialTextOutputInfo(const oui::String& text)
 {

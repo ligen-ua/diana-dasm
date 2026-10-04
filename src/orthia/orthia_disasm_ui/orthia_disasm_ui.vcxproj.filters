@@ -47,6 +47,9 @@
     <ClCompile Include="orthia_config.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_databases.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="orthia_helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -57,6 +60,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="oui_processes_win32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="oui_sandbox_win32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="orthia_image_source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="orthia_item_file.cpp">
@@ -98,6 +107,9 @@
     <ClCompile Include="ui_command_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="console_mode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="orthia_commands.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -116,7 +128,7 @@
     <ClCompile Include="orthia_module_symbols.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="orthia_model_sections.cpp">
+    <ClCompile Include="orthia_module_names.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ui_sections_window.cpp">
@@ -142,6 +154,9 @@
     <ClInclude Include="orthia_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="orthia_databases.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="orthia_helpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -151,13 +166,22 @@
     <ClInclude Include="oui_processes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="oui_sandbox_win32.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="orthia_item_file.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_image_source.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_model_interfaces.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_item_process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_module_names.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_process_adapter.h">
@@ -193,6 +217,9 @@
     <ClInclude Include="ui_command_window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="console_mode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="orthia_commands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -203,9 +230,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_module_analyzer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="orthia_model_sections.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_sections_window.h">

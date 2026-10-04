@@ -44,6 +44,9 @@ namespace orthia
         DI_UINT64 GetEntryPoint() const override;
         int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
+        bool WriteImage(DI_UINT64 address, const void* pData, size_t size) override;
         std::vector<std::string> GetNeededLibraries() const;
+        // the GNU build-id note bytes; DI_SUCCESS with an empty vector when the file has none
+        int QueryBuildId(std::vector<DI_UINT8>& buildId) const;
     };
 }

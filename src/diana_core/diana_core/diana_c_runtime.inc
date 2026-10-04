@@ -60,7 +60,7 @@ int DianaOpOutput_Console(struct _DianaTextOutputContext * pContext,
                {
                    printf("%s", "0");
                }
-               printf("%08llX", operand);
+               printf("%08llX", (unsigned long long)operand);
            break;
        default:
            return DI_ERROR;
@@ -117,7 +117,7 @@ int DianaOpOutput_String(struct _DianaTextOutputContext * pContextIn,
            break;
        case 4: written = snprintf(pBuffer, (size_t)tail, "%04X", (unsigned int)operand);
            break;
-       case 8: written = snprintf(pBuffer, (size_t)tail, "%08llX", operand);
+       case 8: written = snprintf(pBuffer, (size_t)tail, "%08llX", (unsigned long long)operand);
            break;
        default:
            return DI_ERROR;

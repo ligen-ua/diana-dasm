@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(orthia_lib)
 
 include_directories("../../diana_core/diana_core")
@@ -22,6 +22,7 @@ add_library(${PROJECT_NAME} SHARED
     orthia_exec.cpp
     orthia_expressions.cpp
     orthia_files_linux.cpp
+    orthia_image_identity.cpp
     orthia_log.cpp
     orthia_memory_cache.cpp
     orthia_module_manager.cpp
@@ -29,6 +30,7 @@ add_library(${PROJECT_NAME} SHARED
     orthia_elf.cpp
     orthia_pdb_symbols.cpp
     orthia_pe.cpp
+    orthia_sections.cpp
     orthia_shellcode.cpp
     orthia_plugin_interfaces.cpp
     orthia_sha1.c

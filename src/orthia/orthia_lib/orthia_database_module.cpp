@@ -53,6 +53,10 @@ CDatabase::~CDatabase()
 }
 void CDatabase::Init()
 {
+    // per connection and a no-op inside a transaction, so set it here, before DoVersionScripts,
+    // for new and existing databases alike (tbl_metainfo relies on ON DELETE CASCADE)
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "PRAGMA foreign_keys=ON"), "Can't enable foreign keys");
+
     ORTHIA_CHECK_SQLITE2(sqlite3_create_function(m_pDatabase->Get(), "UINT_LESSOE", 2, SQLITE_ANY, NULL, sql_less_or_equal, NULL, NULL ));
 
     DoVersionScripts();
@@ -171,8 +175,6 @@ void CDatabase::CreateNew(const orthia::PlatformString_type & fullFileName)
     m_pDatabase = new CSQLDatabase2(database);
 
     ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "PRAGMA encoding = \"UTF-8\""), "Can't create database");
-
-    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), "PRAGMA foreign_keys=ON"), "Can't create database");
 
     ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),"CREATE TABLE IF NOT EXISTS tbl_references (ref_address_from INTEGER, ref_address_to INTEGER)"), 
         "Can't create database");

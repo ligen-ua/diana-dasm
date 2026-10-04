@@ -105,29 +105,46 @@ namespace orthia
                 [mainModuleAddr](const auto& m) { return m.IsInRange(mainModuleAddr); });
             if (mainIt == modules.end())
             {
+                Cleanup(itemId);
                 return;
             }
             auto reader = item->CreateMemoryReader();
             auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
             if (op->IsCancelled())
+            {
+                Cleanup(itemId);
                 return;
+            }
             try
             {
-                if (!db->IsModuleExists(mainIt->address))
+                // not IsModuleExists: a quick open (--cmd without --analyze) registers the module unanalyzed
+                if (!(mainIt->flags & ModuleInfo::flags_analyzeDone))
                 {
                     auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
                     WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
                     if (reader)
                     {
-                        moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
+                        if (db->IsModuleExists(mainIt->address))
+                        {
+                            moduleManager->AnalyzeRegisteredModule(mainIt->address, reader.get(), mainIt->name, 0);
+                        }
+                        else
+                        {
+                            moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
+                        }
                         item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
+                        // the analysis rewrites the names of the module and of its dependencies
+                        for (const auto& mod : modules)
+                        {
+                            item->InvalidateNames(mod.address);
+                        }
                     }
                 }
             }
             catch (const std::exception& e)
             {
-                oui::LogOutput(oui::LogFlags::Error, e.what());
+                WriteLog(oui::String(Utf8ToPlatformString(e.what())));
             }
 
             Cleanup(itemId);
@@ -188,6 +205,7 @@ namespace orthia
             }
             if (mainIt->flags & ModuleInfo::flags_analyzePrivateDone)
             {
+                Cleanup(itemId);
                 return;
             }
             if (!(mainIt->flags & ModuleInfo::flags_symbolsLoaded))
@@ -209,9 +227,7 @@ namespace orthia
                             break;
                         for (const auto& info : page)
                             hints.push_back(info.address);
-                        key.flags |= NameSelectionKey::flags_ContinueFrom;
-                        key.address = page.back().address;
-                        key.continueMarkNameFlag = page.back().flags;
+                        key.offset += (int)page.size();
                     }
                 }
 
@@ -224,6 +240,7 @@ namespace orthia
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols")), mainIt->name));
 
                         moduleManager->ReloadModuleWithHints(mainIt->address, reader.get(), mainIt->name, 0, hints);
+                        item->InvalidateNames(mainIt->address);
                         item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzePrivateDone, 0);
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-private-symbols-done")), mainIt->name));
                     }
@@ -231,7 +248,7 @@ namespace orthia
             }
             catch (const std::exception& e)
             {
-                oui::LogOutput(oui::LogFlags::Error, e.what());
+                WriteLog(oui::String(Utf8ToPlatformString(e.what())));
             }
 
             Cleanup(itemId);
@@ -324,6 +341,8 @@ namespace orthia
                             storage->Store(mod.address, std::move(syms));
                         else
                             syms.FlushToDB(mod.address, db);
+                        // OnModuleSymbolsLoaded came with the first symbol, before they were stored
+                        item->InvalidateNames(mod.address);
                     }
                     if (onProgress)
                     {
@@ -332,7 +351,7 @@ namespace orthia
                 }
                 catch (const std::exception& e)
                 {
-                    oui::LogOutput(oui::LogFlags::Error, e.what());
+                    WriteLog(oui::String(Utf8ToPlatformString(e.what())));
                 }
             }
 

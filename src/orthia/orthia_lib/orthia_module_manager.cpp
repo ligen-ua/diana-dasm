@@ -97,6 +97,41 @@ void CModuleManager::ReloadModule(Address_type offset,
     }
 }
 
+void CModuleManager::RegisterModule(Address_type offset,
+                                    IMemoryReader * pMemoryReader,
+                                    const orthia::PlatformString_type & name)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    // header only: the size must match what AnalyzeRegisteredModule saves later
+    CDianaModule module;
+    module.Init(offset, pMemoryReader);
+
+    auto classicDatabase = QueryDatabaseManager()->GetClassicDatabase();
+    CAutoRollbackClassicDatabase rollback;
+    classicDatabase->StartSaveModule(offset, module.GetModuleSize(), name, &rollback, true);
+    classicDatabase->DoneSave();
+    rollback.Reset();
+}
+
+void CModuleManager::AnalyzeRegisteredModule(Address_type offset,
+                                             IMemoryReader * pMemoryReader,
+                                             const orthia::PlatformString_type & name,
+                                             int analyserFlags)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    CDianaModule module;
+    module.Init(offset, pMemoryReader);
+    module.Analyze(analyserFlags);
+
+    // Neither UnloadModule nor replacing the tbl_modules row: tbl_metainfo (exports,
+    // private symbols, module flags) is ON DELETE CASCADE from it. Only missing
+    // references are added, so running it on an analyzed module is harmless.
+    CDatabaseSaver fileSaver;
+    fileSaver.SaveWithDedup(module, *QueryDatabaseManager(), name);
+}
+
 void CModuleManager::ReloadModuleWithHints(Address_type offset,
                                            IMemoryReader * pMemoryReader,
                                            const orthia::PlatformString_type & name,

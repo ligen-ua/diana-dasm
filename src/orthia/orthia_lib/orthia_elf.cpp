@@ -220,6 +220,45 @@ namespace orthia
             0);
         return result;
     }
+    bool CSimpleElfFile::WriteImage(DI_UINT64 address, const void* pData, size_t size)
+    {
+        if (!pData || address < m_imageBase)
+            return false;
+        const DI_UINT64 offset = address - m_imageBase;
+        if (offset > m_mappedElfFile.size() || size > m_mappedElfFile.size() - offset)
+            return false;
+        memcpy(m_mappedElfFile.data() + offset, pData, size);
+        return true;
+    }
+    int CSimpleElfFile::QueryBuildId(std::vector<DI_UINT8>& buildId) const
+    {
+        buildId.clear();
+        if (m_mappedElfFile.empty() || !m_dianaContext)
+            return DI_ERROR;
+
+        // module-mode stream rooted at the image start, like QueryExports
+        SimpleElfFileStreamWithContext stream;
+        Diana_InitMemoryStreamEx2(&stream,
+            const_cast<char*>(m_mappedElfFile.data()),
+            m_mappedElfFile.size(),
+            0,
+            0);
+        stream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+        stream.elf = const_cast<CSimpleElfFile*>(this);
+
+        DI_UINT8 buffer[256] = { 0, };
+        DI_UINT32 buildIdSize = 0;
+        int error = DianaElfFile_QueryBuildId(const_cast<Diana_ElfFile*>(&m_dianaContext->mappedElf),
+            &stream.parent.parent,
+            0,
+            buffer,
+            sizeof(buffer),
+            &buildIdSize);
+        if (error)
+            return error;
+        buildId.assign(buffer, buffer + buildIdSize);
+        return DI_SUCCESS;
+    }
     int CSimpleElfFile::QueryExports(diana::CBasePeLinkImportsObserver* observer)
     {
         if (m_mappedElfFile.empty() || !m_dianaContext)

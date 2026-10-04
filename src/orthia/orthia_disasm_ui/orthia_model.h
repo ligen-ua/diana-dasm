@@ -71,6 +71,8 @@ namespace orthia
         bool SetActiveItem(int uid);
         bool RemoveItem(int uid);
         int QueryWorkspaceItems(std::vector<WorkplaceItem>& items) const;
+        // database folder -> short name of the item that has it open
+        std::map<PlatformString_type, PlatformString_type> QueryOpenDatabaseFolders() const;
         bool QueryActiveWorkspaceItem(WorkplaceItem& item) const;
         void SetUILog(std::shared_ptr<IUILogInterface> uiLog);
         std::shared_ptr<IWorkPlaceItem> GetItem(int uid);

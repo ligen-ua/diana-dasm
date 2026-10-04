@@ -28,5 +28,13 @@ namespace orthia
     class CFile;
     std::vector<char> CalcSha1(CFile& file, std::shared_ptr<oui::BaseOperation> completeHandler);
 
+    // The directory of a file with its trailing slash, without the Win32 "\\?\" prefix;
+    // empty when the name has no directory part.
+    oui::String DirectoryOfFile(const oui::String& fullName);
+
+    // For display: "\\?\C:\x" -> "C:\x", "\\?\UNC\srv\x" -> "\\srv\x". The stored name keeps
+    // the prefix, file access needs it for long paths.
+    PlatformString_type StripLongPathPrefix(const PlatformString_type& fullName);
+
 
 }

@@ -217,6 +217,32 @@ static void test_expressions_names2()
     }
 }
 
+static void test_expressions_names_with_dash()
+{
+    auto resolver = std::make_shared< orthia::MapNameResolver>();
+    resolver->names[ORTHIA_TCSTR("a-b.dll!f")] = 0x100;
+    resolver->names[ORTHIA_TCSTR("a-b")] = 0x2000;
+    resolver->names[ORTHIA_TCSTR("e-1")] = 0x3000;
+    resolver->names[ORTHIA_TCSTR("t2")] = 0x2;
+
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b.dll!f"), resolver) == 0x100);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b.dll!f - 1"), resolver) == 0xff);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b.dll!f-t2"), resolver) == 0xfe);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b"), resolver) == 0x2000);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-b+10"), resolver) == 0x2010);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("t2-a-b"), resolver) == 0x2 - 0x2000);
+    // starts with a hex char, but a known name is not a number
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("e-1"), resolver) == 0x3000);
+    // without a known dashed name '-' is still a subtraction
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("t2-1"), resolver) == 1);
+    DIANA_TEST_ASSERT(orthia::CaptureAddressExp(ORTHIA_TCSTR("e-2"), resolver) == 0xc);
+    // a known name must end on a name boundary: 0xa - "bx"
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("a-bx"), resolver), orthia::NameNotFound);
+
+    auto range = orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("a-b.dll!f L2"), resolver);
+    DIANA_TEST_ASSERT(range.address == 0x100 && range.length == 2);
+}
+
 static void test_expressions_invalid()
 {
     auto resolver = std::make_shared< orthia::MapNameResolver>();
@@ -277,6 +303,69 @@ static void test_expressions_invalid()
     {
         DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("FS::[7FF769486040h]"), resolver), orthia::TokenError);
     }
+    {
+        // a plain expression never accepts a length
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("1 L4"), resolver), orthia::TokenError);
+    }
+}
+
+static void test_expressions_range()
+{
+    auto resolver = std::make_shared< orthia::MapNameResolver>();
+    resolver->names[ORTHIA_TCSTR("t1")] = 0x5000;
+    resolver->names[ORTHIA_TCSTR("x3")] = 0x3;
+    resolver->names[ORTHIA_TCSTR("lstrlenA")] = 0x6000;
+    resolver->names[ORTHIA_TCSTR("LdrLoadDll")] = 0x7000;
+    resolver->names[ORTHIA_TCSTR("kernel32!lstrlenA")] = 0x8000;
+    resolver->addresses[0x7FF769486040] = 0x9000;
+
+    auto check = [&](const orthia::PlatformString_type& text, orthia::Address_type address, std::optional<orthia::Address_type> length) {
+        auto range = orthia::CaptureAddressRangeExp(text, resolver);
+        DIANA_TEST_ASSERT(range.address == address);
+        DIANA_TEST_ASSERT(range.length == length);
+    };
+    check(ORTHIA_TCSTR("1000"), 0x1000, std::nullopt);
+    check(ORTHIA_TCSTR("1000 L4"), 0x1000, 4);
+    check(ORTHIA_TCSTR("1000 l4"), 0x1000, 4);
+    check(ORTHIA_TCSTR("1000 L 4"), 0x1000, 4);
+    check(ORTHIA_TCSTR("1000 l 4"), 0x1000, 4);
+    check(ORTHIA_TCSTR("1000 L10"), 0x1000, 0x10);
+    check(ORTHIA_TCSTR("1000 l(2*4)"), 0x1000, 8);
+    check(ORTHIA_TCSTR("1000 L0n10"), 0x1000, 10);
+    check(ORTHIA_TCSTR("1000 l4+1"), 0x1000, 5);
+    check(ORTHIA_TCSTR("1000 L x3 * 2"), 0x1000, 6);
+    check(ORTHIA_TCSTR("t1 lx3"), 0x5000, 3);
+    check(ORTHIA_TCSTR("t1+10 l4"), 0x5010, 4);
+    check(ORTHIA_TCSTR("(1+2) L4"), 3, 4);
+    check(ORTHIA_TCSTR("2*(1+2) L4"), 6, 4);
+    check(ORTHIA_TCSTR("poi(7FF769486040h) l2"), 0x9000, 2);
+    check(ORTHIA_TCSTR("DS:[7FF769486040h] l2"), 0x7FF769486040, 2);
+    check(ORTHIA_TCSTR("fffff806`b1458a9e l2"), 0xfffff806b1458a9eULL, 2);
+
+    // names that start with L are symbols, not lengths
+    check(ORTHIA_TCSTR("lstrlenA"), 0x6000, std::nullopt);
+    check(ORTHIA_TCSTR("LdrLoadDll"), 0x7000, std::nullopt);
+    check(ORTHIA_TCSTR("LdrLoadDll l2"), 0x7000, 2);
+    check(ORTHIA_TCSTR("kernel32!lstrlenA L2"), 0x8000, 2);
+
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR(""), resolver), orthia::NoTokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("L4"), resolver), orthia::NameNotFound);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("1000 L"), resolver), orthia::NoTokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("1000 L4 5"), resolver), orthia::TokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("1000 L4 l5"), resolver), orthia::TokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("1000 X4"), resolver), orthia::TokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("1000 5"), resolver), orthia::TokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("(1 L4)"), resolver), orthia::TokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("(1 L4"), resolver), orthia::NoTokenError);
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("poi(1 L4)"), resolver), orthia::TokenError);
+    for (auto text : { ORTHIA_TCSTR("1000 L?4"), ORTHIA_TCSTR("1000 L-4"), ORTHIA_TCSTR("1000 l -4"), ORTHIA_TCSTR("1000 l-x3") })
+    {
+        DIANA_TEST_EXCEPTION2(orthia::CaptureAddressRangeExp(text, resolver), const std::runtime_error& e)
+        {
+            DIANA_TEST_ASSERT(std::string(e.what()).find("not supported") != std::string::npos);
+        }
+    }
+    DIANA_TEST_EXCEPTION(orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("1000 L(4"), resolver), orthia::NoTokenError);
 }
 static void test_expressions_segment_prefix()
 {
@@ -319,7 +408,39 @@ static void test_expressions_poi()
         DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h, )"), resolver), orthia::TokenError);
     }
     {
-        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h, 1)"), resolver), std::exception);
+        DIANA_TEST_EXCEPTION2(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h, 1)"), resolver), const std::runtime_error& e)
+        {
+            DIANA_TEST_ASSERT(std::string(e.what()).find("expects 1 argument") != std::string::npos);
+        }
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi"), resolver), orthia::NoTokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi("), resolver), orthia::NoTokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h,"), resolver), orthia::NoTokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi()"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(,1)"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h,,1)"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h))"), resolver), orthia::TokenError);
+    }
+    {
+        DIANA_TEST_EXCEPTION(orthia::CaptureAddressExp(ORTHIA_TCSTR("poi(7FF769486040h)(1)"), resolver), orthia::TokenError);
+    }
+    {
+        auto range = orthia::CaptureAddressRangeExp(ORTHIA_TCSTR("poi(7FF769486040h) L4"), resolver);
+        DIANA_TEST_ASSERT(range.address == 0xfffff806b1458a9e);
+        DIANA_TEST_ASSERT(range.length == 4);
     }
 
 }
@@ -330,8 +451,10 @@ void test_expressions()
     DIANA_TEST(test_expressions_segment_prefix());
     DIANA_TEST(test_expressions_names());
     DIANA_TEST(test_expressions_names2());
+    DIANA_TEST(test_expressions_names_with_dash());
     DIANA_TEST(test_expressions_mult());
     DIANA_TEST(test_expressions_address());
     DIANA_TEST(test_expressions_summ());
     DIANA_TEST(test_expressions_invalid());
+    DIANA_TEST(test_expressions_range());
 }

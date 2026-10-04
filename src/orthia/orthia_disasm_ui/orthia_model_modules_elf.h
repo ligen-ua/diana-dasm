@@ -5,6 +5,7 @@
 #include "oui_filesystem.h"
 #include "orthia_elf.h"
 #include "orthia_model.h"
+#include "orthia_image_identity.h"
 
 namespace orthia
 {
@@ -16,10 +17,17 @@ namespace orthia
             bool originalFile = false;
             oui::String fullName;
             std::unordered_map<Address_type, orthia::NameInfo> names;
+            // the range the module occupies: an unresolved dependency has no image, but still
+            // gets a range of its own, so every module keeps a unique address
+            Address_type base = 0;
+            Address_type size = 0;
+            bool unresolved = false;
+            ImageIdentity identity;
         };
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
+        oui::String m_exeDirectory;   // searched first, like the dynamic loader's rpath of the binary
         std::shared_ptr<oui::IFileSystem> m_pFs;
         std::shared_ptr<oui::BaseOperation> m_operation;
 
@@ -30,8 +38,10 @@ namespace orthia
         bool CheckConflicts(std::shared_ptr<CSimpleElfFile> elfFile);
         void RelocateModule(std::shared_ptr<CSimpleElfFile> elfFile);
         OPERAND_SIZE GetLastPossibleAddress();
+        Address_type ReserveSpace(OPERAND_SIZE size);
         ModuleIterator LoadModule(const std::string& libName);
         ModuleIterator LoadModuleImpl(const std::string& libName);
+        ModuleIterator InsertUnresolved(const std::string& libName);
 
         void CheckCancel();
         void LoadExports(ModuleInfo& mod);

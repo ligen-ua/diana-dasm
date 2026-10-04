@@ -119,16 +119,17 @@ long long CVMDatabase::AddNewVM(const orthia::PlatformString_type & name,
 void CVMDatabase::DelVM(long long id)
 {
     CSQLTransaction transaction;
+    // children first: tbl_vm_modules references tbl_vm_vms without ON DELETE CASCADE
+    {
+        CSQLAutoReset autoStatement(m_stmtDeleteAllModulesOfVM.Get());
+        SQLBindInt64(m_stmtDeleteAllModulesOfVM.Get(), id, 1);
+        SQLExecute(m_stmtDeleteAllModulesOfVM.Get());
+    }
     {
         CSQLAutoReset autoStatement(m_stmtDeleteVM.Get());
         SQLBindInt64(m_stmtDeleteVM.Get(), id, 1);
         SQLExecute(m_stmtDeleteVM.Get());
     }
-    {
-        CSQLAutoReset autoStatement(m_stmtDeleteAllModulesOfVM.Get());
-        SQLBindInt64(m_stmtDeleteAllModulesOfVM.Get(), id, 1);
-        SQLExecute(m_stmtDeleteAllModulesOfVM.Get());
-    }    
 }
 static void InternalReadFields(CSQLStatement & statement, VmInfo * pInfo)
 {

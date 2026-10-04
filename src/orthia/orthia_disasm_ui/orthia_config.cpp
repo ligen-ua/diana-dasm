@@ -1,46 +1,7 @@
 #include "orthia_config.h"
 #include "orthia_model.h"
-#include <filesystem>
-#include <chrono>
-
-namespace fs = std::filesystem;
-
-static void CleanupOldProcFolders(const orthia::PlatformString_type& procFolderWithSlash)
-{
-    const auto threshold = std::chrono::hours(48);
-    const auto now = fs::file_time_type::clock::now();
-
-    std::error_code ec;
-    for (const auto& entry : fs::directory_iterator(fs::path(procFolderWithSlash), ec))
-    {
-        std::error_code ec2;
-        if (!entry.is_directory(ec2))
-            continue;
-
-        auto newestTime = fs::file_time_type::min();
-        std::error_code ec3;
-        for (const auto& fileEntry : fs::directory_iterator(entry.path(), ec3))
-        {
-            std::error_code ec4;
-            auto wt = fs::last_write_time(fileEntry, ec4);
-            if (!ec4 && wt > newestTime)
-                newestTime = wt;
-        }
-
-        if (newestTime == fs::file_time_type::min())
-        {
-            newestTime = fs::last_write_time(entry, ec2);
-            if (ec2)
-                continue;
-        }
-
-        if (newestTime < now && ((now - newestTime) > threshold))
-        {
-            std::error_code ec5;
-            fs::remove_all(entry.path(), ec5);
-        }
-    }
-}
+#include "orthia_databases.h"
+#include <stdlib.h>
 
 namespace orthia
 {
@@ -48,18 +9,43 @@ namespace orthia
     const PlatformString_type g_nextDB = ORTHIA_TCSTR("db");
     const PlatformString_type g_binFolder = ORTHIA_TCSTR("bin");
     const PlatformString_type g_nextProc = ORTHIA_TCSTR("proc");
+    static PlatformString_type QueryEnvironmentString(const PlatformString_type::value_type* name)
+    {
+#ifdef DIANA_HAS_WIN32
+        wchar_t* value = nullptr;
+        size_t size = 0;
+        if (_wdupenv_s(&value, &size, name) || !value)
+        {
+            return PlatformString_type();
+        }
+        PlatformString_type text(value);
+        free(value);
+        return text;
+#else
+        const char* value = getenv(name);
+        return PlatformString_type(value ? value : "");
+#endif
+    }
     void CConfigOptionsStorage::Init()
     {
-        auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
-        PlatformString_type appDataFolder;
-        int error = GetAppDataFolderWithSlash_Silent(appDataFolder);
-        if (error)
+        // ORTHIA_HOME replaces the whole <app data>/Orthia folder (used by tests to isolate the databases)
+        auto orthiaHome = QueryEnvironmentString(ORTHIA_TCSTR("ORTHIA_HOME"));
+        if (!orthiaHome.empty())
         {
-            auto text = errorNode->QueryValue(ORTHIA_TCSTR("cant-open-file"));
-            throw orthia::CWin32Exception(PlatformStringToUtf8(text), error);
+            m_appDir = AddSlash2(orthiaHome);
         }
-
-        m_appDir = appDataFolder + AddSlash2(g_rootFolderName);
+        else
+        {
+            auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+            PlatformString_type appDataFolder;
+            int error = GetAppDataFolderWithSlash_Silent(appDataFolder);
+            if (error)
+            {
+                auto text = errorNode->QueryValue(ORTHIA_TCSTR("cant-open-file"));
+                throw orthia::CWin32Exception(PlatformStringToUtf8(text), error);
+            }
+            m_appDir = appDataFolder + AddSlash2(g_rootFolderName);
+        }
         m_dbDir = m_appDir + AddSlash2(g_nextDB);
         m_procDBDir = m_appDir + AddSlash2(g_nextProc);
         m_binDir = m_appDir + AddSlash2(g_binFolder);
@@ -67,14 +53,21 @@ namespace orthia
         orthia::CreateAllDirectoriesForFile(m_dbDir);
         orthia::CreateAllDirectoriesForFile(m_binDir);
         orthia::CreateAllDirectoriesForFile(m_procDBDir);
-        CleanupOldProcFolders(m_procDBDir);
+        CleanupExpiredProcFolders(m_procDBDir);
 
+        // ORTHIA_SYMBOL_PATH replaces the default symbol folders, same format as .symfix
+        auto symbolPath = QueryEnvironmentString(ORTHIA_TCSTR("ORTHIA_SYMBOL_PATH"));
+        if (!symbolPath.empty())
+        {
+            SetSymbolsFolders(symbolPath);
+            return;
+        }
 #ifdef DIANA_HAS_WIN32
         m_symbolFolders.push_back(L"C:\\Sym");
         m_symbolFolders.push_back(L"C:\\Symbols");
 #else
-        m_symbolFolders.push_back("~/sym");
-        m_symbolFolders.push_back("~/symbols");
+        m_symbolFolders.push_back(ExpandHomeFolder("~/sym", QueryEnvironmentString("HOME")));
+        m_symbolFolders.push_back(ExpandHomeFolder("~/symbols", QueryEnvironmentString("HOME")));
 #endif
     }
     PlatformString_type CConfigOptionsStorage::GetReadmeFileName() const
@@ -103,14 +96,46 @@ namespace orthia
     {
         return m_procDBDir;
     }
+    PlatformString_type CConfigOptionsStorage::GetDataFolder() const
+    {
+        return m_appDir;
+    }
     PlatformString_type CConfigOptionsStorage::GetBinFolder() const
     {
         return m_binDir;
     }
 
+    PlatformString_type ExpandHomeFolder(const PlatformString_type& path, const PlatformString_type& home)
+    {
+#ifdef DIANA_HAS_WIN32
+        (void)home;
+        return path;
+#else
+        // only "~" and "~/...": "~user" would need a passwd lookup
+        if (home.empty() || path.empty() || path[0] != '~' || (path.size() > 1 && path[1] != '/'))
+        {
+            return path;
+        }
+        PlatformString_type result = home;
+        while (!result.empty() && result.back() == '/')
+        {
+            result.pop_back();
+        }
+        if (path.size() == 1)
+        {
+            return result.empty() ? PlatformString_type("/") : result;
+        }
+        return result + path.substr(1);
+#endif
+    }
     void CConfigOptionsStorage::SetSymbolsFolders(const PlatformString_type& names)
     {
         orthia::SplitStringWithoutWhitespace(names, orthia::StringInfo(ORTHIA_TCSTR(";")), &m_symbolFolders);
+        const auto home = QueryEnvironmentString(ORTHIA_TCSTR("HOME"));
+        for (auto& folder : m_symbolFolders)
+        {
+            folder = ExpandHomeFolder(folder, home);
+        }
     }
     std::vector<PlatformString_type> CConfigOptionsStorage::GetSymbolsFolders() const
     {

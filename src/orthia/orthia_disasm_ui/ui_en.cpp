@@ -47,6 +47,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("name"), ORTHIA_TCSTR("Name"))
         << textManager->RegisterValue(ORTHIA_TCSTR("address"), ORTHIA_TCSTR("Address"))
         << textManager->RegisterValue(ORTHIA_TCSTR("mapped-size"), ORTHIA_TCSTR("Size"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("status"), ORTHIA_TCSTR("Status"))
         << textManager->RegisterValue(ORTHIA_TCSTR("full-path"), ORTHIA_TCSTR("Path"))
         ;
     // names
@@ -89,6 +90,11 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.modules.contextmenu"))
         << textManager->RegisterValue(ORTHIA_TCSTR("show_sections"), ORTHIA_TCSTR("Show &Sections"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.panels.names.contextmenu"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("sort_by_type"),    ORTHIA_TCSTR("Sort by &Type"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("sort_by_name"),    ORTHIA_TCSTR("Sort by &Name"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("sort_by_address"), ORTHIA_TCSTR("Sort by &Address"))
         ;
 
     // workspace
@@ -158,6 +164,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("analyzing-private-symbols"), ORTHIA_TCSTR("Analyzing private symbols: \"%1\" ..."))
         << textManager->RegisterValue(ORTHIA_TCSTR("analyzing-private-symbols-done"), ORTHIA_TCSTR("Private symbols analysis complete: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("symbols-mismatch"), ORTHIA_TCSTR("Symbol file mismatched: \"%1\" ..."))
+        << textManager->RegisterValue(ORTHIA_TCSTR("symbols-elf-unsupported"), ORTHIA_TCSTR("Symbols for \"%1\": ELF symbol loading is not supported yet"))
         << textManager->RegisterValue(ORTHIA_TCSTR("done-opened"), ORTHIA_TCSTR("Opened Successfully"))
         << textManager->RegisterValue(ORTHIA_TCSTR("module-sha1"), ORTHIA_TCSTR("SHA1: %1"))
         << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: \"%1\""))

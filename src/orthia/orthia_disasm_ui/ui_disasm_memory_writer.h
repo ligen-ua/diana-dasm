@@ -28,6 +28,12 @@ namespace oui
         size_t offset = 0;
         int size = 0;
     };
+    // what the printer's limit counts: screen lines (annotations included) or instructions only
+    enum class LimitKind
+    {
+        Lines,
+        Instructions
+    };
     class MemoryPrinter:public orthia::CSubrangeMemoryPrinter<diana::CMasmString>
     {
     protected:
@@ -47,7 +53,9 @@ namespace oui
         oui::LineIndex m_startAddress;
         oui::LineIndex m_endAddress;
         bool m_haveEndAddress = false;
+        oui::LineIndex m_stopAddress;
         orthia::IMarkupCache* m_referencesCache = nullptr;
+        const LimitKind m_limitKind;
 
         void PackCommand(const orthia::PlatformString_type& command, std::shared_ptr<DisasmLineContextTag> tag);
         Diana_LinkedAdditionalGroupInfo* GetLinkedInfo();
@@ -55,7 +63,8 @@ namespace oui
         MemoryPrinter(DisasmWriter* pTextPrinter,
             int dianaMode,
             const oui::LineIndex & startAddress,
-            orthia::Address_type sizeInCommands,
+            orthia::Address_type limit,
+            LimitKind limitKind,
             std::shared_ptr<orthia::IWorkPlaceItem> workspaceItem);
 
         void SetEndAddress(const oui::LineIndex& endAddress);
@@ -85,6 +94,9 @@ namespace oui
             bool* pPrint,
             bool* pExit) override;
         oui::LineIndex GetRealFirstAddress() const;
+        // where the last OnStream stopped, and how many commands have been printed so far
+        oui::LineIndex GetStopAddress() const { return m_stopAddress; }
+        orthia::Address_type GetPrintedCommands() const { return m_currentCommand; }
     };
 
 }

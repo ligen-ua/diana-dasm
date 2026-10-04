@@ -32,4 +32,9 @@ namespace oui
     {
         return m_fsImpl->SyncOpenProcess(procId);
     }
+
+    std::tuple<int, String> CProcessSystem::SyncQueryProcessName(unsigned long long pid)
+    {
+        return m_fsImpl->SyncQueryProcessName(pid);
+    }
 }

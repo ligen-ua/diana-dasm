@@ -191,6 +191,21 @@ namespace orthia
         return activePos;
     }
 
+    std::map<PlatformString_type, PlatformString_type> CProgramModel::QueryOpenDatabaseFolders() const
+    {
+        std::map<PlatformString_type, PlatformString_type> result;
+        std::unique_lock<std::mutex> lockGuard(m_lock);
+        for (const auto& item : m_items)
+        {
+            auto folder = item.second->GetDatabaseFolder();
+            if (!folder.empty())
+            {
+                result[folder] = item.second->GetShortName().native;
+            }
+        }
+        return result;
+    }
+
     int CProgramModel::RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive)
     {
         int newItemId = 0;
@@ -298,7 +313,7 @@ namespace orthia
 
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
-        if (auto address = info->GerProcessModuleAddress())
+        if (auto address = info->GetMainModuleAddress())
         {
             auto rangeInfo = info->GetRangeInfo(address);
             auto addressToStart = std::max(rangeInfo.entryPoint, rangeInfo.address);
@@ -311,7 +326,7 @@ namespace orthia
         // OK
         result.error.native.clear();
 
-        EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GerProcessModuleAddress(), info);
+        EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GetMainModuleAddress(), info);
     }
     void CProgramModel::NotifyWorkspaceDataRefreshed(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId)
     {
@@ -333,6 +348,11 @@ namespace orthia
         Address_type mainAddr,
         std::shared_ptr<CProcessWorkplaceItem> procItem)
     {
+        if (!m_config->GetDeepAnalysis())
+        {
+            // quick open (--cmd without --analyze): .analyze and .reload still work on demand
+            return;
+        }
         if (procItem)
         {
             // Phase 1 (process only): disassemble the main module and log a completion message.
@@ -367,6 +387,20 @@ namespace orthia
                 NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
             },
             procItem ? Address_type{0} : mainAddr);
+    }
+
+    static bool IsModuleAnalyzed(const std::shared_ptr<IWorkPlaceItem>& item, Address_type moduleAddress)
+    {
+        std::vector<ModuleInfo> modules;
+        item->GetModules(modules);
+        for (const auto& mod : modules)
+        {
+            if (mod.address == moduleAddress)
+            {
+                return (mod.flags & ModuleInfo::flags_analyzeDone) != 0;
+            }
+        }
+        return false;
     }
 
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
@@ -482,6 +516,8 @@ namespace orthia
             persistentItemStorage->CPersistentItemStorage::Init(info);
 
             info->fullName = file->GetFullFileName();
+            info->databaseFolder = dbFolder;
+            EraseLastSlash(info->databaseFolder);
             info->file = mappedExe;
             {
                 oui::String shortName;
@@ -518,11 +554,13 @@ namespace orthia
 
             CMemoryReaderOnLoadedData reader(info->file->GetImageBase(), mappedFile.data(), mappedFile.size());
 
-            bool firstOpen = false;
-            if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->file->GetImageBase()))
+            const Address_type imageBase = info->file->GetImageBase();
+            const bool deepAnalysis = m_config->GetDeepAnalysis();
+            const bool firstOpen = !info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(imageBase);
+            const bool needsAnalysis = deepAnalysis && (firstOpen || !IsModuleAnalyzed(info, imageBase));
+            if (firstOpen || needsAnalysis)
             {
-                firstOpen = true;
-                // first open, warn user it may take quite a time
+                // warn user it may take quite a time
                 WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
             }
 
@@ -532,23 +570,46 @@ namespace orthia
                     orthia::CImportsLoader importsLoader(executableType, completeHandler);
                     importsLoader.LoadModules(file->GetFullFileName(), mappedExe, file->GetFileSystem());
 
-                    info->moduleManager->ReloadModule(info->file->GetImageBase(),
-                        &reader,
-                        false,
-                        info->shortName.native,
-                        0);
+                    if (deepAnalysis)
+                    {
+                        info->moduleManager->ReloadModule(imageBase,
+                            &reader,
+                            false,
+                            info->shortName.native,
+                            0);
+                    }
+                    else
+                    {
+                        info->moduleManager->RegisterModule(imageBase, &reader, info->shortName.native);
+                    }
 
                     importsLoader.ReportModules(info->moduleManager);
                 }
                 const int builtInTypeFlag =
                     (executableType == DIANA_EXECUTABLE_TYPE_ELF) ? ModuleInfo::builtInFlags_moduleTypeElf :
                     (executableType == DIANA_EXECUTABLE_TYPE_PE)  ? ModuleInfo::builtInFlags_moduleTypePe : 0;
+                ModuleSourceMeta source;
+                // PE only: the ELF GOT slot keys are not verified for the replay yet
+                source.iatSlots = (executableType == DIANA_EXECUTABLE_TYPE_PE);
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
-                    info->file->GetImageBase(),
+                    imageBase,
                     info->fullName.native,
-                    ModuleInfo::flags_analyzeDone,
-                    builtInTypeFlag);
+                    deepAnalysis ? ModuleInfo::flags_analyzeDone : 0,
+                    builtInTypeFlag,
+                    &source);
             }
+            else
+            {
+                // the dependencies are not loaded again: the linked IAT comes from the database
+                info->ApplyLinkedImports();
+                if (needsAnalysis)
+                {
+                    // opened before without --analyze
+                    info->moduleManager->AnalyzeRegisteredModule(imageBase, &reader, info->shortName.native, 0);
+                    info->UpdateModuleFlags(imageBase, ModuleInfo::flags_analyzeDone, 0);
+                }
+            }
+            info->InitImageSources(executableType);
 
             auto workspaceId = RegisterItem(info, false);
             result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
@@ -750,6 +811,8 @@ namespace orthia
             persistentItemStorage->CPersistentItemStorage::Init(info);
 
             info->fullName = file->GetFullFileName();
+            info->databaseFolder = dbFolder;
+            EraseLastSlash(info->databaseFolder);
             info->file = mappedExe;
             {
                 oui::String shortName;
@@ -791,6 +854,7 @@ namespace orthia
                     ModuleInfo::flags_analyzeDone,
                     0);
             }
+            info->InitImageSources(DIANA_EXECUTABLE_TYPE_NONE);
 
             auto workspaceId = RegisterItem(info, false);
             result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);

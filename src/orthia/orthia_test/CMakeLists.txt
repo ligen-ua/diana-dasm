@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(orthia_test LANGUAGES CXX)
 
 
@@ -19,6 +19,8 @@ ot_vm_test.cpp
 ot_memory_manager.cpp  
 ot_utils.cpp
 ot_elf_test.cpp
+ot_image_identity_test.cpp
+ot_sections_test.cpp
 )
 
 add_executable(${PROJECT_NAME} 

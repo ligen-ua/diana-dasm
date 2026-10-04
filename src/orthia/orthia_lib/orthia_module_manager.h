@@ -31,6 +31,15 @@ public:
                       bool bForce,
                       const orthia::PlatformString_type & name,
                       int analyserFlags);
+    // registers the module row without code analysis (quick open)
+    void RegisterModule(Address_type offset,
+                        IMemoryReader * pMemoryReader,
+                        const orthia::PlatformString_type & name);
+    // analyzes a module registered earlier and adds its references, keeping its metainfo
+    void AnalyzeRegisteredModule(Address_type offset,
+                                 IMemoryReader * pMemoryReader,
+                                 const orthia::PlatformString_type & name,
+                                 int analyserFlags);
     void ReloadModuleWithHints(Address_type offset,
                                IMemoryReader * pMemoryReader,
                                const orthia::PlatformString_type & name,

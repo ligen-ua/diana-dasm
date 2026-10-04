@@ -11,16 +11,66 @@ extern "C"
 #include "diana_processor/diana_processor_core.h"
 }
 #include "orthia_files.h"
+#include "console_mode.h"
+#include "ui_help.h"
+#include "orthia_version.h"
+#include "oui_privileges_posix.h"
 #include <unistd.h>
 
-orthia::intrusive_ptr<orthia::CTextManager> g_textManager;
-void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager);
 int RunTests();
 
-static void PrintUsage()
+static std::string GetProgramName(const char* argv0)
 {
-    std::cout << "Usage: [--run-tests]\n";
-    std::cout << "       --pid <pid-to-open>\n";
+    if (!argv0 || !*argv0)
+    {
+        return "orthia";
+    }
+    const char* slash = strrchr(argv0, '/');
+    return slash ? slash + 1 : argv0;
+}
+
+static void PrintUsage(std::ostream& out, const std::string& programName)
+{
+    out << "Usage: " << programName << " [options]\n";
+    out << "\n";
+    out << "Options:\n";
+    out << "  --file <filename> open the given executable file\n";
+    out << "  --pid <pid>       open the process with the given id (\"self\" for this process)\n";
+    out << "  --cmd <command>   run <command> without UI and exit\n";
+    out << "                    (repeatable, one command per --cmd, executed in order)\n";
+    out << "  --analyze         with --cmd: deep code analysis and symbol loading on open\n";
+    out << "                    (default: headers, modules, imports and exports only)\n";
+    out << "  --no-sandbox      no privilege drop under sudo and no syscall filter\n";
+    out << "  --run-tests       run the built-in tests and exit\n";
+    out << "  -h, --help        show this help and exit\n";
+    out << "  --version         show the version and exit\n";
+    out << "\n";
+    out << "Without --cmd the UI is started with the given files and processes opened.\n";
+    out << "--file and --pid are repeatable in UI mode, --cmd requires exactly one of them,\n";
+    out << "except for the data folder commands, which run without a target:\n";
+    out << "  " << programName << " --cmd \".database list\"   (also: delete <sha1 prefix|pid|file>, cleanup)\n";
+    out << "\n";
+    out << "Exit codes:\n";
+    out << "  0  success\n";
+    out << "  1  at least one command reported an error\n";
+    out << "  2  bad or incomplete argument, or the UI started without a console\n";
+    out << "  3  target failed to open, or no target given for a command that needs one\n";
+    out << "  4  unexpected error\n";
+    out << "\n";
+    out << "Environment:\n";
+    out << "  ORTHIA_HOME       data folder to use instead of $XDG_DATA_HOME/Orthia\n";
+    out << "  ORTHIA_SYMBOL_PATH symbol folders separated by ';' (default ~/sym;~/symbols)\n";
+    out << "\n";
+    out << "Commands (UI command window and --cmd):\n";
+    for (const auto& line : orthia::GetCommandReference("  "))
+    {
+        out << line << "\n";
+    }
+}
+
+static bool IsHelpSwitch(const char* arg)
+{
+    return strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0;
 }
 
 int main(int argc, const char* argv[])
@@ -31,12 +81,32 @@ int main(int argc, const char* argv[])
     ORTHIA_DEV_LOG(orthia::LogSeverity::Info, "Logging enabled");
 
     std::vector<unsigned long long> processesToOpen;
+    std::vector<std::string> filenamesToOpen;
+    std::vector<std::string> commandsToRun;
+    const std::string programName = GetProgramName(argc > 0 ? argv[0] : nullptr);
+    bool analyze = false;
 
     try
     {
         bool nextIsPid = false;
+        bool nextIsCmd = false;
+        bool nextIsFile = false;
+        bool dropPrivileges = true;
         for (int i = 1; i < argc; ++i)
         {
+            // checked first, so that a value starting with -- is taken as a value
+            if (nextIsCmd)
+            {
+                commandsToRun.push_back(argv[i]);
+                nextIsCmd = false;
+                continue;
+            }
+            if (nextIsFile)
+            {
+                filenamesToOpen.push_back(argv[i]);
+                nextIsFile = false;
+                continue;
+            }
             if (nextIsPid)
             {
                 std::string text = argv[i];
@@ -45,9 +115,12 @@ int main(int argc, const char* argv[])
                 {
                     pid = (unsigned long long)getpid();
                 }
-                else
+                else if (!orthia::ParsePidArgument(text, &pid))
                 {
-                    orthia::StringToObject(text, &pid);
+                    std::cerr << "Invalid value for --pid: " << text
+                              << " (expected a decimal or 0x-prefixed hex number, or \"self\")\n\n";
+                    PrintUsage(std::cerr, programName);
+                    return orthia::consoleExit_Usage;
                 }
                 processesToOpen.push_back(pid);
                 nextIsPid = false;
@@ -62,36 +135,112 @@ int main(int argc, const char* argv[])
                 nextIsPid = true;
                 continue;
             }
+            if (strcmp(argv[i], "--cmd") == 0)
+            {
+                nextIsCmd = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--file") == 0)
+            {
+                nextIsFile = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--analyze") == 0)
+            {
+                // the UI always analyzes, so it only matters with --cmd
+                analyze = true;
+                continue;
+            }
+            // --no-privilege-drop: the old name, kept as an undocumented alias
+            if (strcmp(argv[i], "--no-sandbox") == 0 || strcmp(argv[i], "--no-privilege-drop") == 0)
+            {
+                // keeps full root rights and no sandbox
+                dropPrivileges = false;
+                continue;
+            }
+            if (IsHelpSwitch(argv[i]))
+            {
+                PrintUsage(std::cout, programName);
+                return orthia::consoleExit_Ok;
+            }
+            if (strcmp(argv[i], "--version") == 0)
+            {
+                std::cout << "orthia " ORTHIA_UI_VERSION "\n";
+                return orthia::consoleExit_Ok;
+            }
             if (strncmp(argv[i], "--", 2) == 0)
             {
-                PrintUsage();
-                return 1;
+                std::cerr << "Unknown option: " << argv[i] << "\n\n";
+                PrintUsage(std::cerr, programName);
+                return orthia::consoleExit_Usage;
             }
-            std::cerr << "File mode is not supported in this build\n";
-            return 1;
+            std::cerr << "Unexpected argument: " << argv[i]
+                      << " (use --file <filename> to open a file)\n\n";
+            PrintUsage(std::cerr, programName);
+            return orthia::consoleExit_Usage;
+        }
+        if (nextIsPid || nextIsCmd || nextIsFile)
+        {
+            std::cerr << "Missing value for " << argv[argc - 1] << "\n\n";
+            PrintUsage(std::cerr, programName);
+            return orthia::consoleExit_Usage;
         }
 
-        std::cout << "Welcome to Orthia Disasm\n\n";
-        std::cout.flush();
+        const bool consoleMode = !commandsToRun.empty();
+        if (!consoleMode)
+        {
+            if (!orthia::HasInteractiveConsole())
+            {
+                std::cerr << "The UI needs an interactive console (stdin/stdout are redirected);"
+                             " use --cmd to run commands without the UI\n";
+                return orthia::consoleExit_Usage;
+            }
+            // would pollute the command output otherwise
+            std::cout << "Welcome to Orthia Disasm\n\n";
+            std::cout.flush();
+        }
 
-        g_textManager = new orthia::CTextManager();
-        InitLanguage_EN(g_textManager);
-        oui::EditBox_SetContextMenuLabelsProvider([&]() {
-            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.editbox.contextmenu"));
-            return std::make_tuple(
-                node->QueryValue(ORTHIA_TCSTR("cut")),
-                node->QueryValue(ORTHIA_TCSTR("copy")),
-                node->QueryValue(ORTHIA_TCSTR("paste"))
-            );
-        });
+        if (dropPrivileges)
+        {
+            // before InitAppCore: the data folder is created as the user that ran sudo
+            orthia::DropRootPrivileges();
+        }
+        else if (geteuid() == 0)
+        {
+            std::cerr << "Warning: running with full root rights and no sandbox (--no-sandbox)\n";
+        }
 
-        auto config = std::make_shared<orthia::CConfigOptionsStorage>();
-        config->Init();
+        auto config = orthia::InitAppCore();
 
-        Diana_Init();
-        DianaProcessor_GlobalInit();
+        if (dropPrivileges)
+        {
+            // still before the model starts its threads: both apply to the calling thread only
+            std::vector<std::string> warnings;
+            orthia::ApplySandbox(&warnings);
+            for (const auto& warning : warnings)
+            {
+                // only root runs depend on it
+                if (orthia::GetPrivilegeState().startedAsRoot)
+                {
+                    std::cerr << "Warning: " << warning << "\n";
+                }
+                else
+                {
+                    ORTHIA_DEV_LOG(orthia::LogSeverity::Info, warning);
+                }
+            }
+        }
 
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
+
+        if (consoleMode)
+        {
+            const int result = orthia::RunConsoleMode(programModel,
+                { commandsToRun, filenamesToOpen, processesToOpen, analyze });
+            programModel.reset();
+            return result;
+        }
+
         oui::CConsoleApp app;
 
         auto rootWindow = std::make_shared<CMainWindow>(programModel);
@@ -102,23 +251,13 @@ int main(int argc, const char* argv[])
             programModel->Stop();
         });
 
-        for (auto& pid : processesToOpen)
-        {
-            int platformError = 0;
-            std::shared_ptr<oui::IProcess> process;
-            std::tie(platformError, process) = programModel->GetProcessSystem()->SyncOpenProcess(oui::ProcessUnifiedId(pid));
-            if (!process)
-            {
-                throw orthia::CWin32Exception("Can't open process: " + orthia::ObjectToString_Ansi(pid), platformError);
-            }
-            auto uiName = process->GetFullFileNameForUI();
-            rootWindow->AddInitialArgument({ platformError, uiName, nullptr, process });
-        }
+        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen);
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)
     {
         std::cerr << "Error: " << err.what() << "\n";
+        return orthia::consoleExit_Exception;
     }
     return 0;
 }

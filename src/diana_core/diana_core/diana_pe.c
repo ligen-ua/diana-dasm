@@ -1629,7 +1629,7 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
         int endFound = 0;
         int sizeToUse = 0; 
         int u = 0;
-        for (i = 0; i < pCapturedExportDirectory->NumberOfNames - 1; ++i)
+        for (i = 0; i < pCapturedExportDirectory->NumberOfNames; ++i)
         {
             int k = 0;
             DI_UINT32 functionNameOffset = 0;

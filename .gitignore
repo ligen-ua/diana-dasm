@@ -13,5 +13,9 @@
 /cmake-debug
 /cmake-release
 test_results.log
+/tests/cli/_out
+__pycache__
+.pytest_cache
 lib
 obj
+/data/private

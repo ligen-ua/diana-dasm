@@ -15,7 +15,8 @@ void EnumModulesByName(std::shared_ptr<orthia::IWorkPlaceItem> item,
     std::vector<orthia::ModuleInfo> modules;
     item->GetModules(modules);
 
-    orthia::PlatformString_type text;
+    // the full name, or without its last extension: ntdll.dll -> ntdll, libc.so.6 -> libc.so
+    bool anyMatch = false;
     for (auto& mod : modules)
     {
         auto modDowncased = orthia::Downcase(mod.name);
@@ -34,9 +35,29 @@ void EnumModulesByName(std::shared_ptr<orthia::IWorkPlaceItem> item,
         {
             continue;
         }
+        anyMatch = true;
         if (!handler(mod))
         {
-            break;
+            return;
+        }
+    }
+    if (anyMatch || moduleNameDowncased.find('.') != orthia::PlatformString_type::npos)
+    {
+        return;
+    }
+    // fallback: the name up to the first dot, for versioned ELF names (libc.so.6 -> libc)
+    for (auto& mod : modules)
+    {
+        auto modDowncased = orthia::Downcase(mod.name);
+        auto dot = modDowncased.find('.');
+        if (dot == orthia::PlatformString_type::npos || modDowncased.compare(0, dot, moduleNameDowncased) != 0 ||
+            dot != moduleNameDowncased.size())
+        {
+            continue;
+        }
+        if (!handler(mod))
+        {
+            return;
         }
     }
 }
@@ -49,20 +70,37 @@ NameResolverOverWorkplaceItem::NameResolverOverWorkplaceItem(std::shared_ptr<ort
 orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::PlatformString_type& name)
 {
     auto address = item->QueryAddressByName(name, 0);
-    if (!address)
+    if (address)
     {
-        address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
-        if (address != DI_MAX_OPERAND_SIZE)
-        {
-            return address;
-        }
+        return address;
+    }
+    address = item->QueryAddressByName(name, DI_MAX_OPERAND_SIZE);
+    if (address != DI_MAX_OPERAND_SIZE)
+    {
+        return address;
     }
 
-    // try to find private symbols
+    // try to find module!name among exports and private symbols
     auto nameDowncased = orthia::Downcase(name);
     std::vector<orthia::StringInfo> parts;
     bool addressFound = false;
     orthia::SplitString(nameDowncased, orthia::StringInfo(ORTHIA_TCSTR("!")), &parts);
+    if (parts.size() == 1)
+    {
+        // module name without extension
+        EnumModulesByName(item,
+            nameDowncased,
+            [&address, &addressFound](orthia::ModuleInfo& mod)
+        {
+            address = mod.address;
+            addressFound = true;
+            return false;
+        });
+        if (addressFound)
+        {
+            return address;
+        }
+    }
     if (parts.size() == 2)
     {
         auto internalName = parts[1].ToString();
@@ -73,7 +111,7 @@ orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::P
 
             const int c_pageSize = 5000;
             orthia::NameSelectionKey key;
-            key.privateSymbolsOnly = true;
+            key.excludeImports = true;
             std::vector<orthia::NameInfo> page;
             for (;;)
             {
@@ -91,9 +129,7 @@ orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::P
                         return false;
                     }
                 }
-                key.flags |= key.flags_ContinueFrom;
-                key.address = page.back().address;
-                key.continueMarkNameFlag = page.back().flags;
+                key.offset += (int)page.size();
             }
             return true;
         });
@@ -105,7 +141,39 @@ orthia::Address_type NameResolverOverWorkplaceItem::QueryAddress(const orthia::P
     }
     throw std::runtime_error("Unknown variable: " + orthia::PlatformStringToUtf8(name));
 }
-orthia::Address_type NameResolverOverWorkplaceItem::Dereference(orthia::Address_type address) 
+size_t NameResolverOverWorkplaceItem::MatchKnownNamePrefix(const char* text, size_t size)
+{
+    // module names like "ext-ms-win-foo-l1-1-0.dll", with or without the extension
+    std::vector<orthia::ModuleInfo> modules;
+    item->GetModules(modules);
+
+    size_t result = 0;
+    for (auto& mod : modules)
+    {
+        auto name = orthia::PlatformStringToUtf8(mod.name);
+        if (!orthia::HasNonNameChars(name))
+        {
+            continue;
+        }
+        result = std::max(result, orthia::MatchNamePrefix(text, size, name));
+
+        orthia::PlatformString_type extension;
+        orthia::GetExtensionOfFile(mod.name, &extension);
+        if (!extension.empty())
+        {
+            auto stem = mod.name.substr(0, mod.name.size() - extension.size() - 1);
+            result = std::max(result, orthia::MatchNamePrefix(text, size, orthia::PlatformStringToUtf8(stem)));
+        }
+        // the name up to the first dot, as EnumModulesByName falls back to (ld-linux-x86-64.so.2)
+        auto dot = mod.name.find('.');
+        if (dot != orthia::PlatformString_type::npos && dot != 0)
+        {
+            result = std::max(result, orthia::MatchNamePrefix(text, size, orthia::PlatformStringToUtf8(mod.name.substr(0, dot))));
+        }
+    }
+    return result;
+}
+orthia::Address_type NameResolverOverWorkplaceItem::Dereference(orthia::Address_type address)
 {
     auto res = item->ReadData(address, item->GetDianaMode());
     if (res.rangeFlags & res.flags_FullValid)

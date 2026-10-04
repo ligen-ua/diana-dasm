@@ -1,0 +1,11 @@
+VER_1 {
+    global:
+        exp_*;
+        vfunc;
+        vfunc_v1;
+        vfunc_v2;
+    local:
+        *;
+};
+VER_2 {
+} VER_1;

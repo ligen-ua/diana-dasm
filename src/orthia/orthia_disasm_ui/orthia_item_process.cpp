@@ -8,7 +8,7 @@
 #include "orthia_common_print.h"
 #include "orthia_common_format.h"
 #include "orthia_module_manager.h"
-#include "orthia_model_sections.h"
+#include "orthia_sections.h"
 
 namespace orthia
 {
@@ -91,7 +91,7 @@ namespace orthia
     {
         return m_shortName;
     }
-    Address_type CProcessWorkplaceItem::GerProcessModuleAddress()
+    Address_type CProcessWorkplaceItem::GetMainModuleAddress() const
     {
         return m_processModuleAddress;
     }
@@ -193,6 +193,7 @@ namespace orthia
         std::sort(modules.begin(), modules.begin(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
 
         exportsCollector.m_exports.sort();
+        m_moduleNames.Clear();
 
         orthia::CAutoCriticalSection guard(m_lock);
         m_modules = std::move(modules);
@@ -224,6 +225,8 @@ namespace orthia
     }
     void CProcessWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
     {
+        // before the flag: the private symbols analysis waits for it and then reads the names
+        m_moduleNames.Invalidate(moduleAddress);
         UpdateModuleFlags(moduleAddress, ModuleInfo::flags_symbolsLoaded, 0);
     }
     void CProcessWorkplaceItem::GetModules(std::vector<orthia::ModuleInfo>& modules) const
@@ -243,39 +246,15 @@ namespace orthia
 
     class CImportsCollector :public diana::CBasePeLinkImportsObserver
     {
-        std::vector<NameInfo>& m_names;
+        ModuleNames& m_names;
         std::function<NameInfo(OPERAND_SIZE address)> m_getName;
-        int m_maxCount = 0;
-        int & m_totalCount;
-        int m_deliveredCount = 0;
-        const NameSelectionKey& m_nameFilter;
-        bool m_found = false;
-        bool m_skipAll = false;
     public:
-        CImportsCollector(const NameSelectionKey& nameFilter,
-            std::vector<NameInfo>& names,
-            std::function<NameInfo (OPERAND_SIZE address)> getName,
-            int maxCount,
-            int & totalCount)
+        CImportsCollector(ModuleNames& names,
+            std::function<NameInfo (OPERAND_SIZE address)> getName)
             :
             m_names(names),
-            m_getName(getName),
-            m_maxCount(maxCount),
-            m_totalCount(totalCount),
-            m_nameFilter(nameFilter)
+            m_getName(getName)
         {
-            if ((m_nameFilter.flags & m_nameFilter.flags_ContinueFrom) &&
-                m_nameFilter.continueMarkNameFlag != 0 &&
-                m_nameFilter.continueMarkNameFlag != NameInfo::flags_Import)
-            {
-                m_skipAll = true;
-                // m_found intentionally left false so IsMarkFound() returns false
-                // and SetFound(false) is passed to the exports collector
-            }
-        }
-        bool IsMarkFound() const
-        {
-            return m_found;
         }
         void QueryFunctionByOrdinal(const char* pDllName,
             DI_UINT32 ordinal,
@@ -289,85 +268,38 @@ namespace orthia
             DI_UINT32 hint,
             OPERAND_SIZE* pAddress)
         {
-            ++m_totalCount;
-            if (m_skipAll) return;
+            NameInfo info;
+            info.flags = NameInfo::flags_Import;
+            info.address = *pAddress;
+            auto nameInfo = m_getName(info.address);
+            info.name = nameInfo.name;
 
-            if (!m_found)
+            if (info.name.native.empty())
             {
-                if (m_nameFilter.flags & m_nameFilter.flags_ContinueFrom)
+                if (pFunctionName)
                 {
-                    if (m_nameFilter.address == *pAddress)
-                    {
-                        m_found = true;
-                    }
-                    return;
+                    info.name.native = orthia::Utf8ToPlatformString(pFunctionName);
                 }
-                m_found = true;
-            }
-            if (m_deliveredCount < m_maxCount)
-            {
-                NameInfo info;
-                info.flags = NameInfo::flags_Import;
-                info.address = *pAddress;
-                auto nameInfo = m_getName(info.address);
-                info.name = nameInfo.name;
-
-                if (info.name.native.empty())
+                else
                 {
-                    if (pFunctionName)
-                    {
-                        info.name.native = orthia::Utf8ToPlatformString(pFunctionName);
-                    }
-                    else
-                    {
-                        info.name.native = OUI_TCSTR("<unknown>");
-                    }
+                    info.name.native = OUI_TCSTR("<unknown>");
                 }
-                m_names.push_back(info);
-                ++m_deliveredCount;
             }
-        }
-
-        int GetDeliveredCount() const
-        {
-            return m_deliveredCount;
+            m_names.Add(std::move(info));
         }
     };
 
-
-
     struct ModuleExportsCollector :public diana::CBasePeLinkImportsObserver
     {
-        const NameSelectionKey& m_nameFilter;
-        std::vector<NameInfo>& m_names;
-        int m_maxCount = 0;
-        int& m_totalCount;
-        int m_deliveredCount = 0;
-        bool m_found = false;
+        ModuleNames& m_names;
         OPERAND_SIZE m_moduleStart;
 
-        ModuleExportsCollector(const NameSelectionKey& nameFilter, 
-            std::vector<NameInfo>& names,
-            int maxCount, 
-            int& totalCount, 
-            int deliveredCount,
+        ModuleExportsCollector(ModuleNames& names,
             OPERAND_SIZE moduleStart)
             :
-            m_nameFilter(nameFilter),
             m_names(names),
-            m_maxCount(maxCount),
-            m_totalCount(totalCount),
-            m_deliveredCount(deliveredCount),
             m_moduleStart(moduleStart)
         {
-        }
-        void SetFound(bool markFound)
-        {
-            m_found = markFound;
-        }
-        bool IsMarkFound() const
-        {
-            return m_found;
         }
         void QueryFunctionByOrdinal(const char* pDllName,
             DI_UINT32 ordinal,
@@ -393,44 +325,16 @@ namespace orthia
                     return;
                 }
             };
-            auto functionName = orthia::Utf8ToPlatformString(pFunctionName);
-            ++m_totalCount;
-            if (!m_found)
-            {
-                if (m_nameFilter.flags & m_nameFilter.flags_ContinueFrom)
-                {
-                    if (m_nameFilter.address == address)
-                    {
-                        m_found = true;
-                    }
-                    return;
-                }
-                m_found = true;
-            }
-            if (m_deliveredCount < m_maxCount)
-            {
-                NameInfo info;
-                info.flags = NameInfo::flags_Export;
-                info.address = address;
-                info.name = functionName;
-                m_names.push_back(info);
-                ++m_deliveredCount;
-            }
-        }
-
-        int GetDeliveredCount() const
-        {
-            return m_deliveredCount;
+            NameInfo info;
+            info.flags = NameInfo::flags_Export;
+            info.address = address;
+            info.name = orthia::Utf8ToPlatformString(pFunctionName);
+            m_names.Add(std::move(info));
         }
     };
 
-    void CProcessWorkplaceItem::QueryNamesEx(Address_type moduleAddress, const NameSelectionKey& nameFilter, int count, std::vector<NameInfo>& names, int * totalCount)const
+    void CProcessWorkplaceItem::BuildModuleNames(Address_type moduleAddress, ModuleNames& names) const
     {
-        if (totalCount)
-        {
-            *totalCount = 0;
-        }
-        names.clear();
         Address_type moduleSize = 0, entryPoint = 0;
         {
             orthia::CAutoCriticalSection guard(m_lock);
@@ -460,103 +364,66 @@ namespace orthia
             DIANA_EXECUTABLE_FILE_FLAGS_MODULE_MODE))
         {
             ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Module: ", orthia::CLogParamEx(moduleAddress, 16), ":",orthia::CLogParamEx(moduleSize, 16), " ->", (long)status);
-            return;
         }
-        diana::Guard<diana::ExecutableFile> exeGuard(&exe);
-
-        bool markFound = !(nameFilter.flags & NameSelectionKey::flags_ContinueFrom);
-        if (!nameFilter.privateSymbolsOnly)
+        else
         {
-            int importsCount = 0;
-            CImportsCollector importsCollector(nameFilter, names, [this](auto address) {
+            diana::Guard<diana::ExecutableFile> exeGuard(&exe);
+            std::vector<char> page(4096);
+
+            ModuleExportsCollector exportsCollector(names, moduleAddress);
+            DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
+            DianaExecutable_QueryExports(&exe,
+                &stream.parent,
+                page.data(),
+                (int)page.size(),
+                exportsCollector.GetParent(),
+                0);
+
+            CImportsCollector importsCollector(names, [this](auto address) {
 
                 return QueryAddressName(address);
-            },
-                count,
-                importsCount);
-
-            std::vector<char> page(4096);
-            if (!nameFilter.excludeImports)
-            {
-                DianaExecutable_QueryImports(&exe,
-                    moduleAddress,
-                    &stream,
-                    page.data(),
-                    (int)page.size(),
-                    importsCollector.GetParent(),
-                    DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
-                    0);
-            }
-            if (totalCount)
-            {
-                *totalCount = importsCount;
-            }
-
-            int maxCount = count - importsCollector.GetDeliveredCount();
-            markFound = importsCollector.IsMarkFound();
-            if (maxCount || totalCount)
-            {
-                int exportsCount = 0;
-                // deliver exports
-                ModuleExportsCollector exportsCollector(nameFilter,
-                    names,
-                    maxCount,
-                    exportsCount,
-                    0,
-                    moduleAddress);
-
-                bool importsMarkFound = importsCollector.IsMarkFound();
-                if (!importsMarkFound &&
-                    (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
-                    nameFilter.continueMarkNameFlag == NameInfo::flags_Import)
-                {
-                    importsMarkFound = true;
-                }
-                exportsCollector.SetFound(importsMarkFound);
-
-                DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
-
-                // report regular exports
-                DianaExecutable_QueryExports(&exe,
-                        &stream.parent,
-                        page.data(),
-                        (int)page.size(),
-                        exportsCollector.GetParent(),
-                        0);
-
-                if (totalCount)
-                {
-                    *totalCount += exportsCount;
-                }
-                maxCount -= exportsCollector.GetDeliveredCount();
-                markFound = exportsCollector.IsMarkFound();
-                if (!markFound &&
-                    (nameFilter.flags & NameSelectionKey::flags_ContinueFrom) &&
-                    nameFilter.continueMarkNameFlag == NameInfo::flags_Export)
-                {
-                    markFound = true;
-                }
-            }
+            });
+            DianaExecutable_QueryImports(&exe,
+                moduleAddress,
+                &stream,
+                page.data(),
+                (int)page.size(),
+                importsCollector.GetParent(),
+                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
+                0);
         }
 
-        // Also include private symbols (in-memory if available, DB fallback otherwise).
+        // in-memory if available, DB fallback otherwise
         if (m_moduleStorage)
         {
-            m_moduleStorage->QueryModulePrivateSymbols(
-                moduleAddress, nameFilter, count, names, totalCount, markFound);
+            m_moduleStorage->CollectModulePrivateSymbols(moduleAddress, [&](NameInfo info) {
+                names.Add(std::move(info));
+            });
         }
+    }
+    std::shared_ptr<const ModuleNames> CProcessWorkplaceItem::QueryModuleNames(Address_type moduleAddress) const
+    {
+        return m_moduleNames.Query(moduleAddress, [&](ModuleNames& names) {
+            BuildModuleNames(moduleAddress, names);
+        });
     }
     void CProcessWorkplaceItem::QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names)const
     {
-        QueryNamesEx(moduleAddress, name, count, names, nullptr);
+        names.clear();
+        if (count <= 0)
+        {
+            return;
+        }
+        QueryModuleNames(moduleAddress)->QueryPage(name, count, names);
     }
 
     int CProcessWorkplaceItem::QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const
     {
-        int totalCount = 0;
-        std::vector<NameInfo> names;
-        QueryNamesEx(moduleAddress, name, 0, names, &totalCount);
-        return totalCount;
+        return QueryModuleNames(moduleAddress)->QueryCount(name);
+    }
+    void CProcessWorkplaceItem::InvalidateNames(Address_type moduleAddress)
+    {
+        m_moduleNames.Invalidate(moduleAddress);
     }
 
     MarkupRangeInfo CProcessWorkplaceItem::QueryMarkupRange(Address_type address, IMarkupCache* cache) const
@@ -776,10 +643,20 @@ namespace orthia
         return NameInfo();
     }
 
-    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, std::vector<SectionInfo>& sections_out)
+    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, ImageSections& sections)
     {
+        // the file the module was mapped from: ELF section headers are not in memory
+        PlatformString_type imageFile;
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            auto it = m_modulesIndex.find(moduleBase);
+            if (it != m_modulesIndex.end())
+            {
+                imageFile = m_modules[it->second].fullName;
+            }
+        }
         auto reader = CreateMemoryReader();
-        QuerySectionsImpl(reader.get(), moduleBase, sections_out);
+        QueryImageSections(reader.get(), moduleBase, imageFile, sections);
     }
 
 }

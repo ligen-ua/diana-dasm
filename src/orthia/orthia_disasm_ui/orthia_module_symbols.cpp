@@ -56,35 +56,16 @@ namespace orthia
         return &it->second;
     }
 
-    void ModuleSymbols::QueryPrivateSymbols(const NameSelectionKey& filter,
-                                             int count,
-                                             std::vector<NameInfo>& names,
-                                             int* totalCount,
-                                             bool& markFound) const
+    void ModuleSymbols::CollectPrivateSymbols(std::function<void(NameInfo)> fn) const
     {
-        Address_type addressHint = markFound ? 0 : filter.address;
-        auto it = m_data.lower_bound(addressHint);
-        for (; it != m_data.end(); ++it)
+        for (const auto& [addr, sym] : m_data)
         {
-            if (totalCount)
-            {
-                ++(*totalCount);
-                continue;
-            }
-            if (!markFound)
-            {
-                if (it->first == filter.address)
-                    markFound = true;
-                continue;
-            }
             NameInfo info;
-            info.address = it->second.address;
-            info.name = it->second.name;
-            info.privateSymbol = it->second.name;
+            info.address = sym.address;
+            info.name = sym.name;
+            info.privateSymbol = sym.name;
             info.flags = NameInfo::flags_PrivateSymbol;
-            names.push_back(std::move(info));
-            if (count && (int)names.size() >= count)
-                return;
+            fn(std::move(info));
         }
     }
 
@@ -162,19 +143,15 @@ namespace orthia
             });
     }
 
-    void ModuleStorage::QueryModulePrivateSymbols(Address_type moduleAddress,
-                                                   const NameSelectionKey& filter,
-                                                   int count,
-                                                   std::vector<NameInfo>& names,
-                                                   int* totalCount,
-                                                   bool& markFound) const
+    void ModuleStorage::CollectModulePrivateSymbols(Address_type moduleAddress,
+                                                     std::function<void(NameInfo)> fn) const
     {
         {
             CAutoCriticalSection guard(m_lock);
             auto it = m_modules.find(moduleAddress);
             if (it != m_modules.end())
             {
-                it->second.QueryPrivateSymbols(filter, count, names, totalCount, markFound);
+                it->second.CollectPrivateSymbols(fn);
                 return;
             }
         }
@@ -182,33 +159,21 @@ namespace orthia
         if (!m_db)
             return;
 
-        Address_type addressHint = markFound ? 0 : filter.address;
         m_db->QueryMetaInfoModule2(moduleAddress,
             g_database_type_fnc_PrivateSymbol, -1,
-            [&, markFound](Address_type, int, const std::string& text, Address_type) mutable -> bool {
-                if (totalCount)
-                {
-                    ++(*totalCount);
-                    return true;
-                }
+            [&](Address_type, int, const std::string& text, Address_type) -> bool {
                 std::string nameStr;
                 Address_type target = 0;
                 CCommonFormatParser parser;
                 parser.Parse(text);
                 parser.QueryMetadata("address", &target);
                 parser.QueryMetadata("name", &nameStr);
-                if (!markFound)
-                {
-                    if (target == filter.address)
-                        markFound = true;
-                    return true;
-                }
                 NameInfo info;
                 info.name = Utf8ToPlatformString(nameStr);
                 info.address = target;
                 info.flags = NameInfo::flags_PrivateSymbol;
-                names.push_back(std::move(info));
-                return !count || (int)names.size() < count;
-            }, addressHint);
+                fn(std::move(info));
+                return true;
+            });
     }
 }

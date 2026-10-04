@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(orthia_disasm_ui)
 
 include_directories("../../diana_core/diana_core")
@@ -8,19 +8,22 @@ include_directories("../orthia_lib")
 include_directories("../orthia_ui")
 
 set(SOURCES
+    console_mode.cpp
     orthia_commands.cpp
     orthia_commands_display.cpp
     orthia_config.cpp
+    orthia_databases.cpp
     orthia_helpers.cpp
     orthia_external_symbols.cpp
+    orthia_image_source.cpp
     orthia_item_file.cpp
+    orthia_module_names.cpp
     orthia_module_symbols.cpp
     orthia_item_process.cpp
     orthia_model.cpp
     orthia_model_interfaces.cpp
     orthia_model_modules.cpp
     orthia_model_modules_elf.cpp
-    orthia_model_sections.cpp
     orthia_module_analyzer.cpp
     orthia_process_adapter.cpp
     oui_disasm_colors.cpp
@@ -47,11 +50,13 @@ if(UNIX)
     list(APPEND SOURCES
         main_posix.cpp
         oui_processes_posix.cpp
+        oui_privileges_posix.cpp
     )
 else()
     list(APPEND SOURCES
         main.cpp
         oui_processes_win32.cpp
+        oui_sandbox_win32.cpp
     )
 endif()
 
@@ -66,4 +71,4 @@ if(UNIX)
     target_link_libraries(${PROJECT_NAME} pthread)
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME orthia)

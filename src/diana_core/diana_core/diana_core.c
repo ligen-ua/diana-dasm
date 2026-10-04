@@ -540,6 +540,7 @@ const char * Diana_QueryErrorText_Silent(int value)
     DI_ERR_DEF_CASE(DI_ERROR_NOT_IMPLEMENTED)
     DI_ERR_DEF_CASE(DI_OVERFLOW)
     DI_ERR_DEF_CASE(DI_NOT_FOUND)
+    DI_ERR_DEF_CASE(DI_UNSUPPORTED)
     }
 
 #undef DI_ERR_DEF_CASE

@@ -45,6 +45,8 @@ namespace orthia
 
         int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
+        // resolves the imports through the observer and writes them into the IAT of the mapped image
+        int LinkImports(diana::CBasePeLinkImportsObserver* observer);
         int QueryTLSCallbacks(std::vector<OPERAND_SIZE>& callbacks);
         int QueryGUID(DIANA_UUID* pGuid, DI_UINT32* pAge);
 
@@ -52,6 +54,7 @@ namespace orthia
         const std::vector<char>& GetMappedFile() const override;
         int GetDianaMode() const override;
         DI_UINT64 GetEntryPoint() const override;
+        bool WriteImage(DI_UINT64 address, const void* pData, size_t size) override;
     };
 
     void ParseForwarderString(const std::string& fwString, std::string& dllName, std::string& functionName, OPERAND_SIZE &operand);
