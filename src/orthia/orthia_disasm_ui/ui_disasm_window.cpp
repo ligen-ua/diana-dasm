@@ -731,12 +731,7 @@ void CDisasmWindow::OnContextMenu(const oui::Point& point)
                 }
             } });
     }
-    oui::Point pointToUse{ point.x + 1, point.y + 1 };
-    auto parent = GetPool()->GetRootWindow();
-    auto popup = parent->AddChild_t(std::make_shared<oui::CMenuPopup>(std::move(items)));
-    popup->Init(parent->GetPtr());
-    popup->Dock(pointToUse);
-    popup->SetFocus();
+    oui::ShowContextMenu(this, std::move(items), point);
 }
 void CDisasmWindow::CopySelectedAssembler(const oui::MultiLineSelPoint& p1_in, const oui::MultiLineSelPoint& p2_in)
 {

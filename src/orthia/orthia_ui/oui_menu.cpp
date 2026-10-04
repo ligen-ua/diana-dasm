@@ -584,6 +584,32 @@ namespace oui
         return nullptr;
     }
 
+    std::shared_ptr<CMenuPopup> ShowContextMenu(CWindow* owner,
+        std::vector<PopupItem>&& items,
+        const Point& mousePoint)
+    {
+        auto pool = owner->GetPool();
+        if (!pool || items.empty())
+        {
+            return nullptr;
+        }
+
+        Point pointToUse{ mousePoint.x + 1, mousePoint.y + 1 };
+        auto parent = pool->GetRootWindow();
+        if (auto modal = pool->GetModalWindow())
+        {
+            parent = modal;
+            auto pos = modal->GetPosition();
+            pointToUse.x -= pos.x;
+            pointToUse.y -= pos.y;
+        }
+        auto popup = parent->AddChild_t(std::make_shared<CMenuPopup>(std::move(items)));
+        popup->Init(parent->GetPtr());
+        popup->Dock(pointToUse);
+        popup->SetFocus();
+        return popup;
+    }
+
     // CMenuWindow
     CMenuWindow::CMenuWindow()
     {
