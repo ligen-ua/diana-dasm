@@ -22,6 +22,7 @@ extern "C"
 #include "test_x64_integrated.h"
 #include "test_fpu_mmx32.h"
 #include "test_analyze.h"
+#include "test_flist.h"
 #include "test_stack.h"
 #include "test_new.h"
 #include "test_avx.h"
@@ -41,6 +42,7 @@ int main()
     test_aesni();
     test_sse4();
     test_bmi();
+    test_flist();
     test_stack();
     test_analyze();
     test_integrated2();

@@ -202,6 +202,7 @@
     <ClCompile Include="test_patchers.cpp" />
     <ClCompile Include="test_push.cpp" />
     <ClCompile Include="test_sse4.cpp" />
+    <ClCompile Include="test_flist.cpp" />
     <ClCompile Include="test_stack.cpp" />
     <ClCompile Include="test_misc.cpp" />
     <ClCompile Include="test_x64.cpp" />
@@ -233,6 +234,7 @@
     <ClInclude Include="test_processor_impl.h" />
     <ClInclude Include="test_push.h" />
     <ClInclude Include="test_sse4.h" />
+    <ClInclude Include="test_flist.h" />
     <ClInclude Include="test_stack.h" />
     <ClInclude Include="test_x64.h" />
     <ClInclude Include="test_x64_integrated.h" />

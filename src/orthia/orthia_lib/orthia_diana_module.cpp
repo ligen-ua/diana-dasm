@@ -365,15 +365,16 @@ void CDianaInstructionIterator::QueryRefsToCurrentInstuction(std::vector<CommonR
         throw std::runtime_error("Internal error");
 
     Diana_Instruction * pInstruction = &m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction];
-    Diana_SubXRef * pSubRef = (Diana_SubXRef * )pInstruction->m_referencesToThisInstruction.m_pFirst;
+    const Diana_FList_List * pRefs = &pInstruction->m_referencesToThisInstruction;
+    Diana_SubXRef * pSubRef = (Diana_SubXRef * )Diana_FList_First(pRefs);
     pInfo->clear();
     while(pSubRef)
     {
-        Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 0);     
-        pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[0].m_pInstruction->m_offset, 
+        Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 0);
+        pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[0].m_pInstruction->m_offset,
                                 (pCurXRef->m_flags & DI_XREF_EXTERNAL)?true:false));
-        pSubRef = (Diana_SubXRef *)pSubRef->m_instructionEntry.m_pNext;
-    }    
+        pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
+    }
 }
 void CDianaInstructionIterator::QueryRefsFromCurrentInstruction(std::vector<CommonReferenceInfo> * pInfo)
 {
@@ -381,7 +382,8 @@ void CDianaInstructionIterator::QueryRefsFromCurrentInstruction(std::vector<Comm
         throw std::runtime_error("Internal error");
 
     Diana_Instruction * pInstruction = &m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction];
-    Diana_SubXRef * pSubRef = (Diana_SubXRef * )pInstruction->m_referencesFromThisInstruction.m_pFirst;
+    const Diana_FList_List * pRefs = &pInstruction->m_referencesFromThisInstruction;
+    Diana_SubXRef * pSubRef = (Diana_SubXRef * )Diana_FList_First(pRefs);
     pInfo->clear();
     while(pSubRef)
     {
@@ -391,7 +393,7 @@ void CDianaInstructionIterator::QueryRefsFromCurrentInstruction(std::vector<Comm
             // save only externals to avoid duplicate with save_refs_to
             pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[1].m_pInstruction->m_offset, true));
         }
-        pSubRef = (Diana_SubXRef *)pSubRef->m_instructionEntry.m_pNext;
+        pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
     }
 
 }

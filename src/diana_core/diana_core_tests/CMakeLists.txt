@@ -26,6 +26,7 @@ test_new.cpp
 test_or.cpp
 test_patchers.cpp
 test_push.cpp
+test_flist.cpp
 test_stack.cpp
 test_misc.cpp
 test_x64.cpp

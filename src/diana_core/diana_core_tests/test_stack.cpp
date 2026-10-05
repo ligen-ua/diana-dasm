@@ -126,48 +126,8 @@ static void test_list1()
     DIANA_TEST_ASSERT(list1.m_size == 0);
 }
 
-// --- 
-static int Diana_FList_ListObserver(Diana_FList_ListNode * pNode,
-                                    void * pContext,
-                                    int * pbDone)
-{
-    ++*(int * )pContext;
-    return 0;
-}
-static int CalcSize(Diana_FList_List & list1)
-{
-    int size = 0;
-    int done = 0;
-    DIANA_TEST_ASSERT(Diana_FList_ListForEach(&list1, Diana_FList_ListObserver, &size) == 0);
-    return size;
-}
-static void test_flist1()
-{
-    Diana_FList_List list1;
-    Diana_FList_ListNode node1, node2;
-    
-    Diana_FList_InitList(&list1);
-    DIANA_TEST_ASSERT(list1.m_pFirst == 0);
-    DIANA_TEST_ASSERT(list1.m_pLast == 0);
-    DIANA_TEST_ASSERT(CalcSize(list1) == 0);
-
-    Diana_FList_PushBack(&list1, &node1);
-    DIANA_TEST_ASSERT(list1.m_pFirst->m_pNext == 0);
-    DIANA_TEST_ASSERT(list1.m_pFirst == &node1);
-    DIANA_TEST_ASSERT(list1.m_pLast == &node1);
-    DIANA_TEST_ASSERT(CalcSize(list1) == 1);
-
-    Diana_FList_PushBack(&list1, &node2);
-    DIANA_TEST_ASSERT(list1.m_pLast != list1.m_pFirst);
-    DIANA_TEST_ASSERT(list1.m_pFirst == &node1);
-    DIANA_TEST_ASSERT(list1.m_pFirst->m_pNext == &node2);
-    DIANA_TEST_ASSERT(list1.m_pLast == &node2);
-    DIANA_TEST_ASSERT(CalcSize(list1) == 2);
-}
-
 void test_stack()
 {
     DIANA_TEST(test_list1());
-    DIANA_TEST(test_flist1());
     DIANA_TEST(test_stack1());
 }

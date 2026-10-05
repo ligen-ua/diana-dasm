@@ -120,7 +120,7 @@ void VerifyREF(const char * pTestRefs,
     bool bEnd = false;
     const char * pLast = pTestRefs;
     Diana_XRef * pCurXRef = 0;
-    Diana_SubXRef * pSubRef = (Diana_SubXRef * )pRefs->m_pFirst;
+    Diana_SubXRef * pSubRef = (Diana_SubXRef * )Diana_FList_First(pRefs);
     
     if (pTestRefs)
     {
@@ -152,7 +152,7 @@ void VerifyREF(const char * pTestRefs,
             
             DIANA_TEST_ASSERT(pCurXRef->m_subrefs[index].m_pInstruction->m_offset == value);
 
-            pSubRef = (Diana_SubXRef *)pSubRef->m_instructionEntry.m_pNext;
+            pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
             pLast = pTestRefs + u + 1;
         }
     }
@@ -164,7 +164,7 @@ void VerifyREF(const char * pTestRefs,
 
             DIANA_TEST_ASSERT(pCurXRef->m_flags & DI_XREF_INVALID);
 
-            pSubRef = (Diana_SubXRef *)pSubRef->m_instructionEntry.m_pNext;
+            pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
         }
     }
     

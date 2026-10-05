@@ -417,6 +417,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_flist.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_stack.cpp"
 				>
 			</File>
@@ -532,6 +536,10 @@
 			</File>
 			<File
 				RelativePath=".\test_push.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_flist.h"
 				>
 			</File>
 			<File
