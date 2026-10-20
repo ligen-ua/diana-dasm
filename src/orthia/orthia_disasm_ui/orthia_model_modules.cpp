@@ -395,9 +395,14 @@ namespace orthia
     }
     // CPEImportsLoader
     void CPEImportsLoader::LoadModules(const oui::String & fileName, 
-        std::shared_ptr<orthia::CSimplePeFile> peFile,
+        std::shared_ptr<ISimpleFile> file,
         std::shared_ptr<oui::IFileSystem> pFs)
     {
+        auto peFile = std::dynamic_pointer_cast<orthia::CSimplePeFile>(file);
+        if (!peFile)
+        {
+            throw std::runtime_error("Not a PE image");
+        }
         CheckCancel();
         m_pFs = pFs;
         if (!m_pFs)
@@ -516,46 +521,6 @@ namespace orthia
             // 2. fullname
             // 3. import functions address
             classicDatabase->DoneSave();
-        }
-    }
-
-    // CImportsLoader (unified facade)
-    CImportsLoader::CImportsLoader(int executableType, std::shared_ptr<oui::BaseOperation> operation)
-        : m_executableType(executableType)
-    {
-        if (executableType == DIANA_EXECUTABLE_TYPE_ELF)
-        {
-            m_elfLoader = std::make_unique<CElfImportsLoader>(operation);
-        }
-        else
-        {
-            m_peLoader = std::make_unique<CPEImportsLoader>(operation);
-        }
-    }
-
-    void CImportsLoader::LoadModules(const oui::String& fileName,
-        std::shared_ptr<ISimpleFile> file,
-        std::shared_ptr<oui::IFileSystem> pFs)
-    {
-        if (m_elfLoader)
-        {
-            m_elfLoader->LoadModules(fileName, std::static_pointer_cast<CSimpleElfFile>(file), pFs);
-        }
-        else
-        {
-            m_peLoader->LoadModules(fileName, std::static_pointer_cast<CSimplePeFile>(file), pFs);
-        }
-    }
-
-    void CImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)
-    {
-        if (m_elfLoader)
-        {
-            m_elfLoader->ReportModules(moduleManager);
-        }
-        else
-        {
-            m_peLoader->ReportModules(moduleManager);
         }
     }
 

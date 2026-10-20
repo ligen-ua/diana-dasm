@@ -302,9 +302,14 @@ namespace orthia
 
     void CElfImportsLoader::LoadModules(
         const oui::String& fileName,
-        std::shared_ptr<orthia::CSimpleElfFile> elfFile,
+        std::shared_ptr<ISimpleFile> file,
         std::shared_ptr<oui::IFileSystem> pFs)
     {
+        auto elfFile = std::dynamic_pointer_cast<orthia::CSimpleElfFile>(file);
+        if (!elfFile)
+        {
+            throw std::runtime_error("Not an ELF image");
+        }
         CheckCancel();
         m_pFs = pFs;
         m_dianaMode = elfFile->GetDianaMode();

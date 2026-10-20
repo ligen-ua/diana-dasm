@@ -1,6 +1,7 @@
 #include "orthia_diana_image_format.h"
 #include "orthia_elf.h"
 #include "orthia_log.h"
+#include "../orthia_model_modules_elf.h"
 
 namespace orthia
 {
@@ -55,6 +56,11 @@ namespace orthia
             const char* GetId() const override { return "elf"; }
             const char* GetDisplayName() const override { return "ELF"; }
             int GetBuiltInFlag() const override { return ModuleInfo::builtInFlags_moduleTypeElf; }
+            std::unique_ptr<IDependencyLoader> CreateDependencyLoader(
+                std::shared_ptr<oui::BaseOperation> operation) const override
+            {
+                return std::make_unique<CElfImportsLoader>(operation);
+            }
 
         protected:
             std::unique_ptr<CDianaModuleImage> CreateModuleImage(IMemoryReader& reader,

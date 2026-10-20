@@ -6,10 +6,11 @@
 #include "orthia_elf.h"
 #include "orthia_model.h"
 #include "orthia_image_identity.h"
+#include "formats/orthia_image_format.h"
 
 namespace orthia
 {
-    class CElfImportsLoader
+    class CElfImportsLoader : public IDependencyLoader
     {
         struct ModuleInfo
         {
@@ -52,10 +53,10 @@ namespace orthia
     public:
         explicit CElfImportsLoader(std::shared_ptr<oui::BaseOperation> operation = nullptr);
 
+        // IDependencyLoader; file is a CSimpleElfFile
         void LoadModules(const oui::String& fileName,
-            std::shared_ptr<orthia::CSimpleElfFile> elfFile,
-            std::shared_ptr<oui::IFileSystem> pFs);
-
-        void ReportModules(std::shared_ptr<CModuleManager> moduleManager);
+            std::shared_ptr<ISimpleFile> file,
+            std::shared_ptr<oui::IFileSystem> pFs) override;
+        void ReportModules(std::shared_ptr<CModuleManager> moduleManager) override;
     };
 }

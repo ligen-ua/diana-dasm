@@ -568,18 +568,25 @@ namespace orthia
 
             if (firstOpen)
             {
+                bool importsKeyedBySlot = false;
                 {
-                    orthia::CImportsLoader importsLoader(executableType, completeHandler);
-                    importsLoader.LoadModules(file->GetFullFileName(), mappedExe, file->GetFileSystem());
+                    auto dependencies = format->CreateDependencyLoader(completeHandler);
+                    if (dependencies)
+                    {
+                        dependencies->LoadModules(file->GetFullFileName(), mappedExe, file->GetFileSystem());
+                        importsKeyedBySlot = dependencies->ImportsKeyedBySlot();
+                    }
 
                     format->RegisterMainModule(*info->moduleManager, *mappedExe, reader, info->shortName.native, deepAnalysis);
 
-                    importsLoader.ReportModules(info->moduleManager);
+                    if (dependencies)
+                    {
+                        dependencies->ReportModules(info->moduleManager);
+                    }
                 }
                 const int builtInTypeFlag = format->GetBuiltInFlag();
                 ModuleSourceMeta source;
-                // PE only: the ELF GOT slot keys are not verified for the replay yet
-                source.iatSlots = (executableType == DIANA_EXECUTABLE_TYPE_PE);
+                source.iatSlots = importsKeyedBySlot;
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     imageBase,
                     info->fullName.native,

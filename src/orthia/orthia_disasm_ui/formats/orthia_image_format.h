@@ -38,6 +38,23 @@ namespace orthia
         static void AddName(std::vector<NameInfo>& out, int flags, Address_type address, const std::string& utf8Name);
     };
 
+    // File mode: finds the opened file's dependencies, maps them into free address ranges,
+    // links the imports and records the modules and their names in the database
+    struct IDependencyLoader
+    {
+        virtual ~IDependencyLoader() = default;
+        // before the main module is registered
+        virtual void LoadModules(const oui::String& fileName,
+            std::shared_ptr<ISimpleFile> file,
+            std::shared_ptr<oui::IFileSystem> fs) = 0;
+        // after it
+        virtual void ReportModules(std::shared_ptr<CModuleManager> moduleManager) = 0;
+        // true when the main module's import rows are keyed by their slot address (the PE IAT),
+        // so FileWorkplaceItem::ApplyLinkedImports can write the same values back on reopen
+        // without loading the dependencies again
+        virtual bool ImportsKeyedBySlot() const { return false; }
+    };
+
     // How to read an image (PE, ELF, ...): one stateless object per format, found through the
     // registry below. Not to be confused with IImageSource (orthia_image_source.h), which says
     // where a module's bytes come from (the opened file, a linked dependency, ...).
@@ -61,6 +78,9 @@ namespace orthia
         // throws std::exception with a message for the user when the image is malformed
         virtual std::shared_ptr<ISimpleFile> MapFile(const std::vector<char>& data,
             const MapFileParameters& params) const = 0;
+        // nullptr: the format has no dependencies to load
+        virtual std::unique_ptr<IDependencyLoader> CreateDependencyLoader(
+            std::shared_ptr<oui::BaseOperation> operation) const { return nullptr; }
         // adds the opened file's own module to a new database; reader reads the mapped file
         virtual void RegisterMainModule(CModuleManager& manager,
             ISimpleFile& file,

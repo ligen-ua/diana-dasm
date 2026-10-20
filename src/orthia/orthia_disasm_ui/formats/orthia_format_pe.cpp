@@ -1,5 +1,6 @@
 #include "orthia_diana_image_format.h"
 #include "orthia_pe.h"
+#include "../orthia_model_modules.h"
 
 namespace orthia
 {
@@ -63,6 +64,11 @@ namespace orthia
             const char* GetId() const override { return "pe"; }
             const char* GetDisplayName() const override { return "PE"; }
             int GetBuiltInFlag() const override { return ModuleInfo::builtInFlags_moduleTypePe; }
+            std::unique_ptr<IDependencyLoader> CreateDependencyLoader(
+                std::shared_ptr<oui::BaseOperation> operation) const override
+            {
+                return std::make_unique<CPEImportsLoader>(operation);
+            }
 
         protected:
             std::unique_ptr<CDianaModuleImage> CreateModuleImage(IMemoryReader& reader,
