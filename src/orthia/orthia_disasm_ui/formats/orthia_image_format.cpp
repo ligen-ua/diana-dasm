@@ -86,7 +86,24 @@ namespace orthia
                 return format;
             }
         }
+        PlatformString_type ext;
+        GetExtensionOfFile(mod.fullName, &ext);
+        if (ext == ORTHIA_TCSTR("dll") || ext == ORTHIA_TCSTR("exe") || ext == ORTHIA_TCSTR("sys"))
+        {
+            return FindFormatById("pe");
+        }
         return nullptr;
+    }
+
+    void QueryModuleSections(const ModuleAccess& access, ImageSections& sections)
+    {
+        sections = ImageSections();
+        if (auto* format = FindFormatByModule(*access.mod))
+        {
+            format->QuerySections(access, sections);
+            return;
+        }
+        QueryImageSections(access.reader, access.mod->address, access.imageFile, access.openFile, sections);
     }
 
 }

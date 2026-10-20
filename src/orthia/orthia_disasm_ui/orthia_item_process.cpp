@@ -467,18 +467,24 @@ namespace orthia
 
     void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections)
     {
-        // the file the module was mapped from: ELF section headers are not in memory
-        PlatformString_type imageFile;
+        orthia::ModuleInfo mod;
         {
             orthia::CAutoCriticalSection guard(m_lock);
             auto it = m_modulesIndex.find(moduleBase);
             if (it != m_modulesIndex.end())
             {
-                imageFile = m_modules[it->second].fullName;
+                mod = m_modules[it->second];
             }
+            mod.address = moduleBase;
         }
         auto reader = CreateMemoryReader();
-        QueryImageSections(reader.get(), moduleBase, imageFile, openFile, sections);
+        ModuleAccess access;
+        access.reader = reader.get();
+        access.mod = &mod;
+        // the file the module was mapped from: ELF section headers are not in memory
+        access.imageFile = mod.fullName;
+        access.openFile = openFile;
+        QueryModuleSections(access, sections);
     }
 
 }

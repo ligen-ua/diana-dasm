@@ -39,4 +39,12 @@ void QueryImageSections(IMemoryReader* reader,
     const FileOpener_type& openFile,
     ImageSections& result);
 
+// the same for a module whose format is known; false when its headers don't parse as it
+bool QueryPeImageSections(IMemoryReader* reader, Address_type moduleBase, ImageSections& result);
+bool QueryElfImageSections(IMemoryReader* reader,
+    Address_type moduleBase,
+    const PlatformString_type& imageFile,
+    const FileOpener_type& openFile,
+    ImageSections& result);
+
 }

@@ -2,6 +2,7 @@
 #include "orthia_image_source.h"
 #include "orthia_helpers.h"
 #include <map>
+#include <algorithm>
 #include "formats/orthia_image_format.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
@@ -794,8 +795,24 @@ namespace orthia
                 imageFile = static_cast<CLinkedFileImageSource*>(source)->GetPath();
             }
         }
+        ModuleInfo mod;
+        {
+            std::vector<ModuleInfo> modules;
+            GetModules(modules);
+            auto it = std::find_if(modules.begin(), modules.end(), [&](const ModuleInfo& m) { return m.address == moduleBase; });
+            if (it != modules.end())
+            {
+                mod = *it;
+            }
+            mod.address = moduleBase;
+        }
         auto reader = CreateMemoryReader();
-        QueryImageSections(reader.get(), moduleBase, imageFile, openFile, sections);
+        ModuleAccess access;
+        access.reader = reader.get();
+        access.mod = &mod;
+        access.imageFile = imageFile;
+        access.openFile = openFile;
+        QueryModuleSections(access, sections);
     }
 
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)

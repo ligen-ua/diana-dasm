@@ -1,6 +1,7 @@
 #include "orthia_diana_image_format.h"
 #include "orthia_pe.h"
 #include "../orthia_model_modules.h"
+#include "../orthia_external_symbols.h"
 
 namespace orthia
 {
@@ -64,6 +65,42 @@ namespace orthia
             const char* GetId() const override { return "pe"; }
             const char* GetDisplayName() const override { return "PE"; }
             int GetBuiltInFlag() const override { return ModuleInfo::builtInFlags_moduleTypePe; }
+            void DescribeModule(const ModuleAccess& access, std::vector<PlatformString_type>& lines) const override
+            {
+                const ModuleInfo& mod = *access.mod;
+                DIANA_UUID guid = { 0, };
+                DI_UINT32 age = 0;
+                PlatformString_type pdbName;
+                const bool haveDebugInfo = QueryModulePeDebugInfo(access.reader, mod, guid, age, pdbName);
+#ifdef WIN32
+                {
+                    CMemoryStorageOfModifiedData storage(access.reader);
+                    VmMemoryRangesTargetOverVectorPlain moduleData;
+                    storage.ReportRegions(mod.address, mod.size, &moduleData, true);
+                    if (!moduleData.m_data.empty())
+                    {
+                        if (const wchar_t* version = QueryModuleVersion((HMODULE)moduleData.m_data.data()))
+                        {
+                            lines.push_back(ORTHIA_TCSTR("Version: ") + PlatformString_type(version));
+                        }
+                    }
+                }
+#endif
+                if (!haveDebugInfo)
+                {
+                    // no CodeView entry: a zero GUID would look like a real one
+                    lines.push_back(ORTHIA_TCSTR("Debug GUID: <none>"));
+                    return;
+                }
+                lines.push_back(ORTHIA_TCSTR("Debug GUID: ") + UUIDToString(guid));
+                lines.push_back(ORTHIA_TCSTR("Debug Age: ") + ObjectToString(age));
+                lines.push_back(ORTHIA_TCSTR("Pdb name: ") + pdbName);
+            }
+            // the section headers are mapped with the image
+            bool QuerySections(const ModuleAccess& access, ImageSections& sections) const override
+            {
+                return QueryPeImageSections(access.reader, access.mod->address, sections);
+            }
             // TimeDateStamp and SizeOfImage are in the NT headers; the RSDS GUID is not
             size_t GetHeaderIdentitySize() const override { return 0x1000; }
             bool QueryHeaderIdentity(const char* header, size_t size, ImageIdentity& identity) const override

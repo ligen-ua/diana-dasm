@@ -9,6 +9,18 @@ namespace orthia
     class CModuleManager;
     struct IImageFormat;
 
+    // What a format may read about one module, in file mode and in process mode. The mapped
+    // image is not the whole file (ELF section headers, .gnu_debuglink), so the module's own
+    // file is reachable too: on the target, through openFile. It may be missing, or another
+    // build than the one mapped; a format checks it against memory and falls back to memory
+    struct ModuleAccess
+    {
+        IMemoryReader* reader = nullptr;            // the image mapped at mod->address
+        const ModuleInfo* mod = nullptr;
+        PlatformString_type imageFile;              // the module's file on the target, may be empty
+        FileOpener_type openFile;                   // may be empty
+    };
+
     // One parsed module, the same in file mode and process mode. Opened per use, not cached
     struct IModuleImage
     {
@@ -100,6 +112,11 @@ namespace orthia
         // needs (0: the format has no such check), and the identity they give (maybe partial)
         virtual size_t GetHeaderIdentitySize() const { return 0; }
         virtual bool QueryHeaderIdentity(const char* header, size_t size, ImageIdentity& identity) const { return false; }
+
+        // `modinfo` lines after the module's name and file: the debug record and the like
+        virtual void DescribeModule(const ModuleAccess& access, std::vector<PlatformString_type>& lines) const {}
+        // false when the format has no sections or the headers don't parse
+        virtual bool QuerySections(const ModuleAccess& access, ImageSections& sections) const { return false; }
     };
 
     // how much of a file's start FindFormatByData needs to tell every format apart
@@ -110,8 +127,12 @@ namespace orthia
     // nullptr when no format recognizes the bytes
     const IImageFormat* FindFormatByData(const char* header, size_t size);
     const IImageFormat* FindFormatById(const std::string& id);
-    // by the type bit in mod.builtInFlags; nullptr when there is none
+    // by the type bit in mod.builtInFlags; a module recorded before the bits existed is PE when
+    // its file is a .dll, .exe or .sys. nullptr when nothing tells
     const IImageFormat* FindFormatByModule(const ModuleInfo& mod);
+    // the module's sections through its format; for a module of unknown format, through
+    // whatever its headers in memory look like
+    void QueryModuleSections(const ModuleAccess& access, ImageSections& sections);
     // IModuleImage::QueryNames of a file mapped by format.MapFile; false when its headers don't parse
     bool QueryMappedFileNames(const IImageFormat& format, const ISimpleFile& file, std::vector<NameInfo>& out);
 

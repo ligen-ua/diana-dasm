@@ -94,7 +94,6 @@ def test_modinfo(orthia, blob, module):
     res.assert_line(r"^Image: main$")
 
 
-@pytest.mark.xfail(reason="B18: modinfo reports raw code as an unknown module format")
 def test_modinfo_no_error(orthia, blob, module):
     orthia.run(f"modinfo {module}", file=blob, options=raw_options()).assert_ok()
 

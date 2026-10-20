@@ -567,4 +567,20 @@ void QueryImageSections(IMemoryReader* reader,
     TryParseElfSections(reader, moduleBase, imageFile, openFile, result);
 }
 
+bool QueryPeImageSections(IMemoryReader* reader, Address_type moduleBase, ImageSections& result)
+{
+    result = ImageSections();
+    return reader && moduleBase && TryParsePeSections(reader, moduleBase, result.sections);
+}
+
+bool QueryElfImageSections(IMemoryReader* reader,
+    Address_type moduleBase,
+    const PlatformString_type& imageFile,
+    const FileOpener_type& openFile,
+    ImageSections& result)
+{
+    result = ImageSections();
+    return reader && moduleBase && TryParseElfSections(reader, moduleBase, imageFile, openFile, result);
+}
+
 } // namespace orthia

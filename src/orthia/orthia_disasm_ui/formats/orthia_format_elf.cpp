@@ -2,6 +2,7 @@
 #include "orthia_elf.h"
 #include "orthia_log.h"
 #include "../orthia_model_modules_elf.h"
+#include "../orthia_external_symbols.h"
 
 namespace orthia
 {
@@ -56,6 +57,21 @@ namespace orthia
             const char* GetId() const override { return "elf"; }
             const char* GetDisplayName() const override { return "ELF"; }
             int GetBuiltInFlag() const override { return ModuleInfo::builtInFlags_moduleTypeElf; }
+            void DescribeModule(const ModuleAccess& access, std::vector<PlatformString_type>& lines) const override
+            {
+                PlatformString_type buildIdHex;
+                if (!QueryModuleElfDebugInfo(access.reader, *access.mod, buildIdHex))
+                {
+                    buildIdHex = ORTHIA_TCSTR("<none>");
+                }
+                lines.push_back(ORTHIA_TCSTR("Build ID: ") + buildIdHex);
+            }
+            // the section headers are not mapped: read from the module's file when it is the
+            // build in memory, the program headers from memory otherwise
+            bool QuerySections(const ModuleAccess& access, ImageSections& sections) const override
+            {
+                return QueryElfImageSections(access.reader, access.mod->address, access.imageFile, access.openFile, sections);
+            }
             std::unique_ptr<IDependencyLoader> CreateDependencyLoader(
                 std::shared_ptr<oui::BaseOperation> operation) const override
             {

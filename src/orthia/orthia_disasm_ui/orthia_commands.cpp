@@ -9,6 +9,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_databases.h"
 #include "orthia_helpers.h"
+#include "formats/orthia_image_format.h"
 #include <ctime>
 #include <set>
 
@@ -385,61 +386,20 @@ namespace orthia
 
             CheckImageReadable(pMemoryReader.get(), mod);
 
-            if (mod.builtInFlags & orthia::ModuleInfo::builtInFlags_moduleTypeElf)
-            {
-                orthia::PlatformString_type buildIdHex;
-                if (!orthia::QueryModuleElfDebugInfo(pMemoryReader.get(), mod, buildIdHex))
-                {
-                    buildIdHex = ORTHIA_TCSTR("<none>");
-                }
-
-                line = ORTHIA_TCSTR("Build ID: ") + buildIdHex;
-                args.ReplyLine(line);
-            }
-            else if (orthia::IsPeModule(mod))
-            {
-                DIANA_UUID guid = { 0, };
-                DI_UINT32 age = 0;
-                orthia::PlatformString_type pdbName;
-                bool haveDebugInfo = orthia::QueryModulePeDebugInfo(pMemoryReader.get(), mod, guid, age, pdbName);
-
-#ifdef WIN32
-                {
-                    orthia::CMemoryStorageOfModifiedData storage(pMemoryReader.get());
-                    orthia::VmMemoryRangesTargetOverVectorPlain moduleData;
-                    storage.ReportRegions(mod.address, mod.size, &moduleData, true);
-                    if (!moduleData.m_data.empty())
-                    {
-                        const wchar_t* version = orthia::QueryModuleVersion((HMODULE)moduleData.m_data.data());
-                        if (version)
-                        {
-                            line = ORTHIA_TCSTR("Version: ") + orthia::PlatformString_type(version);
-                            args.ReplyLine(line);
-                        }
-                    }
-                }
-#endif
-
-                if (!haveDebugInfo)
-                {
-                    // no CodeView entry: a zero GUID would look like a real one
-                    args.ReplyLine(ORTHIA_TCSTR("Debug GUID: <none>"));
-                }
-                else
-                {
-                    line = ORTHIA_TCSTR("Debug GUID: ") + orthia::UUIDToString(guid);
-                    args.ReplyLine(line);
-
-                    line = ORTHIA_TCSTR("Debug Age: ") + orthia::ObjectToString(age);
-                    args.ReplyLine(line);
-
-                    line = ORTHIA_TCSTR("Pdb name: ") + pdbName;
-                    args.ReplyLine(line);
-                }
-            }
-            else
+            const orthia::IImageFormat* format = orthia::FindFormatByModule(mod);
+            if (!format)
             {
                 throw std::runtime_error("Unknown module format: " + orthia::PlatformStringToUtf8(mod.fullName));
+            }
+            orthia::ModuleAccess access;
+            access.reader = pMemoryReader.get();
+            access.mod = &mod;
+            access.imageFile = mod.fullName;
+            std::vector<orthia::PlatformString_type> lines;
+            format->DescribeModule(access, lines);
+            for (const auto& text : lines)
+            {
+                args.ReplyLine(text);
             }
 
             moduleFound = true;
