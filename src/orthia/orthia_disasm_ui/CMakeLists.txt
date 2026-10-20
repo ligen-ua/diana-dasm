@@ -24,6 +24,10 @@ set(SOURCES
     orthia_model_interfaces.cpp
     orthia_model_modules.cpp
     orthia_model_modules_elf.cpp
+    formats/orthia_image_format.cpp
+    formats/orthia_diana_image_format.cpp
+    formats/orthia_format_pe.cpp
+    formats/orthia_format_elf.cpp
     orthia_module_analyzer.cpp
     orthia_process_adapter.cpp
     oui_disasm_colors.cpp

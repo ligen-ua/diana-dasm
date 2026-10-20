@@ -6,6 +6,8 @@
 #include "orthia_module_names.h"
 #include "orthia_config.h"
 #include "orthia_external_symbols.h"
+#include "formats/orthia_image_format.h"
+#include "diana_executable.h"
 #ifndef _WIN32
 #include "oui_privileges_posix.h"
 #endif
@@ -506,6 +508,85 @@ TEST(ElfDebugFile, HostLookup)
     EXPECT_TRUE(orthia::FindElfDebugFile(module.native(), orthia::PlatformString_type(), ORTHIA_TCSTR("libx.so"), folders).empty());
 
     fs::remove_all(root, error);
+}
+
+TEST(ImageFormats, Registry)
+{
+    std::set<std::string> ids;
+    int typeFlags = 0;
+    for (auto* format : orthia::GetImageFormats())
+    {
+        ASSERT_NE(nullptr, format);
+        EXPECT_TRUE(ids.insert(format->GetId()).second) << format->GetId();
+        EXPECT_EQ(format, orthia::FindFormatById(format->GetId()));
+        EXPECT_NE(std::string(), format->GetDisplayName());
+        // one bit per format, apart from the status bits that share the field
+        const int flag = format->GetBuiltInFlag();
+        EXPECT_NE(0, flag);
+        EXPECT_EQ(0, flag & (flag - 1)) << format->GetId();
+        EXPECT_EQ(0, flag & typeFlags) << format->GetId();
+        EXPECT_EQ(0, flag & orthia::ModuleInfo::builtInFlags_unresolved) << format->GetId();
+        typeFlags |= flag;
+    }
+    EXPECT_EQ((std::set<std::string>{ "pe", "elf" }), ids);
+    EXPECT_STREQ("PE", orthia::FindFormatById("pe")->GetDisplayName());
+    EXPECT_STREQ("ELF", orthia::FindFormatById("elf")->GetDisplayName());
+    // the ids are stored, so they stay lowercase and exact
+    EXPECT_EQ(nullptr, orthia::FindFormatById("PE"));
+    EXPECT_EQ(nullptr, orthia::FindFormatById(""));
+    EXPECT_EQ(nullptr, orthia::FindFormatById("raw"));
+
+    EXPECT_EQ(orthia::FindFormatById("pe"), orthia::FindFormatByExecutableType(DIANA_EXECUTABLE_TYPE_PE));
+    EXPECT_EQ(orthia::FindFormatById("elf"), orthia::FindFormatByExecutableType(DIANA_EXECUTABLE_TYPE_ELF));
+    EXPECT_EQ(nullptr, orthia::FindFormatByExecutableType(DIANA_EXECUTABLE_TYPE_NONE));
+}
+
+TEST(ImageFormats, Detect)
+{
+    auto detect = [](const std::string& header) {
+        auto* format = orthia::FindFormatByData(header.data(), header.size());
+        return format ? std::string(format->GetId()) : std::string("none");
+    };
+    EXPECT_EQ("pe", detect(std::string("MZ\x90\0", 4)));
+    EXPECT_EQ("elf", detect(std::string("\x7f" "ELF\x02\x01\x01", 7)));
+    EXPECT_EQ("none", detect("just some text"));
+    EXPECT_EQ("none", detect(std::string("\x55\x48\x89\xe5", 4)));
+    // too short to tell
+    EXPECT_EQ("none", detect("M"));
+    EXPECT_EQ("none", detect(std::string("\x7f" "EL", 3)));
+    EXPECT_EQ("none", detect(""));
+}
+
+TEST(ImageFormats, MapErrorMessage)
+{
+    // recognized, but no valid headers behind the magic
+    std::vector<char> data(0x200, 0);
+    data[0] = 'M';
+    data[1] = 'Z';
+    try
+    {
+        orthia::FindFormatById("pe")->MapFile(data, orthia::MapFileParameters());
+        FAIL() << "mapped a PE file without NT headers";
+    }
+    catch (const std::runtime_error& e)
+    {
+        EXPECT_EQ(0u, std::string(e.what()).find("Invalid PE image: ")) << e.what();
+    }
+
+    std::vector<char> elf(0x40, 0);
+    elf[0] = 0x7f;
+    elf[1] = 'E';
+    elf[2] = 'L';
+    elf[3] = 'F';
+    try
+    {
+        orthia::FindFormatById("elf")->MapFile(elf, orthia::MapFileParameters());
+        FAIL() << "mapped an ELF file with an empty header";
+    }
+    catch (const std::runtime_error& e)
+    {
+        EXPECT_EQ(0u, std::string(e.what()).find("Invalid ELF image: ")) << e.what();
+    }
 }
 
 int RunTests()

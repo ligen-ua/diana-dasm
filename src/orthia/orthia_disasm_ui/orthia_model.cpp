@@ -9,6 +9,7 @@
 #include "orthia_module_symbols.h"
 #include "orthia_shellcode.h"
 #include "orthia_common_format.h"
+#include "formats/orthia_image_format.h"
 
 namespace orthia
 {
@@ -438,14 +439,15 @@ namespace orthia
 
             // detect format and map
             const int executableType = DianaExecutable_DetectType(binPeFile.data(), binPeFile.size());
-            if (executableType == DIANA_EXECUTABLE_TYPE_NONE)
+            const IImageFormat* format = FindFormatByExecutableType(executableType);
+            if (!format)
             {
                 // Unknown format: store the IFile2 so the UI can offer shellcode loading
                 result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
                 return;
             }
             orthia::MapFileParameters params;
-            auto mappedExe = orthia::MakeSimpleFile(executableType, binPeFile, params);
+            auto mappedExe = format->MapFile(binPeFile, params);
 
             // check folder
             auto fileHash = CalcSha1(binPeFile);
@@ -570,24 +572,11 @@ namespace orthia
                     orthia::CImportsLoader importsLoader(executableType, completeHandler);
                     importsLoader.LoadModules(file->GetFullFileName(), mappedExe, file->GetFileSystem());
 
-                    if (deepAnalysis)
-                    {
-                        info->moduleManager->ReloadModule(imageBase,
-                            &reader,
-                            false,
-                            info->shortName.native,
-                            0);
-                    }
-                    else
-                    {
-                        info->moduleManager->RegisterModule(imageBase, &reader, info->shortName.native);
-                    }
+                    format->RegisterMainModule(*info->moduleManager, *mappedExe, reader, info->shortName.native, deepAnalysis);
 
                     importsLoader.ReportModules(info->moduleManager);
                 }
-                const int builtInTypeFlag =
-                    (executableType == DIANA_EXECUTABLE_TYPE_ELF) ? ModuleInfo::builtInFlags_moduleTypeElf :
-                    (executableType == DIANA_EXECUTABLE_TYPE_PE)  ? ModuleInfo::builtInFlags_moduleTypePe : 0;
+                const int builtInTypeFlag = format->GetBuiltInFlag();
                 ModuleSourceMeta source;
                 // PE only: the ELF GOT slot keys are not verified for the replay yet
                 source.iatSlots = (executableType == DIANA_EXECUTABLE_TYPE_PE);

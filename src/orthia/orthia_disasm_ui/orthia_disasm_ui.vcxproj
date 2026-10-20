@@ -215,6 +215,10 @@
     <ClCompile Include="orthia_model_interfaces.cpp" />
     <ClCompile Include="orthia_model_modules.cpp" />
     <ClCompile Include="orthia_model_modules_elf.cpp" />
+    <ClCompile Include="formats\orthia_image_format.cpp" />
+    <ClCompile Include="formats\orthia_diana_image_format.cpp" />
+    <ClCompile Include="formats\orthia_format_pe.cpp" />
+    <ClCompile Include="formats\orthia_format_elf.cpp" />
     <ClCompile Include="orthia_module_analyzer.cpp" />
     <ClCompile Include="orthia_module_names.cpp" />
     <ClCompile Include="orthia_module_symbols.cpp" />
@@ -254,6 +258,8 @@
     <ClInclude Include="orthia_model_interfaces.h" />
     <ClInclude Include="orthia_model_modules.h" />
     <ClInclude Include="orthia_model_modules_elf.h" />
+    <ClInclude Include="formats\orthia_image_format.h" />
+    <ClInclude Include="formats\orthia_diana_image_format.h" />
     <ClInclude Include="orthia_module_analyzer.h" />
     <ClInclude Include="orthia_module_names.h" />
     <ClInclude Include="orthia_process_adapter.h" />
