@@ -14,12 +14,12 @@ from images import ElfInfo, PeInfo
 _LM_START = re.compile(r"^([0-9a-f`]{17})\s+[0-9a-f`]{17}\s+(\S+)", re.M)
 
 PE_FILES = ["tls_x86_64.dll", "tls_aarch64.dll"]
-ELF_FILES = ["libstartup_x64.so", "libstartup_arm64.so", "libexports_gnu.so", "libexports_sysv.so"]
+ELF_FILES = ["libstartup_x64.so", "libstartup_arm64.so", "libexports_gnu.so", "libexports_sysv.so", "nopie_x64"]
 
 
 def module_names(orthia, path):
     """(base, {name: [address, ...]}) of the opened file's own module"""
-    module = path.name.rsplit(".", 1)[0]
+    module = path.name.rsplit(".", 1)[0] if "." in path.name else path.name
     res = orthia.run("lm", f"x {module}!*", file=path).assert_ok()
     starts = {m.group(2): int(m.group(1).replace("`", ""), 16) for m in _LM_START.finditer(res.stdout)}
     prefix = f"{path.name}!"
@@ -59,8 +59,29 @@ def test_elf_exports(orthia, name):
         # one name per address in file mode: an alias (vfunc, vfunc_v2) or, for an IFUNC's
         # resolver, its "$" name may be the one kept
         aliases = {n for n, v in elf.exported_functions.items() if v == value}
-        found = names_at(names, bias + value)
-        assert aliases & set(found) or any(n.startswith("$") for n in found), (export, hex(bias + value), names)
+        address = elf.address(value, bias)
+        found = names_at(names, address)
+        assert aliases & set(found) or any(n.startswith("$") for n in found), (export, hex(address), names)
+    if elf.e_entry:
+        assert names["$entrypoint"] == [elf.address(elf.e_entry, bias)], names
+
+
+@pytest.mark.elf
+@pytest.mark.parametrize("name", [
+    "libstartup_x64.so",
+    pytest.param("nopie_x64", marks=pytest.mark.xfail(
+        reason="B24: an ET_EXEC file is mapped with vaddr 0 at its first p_vaddr, its code 0x400000 too high")),
+])
+def test_elf_export_bytes(orthia, name):
+    # the names are where the code is: the bytes at each exported function are the file's
+    path = REPO_ROOT / "data/elf" / name
+    elf = ElfInfo(path)
+    bias, _ = module_names(orthia, path)
+    export, value = sorted(elf.exported_functions.items())[0]
+    address = elf.address(value, bias)
+    res = orthia.run(f"db {address:x} L4", file=path).assert_ok()
+    expected = " ".join(f"{b:02x}" for b in elf.bytes_at(value, 4))
+    res.assert_line(rf"^[0-9a-f`]{{17}}  {expected}\s")
 
 
 @pytest.mark.elf

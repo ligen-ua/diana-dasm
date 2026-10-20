@@ -21,6 +21,7 @@ class Section(NamedTuple):
 # ELF
 
 PT_LOAD = 1
+ET_EXEC, ET_DYN = 2, 3
 SHT_NOTE = 7
 SHT_DYNSYM = 11
 STT_FUNC, STT_GNU_IFUNC = 2, 10
@@ -109,6 +110,11 @@ class ElfInfo:
                 return notes[name_end:name_end + descsz].hex()
             pos = name_end + ((descsz + 3) & ~3)
         return None
+
+    def address(self, value: int, bias: int) -> int:
+        """Where a symbol value or e_entry is once the image is loaded at `bias`: ET_EXEC
+        values are link-time addresses and the image stays at them; the others are offsets."""
+        return value if self.e_type == ET_EXEC else bias + value
 
     @property
     def image_size(self) -> int:
