@@ -1,5 +1,16 @@
 #pragma once
 
+// Executable formats for the UI layer. Adding one (Mach-O, NE, ...):
+//  1. formats/orthia_format_<id>.cpp: an IImageFormat (and an IModuleImage it opens), plus a
+//     const IImageFormat& Get<Name>ImageFormat() that returns its one instance;
+//  2. one line in GetImageFormats() (orthia_image_format.cpp);
+//  3. a free bit in ModuleInfo::builtInFlags (orthia_model_interfaces.h) for GetBuiltInFlag;
+//  4. the .cpp in orthia_disasm_ui.vcxproj (+ .filters) and CMakeLists.txt.
+// Everything else (detection, opening files, process modules, names, modinfo, sections,
+// symbols, --format) finds the format through the registry. Hooks a format doesn't need keep
+// their defaults: no dependencies, no sections, no symbols, ...
+// A format Diana parses can derive from CDianaImageFormat / CDianaModuleImage.
+
 #include "../orthia_model_interfaces.h"
 #include "orthia_simple_file.h"
 #include "orthia_image_identity.h"
@@ -7,6 +18,8 @@
 namespace orthia
 {
     class CModuleManager;
+    class IExternalSymbolsLoader;
+    struct SymbolsLoaderParams;
     struct IImageFormat;
 
     // What a format may read about one module, in file mode and in process mode. The mapped
@@ -117,6 +130,8 @@ namespace orthia
         virtual void DescribeModule(const ModuleAccess& access, std::vector<PlatformString_type>& lines) const {}
         // false when the format has no sections or the headers don't parse
         virtual bool QuerySections(const ModuleAccess& access, ImageSections& sections) const { return false; }
+        // private symbols from outside the image (PDB, separate debug files); nullptr: none
+        virtual std::unique_ptr<IExternalSymbolsLoader> CreateSymbolsLoader(const SymbolsLoaderParams& params) const;
     };
 
     // how much of a file's start FindFormatByData needs to tell every format apart

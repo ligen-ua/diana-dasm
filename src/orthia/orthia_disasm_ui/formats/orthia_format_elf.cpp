@@ -66,6 +66,10 @@ namespace orthia
                 }
                 lines.push_back(ORTHIA_TCSTR("Build ID: ") + buildIdHex);
             }
+            std::unique_ptr<IExternalSymbolsLoader> CreateSymbolsLoader(const SymbolsLoaderParams& params) const override
+            {
+                return CreateElfDebugFileLoader(params);
+            }
             // the section headers are not mapped: read from the module's file when it is the
             // build in memory, the program headers from memory otherwise
             bool QuerySections(const ModuleAccess& access, ImageSections& sections) const override

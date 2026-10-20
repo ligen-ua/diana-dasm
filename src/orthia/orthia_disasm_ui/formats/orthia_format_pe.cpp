@@ -96,6 +96,10 @@ namespace orthia
                 lines.push_back(ORTHIA_TCSTR("Debug Age: ") + ObjectToString(age));
                 lines.push_back(ORTHIA_TCSTR("Pdb name: ") + pdbName);
             }
+            std::unique_ptr<IExternalSymbolsLoader> CreateSymbolsLoader(const SymbolsLoaderParams& params) const override
+            {
+                return CreatePdbSymbolsLoader(params);
+            }
             // the section headers are mapped with the image
             bool QuerySections(const ModuleAccess& access, ImageSections& sections) const override
             {

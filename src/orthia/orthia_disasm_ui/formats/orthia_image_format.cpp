@@ -1,10 +1,16 @@
 #include "orthia_image_format.h"
 #include "orthia_diana_image_format.h"
 #include "../orthia_helpers.h"
+#include "../orthia_external_symbols.h"
 
 namespace orthia
 {
     const IImageFormat& GetRawImageFormat();
+
+    std::unique_ptr<IExternalSymbolsLoader> IImageFormat::CreateSymbolsLoader(const SymbolsLoaderParams&) const
+    {
+        return nullptr;
+    }
 
     void CModuleImageBase::AddName(std::vector<NameInfo>& out, int flags, Address_type address, const std::string& utf8Name)
     {

@@ -13,24 +13,17 @@ extern "C"
 #include "orthia_sections.h"
 #include "orthia_streams.h"
 #include "orthia_utils.h"
+#include "formats/orthia_image_format.h"
 #include <filesystem>
 #include <optional>
 
 namespace orthia
 {
 
-bool IsPeModule(const ModuleInfo& mod)
+static bool IsModuleOfFormat(const ModuleInfo& mod, const char* formatId)
 {
-    if (mod.builtInFlags & ModuleInfo::builtInFlags_moduleTypePe)
-        return true;
-    if (mod.builtInFlags & ModuleInfo::builtInFlags_moduleTypeElf)
-        return false;
-    // Legacy fallback for modules without builtInFlags (old databases)
-    PlatformString_type ext;
-    GetExtensionOfFile(mod.fullName, &ext);
-    return ext == ORTHIA_TCSTR("dll")
-        || ext == ORTHIA_TCSTR("exe")
-        || ext == ORTHIA_TCSTR("sys");
+    const IImageFormat* format = FindFormatByModule(mod);
+    return format && format == FindFormatById(formatId);
 }
 
 bool IsModuleImageReadable(IMemoryReader* memoryReader, const ModuleInfo& mod)
@@ -274,7 +267,7 @@ public:
 
     bool CanLoad(const ModuleInfo& mod) const override
     {
-        return IsPeModule(mod);
+        return IsModuleOfFormat(mod, "pe");
     }
 
     void Load(const ModuleInfo& mod, IMemoryReader* memoryReader, ModuleSymbols& out,
@@ -543,7 +536,7 @@ public:
 
     bool CanLoad(const ModuleInfo& mod) const override
     {
-        return !IsPeModule(mod);
+        return IsModuleOfFormat(mod, "elf");
     }
 
     void Load(const ModuleInfo& mod, IMemoryReader* memoryReader, ModuleSymbols& /*out*/,
@@ -611,14 +604,33 @@ public:
 
 } // anonymous namespace
 
+std::unique_ptr<IExternalSymbolsLoader> CreatePdbSymbolsLoader(const SymbolsLoaderParams& params)
+{
+    return std::make_unique<CPdbExternalSymbolsLoader>(params.symbolFolders, params.logger);
+}
+
+std::unique_ptr<IExternalSymbolsLoader> CreateElfDebugFileLoader(const SymbolsLoaderParams& params)
+{
+    return std::make_unique<CElfExternalSymbolsLoader>(params.symbolFolders, params.logger, params.openFile);
+}
+
 std::unique_ptr<IExternalSymbolsLoader> CreateExternalSymbolsLoader(
     const std::vector<PlatformString_type>& symbolFolders,
     std::shared_ptr<CLoaderUILogger> logger,
     FileOpener_type openFile)
 {
+    SymbolsLoaderParams params;
+    params.symbolFolders = symbolFolders;
+    params.logger = std::move(logger);
+    params.openFile = std::move(openFile);
     auto composite = std::make_unique<CCompositeExternalSymbolsLoader>();
-    composite->Add(std::make_unique<CPdbExternalSymbolsLoader>(symbolFolders, logger));
-    composite->Add(std::make_unique<CElfExternalSymbolsLoader>(symbolFolders, std::move(logger), std::move(openFile)));
+    for (auto* format : GetImageFormats())
+    {
+        if (auto loader = format->CreateSymbolsLoader(params))
+        {
+            composite->Add(std::move(loader));
+        }
+    }
     return composite;
 }
 

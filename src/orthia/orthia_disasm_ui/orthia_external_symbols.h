@@ -10,8 +10,6 @@ namespace orthia
 {
     class CClassicDatabase;
 
-    bool IsPeModule(const ModuleInfo& mod);
-
     // Whether the module's image can be read at mod.address: an unresolved dependency owns
     // an address range with nothing mapped there, and so does, in file mode, any dependency
     bool IsModuleImageReadable(IMemoryReader* memoryReader, const ModuleInfo& mod);
@@ -83,6 +81,18 @@ namespace orthia
                           OnPrivateSymbolLoaded onSymbol = nullptr) = 0;
     };
 
+    struct SymbolsLoaderParams
+    {
+        std::vector<PlatformString_type> symbolFolders;     // host-side
+        std::shared_ptr<CLoaderUILogger> logger;
+        FileOpener_type openFile;                           // the modules' own (target) files
+    };
+    // the loaders behind the formats (IImageFormat::CreateSymbolsLoader):
+    // PDB files for PE modules, separate debug files for ELF modules
+    std::unique_ptr<IExternalSymbolsLoader> CreatePdbSymbolsLoader(const SymbolsLoaderParams& params);
+    std::unique_ptr<IExternalSymbolsLoader> CreateElfDebugFileLoader(const SymbolsLoaderParams& params);
+
+    // every format's loader; a module is loaded by the first one that can
     std::unique_ptr<IExternalSymbolsLoader> CreateExternalSymbolsLoader(
         const std::vector<PlatformString_type>& symbolFolders,
         std::shared_ptr<CLoaderUILogger> logger = nullptr,
