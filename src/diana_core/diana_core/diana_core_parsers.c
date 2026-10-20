@@ -34,12 +34,15 @@ typedef struct _dianaParserContext
 
 }DianaParserContext;
 
-static void DianaParserContext_Init(DianaParserContext * pContext, 
-                                    DianaBaseGenObject_type * pLine)
+static void DianaParserContext_Init(DianaParserContext * pContext,
+                                    DianaBaseGenObject_type * pLine,
+                                    int opcodePosition)
 {
     pContext->states[0].pLine = pLine;
     pContext->states[0].position = -1;
-    pContext->states[0].opcodePosition = 0;
+    // a rollback to the root starts again at the first byte, never before it: the cache before cacheIt holds
+    // bytes of the previous instruction (a VEX selector, a mandatory prefix)
+    pContext->states[0].opcodePosition = opcodePosition;
 
     pContext->pResult = 0;
 
@@ -112,8 +115,9 @@ static int TryMatchKey(DianaBaseGenObject_type * pFoundKey, DianaParseParams * p
         return 1;
     }
 
+    // not in 64-bit mode: 16-bit mode has them too
     if (flagMask & DI_FLAG_CMD_I386 &&
-        pParseParams->pContext->iMainMode_addressSize == DIANA_MODE32)
+        pParseParams->pContext->iMainMode_addressSize != DIANA_MODE64)
     {
         return 1;
     }
@@ -184,6 +188,18 @@ int DispatchKey(DianaParserContext * pContext,
             return 0;
 
         if (!AreKeysGood(pObject, pKey))
+            return 0;
+
+        // the virtual VEX entries (c5 + selector) only after a VEX prefix, the others only without: a raw c5 is
+        // lds (32-bit c5 09 54 cb matched vandpd); the EVEX entries (62 + selector) only after EVEX
+        if (!(((DianaCmdInfo*)pObject)->m_flags & DI_FLAG_CMD_VEX_ENCODED) != !pParseParams->pContext->iVexPrefix)
+            return 0;
+        if (!(pObject->m_flags & DIANA_BASE_GEN_OBJECT_EVEX) != !pParseParams->pContext->iEvexPrefix)
+            return 0;
+        // VEX.W0 with W = 1: #UD, or the W1 entry of the opcode
+        if ((pObject->m_flags & DIANA_BASE_GEN_OBJECT_VEX_W0) && (pParseParams->pContext->iVexPrefix & DI_VEX_PREFIX_W))
+            return 0;
+        if ((pObject->m_flags & DIANA_BASE_GEN_OBJECT_VEX_W1) && !(pParseParams->pContext->iVexPrefix & DI_VEX_PREFIX_W))
             return 0;
         
         pContext->pResult = (DianaCmdInfo*)pObject;
@@ -351,7 +367,7 @@ int Diana_ParseCmdImpl(DianaParseParams * pParseParams, // IN
         return DI_ERROR;
     }
     
-    DianaParserContext_Init(&context, pParseParams->pInitialLine);
+    DianaParserContext_Init(&context, pParseParams->pInitialLine, it);
     for(;;)
     {
         GetKeyByAddress(pParseParams->pContext->cache + it, 
@@ -472,13 +488,21 @@ int TryMatch(DianaParseParams * pParseParams,
     {
         // something found
         int oldTailSize = cmdProxy.tail_size;
+        // the state the prefixes change: a failed match is undone for the next try (another mandatory prefix)
+        DianaContext * pContext = pParseParams->pContext;
+        int savedOpSize = pContext->iCurrentCmd_opsize, savedAddressSize = pContext->iCurrentCmd_addressSize;
+        int savedPrefix = pContext->iPrefix, savedSizePrefixes = pContext->iSizePrefixes;
+        DianaUnifiedRegister savedSreg = pContext->currentCmd_sreg;
+        DI_CHAR savedRex = pContext->iRexPrefix;
         ApplyPrefixes(pParseParams->pContext, 
                       iCurrentPrefix); // exclude iCurrentPrefix
 
         if (pParseParams->pContext->iSizePrefixes & DIANA_INVALID_STATE)
         {
-            return DI_ERROR;
+            iResult = DI_ERROR;
         }
+        else
+        {
 
         if (oldPrefixFound)
         {
@@ -490,14 +514,29 @@ int TryMatch(DianaParseParams * pParseParams,
         iResult = Diana_LinkOperands(pParseParams->pContext, 
                                      pParseParams->pResult, 
                                      &cmdProxy.parent);
-        
-        pParseParams->pContext->cacheSize = cmdProxy.tail_size;
-        pParseParams->pContext->cacheIt += oldTailSize - cmdProxy.tail_size;
-
-        if (pParseParams->pContext->cacheIt < DI_CACHE_RESERVED)
+        if (!iResult)
         {
-            Diana_FatalBreak();
+            pParseParams->pContext->cacheSize = cmdProxy.tail_size;
+            pParseParams->pContext->cacheIt += oldTailSize - cmdProxy.tail_size;
+
+            if (pParseParams->pContext->cacheIt < DI_CACHE_RESERVED)
+            {
+                Diana_FatalBreak();
+            }
+            return iResult;
         }
+        }
+        // undo for the next try
+        pContext->iCurrentCmd_opsize = savedOpSize;
+        pContext->iCurrentCmd_addressSize = savedAddressSize;
+        pContext->iPrefix = savedPrefix;
+        pContext->iSizePrefixes = savedSizePrefixes;
+        pContext->currentCmd_sreg = savedSreg;
+        pContext->iRexPrefix = savedRex;
+        pParseParams->pResult->iLinkedOpCount = 0;
+        pParseParams->pResult->pInfo = 0;
+        pContext->cacheIt = DI_CACHE_RESERVED;
+        pContext->cacheSize = iOriginalCacheSize;
         return iResult;
     }
 
@@ -520,8 +559,17 @@ int Diana_InsertPrefix(DianaContext * pContext,
     for(; i < pContext->prefixesCount; ++i)
     {
         if (pContext->prefixes[i].prefix == prefix)
-            return DI_SUCCESS;
+        {
+            // repeated: the last one counts (64 36 64: fs), it moves to the end
+            for (; i + 1 < pContext->prefixesCount; ++i)
+                pContext->prefixes[i] = pContext->prefixes[i + 1];
+            --pContext->prefixesCount;
+            if (pContext->lastPrefixBeforeRex != DI_FULL_CHAR_NULL && pContext->lastPrefixBeforeRex >= pContext->prefixesCount)
+                pContext->lastPrefixBeforeRex = pContext->prefixesCount ? pContext->prefixesCount - 1 : DI_FULL_CHAR_NULL;
+            break;
+        }
     }
+    i = pContext->prefixesCount;
 
     pContext->prefixes[pContext->prefixesCount].prefix = prefix;
     pContext->prefixes[pContext->prefixesCount].linkedPrefixFnc = linkedPrefixFnc;
@@ -538,6 +586,120 @@ static int IsVEXPrefix(DI_CHAR data)
     return (data == 0xC4 || data == 0xC5);
 }
 
+// the rules of every EVEX entry (the spec doesn't write them per line), after the operands are linked
+static int Di_CheckEvex(DianaContext * pContext, DianaParserResult * pResult)
+{
+    const DianaEvexCmdAttributes * pAttributes = Diana_GetEvexAttributes(pResult->pInfo);
+    DI_UINT32 flags = pAttributes ? pAttributes->m_flags : 0;
+    int prefix = pContext->iEvexPrefix;
+    int i = 0, memory = -1, vsib = 0;
+    if (!pAttributes)
+        return DI_ERROR;
+    for (i = 0; i < pResult->iLinkedOpCount; ++i)
+    {
+        DianaLinkedOperand * pOp = pResult->linkedOperands + i;
+        if (pOp->type == diana_index || pOp->type == diana_memory)
+            memory = i;
+        vsib |= pOp->pInfo->m_type == diana_orVSIB;
+    }
+    // the opmask
+    if (pContext->iEvexAAA && !(flags & DI_EVEX_MASK))
+        return DI_ERROR;
+    if (!pContext->iEvexAAA && (flags & DI_EVEX_MASK_REQUIRED))
+        return DI_ERROR;
+    if (prefix & DI_EVEX_PREFIX_Z)
+    {
+        // zeroing: the entry allows it, not with a memory destination, not without a mask (the CPU: #UD)
+        if (!(flags & DI_EVEX_ZEROING) || memory == 0 || !pContext->iEvexAAA)
+            return DI_ERROR;
+    }
+    // a scalar (LIG): L'L 11 is #UD, except as the rounding of a register form
+    if ((flags & DI_EVEX_VL_MASK) == DI_EVEX_VL_LIG && pContext->iEvexLL == 3 &&
+        !((prefix & DI_EVEX_PREFIX_B) && memory < 0))
+        return DI_ERROR;
+    // no vvvv operand: vvvv and V' are 1111, 1 (V' is the VSIB index bit 4)
+    if (!DI_VEX_GET_NDS(pResult->pInfo->m_flags) && !vsib && (prefix & DI_EVEX_PREFIX_V1))
+        return DI_ERROR;
+    if ((flags & DI_EVEX_DISTINCT) && pResult->iLinkedOpCount)
+    {
+        int dest = Diana_VectorRegisterNumber(pResult->linkedOperands[0].value.recognizedRegister, 0);
+        for (i = 1; i < pResult->iLinkedOpCount; ++i)
+        {
+            DianaLinkedOperand * pOp = pResult->linkedOperands + i;
+            if (pOp->type == diana_register && Diana_VectorRegisterNumber(pOp->value.recognizedRegister, 0) == dest)
+                return DI_ERROR;
+        }
+    }
+    pResult->evex.isEvex = 1;
+    pResult->evex.mask = pContext->iEvexAAA;
+    pResult->evex.zeroing = (prefix & DI_EVEX_PREFIX_Z) ? 1 : 0;
+    switch (flags & DI_EVEX_VL_MASK)
+    {
+    case DI_EVEX_VL_128: pResult->evex.vectorSize = 16; break;
+    case DI_EVEX_VL_256: pResult->evex.vectorSize = 32; break;
+    case DI_EVEX_VL_512: pResult->evex.vectorSize = 64; break;
+    default: pResult->evex.vectorSize = 16; break;
+    }
+    if (prefix & DI_EVEX_PREFIX_B)
+    {
+        if (memory >= 0)
+        {
+            // the broadcast: set by the operand linking (Diana_LinkOperands)
+            if (!pResult->evex.broadcast)
+                return DI_ERROR;
+        }
+        else
+        if (flags & DI_EVEX_ER)
+            pResult->evex.rounding = (DI_UINT8)(DIANA_EVEX_ROUND_RN + pContext->iEvexLL);
+        else
+        if (flags & DI_EVEX_SAE)
+            pResult->evex.rounding = DIANA_EVEX_ROUND_SAE;
+        else
+        if (!(flags & DI_EVEX_B_IGNORED))
+            return DI_ERROR;
+    }
+    return DI_SUCCESS;
+}
+
+// an EVEX instruction: the virtual prefix 62 <selector> is in the cache (Di_ProcessEvexPrefix)
+static int Di_ParseEvexCmd(DianaParseParams * pParseParams)
+{
+    DianaContext * pContext = pParseParams->pContext;
+    DianaStreamProxy cmdProxy;
+    int newIt = 0, oldTailSize = 0, iResult = 0;
+    DI_CHAR rex = pContext->iRexPrefix;
+    int opSize = DI_REX_HAS_FLAG_W(rex) ? 8 : 4;
+    DI_FULL_CHAR i = 0;
+    // 66, F2, F3, LOCK before EVEX: #UD
+    for (; i < pContext->prefixesCount; ++i)
+    {
+        DI_CHAR prefix = pContext->prefixes[i].prefix;
+        if (prefix == 0x66 || prefix == 0xF2 || prefix == 0xF3 || prefix == 0xF0)
+            return DI_ERROR;
+    }
+    iResult = Diana_ParseCmdImpl(pParseParams, &cmdProxy, &newIt);
+    if (iResult) return iResult;
+    if (!(pParseParams->pResult->pInfo->m_parent.m_flags & DIANA_BASE_GEN_OBJECT_EVEX))
+        return DI_ERROR;
+    oldTailSize = cmdProxy.tail_size;
+    ApplyPrefixes(pContext, DI_FULL_CHAR_NULL);
+    if (pContext->iSizePrefixes & DIANA_INVALID_STATE) return DI_ERROR;
+    // the segment and 67 prefixes clear the REX state: R X B W of EVEX stay
+    pContext->iRexPrefix = rex;
+    pContext->iCurrentCmd_opsize = opSize;
+    pContext->cacheIt = newIt;
+    iResult = Diana_LinkOperands(pContext, pParseParams->pResult, &cmdProxy.parent);
+    // no vvvv operand: vvvv must be 1111 (0 here, it is stored inverted)
+    if (!iResult && !DI_VEX_GET_NDS(pParseParams->pResult->pInfo->m_flags) && pContext->iVexVVVV)
+        return DI_ERROR;
+    if (!iResult)
+        iResult = Di_CheckEvex(pContext, pParseParams->pResult);
+    pContext->cacheSize = cmdProxy.tail_size;
+    pContext->cacheIt += oldTailSize - cmdProxy.tail_size;
+    if (!iResult && pContext->cacheIt < DI_CACHE_RESERVED) Diana_FatalBreak();
+    return iResult;
+}
+
 int Diana_ParseCmdEx(DianaParseParams* pParseParams)    // OUT
 {
     int iResult = 0;
@@ -552,6 +714,9 @@ int Diana_ParseCmdEx(DianaParseParams* pParseParams)    // OUT
     Diana_ResetPrefixes(pParseParams->pContext);
     pParseParams->pContext->iVexPrefix = 0;
     pParseParams->pContext->iVexVVVV   = 0;
+    pParseParams->pContext->iEvexPrefix = 0;
+    pParseParams->pContext->iEvexAAA = 0;
+    pParseParams->pContext->iEvexLL = 0;
     DIANA_MEMSET(pParseParams->pResult, 0, sizeof(DianaParserResult));
 
     // check prefixes
@@ -586,7 +751,20 @@ int Diana_ParseCmdEx(DianaParseParams* pParseParams)    // OUT
                                            pParseParams->pResult);
     
         if (!prefixFound)
+        {
+            // a REX before a legacy prefix has no effect (the CPU ignores it): drop it, read on (40 2e c5 f8 77 is
+            // vzeroupper)
+            DianaContext * pContext = pParseParams->pContext;
+            if (pContext->iAMD64Mode && data >= DI_REX_PREFIX_START && data <= DI_REX_PREFIX_END)
+            {
+                int nextIsPrefix = 0;
+                if (!Diana_ReadCache(pContext, pParseParams->readStream, 0) && pContext->cacheSize)
+                    Di_ProcessCustomPrefix(pContext->cache[pContext->cacheIt], &nextIsPrefix, pContext, 0);
+                if (nextIsPrefix)
+                    continue;
+            }
             break;
+        }
 
         iResult = Diana_InsertPrefix(pParseParams->pContext, 
                                      data,
@@ -628,23 +806,72 @@ int Diana_ParseCmdEx(DianaParseParams* pParseParams)    // OUT
     if (iResult && !dataValid)
         return iResult;
 
+    // REX right before VEX (c4, c5 are VEX in 64-bit mode) or EVEX (62): #UD
+    if (!dataValid && pParseParams->pContext->cacheSize &&
+        (IsVEXPrefix(pParseParams->pContext->cache[pParseParams->pContext->cacheIt]) ||
+         pParseParams->pContext->cache[pParseParams->pContext->cacheIt] == 0x62))
+        return DI_ERROR;
+
+    // 90 is nop after any prefix: F3 90 is pause (a table entry), REX.B 90 is xchg r8, rax
+    {
+        DianaContext * pContext = pParseParams->pContext;
+        int op = dataValid ? data : (pContext->cacheSize ? pContext->cache[pContext->cacheIt] : -1);
+        DI_FULL_CHAR i = 0;
+        int hasF3 = 0;
+        for (; i < pContext->prefixesCount; ++i)
+            hasF3 |= pContext->prefixes[i].prefix == 0xF3;
+        if (op == 0x90 && !hasF3 && !(pContext->iRexPrefixValue & 1))
+        {
+            if (!dataValid)
+                Diana_CacheEatOne(pContext);
+            pParseParams->pResult->iLinkedOpCount = 0;
+            pParseParams->pResult->pInfo = Diana_GetNopInfo();
+            return DI_SUCCESS;
+        }
+    }
+
 
     pParseParams->pResult->pInfo = 0;
 
     // parse cmd
     iOriginalCacheSize = pParseParams->pContext->cacheSize;
 
-    // VEX prefix interception (AMD64 only, C4/C5 not handled by legacy prefix loop)
-    if (pParseParams->pContext->iAMD64Mode && dataValid && IsVEXPrefix(data))
+    // EVEX (62; outside 64-bit mode only when the next byte has bits 7..6 set, else bound)
+    if (dataValid && data == 0x62)
+    {
+        int evexFound = 0;
+        iResult = Di_ProcessEvexPrefix(&evexFound, pParseParams->pContext, pParseParams->readStream);
+        if (iResult) return iResult;
+        iOriginalCacheSize = pParseParams->pContext->cacheSize;
+        if (evexFound)
+            return Di_ParseEvexCmd(pParseParams);
+    }
+
+    // VEX prefix interception (C4/C5 not handled by legacy prefix loop; outside 64-bit mode only when the next
+    // byte has bits 7..6 set, else les/lds)
+    if (dataValid && IsVEXPrefix(data))
     {
         int vexFound = 0;
         iResult = Di_ProcessVexPrefix(data, &vexFound, pParseParams->pContext, pParseParams->readStream);
         if (iResult) return iResult;
+        // les/lds: the bytes Di_ProcessVexPrefix read are in the cache now
+        iOriginalCacheSize = pParseParams->pContext->cacheSize;
         if (vexFound)
         {
             DianaStreamProxy cmdProxy;
             int newIt = 0;
             int oldTailSize = 0;
+            DI_CHAR vexRex = pParseParams->pContext->iRexPrefix;
+            // the general registers of VEX instructions are 32-bit, 64-bit with W: no 16-bit form (66 is #UD)
+            int vexOpSize = DI_REX_HAS_FLAG_W(vexRex) ? 8 : 4;
+            DI_FULL_CHAR i = 0;
+            // 66, F2, F3, LOCK before VEX: #UD
+            for (; i < pParseParams->pContext->prefixesCount; ++i)
+            {
+                DI_CHAR prefix = pParseParams->pContext->prefixes[i].prefix;
+                if (prefix == 0x66 || prefix == 0xF2 || prefix == 0xF3 || prefix == 0xF0)
+                    return DI_ERROR;
+            }
             iResult = Diana_ParseCmdImpl(pParseParams, &cmdProxy, &newIt);
             if (iResult) return iResult;
             if (!(pParseParams->pResult->pInfo->m_flags & DI_FLAG_CMD_VEX_ENCODED))
@@ -655,8 +882,14 @@ int Diana_ParseCmdEx(DianaParseParams* pParseParams)    // OUT
             oldTailSize = cmdProxy.tail_size;
             ApplyPrefixes(pParseParams->pContext, DI_FULL_CHAR_NULL);
             if (pParseParams->pContext->iSizePrefixes & DIANA_INVALID_STATE) return DI_ERROR;
+            // the segment and 67 prefixes clear the REX state: R X B W of VEX stay
+            pParseParams->pContext->iRexPrefix = vexRex;
+            pParseParams->pContext->iCurrentCmd_opsize = vexOpSize;
             pParseParams->pContext->cacheIt = newIt;
             iResult = Diana_LinkOperands(pParseParams->pContext, pParseParams->pResult, &cmdProxy.parent);
+            // no vvvv operand: vvvv must be 1111 (0 here, it is stored inverted), else #UD
+            if (!iResult && !DI_VEX_GET_NDS(pParseParams->pResult->pInfo->m_flags) && pParseParams->pContext->iVexVVVV)
+                return DI_ERROR;
             pParseParams->pContext->cacheSize = cmdProxy.tail_size;
             pParseParams->pContext->cacheIt += oldTailSize - cmdProxy.tail_size;
             if (!iResult && pParseParams->pContext->cacheIt < DI_CACHE_RESERVED) Diana_FatalBreak();
@@ -664,16 +897,37 @@ int Diana_ParseCmdEx(DianaParseParams* pParseParams)    // OUT
         }
     }
 
-    if (pParseParams->pContext->lastPrefixBeforeRex != DI_FULL_CHAR_NULL)
+    // the mandatory prefix: F2 or F3 (the last of them) before 66, whatever the order and the segment prefixes
+    // between (66 f3 0f 7f is movdqu, 66 64 0f 11 is movupd); then the last prefix; then none
     {
-        iResult = TryMatch(pParseParams,
-                           dataValid,
-                           data,
-                           iOriginalCacheSize,
-                           pParseParams->pContext->lastPrefixBeforeRex);
-
-        if (!iResult)
-            return iResult;
+        DI_FULL_CHAR i = 0, repPrefix = DI_FULL_CHAR_NULL, sizePrefix = DI_FULL_CHAR_NULL;
+        DI_FULL_CHAR lastPrefix = pParseParams->pContext->lastPrefixBeforeRex;
+        for (; i < pParseParams->pContext->prefixesCount; ++i)
+        {
+            DI_CHAR prefix = pParseParams->pContext->prefixes[i].prefix;
+            if (prefix == 0xF2 || prefix == 0xF3)
+                repPrefix = i;
+            if (prefix == 0x66)
+                sizePrefix = i;
+        }
+        if (repPrefix != DI_FULL_CHAR_NULL)
+        {
+            iResult = TryMatch(pParseParams, dataValid, data, iOriginalCacheSize, repPrefix);
+            if (!iResult)
+                return iResult;
+        }
+        if (sizePrefix != DI_FULL_CHAR_NULL)
+        {
+            iResult = TryMatch(pParseParams, dataValid, data, iOriginalCacheSize, sizePrefix);
+            if (!iResult)
+                return iResult;
+        }
+        if (lastPrefix != DI_FULL_CHAR_NULL && lastPrefix != repPrefix && lastPrefix != sizePrefix)
+        {
+            iResult = TryMatch(pParseParams, dataValid, data, iOriginalCacheSize, lastPrefix);
+            if (!iResult)
+                return iResult;
+        }
     }
 
     // prefixes not matched as commands, try to match command

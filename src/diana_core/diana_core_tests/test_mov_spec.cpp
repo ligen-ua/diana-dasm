@@ -129,7 +129,8 @@ static void test_mov_spec_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_RCX);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_DS);
+        // the base is EBP/ESP/RSP: SS is the default segment
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RSP);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.index == 0x00);
@@ -150,7 +151,7 @@ static void test_mov_spec_impl()
         DIANA_TEST_ASSERT(result.iFullCmdSize == sizeof(mov5)-1);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED == (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_ESP);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.index == 0x00);
@@ -171,7 +172,8 @@ static void test_mov_spec_impl()
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
         DIANA_TEST_ASSERT(result.iFullCmdSize == sizeof(mov6));
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_RBP);
+        // 66, no REX.W: a 16-bit destination (objdump: movsxd bp,DWORD PTR [rax+0x4c])
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_BP);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_DS);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RAX);

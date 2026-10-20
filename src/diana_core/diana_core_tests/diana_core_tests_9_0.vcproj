@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="..\diana_core;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -123,7 +123,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="..\diana_core;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -200,7 +200,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				AdditionalIncludeDirectories="..\diana_core;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
 				TreatWChar_tAsBuiltInType="true"
 				RuntimeTypeInfo="true"
@@ -277,7 +277,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				AdditionalIncludeDirectories="..\diana_core;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
 				TreatWChar_tAsBuiltInType="true"
 				RuntimeTypeInfo="true"
@@ -345,7 +345,35 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_aesni.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_analyze.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_analyze_common.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_arm32.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_arm64.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_arm64_cmds.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_avx.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_bmi.cpp"
 				>
 			</File>
 			<File
@@ -358,6 +386,10 @@
 			</File>
 			<File
 				RelativePath=".\test_common.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_flist.cpp"
 				>
 			</File>
 			<File
@@ -382,6 +414,10 @@
 			</File>
 			<File
 				RelativePath=".\test_masm1.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_misc.cpp"
 				>
 			</File>
 			<File
@@ -417,19 +453,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\test_flist.cpp"
+				RelativePath=".\test_sse4.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\test_stack.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\test_aesni.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\test_misc.cpp"
 				>
 			</File>
 			<File
@@ -441,7 +469,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\test_avx.cpp"
+				RelativePath=".\test_x86_oracle.cpp"
 				>
 			</File>
 		</Filter>
@@ -455,7 +483,43 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_aesni.h"
+				>
+			</File>
+			<File
 				RelativePath=".\test_analyze.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_analyze_arm64.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_analyze_common.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_arm32.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_arm64.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_arm64_cmds.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_arm_exe.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_avx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_bmi.h"
 				>
 			</File>
 			<File
@@ -468,6 +532,10 @@
 			</File>
 			<File
 				RelativePath=".\test_common.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_flist.h"
 				>
 			</File>
 			<File
@@ -491,6 +559,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_masm1.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_misc.h"
+				>
+			</File>
+			<File
 				RelativePath=".\test_mov.h"
 				>
 			</File>
@@ -507,22 +583,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\test_aesni.h"
-				>
-			</File>
-			<File
-				RelativePath=".\test_avx.h"
-				>
-			</File>
-			<File
-				RelativePath=".\test_masm1.h"
-				>
-			</File>
-			<File
-				RelativePath=".\test_misc.h"
-				>
-			</File>
-			<File
 				RelativePath=".\test_new.h"
 				>
 			</File>
@@ -535,11 +595,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_processor_impl.h"
+				>
+			</File>
+			<File
 				RelativePath=".\test_push.h"
 				>
 			</File>
 			<File
-				RelativePath=".\test_flist.h"
+				RelativePath=".\test_sse4.h"
 				>
 			</File>
 			<File
@@ -552,6 +616,10 @@
 			</File>
 			<File
 				RelativePath=".\test_x64_integrated.h"
+				>
+			</File>
+			<File
+				RelativePath=".\test_x86_oracle.h"
 				>
 			</File>
 		</Filter>

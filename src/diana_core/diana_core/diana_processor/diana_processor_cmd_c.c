@@ -204,6 +204,7 @@ int Diana_Call_cmova(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if ((GET_FLAG_CF == 0) && (GET_FLAG_ZF == 0))
     {
@@ -220,6 +221,7 @@ int Diana_Call_cmovae(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_CF == 0)
     {
@@ -236,6 +238,7 @@ int Diana_Call_cmovb(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_CF)
     {
@@ -252,6 +255,7 @@ int Diana_Call_cmovbe(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_CF || GET_FLAG_ZF)
     {
@@ -269,6 +273,7 @@ int Diana_Call_cmove(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_ZF)
     {
@@ -285,6 +290,7 @@ int Diana_Call_cmovg(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if ((GET_FLAG_SF == GET_FLAG_OF) && (GET_FLAG_ZF == 0))
     {
@@ -301,6 +307,7 @@ int Diana_Call_cmovge(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_SF == GET_FLAG_OF)
     {
@@ -317,6 +324,7 @@ int Diana_Call_cmovl(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_SF != GET_FLAG_OF)
     {
@@ -333,6 +341,7 @@ int Diana_Call_cmovle(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_ZF || (GET_FLAG_SF != GET_FLAG_OF))
     {
@@ -349,6 +358,7 @@ int Diana_Call_cmovne(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (!GET_FLAG_ZF)
     {
@@ -365,6 +375,7 @@ int Diana_Call_cmovno(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (!GET_FLAG_OF)
     {
@@ -381,6 +392,7 @@ int Diana_Call_cmovnp(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (!GET_FLAG_PF)
     {
@@ -397,6 +409,7 @@ int Diana_Call_cmovns(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (!GET_FLAG_SF)
     {
@@ -413,6 +426,7 @@ int Diana_Call_cmovo(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_OF)
     {
@@ -429,6 +443,7 @@ int Diana_Call_cmovp(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_PF)
     {
@@ -445,6 +460,7 @@ int Diana_Call_cmovs(struct _dianaContext * pDianaContext,
     oldDestValue;
 
     DI_MEM_GET_SRC(src);
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
 
     if (GET_FLAG_SF)
     {

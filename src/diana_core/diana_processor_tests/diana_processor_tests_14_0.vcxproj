@@ -177,6 +177,7 @@
     <ClCompile Include="test_processor_a.cpp" />
     <ClCompile Include="test_processor_b.cpp" />
     <ClCompile Include="test_processor_c.cpp" />
+    <ClCompile Include="test_processor_cpu.cpp" />
     <ClCompile Include="test_processor_call.cpp" />
     <ClCompile Include="test_processor_d.cpp" />
     <ClCompile Include="test_processor_flags.cpp" />
@@ -185,6 +186,8 @@
     <ClCompile Include="test_processor_fpu_sse.cpp" />
     <ClCompile Include="test_processor_fpu2.cpp" />
     <ClCompile Include="test_processor_sse2.cpp" />
+    <ClCompile Include="test_processor_avx.cpp" />
+    <ClCompile Include="test_processor_avx512.cpp" />
     <ClCompile Include="test_processor_i.cpp" />
     <ClCompile Include="test_processor_j.cpp" />
     <ClCompile Include="test_processor_l.cpp" />
@@ -195,6 +198,9 @@
     <ClCompile Include="test_processor_r.cpp" />
     <ClCompile Include="test_processor_s.cpp" />
     <ClCompile Include="test_processor_x.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="test_processor_cpu.inc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test_processor.h" />

@@ -52,12 +52,14 @@ void test_cmpxchg8b()
         DIANA_TEST_ASSERT(result.iLinkedOpCount==1);
         DIANA_TEST_ASSERT(result.pInfo->m_operandCount==1);
         DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
+        // one table entry for 0f c7 /1: the group is cmpxchg16b, the text cmpxchg8b without REX.W
         DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "cmpxchg16b")==0);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 4);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 8);
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedAddressSize == 4);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
+        // the base is EBP/ESP/RSP: SS is the default segment
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_EBP);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.index == 0);

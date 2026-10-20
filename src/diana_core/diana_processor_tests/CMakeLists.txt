@@ -9,8 +9,11 @@ main.cpp
 ../diana_core_tests/test_common.cpp
 test_processor.cpp
 test_processor_a.cpp
+test_processor_avx.cpp
+test_processor_avx512.cpp
 test_processor_b.cpp
 test_processor_c.cpp
+test_processor_cpu.cpp
 test_processor_call.cpp
 test_processor_d.cpp
 test_processor_flags.cpp

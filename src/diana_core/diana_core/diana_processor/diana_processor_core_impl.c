@@ -36,16 +36,9 @@ DianaRegInfo * DianaProcessor_FPU_QueryReg_MM(DianaProcessor * pThis,
         return 0;
     }
 
-    if (pThis->m_context.iAMD64Mode == 0)
-    {
-        index = reg_MM0 + 16 - reg - 1;
-        index = index % 8;
-        realRegister = reg_MM0 + index;
-        return pThis->m_registers + realRegister;    
-    }
-
-    index = reg_MM0 + 16 - reg - Diana_FPU_GetStackTop(pThis);
-    --index;
+    // MMi is the physical x87 register i in every mode (not ST(i): no TOP); the physical register i is stored at
+    // 7 - i (DianaProcessor_FPU_QueryReg)
+    index = reg_MM0 + 16 - reg - 1;
     index = index % 8;
     realRegister = reg_MM0 + index;
     return pThis->m_registers + realRegister;
@@ -213,11 +206,21 @@ int Diana_ProcessorSetGetOperand_register(struct _dianaContext * pDianaContext,
 
     if (bSet)
     {
-        DianaProcessor_SetValue(pCallContext, 
+        // 64-bit mode: a write to a 32-bit general register clears the upper half of the 64-bit one, for every
+        // instruction (checked on an Intel CPU: inc, neg, imul, bsf, movsx, movd...); the 32-bit write first, the flags
+        // it updates are those of the 32-bit value
+        DianaUnifiedRegister reg64;
+        DianaProcessor_SetValue(pCallContext,
                                 pLinkedOp->value.recognizedRegister,
                                 DianaProcessor_QueryReg(pCallContext,
                                                         pLinkedOp->value.recognizedRegister), 
                                 *pResult);
+        if (pCallContext->m_context.iAMD64Mode &&
+            DianaProcessor_Query64RegisterFor32(pLinkedOp->value.recognizedRegister, &reg64) == DI_SUCCESS)
+        {
+            DianaRegInfo * pReg64 = DianaProcessor_QueryReg(pCallContext, reg64);
+            *(DI_UINT32 *)(pCallContext->m_pRegistersVector + pReg64->m_offset + 4) = 0;
+        }
     }
     else
     {

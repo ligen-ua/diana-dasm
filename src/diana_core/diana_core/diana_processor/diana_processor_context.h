@@ -4,6 +4,11 @@
 #include "diana_processor_core_impl.h"
 
 #define DIANA_PROCESSOR_CONTEXT_FPU_STATE_VALID     1 
+// reg_YMM_High is valid: DianaProcessor_InitContext writes the upper halves only with it (a Windows CONTEXT has no
+// YMM state, the converters leave the processor's upper halves as they are)
+#define DIANA_PROCESSOR_CONTEXT_YMM_STATE_VALID     2
+// reg_K, reg_ZMM_High, reg_ZMM16_31 are valid (AVX-512: the XSAVE components 5, 6, 7)
+#define DIANA_PROCESSOR_CONTEXT_ZMM_STATE_VALID     4
 
 typedef struct _Diana_Processor_Registers_Context
 {
@@ -64,6 +69,7 @@ typedef struct _Diana_Processor_Registers_Context
     DianaRegisterValue_type reg_R15;
 
 
+    // 64 bits of ST(i) in every mode (not the physical register i), relative to TOP of fpuState.statusWord
     DianaRegisterValue_type reg_MM0; // reg_FPU_ST0
     DianaRegisterValue_type reg_MM1; // reg_FPU_ST1
     DianaRegisterValue_type reg_MM2;
@@ -89,6 +95,15 @@ typedef struct _Diana_Processor_Registers_Context
     DianaRegisterValue128_type reg_XMM13;
     DianaRegisterValue128_type reg_XMM14;
     DianaRegisterValue128_type reg_XMM15;
+
+    // bits 255:128 of ymm0..15 (reg_XMMi is the low half), with DIANA_PROCESSOR_CONTEXT_YMM_STATE_VALID
+    DianaRegisterValue128_type reg_YMM_High[16];
+
+    // AVX-512, with DIANA_PROCESSOR_CONTEXT_ZMM_STATE_VALID: the opmask registers k0..k7, bits 511:256 of zmm0..15,
+    // zmm16..31
+    DianaRegisterValue_type reg_K[8];
+    DianaRegisterValue256_type reg_ZMM_High[16];
+    DianaRegisterValue512_type reg_ZMM16_31[16];
 
 }Diana_Processor_Registers_Context;
 

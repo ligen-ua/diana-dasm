@@ -178,11 +178,22 @@ int Diana_ParseCmdOnBuffer(int iMode,
                            DianaParserResult * pResult,  //OUT
                            DIANA_SIZE_T * sizeRead)    // OUT
 {
+    return Diana_ParseCmdOnBufferEx(iMode, DIANA_ARCH_X86, pBuffer, size, pInitialLine, pResult, sizeRead);
+}
+
+int Diana_ParseCmdOnBufferEx(int iMode,
+                             int iArch,
+                             void * pBuffer,
+                             DIANA_SIZE_T size,
+                             DianaBaseGenObject_type * pInitialLine,  // IN
+                             DianaParserResult * pResult,  //OUT
+                             DIANA_SIZE_T * sizeRead)    // OUT
+{
     DianaMemoryStream stream;
     DianaContext context;
     int iRes;
 
-    Diana_InitContext(&context, iMode);
+    Diana_InitContextEx(&context, iMode, iArch);
     Diana_InitMemoryStream(&stream, pBuffer, size);
     iRes = Diana_ParseCmd(&context, 
                           pInitialLine, 

@@ -21,6 +21,10 @@ int Di_CheckZeroExtends(DianaProcessor * pCallContext,
                         int src_size,
                         int * dest_size);
 
+// 64-bit mode, a 32-bit register destination (the first operand): the upper half is cleared, the lower half kept
+// (cmovcc clears it also when it doesn't move)
+int Di_ClearUpperHalf(DianaProcessor * pCallContext);
+
 int Di_CheckZeroExtends2(DianaProcessor * pCallContext,
                          OPERAND_SIZE * pDest,
                          int src_size,

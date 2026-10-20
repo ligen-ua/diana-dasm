@@ -18,6 +18,7 @@ typedef struct Diana_ElfAnalyzerCommonParams_
     void                    * pPage;
     int                       pageSize;
     Diana_Stack             * pStack;
+    DianaAnalyzeParams analyzeParams;
 } Diana_ElfAnalyzerCommonParams_type;
 
 static DI_UINT16 ElfAnalyzer_rd16(const unsigned char * p, int isLE)
@@ -147,11 +148,45 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
             if (sym.st_value >= pImpl->sizeOfModule)
                 break;
 
-            DI_CHECK(Diana_AnalyzeCode(pParams->pOwner,
-                                       pParams->pObserver,
-                                       pParams->pElfFile->dianaMode,
-                                       (OPERAND_SIZE)sym.st_value,
-                                       pImpl->sizeOfModule));
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                          pParams->pObserver,
+                                          pParams->pElfFile->dianaMode,
+                                          (OPERAND_SIZE)sym.st_value,
+                                          pImpl->sizeOfModule,
+                                          pParams->pStack,
+                                          0,
+                                          &pParams->analyzeParams));
+        }
+    }
+    return DI_SUCCESS;
+}
+
+// AArch64: 8-byte pointers at 8-aligned offsets; pPage starts with the last pointer of the previous page
+static int ELF_ScanPageArm64(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSize)
+{
+    const int isLE = pParams->pElfFile->pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
+    const unsigned char * p = (const unsigned char *)pParams->pPage + sizeof(DIANA_SIZE_T);
+    const unsigned char * pEnd = (const unsigned char *)pParams->pPage + pageSize - 8 + 1;
+    for (; p < pEnd; p += 8)
+    {
+        DI_UINT64 address = ElfAnalyzer_rd64(p, isLE);
+        OPERAND_SIZE relativeAddress = 0;
+        DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+        DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                       address,
+                                                       DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                       &relativeAddress,
+                                                       &result));
+        if (result == diaJumpNormal)
+        {
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                          pParams->pObserver,
+                                          pParams->pElfFile->dianaMode,
+                                          relativeAddress,
+                                          pParams->pElfFile->pImpl->sizeOfModule,
+                                          pParams->pStack,
+                                          DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                          &pParams->analyzeParams));
         }
     }
     return DI_SUCCESS;
@@ -163,6 +198,8 @@ static int ELF_ScanPage(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSi
     char * pEnd = p + pageSize - sizeof(DIANA_SIZE_T) + 1;
     if (pageSize < (int)sizeof(DIANA_SIZE_T))
         return DI_SUCCESS;
+    if (pParams->analyzeParams.arch == DIANA_ARCH_AARCH64)
+        return ELF_ScanPageArm64(pParams, pageSize);
 
     for (++p; p < pEnd; ++p)
     {
@@ -180,13 +217,14 @@ static int ELF_ScanPage(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSi
                                               &result));
         if (result == diaJumpNormal)
         {
-            DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                          pParams->pObserver,
                                          pParams->pElfFile->dianaMode,
                                          relativeAddress,
                                          pParams->pElfFile->pImpl->sizeOfModule,
                                          pParams->pStack,
-                                         DI_ANALYSE_BREAK_ON_INVALID_CMD));
+                                         DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                     &pParams->analyzeParams));
         }
     }
     return DI_SUCCESS;
@@ -249,30 +287,41 @@ static int Diana_ELF_AnalyzeELFImplUsingBuffer(Diana_ElfAnalyzerCommonParams_typ
 
     if (pImpl->elfHeader.e_entry && pImpl->elfHeader.e_entry < pImpl->sizeOfModule)
     {
-        DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+        DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                      pParams->pObserver,
                                      pParams->pElfFile->dianaMode,
                                      (OPERAND_SIZE)pImpl->elfHeader.e_entry,
                                      pImpl->sizeOfModule,
                                      pParams->pStack,
-                                     0));
+                                     0,
+                                     &pParams->analyzeParams));
     }
 
     DI_CHECK(Diana_ELF_AnalyzeSymbols(pParams));
     DI_CHECK(Diana_ELF_AnalyzeData(pParams));
+    // AArch64: BTI landing pads nothing else reached (C++ exception landing pads)
+    DI_CHECK(Diana_AnalyzeLandingPads(pParams->pOwner,
+                                      pParams->pObserver,
+                                      pParams->pElfFile->dianaMode,
+                                      0,
+                                      pImpl->sizeOfModule,
+                                      pImpl->sizeOfModule,
+                                      pParams->pStack,
+                                      &pParams->analyzeParams));
 
     if (DI_ANALYSE_PE_FILE_SCAN_THROUGH & analyserFlags)
     {
         OPERAND_SIZE i = 0;
         for (; i < pImpl->sizeOfModule; i += 4ULL)
         {
-            DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                          pParams->pObserver,
                                          pParams->pElfFile->dianaMode,
                                          i,
                                          pImpl->sizeOfModule,
                                          pParams->pStack,
-                                         DI_ANALYSE_BREAK_ON_INVALID_CMD));
+                                         DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                     &pParams->analyzeParams));
         }
     }
     return DI_SUCCESS;
@@ -288,8 +337,13 @@ static int Diana_ELF_AnalyzeELFImpl(Diana_ElfFile * pElfFile,
     int status = 0;
     int stackInited = 0;
     Diana_ElfAnalyzerCommonParams_type params;
+    void * pPage = 0;
 
-    void * pPage = DIANA_MALLOC(pageSize + sizeof(OPERAND_SIZE));
+    // x86 and AArch64 (AArch32 is M6)
+    if (pElfFile->arch != DIANA_ARCH_X86 && pElfFile->arch != DIANA_ARCH_AARCH64)
+        return DI_UNSUPPORTED;
+
+    pPage = DIANA_MALLOC(pageSize + sizeof(OPERAND_SIZE));
     DI_CHECK_ALLOC(pPage);
 
     DI_CHECK_GOTO(Diana_Stack_Init(&stack, 4096, sizeof(Diana_RouteInfo)));
@@ -301,6 +355,12 @@ static int Diana_ELF_AnalyzeELFImpl(Diana_ElfFile * pElfFile,
     params.pOwner    = pOwner;
     params.pObserver = pObserver;
     params.pStack    = &stack;
+    DianaAnalyzeParams_Init(&params.analyzeParams, pElfFile->arch);
+    if (pElfFile->arch == DIANA_ARCH_AARCH64)
+    {
+        // the observer knows where the image is, ADRP needs only offset 0 page-aligned
+        params.analyzeParams.flags = DIANA_ANALYZE_ADDRESSES_RELATIVE;
+    }
 
     status = Diana_ELF_AnalyzeELFImplUsingBuffer(&params, analyserFlags);
 cleanup:

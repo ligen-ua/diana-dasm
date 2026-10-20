@@ -662,6 +662,166 @@ static void test_processor_sse2_pmovmskb()
     DIANA_TEST_ASSERT(GET_REG_EAX == 0x1111);
 }
 
+/* the smaller gaps (plans/done/x86-small-items.md): what the CPU of tests/x86/cpu_compare can't show (no RTM, no
+   PKU, CET not enabled) and the faults of the xsave family; the rest is checked against the CPU */
+
+/* xbegin aborts at once (eax = 0, the fallback), xtest: ZF = 1, xabort: a nop, xend: #GP */
+static void test_processor_tsx()
+{
+    unsigned char code[24] = {0xc7, 0xf8, 0x05, 0x00, 0x00, 0x00,       // xbegin +5
+                              0x90, 0x90, 0x90, 0x90, 0x90,
+                              0x0f, 0x01, 0xd6,                         // 11: xtest
+                              0xc6, 0xf8, 0x01,                         // 14: xabort 1
+                              0x0f, 0x01, 0xd5};                        // 17: xend
+    CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
+    DianaProcessor * pCallContext = proc.GetSelf();
+    SET_REG_RAX(0xffffffffffffffffULL);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(GET_REG_RAX == 0);
+    DIANA_TEST_ASSERT(GET_REG_RIP == 11);
+    SET_FLAG_CF;
+    SET_FLAG_OF;
+    CLEAR_FLAG_ZF;
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(GET_FLAG_ZF && !GET_FLAG_CF && !GET_FLAG_OF);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(GET_REG_RIP == 17 && GET_REG_RAX == 0);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+}
+
+/* rdpkru, wrpkru: PKRU 0 after the init; ecx (and edx for wrpkru) not 0: #GP */
+static void test_processor_pku()
+{
+    unsigned char code[16] = {0x0f, 0x01, 0xef,     // wrpkru
+                              0x0f, 0x01, 0xee};    // 3: rdpkru
+    CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
+    DianaProcessor * pCallContext = proc.GetSelf();
+    DIANA_TEST_ASSERT(pCallContext->m_pkru == 0);
+    SET_REG_RAX(0xffffffff55555554ULL);
+    SET_REG_RCX(0);
+    SET_REG_RDX(1);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+    DI_JUMP_TO_RIP(0);
+    SET_REG_RDX(0x100000000ULL);    // edx 0: the upper half doesn't count
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(pCallContext->m_pkru == 0x55555554);
+    SET_REG_RAX(0xffffffffffffffffULL);
+    SET_REG_RDX(0xffffffffffffffffULL);
+    SET_REG_RCX(1);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+    DI_JUMP_TO_RIP(3);
+    SET_REG_RCX(0);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(GET_REG_RAX == 0x55555554 && GET_REG_RDX == 0);
+}
+
+/* CET shadow stacks not enabled: rdssp a nop, incssp, wrss #UD; ud0, ud1 as ud2 */
+static void test_processor_cet()
+{
+    unsigned char code[24] = {0xf3, 0x48, 0x0f, 0x1e, 0xc8,     // rdsspq rax
+                              0xf3, 0x0f, 0xae, 0xe8,           // 5: incsspd eax
+                              0x0f, 0x38, 0xf6, 0x03,           // 9: wrssd [rbx], eax
+                              0x0f, 0xb9, 0x01};                // 13: ud1 eax, [rcx]
+    CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
+    DianaProcessor * pCallContext = proc.GetSelf();
+    SET_REG_RAX(0x1234);
+    SET_REG_RBX(16);
+    SET_REG_RCX(16);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(GET_REG_RAX == 0x1234);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_INVALID_OPCODE);
+    DI_JUMP_TO_RIP(9);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_INVALID_OPCODE);
+    DI_JUMP_TO_RIP(13);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_UNSUPPORTED_COMMAND);
+}
+
+/* xsave, xrstor: the state there and back, XSTATE_BV 0 (the init state), the #GP of the alignment, the header,
+   MXCSR; fxrstor with a reserved MXCSR bit */
+static void test_processor_xsave()
+{
+    // xsave [rax]; xrstor [rax]; fxrstor [rax]; xsavec [rax]; the image at 0x40
+    unsigned char code[0x400] = {0x0f, 0xae, 0x20, 0x0f, 0xae, 0x28, 0x0f, 0xae, 0x08, 0x0f, 0xc7, 0x20};
+    unsigned char * image = code + 0x40;
+    CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
+    DianaProcessor * pCallContext = proc.GetSelf();
+    DianaRegisterYMM_type ymm, zero;
+    memset(&zero, 0, sizeof(zero));
+    for (int i = 0; i < 32; ++i)
+        ymm.u8[i] = (unsigned char)(i + 1);
+    DianaProcessor_YMM_SetValue(pCallContext, reg_YMM3, &ymm);
+    pCallContext->m_mxcsr = 0x3f80;
+    pCallContext->m_fpu.controlWord = 0x27f;
+    SET_REG_RAX(0x48);
+    SET_REG_RDX(0);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);   // not 64-byte aligned
+    DI_JUMP_TO_RIP(0);
+    SET_REG_RAX(0x40);  // edx:eax = 0x40: RFBM = 0 (eax is the address too)
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(image[512] == 0 && image[24] == 0);
+    // RFBM 7: rax = 0x47 isn't aligned; the address in rcx: xsave [rcx] (0f ae 21)
+    code[2] = 0x21;
+    code[5] = 0x29;
+    SET_REG_RCX(0x40);
+    SET_REG_RAX(7);
+    DI_JUMP_TO_RIP(0);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(image[512] == 7 && image[24] == 0x80 && image[25] == 0x3f && image[0] == 0x7f);
+    DIANA_TEST_ASSERT(!memcmp(image + 160 + 3 * 16, &ymm.xmm[0], 16) && !memcmp(image + 576 + 3 * 16, &ymm.xmm[1], 16));
+    // there and back
+    DianaProcessor_YMM_SetValue(pCallContext, reg_YMM3, &zero);
+    pCallContext->m_mxcsr = 0x1f80;
+    pCallContext->m_fpu.controlWord = 0x37f;
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DianaRegisterYMM_type value = DianaProcessor_YMM_GetValue(pCallContext, reg_YMM3);
+    DIANA_TEST_ASSERT(!memcmp(&value, &ymm, sizeof(ymm)));
+    DIANA_TEST_ASSERT(pCallContext->m_mxcsr == 0x3f80 && pCallContext->m_fpu.controlWord == 0x27f);
+    // XSTATE_BV 0: the init state of x87, SSE, AVX; MXCSR from the image (the standard form)
+    image[512] = 0;
+    pCallContext->m_mxcsr = 0x1f80;
+    DI_JUMP_TO_RIP(3);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    value = DianaProcessor_YMM_GetValue(pCallContext, reg_YMM3);
+    DIANA_TEST_ASSERT(!memcmp(&value, &zero, sizeof(zero)));
+    DIANA_TEST_ASSERT(pCallContext->m_mxcsr == 0x3f80 && pCallContext->m_fpu.controlWord == 0x37f);
+    // #GP: XSTATE_BV not in XCR0, bytes 23..8 of the header, a reserved MXCSR bit
+    image[512] = 8;
+    DI_JUMP_TO_RIP(3);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+    image[512] = 7;
+    image[512 + 20] = 1;
+    DI_JUMP_TO_RIP(3);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+    image[512 + 20] = 0;
+    image[512 + 40] = 1;    // bytes 63..24: not checked by the standard form
+    DI_JUMP_TO_RIP(3);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    image[512 + 40] = 0;
+    image[26] = 1;
+    DI_JUMP_TO_RIP(3);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+    // fxrstor [rcx] (0f ae 09): the same MXCSR; 16-byte alignment
+    code[8] = 0x09;
+    DI_JUMP_TO_RIP(6);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+    image[26] = 0;
+    SET_REG_RCX(0x48);
+    DI_JUMP_TO_RIP(6);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+    // xsavec [rcx] (0f c7 21): XCOMP_BV = RFBM | bit 63; the compacted form back, XCOMP_BV with bit 3: #GP
+    code[11] = 0x21;
+    SET_REG_RCX(0x40);
+    SET_REG_RAX(5);
+    DI_JUMP_TO_RIP(9);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    DIANA_TEST_ASSERT(image[512] == 5 && image[520] == 5 && image[527] == 0x80);
+    DI_JUMP_TO_RIP(3);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_SUCCESS);
+    image[520] = 0xd;
+    DI_JUMP_TO_RIP(3);
+    DIANA_TEST_ASSERT(proc.ExecOnce() == DI_GP);
+}
+
 void test_processor_sse2()
 {
     DIANA_TEST(test_processor_sse2_paddb());
@@ -689,4 +849,8 @@ void test_processor_sse2()
     DIANA_TEST(test_processor_sse2_packuswb());
     DIANA_TEST(test_processor_sse2_psadbw());
     DIANA_TEST(test_processor_sse2_pmovmskb());
+    DIANA_TEST(test_processor_tsx());
+    DIANA_TEST(test_processor_pku());
+    DIANA_TEST(test_processor_cet());
+    DIANA_TEST(test_processor_xsave());
 }

@@ -88,6 +88,38 @@ int Diana_Call_bsr(struct _dianaContext * pDianaContext,
     DI_PROC_END;
 }
 
+// bt, bts, btr, btc with a register bit offset and a memory operand: the offset is signed and selects an
+// operand-sized part of a bit string, [address + floor(offset / bits) * size], the bit offset % bits in it
+static void Di_BitStringAddress(DianaProcessor * pCallContext, int size)
+{
+    DianaLinkedOperand * pOperands = pCallContext->m_result.linkedOperands;
+    OPERAND_SIZE value = 0;
+    OPERAND_SIZE_SIGNED offset = 0, bits = size * 8;
+    if (pCallContext->m_result.iLinkedOpCount != 2 ||
+        pOperands[0].type != diana_index || pOperands[1].type != diana_register)
+    {
+        return;
+    }
+    value = DianaProcessor_GetValue(pCallContext, DianaProcessor_QueryReg(pCallContext,
+                                                                          pOperands[1].value.recognizedRegister));
+    switch (size)
+    {
+    case 2:
+        offset = (DI_INT16)value;
+        break;
+    case 4:
+        offset = (DI_INT32)value;
+        break;
+    default:
+        offset = (OPERAND_SIZE_SIGNED)value;
+        break;
+    }
+    // floor, not truncation: -1 is the last bit of the part before
+    if (offset < 0)
+        offset -= bits - 1;
+    pOperands[0].value.rmIndex.dispValue += (OPERAND_SIZE)(offset / bits * size);
+}
+
 int Diana_Call_bt(struct _dianaContext * pDianaContext,
                   DianaProcessor * pCallContext)
 {
@@ -96,6 +128,7 @@ int Diana_Call_bt(struct _dianaContext * pDianaContext,
     DI_DEF_LOCALS(src, dest);
     oldDestValue;
 
+    Di_BitStringAddress(pCallContext, pDianaContext->iCurrentCmd_opsize);
     DI_MEM_GET_DEST(dest);
     DI_MEM_GET_SRC(src);
 
@@ -135,6 +168,7 @@ int Diana_Call_btc(struct _dianaContext * pDianaContext,
     DI_DEF_LOCALS(src, dest);
     oldDestValue;
 
+    Di_BitStringAddress(pCallContext, pDianaContext->iCurrentCmd_opsize);
     DI_MEM_GET_DEST(dest);
     DI_MEM_GET_SRC(src);
 
@@ -182,6 +216,7 @@ int Diana_Call_btr(struct _dianaContext * pDianaContext,
     DI_DEF_LOCALS(src, dest);
     oldDestValue;
 
+    Di_BitStringAddress(pCallContext, pDianaContext->iCurrentCmd_opsize);
     DI_MEM_GET_DEST(dest);
     DI_MEM_GET_SRC(src);
 
@@ -224,6 +259,7 @@ int Diana_Call_bts(struct _dianaContext * pDianaContext,
     DI_DEF_LOCALS(src, dest);
     oldDestValue;
 
+    Di_BitStringAddress(pCallContext, pDianaContext->iCurrentCmd_opsize);
     DI_MEM_GET_DEST(dest);
     DI_MEM_GET_SRC(src);
 

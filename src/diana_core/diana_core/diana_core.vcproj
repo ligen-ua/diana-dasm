@@ -200,6 +200,24 @@
 				RelativePath=".\diana_processor\diana_processor_cmd_n.c">
 			</File>
 			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_avx.c">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_avx2.c">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_avx512.c">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_crypto.c">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_simd.c">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_ext.c">
+			</File>
+			<File
 				RelativePath=".\diana_processor\diana_processor_cmd_p.c">
 			</File>
 			<File
@@ -410,6 +428,24 @@
 			</File>
 			<File
 				RelativePath=".\diana_processor\diana_processor_cmd_n.h">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_avx.h">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_avx2.h">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_avx512.h">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_crypto.h">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_simd.h">
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_cmd_ext.h">
 			</File>
 			<File
 				RelativePath=".\diana_processor\diana_processor_cmd_p.h">

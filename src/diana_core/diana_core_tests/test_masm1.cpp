@@ -59,7 +59,7 @@ static void test_masm1_2()
     diana::CMasmString masmString;
     
     static unsigned char lea5[] = {0x66, 0x8D, 0xBD, 0x40, 0xFF, 0xFF, 0xFF}; // lea         di,[ebp-0C0h]     
-    STRTEST(32, masmString, lea5, "lea DI, word ptr DS:[EBP-0C0h]");
+    STRTEST(32, masmString, lea5, "lea DI, word ptr SS:[EBP-0C0h]");
     static unsigned char call[] = {0xE8, 0x83, 0xF9, 0xFF, 0xFF}; // call        @ILT+945(_main) (4113B6h) 
     STRTEST(32, masmString, call, "call 0FFFFF988h");
 }

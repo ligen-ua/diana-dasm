@@ -270,6 +270,8 @@ int Diana_Call_movsxd(struct _dianaContext * pDianaContext,
         dest = src;
     }
 
+    // movsxd r32, r/m32 (no REX.W): a 32-bit result, the upper half cleared
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
     DI_MEM_SET_DEST(dest);
     DI_PROC_END
 }

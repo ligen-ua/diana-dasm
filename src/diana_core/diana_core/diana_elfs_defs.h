@@ -41,6 +41,9 @@
 #define DIANA_EM_ARM          40      // ARM
 #define DIANA_EM_AARCH64      183     // ARM 64-bit
 
+// e_flags for EM_ARM
+#define DIANA_EF_ARM_BE8      0x00800000  // big-endian data, little-endian code
+
 // Program header types
 #define DIANA_PT_NULL    0
 #define DIANA_PT_LOAD    1

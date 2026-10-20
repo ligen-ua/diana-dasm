@@ -9,6 +9,8 @@ test_aesni.cpp
 test_avx.cpp
 test_add.cpp
 test_analyze.cpp
+test_analyze_arm64.cpp
+test_analyze_common.cpp
 test_call.cpp
 test_cmp.cpp
 test_common.cpp
@@ -33,6 +35,11 @@ test_x64.cpp
 test_x64_integrated.cpp
 test_sse4.cpp
 test_bmi.cpp
+test_arm64.cpp
+test_arm64_cmds.cpp
+test_arm32.cpp
+test_arm_exe.cpp
+test_x86_oracle.cpp
 )
 
 add_executable(${PROJECT_NAME} 

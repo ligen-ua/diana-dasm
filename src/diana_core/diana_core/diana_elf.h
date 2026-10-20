@@ -38,7 +38,8 @@ typedef struct _diana_ElfFile
 {
     Diana_ElfFile_impl* pImpl;
     int flags;
-    int dianaMode;
+    int dianaMode;  // the pointer size
+    int arch;       // DIANA_ARCH_*, from e_machine
 }
 Diana_ElfFile;
 

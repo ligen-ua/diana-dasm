@@ -32,6 +32,11 @@ int DianaOpOutput_Console(struct _DianaTextOutputContext * pContext,
                                   int size)
 {
     &pContext;
+    if (pContext->flags & DIANA_TEXT_OUTPUT_FLAG_C_HEX)
+    {
+        printf("0x%llx", (unsigned long long)operand);
+        return DI_SUCCESS;
+    }
     if (size == 0)
     {
         size = GetRealSize(operand);
@@ -80,9 +85,37 @@ int DianaTextOutput_String(struct _DianaTextOutputContext * pContextIn,
         return DI_ERROR;
     
     tail = pContext->maxBufferSize - pContext->curSize;
-    written = snprintf(pBuffer, (size_t)tail, "%s", pText);
+    // snprintf(pBuffer, tail, "%s", pText) by hand, it is called for every piece of text:
+    // copies what fits, terminates, curSize grows by the full length
+    while (pText[written])
+    {
+        if ((OPERAND_SIZE)written + 1 < tail)
+            pBuffer[written] = pText[written];
+        ++written;
+    }
+    pBuffer[(OPERAND_SIZE)written < tail ? written : (int)tail - 1] = 0;
     pContext->curSize += written;
     return DI_SUCCESS;
+}
+
+// "0x%llx" by hand, returns the length without the terminator
+static int DianaFormatCHex(char * pBuffer, unsigned long long value)
+{
+    static const char digits[] = "0123456789abcdef";
+    char temp[16];
+    int count = 0, i = 0;
+    do
+    {
+        temp[count++] = digits[value & 0xF];
+        value >>= 4;
+    }
+    while (value);
+    pBuffer[0] = '0';
+    pBuffer[1] = 'x';
+    for (; i < count; ++i)
+        pBuffer[2 + i] = temp[count - 1 - i];
+    pBuffer[2 + count] = 0;
+    return 2 + count;
 }
 static int IsHexAlpha(char ch)
 {
@@ -109,6 +142,20 @@ int DianaOpOutput_String(struct _DianaTextOutputContext * pContextIn,
     {
         size = GetRealSize(operand);
     }
+    if (pContextIn->flags & DIANA_TEXT_OUTPUT_FLAG_C_HEX)
+    {
+        char text[24];
+        written = DianaFormatCHex(text, (unsigned long long)operand);
+        if ((OPERAND_SIZE)written >= tail)
+            return DI_ERROR;
+        memcpy(pBuffer, text, (size_t)written + 1);
+        pContext->curSize += written;
+        if (pContext->pOnOpCallback)
+        {
+            pContext->pOnOpCallback(pContext, pContext->onOpCallbackContext, pBuffer, written, operand, size);
+        }
+        return DI_SUCCESS;
+    }
     switch(size)
     {
        case 1: written = snprintf(pBuffer, (size_t)tail, "%0hhX", (unsigned char)operand);
@@ -134,7 +181,8 @@ int DianaOpOutput_String(struct _DianaTextOutputContext * pContextIn,
     }
     pContext->curSize += written;
 
-    if (size != 1 || operand > 10)
+    // 0..9 without h, 10 is 0Ah
+    if (size != 1 || operand > 9)
     {
         if (pContext->curSize >= pContext->maxBufferSize)
             return DI_ERROR;

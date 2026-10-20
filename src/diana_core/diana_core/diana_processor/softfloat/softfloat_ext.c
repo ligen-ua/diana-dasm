@@ -1,5 +1,5 @@
 /*============================================================================
-Implementations of the extended softfloat transcendental/remainder functions
+Implementations of the extended softfloat transcendental functions
 declared in softfloatx80.h but absent from the library.
 
 These stubs convert to/from IEEE 754 double via the existing floatx80 <-> float64
@@ -137,49 +137,3 @@ int fsincos(floatx80_t a, floatx80_t *sin_a, floatx80_t *cos_a, float_status_t *
     return 0;
 }
 
-/*---------------------------------------------------------------------------
-| Remainder functions
-|
-| Returns 0 when the reduction is complete, non-zero when partial (C2).
-| For simplicity we always complete in one step (no partial remainder).
-*--------------------------------------------------------------------------*/
-
-/* fprem: truncate-toward-zero quotient */
-int floatx80_remainder(floatx80_t a, floatx80_t b,
-                       floatx80_t *r, DI_UINT64 *q,
-                       float_status_t *status)
-{
-    double da = fx80_to_double(a);
-    double db = fx80_to_double(b);
-    double quot;
-    double rem;
-    (void)status;
-    if (db == 0.0) { *r = a; *q = 0; return 0; }
-    quot = da / db;
-    /* truncate toward zero */
-    quot = (quot >= 0.0) ? floor(quot) : ceil(quot);
-    rem = da - quot * db;
-    *r = double_to_fx80(rem);
-    *q = (DI_UINT64)(DI_INT64)quot & 0x3F;  /* low 6 bits of quotient */
-    return 0;  /* complete, not partial */
-}
-
-/* fprem1: round-to-nearest quotient (IEEE 754 remainder) */
-int floatx80_ieee754_remainder(floatx80_t a, floatx80_t b,
-                               floatx80_t *r, DI_UINT64 *q,
-                               float_status_t *status)
-{
-    double da = fx80_to_double(a);
-    double db = fx80_to_double(b);
-    double quot;
-    double rem;
-    (void)status;
-    if (db == 0.0) { *r = a; *q = 0; return 0; }
-    /* round-to-nearest-even quotient without relying on C99 remainder() */
-    quot = da / db;
-    quot = floor(quot + 0.5);
-    rem = da - quot * db;
-    *r = double_to_fx80(rem);
-    *q = (DI_UINT64)(DI_INT64)quot & 0x3F;
-    return 0;
-}

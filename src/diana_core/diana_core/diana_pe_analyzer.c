@@ -8,12 +8,48 @@ typedef struct Diana_PeAnalyzerCommonParams
     void * pPage;
     int pageSize;
     Diana_Stack * pStack;
+    DianaAnalyzeParams analyzeParams;
 }Diana_PeAnalyzerCommonParams_type;
 
 int DianaAnalyzeObserverOverMemory_ConvertAddressToRelative(void * pThis, 
                                                             OPERAND_SIZE address,
                                                             OPERAND_SIZE * pRelativeOffset,
                                                             int * pbInvalidPointer);
+
+// AArch64: 8-byte pointers at 8-aligned offsets; pPage starts with the last pointer of the previous page
+static
+int ScanPageArm64(Diana_PeAnalyzerCommonParams_type * pParams,
+                  int pageSize)
+{
+    const unsigned char * p = (const unsigned char *)pParams->pPage + sizeof(DIANA_SIZE_T);
+    const unsigned char * pEnd = (const unsigned char *)pParams->pPage + pageSize - 8 + 1;
+    for (; p < pEnd; p += 8)
+    {
+        DI_UINT64 address = 0;
+        OPERAND_SIZE relativeAddress = 0;
+        DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+        int i = 0;
+        for (i = 7; i >= 0; --i)
+            address = (address << 8) | p[i];
+        DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                       address,
+                                                       DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                       &relativeAddress,
+                                                       &result));
+        if (result == diaJumpNormal)
+        {
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                          pParams->pObserver,
+                                          pParams->pPeFile->pImpl->dianaMode,
+                                          relativeAddress,
+                                          pParams->pPeFile->pImpl->sizeOfModule,
+                                          pParams->pStack,
+                                          DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                          &pParams->analyzeParams));
+        }
+    }
+    return DI_SUCCESS;
+}
 
 static
 int ScanPage(Diana_PeAnalyzerCommonParams_type * pParams,
@@ -23,6 +59,8 @@ int ScanPage(Diana_PeAnalyzerCommonParams_type * pParams,
     char * pEnd = p + pageSize - sizeof(DIANA_SIZE_T)+1;
     if (pageSize < sizeof(DIANA_SIZE_T))
         return DI_SUCCESS;
+    if (pParams->analyzeParams.arch == DIANA_ARCH_AARCH64)
+        return ScanPageArm64(pParams, pageSize);
 
     for(++p; p < pEnd; ++p)
     {
@@ -40,13 +78,14 @@ int ScanPage(Diana_PeAnalyzerCommonParams_type * pParams,
                                               &result));
         if (result == diaJumpNormal)
         {
-            DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                         pParams->pObserver,
                                         pParams->pPeFile->pImpl->dianaMode,
                                         relativeAddress,
                                         pParams->pPeFile->pImpl->sizeOfModule,
                                         pParams->pStack,
-                                        DI_ANALYSE_BREAK_ON_INVALID_CMD));
+                                        DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                     &pParams->analyzeParams));
             continue;
         }
     }
@@ -147,11 +186,14 @@ int Diana_AnalyzeExports(Diana_PeAnalyzerCommonParams_type * pParams)
         {
             if (pCapturedFunctions[i] < pParams->pPeFile->pImpl->sizeOfModule)
             {
-                DI_CHECK(Diana_AnalyzeCode(pParams->pOwner,
-                                            pParams->pObserver,
-                                            pParams->pPeFile->pImpl->dianaMode,
-                                            pCapturedFunctions[i],
-                                            pParams->pPeFile->pImpl->sizeOfModule));
+                DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                              pParams->pObserver,
+                                              pParams->pPeFile->pImpl->dianaMode,
+                                              pCapturedFunctions[i],
+                                              pParams->pPeFile->pImpl->sizeOfModule,
+                                              pParams->pStack,
+                                              0,
+                                              &pParams->analyzeParams));
             }
         }
         theRestNumberOfFunctions -= numberOfFunctionsToRead;
@@ -159,27 +201,86 @@ int Diana_AnalyzeExports(Diana_PeAnalyzerCommonParams_type * pParams)
     return DI_SUCCESS;
 }
 
-static 
+// .pdata: RUNTIME_FUNCTION entries, the first field is the start of a function with unwind data.
+// x64 entries are {Begin, End, UnwindInfo}, ARM64 entries are {Begin, UnwindData}
+static
+int Diana_AnalyzePData(Diana_PeAnalyzerCommonParams_type * pParams)
+{
+    const DIANA_IMAGE_DATA_DIRECTORY * pDirectory =
+        pParams->pPeFile->pImpl->pImageDataDirectoryArray + DIANA_IMAGE_DIRECTORY_ENTRY_EXCEPTION;
+    DI_UINT32 entrySize = pParams->pPeFile->pImpl->arch == DIANA_ARCH_AARCH64 ? 8 : 12;
+    DI_UINT32 theRestCount = 0;
+    DI_UINT32 entriesPerPage = (DI_UINT32)pParams->pageSize / entrySize;
+
+    if (pParams->pPeFile->pImpl->dianaMode != DIANA_MODE64 || !pDirectory->VirtualAddress)
+        return DI_SUCCESS;
+    theRestCount = pDirectory->Size / entrySize;
+    DI_CHECK(pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream, pDirectory->VirtualAddress));
+    while (theRestCount)
+    {
+        DI_UINT32 i = 0;
+        DI_UINT32 count = theRestCount > entriesPerPage ? entriesPerPage : theRestCount;
+        const unsigned char * pEntries = (const unsigned char *)pParams->pPage;
+        DI_CHECK(DianaExactRead(&pParams->pObserver->m_pStream->parent, pParams->pPage, count * entrySize));
+        theRestCount -= count;
+        for (i = 0; i < count; ++i)
+        {
+            const unsigned char * p = pEntries + i * entrySize;
+            OPERAND_SIZE begin = (OPERAND_SIZE)p[0] | ((OPERAND_SIZE)p[1] << 8) | ((OPERAND_SIZE)p[2] << 16) | ((OPERAND_SIZE)p[3] << 24);
+            if (!begin || begin >= pParams->pPeFile->pImpl->sizeOfModule)
+                continue;
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                         pParams->pObserver,
+                                         pParams->pPeFile->pImpl->dianaMode,
+                                         begin,
+                                         pParams->pPeFile->pImpl->sizeOfModule,
+                                         pParams->pStack,
+                                         0,
+                                     &pParams->analyzeParams));
+        }
+        // the analysis moved the stream
+        if (theRestCount)
+        {
+            DI_CHECK(pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream,
+                                                            pDirectory->VirtualAddress + (pDirectory->Size / entrySize - theRestCount) * entrySize));
+        }
+    }
+    return DI_SUCCESS;
+}
+
+static
 int Diana_PE_AnalyzePEImplUsingBuffer(Diana_PeAnalyzerCommonParams_type * pParams,
                                       int analyserFlags)
 {
     // scan from entry point
     if (pParams->pPeFile->pImpl->addressOfEntryPoint)
     {
-        DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+        DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                      pParams->pObserver, 
                                      pParams->pPeFile->pImpl->dianaMode, 
                                      pParams->pPeFile->pImpl->addressOfEntryPoint, 
                                      pParams->pPeFile->pImpl->sizeOfModule,
                                      pParams->pStack,
-                                     0));
+                                     0,
+                                     &pParams->analyzeParams));
     }
+    // functions with unwind data, roots before the pointer scan below
+    DI_CHECK(Diana_AnalyzePData(pParams));
     {
         // scan raw pages
         DI_CHECK(Diana_AnalyzeData(pParams));
     }
     // scan exports
     DI_CHECK(Diana_AnalyzeExports(pParams));
+    // AArch64: BTI landing pads nothing else reached
+    DI_CHECK(Diana_AnalyzeLandingPads(pParams->pOwner,
+                                      pParams->pObserver,
+                                      pParams->pPeFile->pImpl->dianaMode,
+                                      0,
+                                      pParams->pPeFile->pImpl->sizeOfModule,
+                                      pParams->pPeFile->pImpl->sizeOfModule,
+                                      pParams->pStack,
+                                      &pParams->analyzeParams));
 
     // scan all
     if (DI_ANALYSE_PE_FILE_SCAN_THROUGH & analyserFlags)
@@ -187,13 +288,14 @@ int Diana_PE_AnalyzePEImplUsingBuffer(Diana_PeAnalyzerCommonParams_type * pParam
         OPERAND_SIZE i = 0;
         for(; i < pParams->pPeFile->pImpl->sizeOfModule; i+=4ULL)
         {
-            DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                          pParams->pObserver, 
                                          pParams->pPeFile->pImpl->dianaMode, 
                                          i, 
                                          pParams->pPeFile->pImpl->sizeOfModule,
                                          pParams->pStack,
-                                         DI_ANALYSE_BREAK_ON_INVALID_CMD));
+                                         DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                     &pParams->analyzeParams));
         }
     }
     return DI_SUCCESS;
@@ -211,8 +313,13 @@ int Diana_PE_AnalyzePEImpl(Diana_PeFile * pPeFile,
     int status = 0;
     int stackInited = 0;
     Diana_PeAnalyzerCommonParams_type params;
+	void * pPage = 0;
 
-    void * pPage = DIANA_MALLOC(pageSize + sizeof(OPERAND_SIZE));
+    // x86 and AArch64 (no ARM64EC/CHPE)
+    if (pPeFile->pImpl->arch != DIANA_ARCH_X86 && pPeFile->pImpl->arch != DIANA_ARCH_AARCH64)
+        return DI_UNSUPPORTED;
+
+    pPage = DIANA_MALLOC(pageSize + sizeof(OPERAND_SIZE));
     DI_CHECK_ALLOC(pPage);
 
     DI_CHECK_GOTO(Diana_Stack_Init(&stack, 4096, sizeof(Diana_RouteInfo)));
@@ -224,6 +331,12 @@ int Diana_PE_AnalyzePEImpl(Diana_PeFile * pPeFile,
     params.pOwner = pOwner;
     params.pObserver = pObserver;
     params.pStack = &stack;
+    DianaAnalyzeParams_Init(&params.analyzeParams, pPeFile->pImpl->arch);
+    if (pPeFile->pImpl->arch == DIANA_ARCH_AARCH64)
+    {
+        // the observer knows where the image is, ADRP needs only offset 0 page-aligned
+        params.analyzeParams.flags = DIANA_ANALYZE_ADDRESSES_RELATIVE;
+    }
 
     status = Diana_PE_AnalyzePEImplUsingBuffer(&params,
                                                analyserFlags);

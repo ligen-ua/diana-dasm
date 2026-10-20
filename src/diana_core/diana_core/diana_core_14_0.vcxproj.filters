@@ -4,12 +4,16 @@
     <ClCompile Include="diana_allocators.c" />
     <ClCompile Include="diana_analyze.c" />
     <ClCompile Include="diana_analyze2.c" />
+    <ClCompile Include="diana_arm64.c" />
+    <ClCompile Include="diana_arm32.c" />
     <ClCompile Include="diana_core.c" />
     <ClCompile Include="diana_core_gen_tags.c" />
     <ClCompile Include="diana_core_parsers.c" />
     <ClCompile Include="diana_core_utils.c" />
     <ClCompile Include="diana_core_win32_context.c" />
     <ClCompile Include="diana_gen.c" />
+    <ClCompile Include="diana_gen_a64.c" />
+    <ClCompile Include="diana_gen_a32.c" />
     <ClCompile Include="diana_list.c" />
     <ClCompile Include="diana_operands.c" />
     <ClCompile Include="diana_patchers.c" />
@@ -23,6 +27,8 @@
     <ClCompile Include="diana_tables_32.c" />
     <ClCompile Include="diana_tables_common.c" />
     <ClCompile Include="diana_text_output_masm.c" />
+    <ClCompile Include="diana_text_output_arm.c" />
+    <ClCompile Include="diana_text_output_arm32.c" />
     <ClCompile Include="diana_uids.c" />
     <ClCompile Include="diana_win32.c" />
     <ClCompile Include="diana_win32_executable_heap.c" />
@@ -156,6 +162,8 @@
     <ClInclude Include="diana_allocators.h" />
     <ClInclude Include="diana_analyze.h" />
     <ClInclude Include="diana_analyze2.h" />
+    <ClInclude Include="diana_arm.h" />
+    <ClInclude Include="diana_arm32.h" />
     <ClInclude Include="diana_apply_config_rules.h" />
     <ClInclude Include="diana_config.h" />
     <ClInclude Include="diana_core.h" />
@@ -166,6 +174,8 @@
     <ClInclude Include="diana_core_win32_context.h" />
     <ClInclude Include="diana_disable_warnings.h" />
     <ClInclude Include="diana_gen.h" />
+    <ClInclude Include="diana_gen_a64.h" />
+    <ClInclude Include="diana_gen_a32.h" />
     <ClInclude Include="diana_list.h" />
     <ClInclude Include="diana_operands.h" />
     <ClInclude Include="diana_patchers.h" />
@@ -326,6 +336,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="diana_custom_config.inc" />
+    <None Include="diana_text_output_arm_sysregs.inc" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="diana_processor\ReadMe.txt" />

@@ -108,6 +108,21 @@ int ReadOptionalHeader(Diana_PeFile_impl * pImpl,
         *pDisasmMode = DIANA_MODE64;
         *pOptionalHeaderSize = sizeof(DIANA_IMAGE_OPTIONAL_HEADER64);
         return DI_InitAmd64(pImpl, pStream);
+
+    // ARM: the same PE32/PE32+ layouts, only the code differs.
+    // Windows on ARM is always little-endian, there is no big-endian ARM PE
+    case DIANA_IMAGE_FILE_MACHINE_ARM64:
+        pImpl->arch = DIANA_ARCH_AARCH64;
+        *pDisasmMode = DIANA_MODE64;
+        *pOptionalHeaderSize = sizeof(DIANA_IMAGE_OPTIONAL_HEADER64);
+        return DI_InitAmd64(pImpl, pStream);
+
+    case DIANA_IMAGE_FILE_MACHINE_ARMNT:
+    case DIANA_IMAGE_FILE_MACHINE_THUMB:
+        pImpl->arch = DIANA_ARCH_THUMB;
+        *pDisasmMode = DIANA_MODE32;
+        *pOptionalHeaderSize = sizeof(DIANA_IMAGE_OPTIONAL_HEADER32);
+        return DI_Init386(pImpl, pStream);
     }
     return DI_UNSUPPORTED_COMMAND;
 }

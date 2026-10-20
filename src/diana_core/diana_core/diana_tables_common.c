@@ -56,6 +56,18 @@ int Diana_DispatchMod3(DianaLinkedOperand * pInfo,
         pInfo->usedSize = 32;
         return DianaRecognizeYMM(( DI_CHAR )rm, pOut);
     }
+    if (pInfo->pInfo->m_type == diana_orMemoryZMM)
+    {
+        pInfo->usedSize = 64;
+        *pOut = Diana_VectorRegister(64, rm);
+        return *pOut == reg_none ? DI_ERROR : DI_SUCCESS;
+    }
+    if (pInfo->pInfo->m_type == diana_orMemoryK)
+    {
+        pInfo->usedSize = 8;
+        *pOut = (DianaUnifiedRegister)(reg_K0 + (rm & 7));
+        return DI_SUCCESS;
+    }
 
     switch (iRegSizeInBytes)
     {

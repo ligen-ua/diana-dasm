@@ -26,8 +26,6 @@ int Diana_Call_fucomi(struct _dianaContext * pDianaContext, DianaProcessor * pCa
 int Diana_Call_fucomip(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 // Integer compare
-int Diana_Call_ficom(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
-int Diana_Call_ficomp(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 // Load constants
 int Diana_Call_fld1(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
@@ -47,7 +45,6 @@ int Diana_Call_ffreep(struct _dianaContext * pDianaContext, DianaProcessor * pCa
 int Diana_Call_fninit(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 // Arithmetic
-int Diana_Call_fimul(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_frndint(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_fscale(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_fxtract(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
@@ -63,7 +60,6 @@ int Diana_Call_fcos(struct _dianaContext * pDianaContext, DianaProcessor * pCall
 int Diana_Call_fsincos(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 // Store integer truncated
-int Diana_Call_fisttp(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 // Conditional float move
 int Diana_Call_fcmovb(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
@@ -84,5 +80,9 @@ int Diana_Call_frstor(struct _dianaContext * pDianaContext, DianaProcessor * pCa
 int Diana_Call_fnsave(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_fxsave(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_fxrstor(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xsave(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xsaveopt(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xsavec(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xrstor(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 #endif

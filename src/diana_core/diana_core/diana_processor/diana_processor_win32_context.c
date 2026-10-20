@@ -1,9 +1,10 @@
 #include "diana_processor_win32_context.h"
 #include "diana_processor_core.h"
 
-int DianaProcessor_ConvertContextToIndependent_Win32(const DIANA_CONTEXT_NTLIKE_32 * pContextIn, 
+int DianaProcessor_ConvertContextToIndependent_Win32(const DIANA_CONTEXT_NTLIKE_32 * pContextIn,
                                                      Diana_Processor_Registers_Context * pContextOut)
 {
+    int i = 0;
     DIANA_MEMSET(pContextOut, 0, sizeof(Diana_Processor_Registers_Context));
 
     pContextOut->reg_DR0.value = pContextIn->Dr0;
@@ -16,14 +17,21 @@ int DianaProcessor_ConvertContextToIndependent_Win32(const DIANA_CONTEXT_NTLIKE_
     pContextOut->fpuStateFlags = DIANA_PROCESSOR_CONTEXT_FPU_STATE_VALID;
     pContextOut->fpuState.controlWord = (DI_UINT16)pContextIn->FloatSave.ControlWord;
     pContextOut->fpuState.statusWord = (DI_UINT16)pContextIn->FloatSave.StatusWord;
-    pContextOut->reg_MM0.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[0];
-    pContextOut->reg_MM1.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[8];
-    pContextOut->reg_MM2.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[16];
-    pContextOut->reg_MM3.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[24];
-    pContextOut->reg_MM4.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[32];
-    pContextOut->reg_MM5.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[40];
-    pContextOut->reg_MM6.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[48];
-    pContextOut->reg_MM7.value = *(DI_UINT64*)&pContextIn->FloatSave.RegisterArea[56];
+    // the full tag word (FSAVE): 2 bits per physical register, 11 is empty
+    for (i = 0; i < 8; ++i)
+    {
+        if (((pContextIn->FloatSave.TagWord >> (2 * i)) & 3) != 3)
+            pContextOut->fpuState.registerFlags[i] = DI_PROCESSOR_FPU_REGISTER_BUSY;
+    }
+    // RegisterArea is ST(0)..ST(7) of 10 bytes each (FSAVE), the low 8 bytes the significand
+    DIANA_MEMCPY(&pContextOut->reg_MM0.value, &pContextIn->FloatSave.RegisterArea[0], 8);
+    DIANA_MEMCPY(&pContextOut->reg_MM1.value, &pContextIn->FloatSave.RegisterArea[10], 8);
+    DIANA_MEMCPY(&pContextOut->reg_MM2.value, &pContextIn->FloatSave.RegisterArea[20], 8);
+    DIANA_MEMCPY(&pContextOut->reg_MM3.value, &pContextIn->FloatSave.RegisterArea[30], 8);
+    DIANA_MEMCPY(&pContextOut->reg_MM4.value, &pContextIn->FloatSave.RegisterArea[40], 8);
+    DIANA_MEMCPY(&pContextOut->reg_MM5.value, &pContextIn->FloatSave.RegisterArea[50], 8);
+    DIANA_MEMCPY(&pContextOut->reg_MM6.value, &pContextIn->FloatSave.RegisterArea[60], 8);
+    DIANA_MEMCPY(&pContextOut->reg_MM7.value, &pContextIn->FloatSave.RegisterArea[70], 8);
 
 
     pContextOut->reg_GS.value = (DI_UINT16)pContextIn->SegGs;
@@ -50,6 +58,7 @@ int DianaProcessor_ConvertContextToIndependent_Win32(const DIANA_CONTEXT_NTLIKE_
 int DianaProcessor_ConvertContextToIndependent_X64(const DIANA_CONTEXT_NTLIKE_64 * pContextIn, 
                                                    Diana_Processor_Registers_Context * pContextOut)
 {
+    int i = 0;
     DIANA_MEMSET(pContextOut, 0, sizeof(Diana_Processor_Registers_Context));
     
     pContextOut->reg_CS.value = (DI_UINT16)pContextIn->SegCs;
@@ -76,7 +85,6 @@ int DianaProcessor_ConvertContextToIndependent_X64(const DIANA_CONTEXT_NTLIKE_64
     pContextOut->reg_RBX.value = pContextIn->Rbx;
     pContextOut->reg_RCX.value = pContextIn->Rcx;
     pContextOut->reg_RDX.value = pContextIn->Rdx;
-    pContextOut->reg_RBP.value = pContextIn->Rbx;
     pContextOut->reg_RSP.value = pContextIn->Rsp;
     pContextOut->reg_RBP.value = pContextIn->Rbp;
     pContextOut->reg_RSI.value = pContextIn->Rsi;
@@ -95,6 +103,13 @@ int DianaProcessor_ConvertContextToIndependent_X64(const DIANA_CONTEXT_NTLIKE_64
     pContextOut->fpuStateFlags = DIANA_PROCESSOR_CONTEXT_FPU_STATE_VALID;
     pContextOut->fpuState.controlWord = (DI_UINT16)pContextIn->FltSave.ControlWord;
     pContextOut->fpuState.statusWord = (DI_UINT16)pContextIn->FltSave.StatusWord;
+    // the abridged tag word (FXSAVE): bit i set, the physical register i is valid
+    for (i = 0; i < 8; ++i)
+    {
+        if ((pContextIn->FltSave.TagWord >> i) & 1)
+            pContextOut->fpuState.registerFlags[i] = DI_PROCESSOR_FPU_REGISTER_BUSY;
+    }
+    // FloatRegisters is ST(0)..ST(7) (FXSAVE)
     pContextOut->reg_MM0.value = pContextIn->FltSave.FloatRegisters[0].Low;
     pContextOut->reg_MM1.value = pContextIn->FltSave.FloatRegisters[1].Low;
     pContextOut->reg_MM2.value = pContextIn->FltSave.FloatRegisters[2].Low;

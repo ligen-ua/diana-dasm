@@ -16,8 +16,13 @@ static void test_fpu_mmx32_impl()
     DianaParserResult result;
     size_t read;
 
-    static unsigned char mov00[] = {0x0f, 0xae, 0xc0};//           fxsave  eax
+    // fxsave takes memory only: 0f ae c0 is no instruction (objdump, llvm-mc)
+    static unsigned char mov00[] = {0x0f, 0xae, 0xc0};
     iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE32, mov00, sizeof(mov00), Diana_GetRootLine(), &result, &read);
+    DIANA_TEST_ASSERT(iRes != DI_SUCCESS);
+
+    static unsigned char mov00m[] = {0x0f, 0xae, 0x00};//           fxsave  [eax]
+    iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE32, mov00m, sizeof(mov00m), Diana_GetRootLine(), &result, &read);
     DIANA_TEST_ASSERT_IF(!iRes)
     {
         DIANA_TEST_ASSERT(result.iLinkedOpCount==1);
@@ -25,9 +30,8 @@ static void test_fpu_mmx32_impl()
         DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
         DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "fxsave")==0);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
-        DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 4);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_EAX);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_EAX);
     } 
 
     static unsigned char mov01[] = {0xf3, 0x36, 0x66, 0x44};//           rep     inc sp

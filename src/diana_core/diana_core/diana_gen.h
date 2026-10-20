@@ -11,7 +11,14 @@ typedef enum {diana_orNone, diana_orRegMem, diana_orRegistry,
               diana_orReg32mem16, diana_orFPU_ST, diana_orFPU_ST0, diana_orFPU_STi,
               diana_orReg16_32_64_mem16, diana_orRegMem_exact, diana_orMemory_exact,
 
-              diana_orRegYMM, diana_orMemoryYMM
+              diana_orRegYMM, diana_orMemoryYMM,
+
+              diana_orMemOnly,   // orRegMem without the register form
+              diana_orXMM0,      // the implicit xmm0 (blendvps, pblendvb)
+              diana_orRegIs4,    // a vector register in imm8[7:4] (VEX: vblendvps); m_size 32: ymm
+              diana_orVSIB,      // VSIB memory (gathers): m_size the element, m_size2 the index (16 xmm, 32 ymm, 64 zmm)
+              // AVX-512: zmm, zmm or memory (m_size2 the memory size), the opmask registers, k or memory
+              diana_orRegZMM, diana_orMemoryZMM, diana_orRegK, diana_orMemoryK
 } DianaOperands_type;
 
 typedef enum {diana_reg_none, diana_reg_ES, diana_reg_CS, diana_reg_SS, diana_reg_DS, diana_reg_FS, diana_reg_GS} DianaSreg_type;

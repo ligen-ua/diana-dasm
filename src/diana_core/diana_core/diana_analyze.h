@@ -2,6 +2,7 @@
 #define DIANA_ANALYZE_H
 
 #include "diana_stack.h"
+#include "diana_arm.h"
 
 
 #define DI_INSTRUCTION_CAN_CHANGE_CSIP    0x1
@@ -13,11 +14,20 @@
 #define DI_INSTRUCTION_ROOT               0x40
 #define DI_INSTRUCTION_EXTERNAL           0x80
 #define DI_INSTRUCTION_DATA               0x100
+// AArch64: a valid instruction diana_core doesn't decode yet (SVE, SME...), analyzed as one without control flow
+#define DI_INSTRUCTION_UNSUPPORTED        0x200
+// AArch64: the instruction needs a feature that DianaAnalyzeParams::pArmProfile doesn't have
+#define DI_INSTRUCTION_OUTSIDE_PROFILE    0x400
 
 #define DI_ROUTE_QUESTIONABLE             0x1
 
 #define DI_XREF_INVALID                   0x1
 #define DI_XREF_EXTERNAL                  0x2
+// the target is data: read or written (mov eax, [rip+X]), or an address taken whose target is not code;
+// the target instruction is in m_externalInstructionsList with DI_INSTRUCTION_DATA
+#define DI_XREF_DATA                      0x4
+// the instruction takes the target's address (lea, an immediate, ADR/ADRP+ADD) instead of jumping there
+#define DI_XREF_ADDRESS_TAKEN             0x8
 
 typedef struct _Diana_Instruction
 {
@@ -93,6 +103,12 @@ typedef struct _diana_RouteInfo
     Diana_FList_List instructions;
     OPERAND_SIZE  startOffset;
     long flags;
+#ifndef DIANA_NO_ARM
+    // AArch64: register armBoundReg is below armBoundCount on this route (cmp w0, #10; b.ls <route>),
+    // the bound of a jump table index; armBoundCount 0 means none
+    int armBoundReg;
+    OPERAND_SIZE armBoundCount;
+#endif
 }Diana_RouteInfo;
 
 int Diana_InstructionsOwner_Init(Diana_InstructionsOwner * pOwner,
@@ -121,6 +137,48 @@ int Diana_AnalyzeCodeEx(Diana_InstructionsOwner * pOwner,
                         Diana_Stack * pStack,
                         int flags);
 
+
+// what Diana_AnalyzeCodeEx2 analyzes; Diana_AnalyzeCode(Ex) means x86 with the defaults
+#define DIANA_ANALYZE_IMAGE_BASE_UNKNOWN  1     // imageBase is not known: no ADRP references
+// imageBase is not known, offset 0 is page-aligned (PE, ELF): ADRP/ADR addresses go to the observer as offsets,
+// addresses loaded from memory as absolute addresses
+#define DIANA_ANALYZE_ADDRESSES_RELATIVE  2
+
+typedef struct _DianaAnalyzeParams
+{
+    int arch;                               // DIANA_ARCH_*
+    // AArch64: always decoded with all features, instructions outside the profile get
+    // DI_INSTRUCTION_OUTSIDE_PROFILE; 0 means no check
+    const DianaArmProfile * pArmProfile;
+    // the address of offset 0, for ADRP pages and alignment
+    OPERAND_SIZE imageBase;
+    int flags;                              // DIANA_ANALYZE_IMAGE_BASE_*
+}DianaAnalyzeParams;
+
+// x86 for DIANA_ARCH_X86, no profile, image base 0
+void DianaAnalyzeParams_Init(DianaAnalyzeParams * pParams, int arch);
+
+// pParams == 0 is x86, the same as Diana_AnalyzeCodeEx
+int Diana_AnalyzeCodeEx2(Diana_InstructionsOwner * pOwner,
+                         DianaAnalyzeObserver * pObserver,
+                         int mode,
+                         OPERAND_SIZE initialOffset,
+                         OPERAND_SIZE maxOffset,
+                         Diana_Stack * pStack,
+                         int flags,
+                         const DianaAnalyzeParams * pParams);
+
+// AArch64: every bti c, bti j or bti jc at a 4-aligned offset of [startOffset, endOffset) that no route has reached
+// starts a strict route (DI_ANALYSE_BREAK_ON_INVALID_CMD): a landing pad of an indirect branch or call, like the C++
+// exception landing pads only the unwinder knows. Run it after the other seeds. Other architectures: nothing to do
+int Diana_AnalyzeLandingPads(Diana_InstructionsOwner * pOwner,
+                             DianaAnalyzeObserver * pObserver,
+                             int mode,
+                             OPERAND_SIZE startOffset,
+                             OPERAND_SIZE endOffset,
+                             OPERAND_SIZE maxOffset,
+                             Diana_Stack * pStack,
+                             const DianaAnalyzeParams * pParams);
 
 int Diana_AnalyzeJumps(DianaParserResult* pResult,
     OPERAND_SIZE offset,

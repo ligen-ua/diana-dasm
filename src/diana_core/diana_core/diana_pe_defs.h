@@ -136,6 +136,10 @@ typedef struct _DIANA_IMAGE_SECTION_HEADER
 #define DIANA_IMAGE_FILE_MACHINE_SH5               0x01a8  // SH5
 #define DIANA_IMAGE_FILE_MACHINE_ARM               0x01c0  // ARM Little-Endian
 #define DIANA_IMAGE_FILE_MACHINE_THUMB             0x01c2
+#define DIANA_IMAGE_FILE_MACHINE_ARMNT             0x01c4  // ARM Thumb-2 Little-Endian
+#define DIANA_IMAGE_FILE_MACHINE_ARM64             0xAA64  // ARM64 Little-Endian
+#define DIANA_IMAGE_FILE_MACHINE_ARM64EC           0xA641
+#define DIANA_IMAGE_FILE_MACHINE_ARM64X            0xA64E
 #define DIANA_IMAGE_FILE_MACHINE_AM33              0x01d3
 #define DIANA_IMAGE_FILE_MACHINE_POWERPC           0x01F0  // IBM PowerPC Little-Endian
 #define DIANA_IMAGE_FILE_MACHINE_POWERPCFP         0x01f1

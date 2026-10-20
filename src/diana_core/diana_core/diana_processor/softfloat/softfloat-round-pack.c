@@ -283,7 +283,8 @@ float16 roundAndPackFloat16(int zSign, DI_INT16 zExp, DI_UINT16 zSig, float_stat
     }
     if (roundBits) float_raise(status, float_flag_inexact);
     zSigRound = ((zSig + roundIncrement) & ~roundMask) >> 4;
-    zSigRound &= ~(((roundBits ^ 0x10) == 0) & roundNearestEven);
+    // a tie (roundBits 0x8 with the 4 round bits): to even (0x10 was the tie of a 5-bit mask: ties rounded up)
+    zSigRound &= ~(((roundBits ^ 0x8) == 0) & roundNearestEven);
     if (zSigRound == 0) zExp = 0;
     return packFloat16(zSign, zExp, zSigRound);
 }

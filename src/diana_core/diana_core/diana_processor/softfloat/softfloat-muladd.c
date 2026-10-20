@@ -207,6 +207,10 @@ float32 float32_muladd(float32 a, float32 b, float32 c, int flags, float_status_
     }
 
     if (pZero) {
+        // a denormal factor of a zero product is a denormal operand too (the CPU: DE)
+        if ((aSig && aExp == 0) || (bSig && bExp == 0)) {
+            float_raise(status, float_flag_denormal);
+        }
         if (cExp == 0) {
             if (cSig == 0) {
                 /* Adding two exact zeroes */
@@ -422,6 +426,10 @@ float64 float64_muladd(float64 a, float64 b, float64 c, int flags, float_status_
     }
 
     if (pZero) {
+        // a denormal factor of a zero product is a denormal operand too (the CPU: DE)
+        if ((aSig && aExp == 0) || (bSig && bExp == 0)) {
+            float_raise(status, float_flag_denormal);
+        }
         if (cExp == 0) {
             if (cSig == 0) {
                 /* Adding two exact zeroes */

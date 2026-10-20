@@ -29,7 +29,16 @@ static const char * g_registers[] = {
  "YMM8",  "YMM9",  "YMM10", "YMM11", "YMM12", "YMM13", "YMM14", "YMM15",
  "fpu_ST0", "fpu_ST1", "fpu_ST2", "fpu_ST3", "fpu_ST4", "fpu_ST5", "fpu_ST6", "fpu_ST7",
  "CR8",   "CR9",   "CR10",  "CR11",  "CR12",  "CR13",  "CR14",  "CR15",
- "DR8",   "DR9",   "DR10",  "DR11",  "DR12",  "DR13",  "DR14",  "DR15"};
+ "DR8",   "DR9",   "DR10",  "DR11",  "DR12",  "DR13",  "DR14",  "DR15",
+ "ZMM0",  "ZMM1",  "ZMM2",  "ZMM3",  "ZMM4",  "ZMM5",  "ZMM6",  "ZMM7",
+ "ZMM8",  "ZMM9",  "ZMM10", "ZMM11", "ZMM12", "ZMM13", "ZMM14", "ZMM15",
+ "ZMM16", "ZMM17", "ZMM18", "ZMM19", "ZMM20", "ZMM21", "ZMM22", "ZMM23",
+ "ZMM24", "ZMM25", "ZMM26", "ZMM27", "ZMM28", "ZMM29", "ZMM30", "ZMM31",
+ "XMM16", "XMM17", "XMM18", "XMM19", "XMM20", "XMM21", "XMM22", "XMM23",
+ "XMM24", "XMM25", "XMM26", "XMM27", "XMM28", "XMM29", "XMM30", "XMM31",
+ "YMM16", "YMM17", "YMM18", "YMM19", "YMM20", "YMM21", "YMM22", "YMM23",
+ "YMM24", "YMM25", "YMM26", "YMM27", "YMM28", "YMM29", "YMM30", "YMM31",
+ "K0",    "K1",    "K2",    "K3",    "K4",    "K5",    "K6",    "K7"};
 
 static const char * GetRegisterName(DianaUnifiedRegister reg)
 {
@@ -105,28 +114,43 @@ static int PrintRegister(DianaTextOutputContext * pContext, DianaUnifiedRegister
 static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pLinkedOp)
 {
     int bWasSomething = 0;
+    // EVEX: a broadcast element is "dword bcst" (MASM, objdump)
+    const char * kind = pContext->pResult->evex.broadcast ? " bcst " : " ptr ";
 
     switch(pLinkedOp->usedSize)
     {
     default:
         break;
     case 1:
-        DI_CHECK(DianaTextOutput(pContext, "byte ptr "));
+        DI_CHECK(DianaTextOutput(pContext, "byte"));
+        DI_CHECK(DianaTextOutput(pContext, kind));
         break;
     case 2:
-        DI_CHECK(DianaTextOutput(pContext, "word ptr "));
+        DI_CHECK(DianaTextOutput(pContext, "word"));
+        DI_CHECK(DianaTextOutput(pContext, kind));
         break;
     case 4:
-        DI_CHECK(DianaTextOutput(pContext, "dword ptr "));
+        DI_CHECK(DianaTextOutput(pContext, "dword"));
+        DI_CHECK(DianaTextOutput(pContext, kind));
+        break;
+    case 6:
+        DI_CHECK(DianaTextOutput(pContext, "fword ptr "));
         break;
     case 8:
-        DI_CHECK(DianaTextOutput(pContext, "qword ptr "));
+        DI_CHECK(DianaTextOutput(pContext, "qword"));
+        DI_CHECK(DianaTextOutput(pContext, kind));
+        break;
+    case 10:
+        DI_CHECK(DianaTextOutput(pContext, "tbyte ptr "));
         break;
     case 16:
         DI_CHECK(DianaTextOutput(pContext, "xmmword ptr "));
         break;
     case 32:
         DI_CHECK(DianaTextOutput(pContext, "ymmword ptr "));
+        break;
+    case 64:
+        DI_CHECK(DianaTextOutput(pContext, "zmmword ptr "));
         break;
     };
     DI_CHECK(PrintRegister(pContext, pLinkedOp->value.rmIndex.seg_reg));
@@ -167,9 +191,31 @@ static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pL
         int wasConvert = 0;
         DI_UINT64 usedValue = pLinkedOp->value.rmIndex.dispValue;
         DI_CHAR usedSize = pLinkedOp->value.rmIndex.dispSize;
+        DianaRmIndex scaled;
+        const DianaRmIndex * pDisp = &pLinkedOp->value.rmIndex;
+        if (usedSize == 1 && pContext->pResult->evex.disp8Scale > 1)
+        {
+            // EVEX disp8*N: dispValue is the product, more than 8 bits
+            scaled = pLinkedOp->value.rmIndex;
+            scaled.dispSize = 4;
+            pDisp = &scaled;
+            usedSize = 4;
+        }
+        if (!bWasSomething && pLinkedOp->pInfo->m_type != diana_orOffset && pLinkedOp->pInfo->m_type != diana_orPtr)
+        {
+            // an absolute address: the displacement sign-extended to the address size, unsigned
+            // (16-bit [9F30h], not [-60D0h])
+            if (pLinkedOp->usedAddressSize == 2)
+                usedValue &= 0xFFFF;
+            else
+            if (pLinkedOp->usedAddressSize == 4)
+                usedValue &= 0xFFFFFFFF;
+            usedSize = (DI_CHAR)pLinkedOp->usedAddressSize;
+        }
+        else
         if (pLinkedOp->pInfo->m_type != diana_orOffset && pLinkedOp->pInfo->m_type != diana_orPtr)
         {
-            DI_CHECK(ConvertDispToSigned(&pLinkedOp->value.rmIndex, &usedValue, &wasConvert));
+            DI_CHECK(ConvertDispToSigned(pDisp, &usedValue, &wasConvert));
             if (wasConvert)
             {
                 positive = 0;
@@ -191,6 +237,18 @@ static int PrintIndex(DianaTextOutputContext * pContext, DianaLinkedOperand * pL
         DI_CHECK(DianaOpOutput(pContext, usedValue, usedSize));
     }
     DI_CHECK(DianaTextOutput(pContext, "]"));
+    if (pContext->pResult->evex.broadcast)
+    {
+        // EVEX: the element count, always ({1to2} of vcvtpd2ps xmm0 is ambiguous without it)
+        char text[8] = {'{', '1', 't', 'o', 0};
+        int count = pContext->pResult->evex.broadcast, i = 4;
+        if (count >= 10)
+            text[i++] = (char)('0' + count / 10);
+        text[i++] = (char)('0' + count % 10);
+        text[i++] = '}';
+        text[i] = 0;
+        DI_CHECK(DianaTextOutput(pContext, text));
+    }
     return DI_SUCCESS;
 }
 static int PrintImmediate(DianaTextOutputContext * pContext, DianaLinkedOperand * pLinkedOp)
@@ -206,14 +264,22 @@ static int PrintCallPtr(DianaTextOutputContext * pContext, DianaLinkedOperand * 
 }
 static int PrintRelative(DianaTextOutputContext * pContext, DianaLinkedOperand * pLinkedOp)
 {
+    // the target wraps at the operand size (IP, EIP, RIP), 67 doesn't change it
+    int size = pContext->pResult->iOperandSize ? pContext->pResult->iOperandSize : pLinkedOp->usedAddressSize;
     OPERAND_SIZE res = pLinkedOp->value.rel.m_value + pContext->instructionRIP + pContext->pResult->iFullCmdSize;
-    DI_CHECK(DianaOpOutput(pContext, res, pLinkedOp->usedAddressSize));
+    if (size == 2)
+        res &= 0xFFFF;
+    else
+    if (size == 4)
+        res &= 0xFFFFFFFF;
+    DI_CHECK(DianaOpOutput(pContext, res, size));
     return DI_SUCCESS;
 }
 static int PrintMemory(DianaTextOutputContext * pContext, DianaLinkedOperand * pLinkedOp)
 {
     return PrintIndex(pContext, pLinkedOp);
 }
+static int PrintOperand(DianaTextOutputContext * pContext, DianaLinkedOperand * pLinkedOp);
 static int PrintOpSeparator(DianaTextOutputContext * pContext)
 {
     if (pContext->flags & DIANA_TEXT_OUTPUT_FLAG_OPERAND_PRINTED)
@@ -231,11 +297,39 @@ static int PrintOpSeparator(DianaTextOutputContext * pContext)
     pContext->flags |= DIANA_TEXT_OUTPUT_FLAG_OPERAND_PRINTED;
     return DI_SUCCESS;
 }
-static int PrintOperands(DianaTextOutputContext * pContext)
+// EVEX: {k1}{z} after operand 0, {rn-sae} after the last operand that is not an immediate (objdump)
+static int PrintEvexDecorations(DianaTextOutputContext * pContext, int i)
 {
-    DianaLinkedOperand * pLinkedOp = pContext->pResult->linkedOperands;
-    int i = 0;
+    const DianaEvexInfo * pEvex = &pContext->pResult->evex;
+    static const char * rounding[] = {"", "{sae}", "{rn-sae}", "{rd-sae}", "{ru-sae}", "{rz-sae}"};
+    int last = pContext->pResult->iLinkedOpCount - 1;
+    if (!pEvex->isEvex)
+        return DI_SUCCESS;
+    if (i == 0 && pEvex->mask)
+    {
+        char text[5] = {'{', 'k', (char)('0' + pEvex->mask), '}', 0};
+        DI_CHECK(DianaTextOutput(pContext, text));
+    }
+    if (i == 0 && pEvex->zeroing)
+        DI_CHECK(DianaTextOutput(pContext, "{z}"));
+    for (; last >= 0 && pContext->pResult->linkedOperands[last].type == diana_imm; --last);
+    if (i == last && pEvex->rounding && pEvex->rounding < sizeof(rounding) / sizeof(rounding[0]))
+        DI_CHECK(DianaTextOutput(pContext, rounding[pEvex->rounding]));
+    return DI_SUCCESS;
+}
+static int PrintOperandsFrom(DianaTextOutputContext * pContext, int first)
+{
+    DianaLinkedOperand * pLinkedOp = pContext->pResult->linkedOperands + first;
+    int i = first;
     for (i; i < pContext->pResult->pInfo->m_operandCount; ++pLinkedOp, ++i)
+    {
+        DI_CHECK(PrintOperand(pContext, pLinkedOp));
+        DI_CHECK(PrintEvexDecorations(pContext, i));
+    }
+    return DI_SUCCESS;
+}
+static int PrintOperand(DianaTextOutputContext * pContext, DianaLinkedOperand * pLinkedOp)
+{
     {
         switch (pLinkedOp->type)
         {
@@ -270,6 +364,10 @@ static int PrintOperands(DianaTextOutputContext * pContext)
     }
     return DI_SUCCESS;
 }
+static int PrintOperands(DianaTextOutputContext * pContext)
+{
+    return PrintOperandsFrom(pContext, 0);
+}
 static int diana_cmd_output_generic(DianaTextOutputContext * pContext)
 {    
     DI_CHECK(DianaTextOutput(pContext, pContext->pResult->pInfo->m_pGroupInfo->m_pName));    
@@ -281,6 +379,61 @@ static int diana_cmd_output_hint_nop(DianaTextOutputContext* pContext)
     DI_CHECK(DianaTextOutput(pContext, "nop"));
     return PrintOperands(pContext);
 }
+
+// 98 and 99 have one table entry; the name depends on the operand size
+static int diana_cmd_output_cbw(DianaTextOutputContext* pContext)
+{
+    int size = pContext->pResult->iOperandSize;
+    return DianaTextOutput(pContext, size == 8 ? "cdqe" : size == 4 ? "cwde" : "cbw");
+}
+static int diana_cmd_output_cwd(DianaTextOutputContext* pContext)
+{
+    int size = pContext->pResult->iOperandSize;
+    return DianaTextOutput(pContext, size == 8 ? "cqo" : size == 4 ? "cdq" : "cwd");
+}
+// e3: jcxz, jecxz, jrcxz by the address size; the counter register is not printed
+static int diana_cmd_output_jecxz(DianaTextOutputContext* pContext)
+{
+    DianaUnifiedRegister reg = pContext->pResult->linkedOperands[0].value.recognizedRegister;
+    DI_CHECK(DianaTextOutput(pContext, reg == reg_CX ? "jcxz" : reg == reg_RCX ? "jrcxz" : "jecxz"));
+    return PrintOperandsFrom(pContext, 1);
+}
+// 0f c7 /1: cmpxchg8b, cmpxchg16b with REX.W
+static int diana_cmd_output_cmpxchg16b(DianaTextOutputContext* pContext)
+{
+    DI_CHECK(DianaTextOutput(pContext, pContext->pResult->iOperandSize == 8 ? "cmpxchg16b" : "cmpxchg8b"));
+    return PrintOperands(pContext);
+}
+// 0f 6e, 0f 7e: movd, movq with REX.W
+static int diana_cmd_output_movd(DianaTextOutputContext* pContext)
+{
+    DI_CHECK(DianaTextOutput(pContext, pContext->pResult->iOperandSize == 8 ? "movq" : "movd"));
+    return PrintOperands(pContext);
+}
+// the commands after g_functions: pinsrd, pextrd are pinsrq, pextrq with REX.W; pcmpestri, pcmpestrm are
+// pcmpestriq, pcmpestrmq (the lengths in RAX, RDX); the VEX forms: vmovd, vpinsrd, vpextrd, vpcmpestri, vpcmpestrm
+// with VEX.W; rdsspd, incsspd, wrssd, wrussd are the q forms with REX.W
+static int diana_cmd_output_after_table(DianaTextOutputContext * pContext)
+{
+    unsigned long cmdId = (unsigned long)pContext->pResult->pInfo->m_pGroupInfo->m_commandId;
+    if (pContext->pResult->iOperandSize == 8)
+    {
+        const char * name = cmdId == diana_cmd_pinsrd ? "pinsrq" : cmdId == diana_cmd_pextrd ? "pextrq" :
+                            cmdId == diana_cmd_pcmpestri ? "pcmpestriq" : cmdId == diana_cmd_pcmpestrm ? "pcmpestrmq" :
+                            cmdId == diana_cmd_vmovd ? "vmovq" : cmdId == diana_cmd_vpinsrd ? "vpinsrq" :
+                            cmdId == diana_cmd_vpextrd ? "vpextrq" : cmdId == diana_cmd_vpcmpestri ? "vpcmpestriq" :
+                            cmdId == diana_cmd_vpcmpestrm ? "vpcmpestrmq" : cmdId == diana_cmd_rdsspd ? "rdsspq" :
+                            cmdId == diana_cmd_incsspd ? "incsspq" : cmdId == diana_cmd_wrssd ? "wrssq" :
+                            cmdId == diana_cmd_wrussd ? "wrussq" : 0;
+        if (name)
+        {
+            DI_CHECK(DianaTextOutput(pContext, name));
+            return PrintOperands(pContext);
+        }
+    }
+    return diana_cmd_output_generic(pContext);
+}
+
 static DianaTextOutputCmd_fnc g_functions[] = 
 {
     0,
@@ -553,7 +706,7 @@ static DianaTextOutputCmd_fnc g_functions[] =
     diana_cmd_output_generic,     //   diana_cmd_output_cvtss2si,
     diana_cmd_output_generic,     //   diana_cmd_output_cvttsd2si,
     diana_cmd_output_generic,     //   diana_cmd_output_cvttss2si,
-    diana_cmd_output_generic,     //   diana_cmd_output_movd,
+    diana_cmd_output_movd,        //   diana_cmd_output_movd,
     diana_cmd_output_generic,     //   diana_cmd_output_stmxcsr,
     diana_cmd_output_generic,     //   diana_cmd_output_ldmxcsr,
     diana_cmd_output_generic,     //   diana_cmd_output_rdtsc,
@@ -561,7 +714,7 @@ static DianaTextOutputCmd_fnc g_functions[] =
     diana_cmd_output_generic,     //   diana_cmd_output_rdpmc,
     diana_cmd_output_generic,     //   diana_cmd_output_rdmsr,
     diana_cmd_output_generic,     //   diana_cmd_output_wrmsr,
-    diana_cmd_output_generic,     //   diana_cmd_output_cmpxchg16b,
+    diana_cmd_output_cmpxchg16b,  //   diana_cmd_output_cmpxchg16b,
     diana_cmd_output_generic,     //   diana_cmd_output_cpuid,
     diana_cmd_output_generic,     //   diana_cmd_output_sysenter,
     diana_cmd_output_generic,     //   diana_cmd_output_syscall,
@@ -629,7 +782,7 @@ static DianaTextOutputCmd_fnc g_functions[] =
     diana_cmd_output_generic,     //   diana_cmd_output_btr,
     diana_cmd_output_generic,     //   diana_cmd_output_bts,
     diana_cmd_output_generic,     //   diana_cmd_output_call,
-    diana_cmd_output_generic,     //   diana_cmd_output_cbw,
+    diana_cmd_output_cbw,         //   diana_cmd_output_cbw,
     diana_cmd_output_generic,     //   diana_cmd_output_clc,
     diana_cmd_output_generic,     //   diana_cmd_output_cld,
     diana_cmd_output_generic,     //   diana_cmd_output_cli,
@@ -654,7 +807,7 @@ static DianaTextOutputCmd_fnc g_functions[] =
     diana_cmd_output_generic,     //   diana_cmd_output_cmp,
     diana_cmd_output_generic,     //   diana_cmd_output_cmps,
     diana_cmd_output_generic,     //   diana_cmd_output_cmpxchg,
-    diana_cmd_output_generic,     //   diana_cmd_output_cwd,
+    diana_cmd_output_cwd,         //   diana_cmd_output_cwd,
     diana_cmd_output_generic,     //   diana_cmd_output_daa,
     diana_cmd_output_generic,     //   diana_cmd_output_das,
     diana_cmd_output_generic,     //   diana_cmd_output_dec,
@@ -674,7 +827,7 @@ static DianaTextOutputCmd_fnc g_functions[] =
     diana_cmd_output_generic,     //   diana_cmd_output_jb,
     diana_cmd_output_generic,     //   diana_cmd_output_jbe,
     diana_cmd_output_generic,     //   diana_cmd_output_je,
-    diana_cmd_output_generic,     //   diana_cmd_output_jecxz,
+    diana_cmd_output_jecxz,       //   diana_cmd_output_jecxz,
     diana_cmd_output_generic,     //   diana_cmd_output_jg,
     diana_cmd_output_generic,     //   diana_cmd_output_jge,
     diana_cmd_output_generic,     //   diana_cmd_output_jl,
@@ -820,9 +973,22 @@ int DianaTextOutputContext_TextOut(DianaTextOutputContext * pContext,
     if (pContext->pReset)
         pContext->pReset(pContext);
 
+    switch (DIANA_CMD_SET(cmdId))
+    {
+    case DIANA_CMD_SET_X86:
+        break;
+#ifndef DIANA_NO_ARM
+    case DIANA_CMD_SET_A64:
+        return DianaA64_TextOut(pContext);
+    case DIANA_CMD_SET_A32:
+        return DianaA32_TextOut(pContext);
+#endif
+    default:
+        return DI_UNSUPPORTED;
+    }
     if (cmdId >= sizeof(g_functions)/sizeof(g_functions[0]))
     {
-        return diana_cmd_output_generic(pContext);
+        return diana_cmd_output_after_table(pContext);
     }
     return (*g_functions[cmdId])(pContext);
 }

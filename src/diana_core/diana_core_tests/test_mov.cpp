@@ -270,7 +270,8 @@ static void test_mov_impl()
         DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "movsxd")==0);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_register);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_RBX);
+        // no REX.W: a 32-bit destination (objdump: movsxd ebx,DWORD PTR [r11d])
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_EBX);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_R11D);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.dispValue == 0x0);

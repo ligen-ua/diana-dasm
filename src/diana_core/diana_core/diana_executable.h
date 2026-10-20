@@ -15,8 +15,9 @@ extern "C" {
 typedef struct _DianaExecutable
 {
     int type;              /* DIANA_EXECUTABLE_TYPE_PE or DIANA_EXECUTABLE_TYPE_ELF */
-    int dianaMode;         /* DIANA_MODE32 or DIANA_MODE64 */
+    int dianaMode;         /* DIANA_MODE32 or DIANA_MODE64, the pointer size */
     OPERAND_SIZE sizeOfModule;
+    int arch;              /* DIANA_ARCH_*, pass it to Diana_InitContextEx */
     union
     {
         Diana_PeFile  peFile;

@@ -2,6 +2,8 @@
 #include "test_common.h"
 #include "test_processor_impl.h"
 #include "vector"
+#include <stdio.h>
+#include <string.h>
 
 static void test_processor_movs()
 {
@@ -47,7 +49,7 @@ static void test_processor_movsxd64_2()
 {
     unsigned char code[9] = 
     {
-        0x63, 0x4C, 0x24, 0x04, 1, 2, 3, 0x80        //movsxd  rcx, [rsp+4]
+        0x63, 0x4C, 0x24, 0x04, 1, 2, 3, 0x80        //movsxd  ecx, [rsp+4]
     }; 
 
     CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
@@ -56,7 +58,8 @@ static void test_processor_movsxd64_2()
     int res = proc.ExecOnce();
     DIANA_TEST_ASSERT(res == DI_SUCCESS);
 
-    DIANA_TEST_ASSERT(GET_REG_RCX == 0xFFFFFFFF80030201ULL);
+    // no REX.W: the destination is ecx, a 32-bit result clears the upper half of rcx
+    DIANA_TEST_ASSERT(GET_REG_RCX == 0x0000000080030201ULL);
 }
 
 
@@ -373,12 +376,109 @@ static void test_processor_movzx_64()
     DIANA_TEST_ASSERT(valRcx == 0x0000000000000f41);
 }
 
+// the results of these bytes on an Intel Core i7-11800H (tests/x86 cpu checks, 2026-10-17)
+static void test_processor_movsxd64_3()
+{
+    unsigned char code[9] = 
+    {
+        0x63, 0x4C, 0x24, 0x04, 1, 2, 3, 0x80        //movsxd  ecx, [rsp+4]
+    }; 
+
+    CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
+    DianaProcessor * pCallContext = proc.GetSelf();
+
+    SET_REG_RCX(0xFFFFFFFFFFFFFFFFULL);
+    int res = proc.ExecOnce();
+    DIANA_TEST_ASSERT(res == DI_SUCCESS);
+
+    // a 32-bit destination: the upper half of rcx is cleared, not filled with the sign
+    DIANA_TEST_ASSERT(GET_REG_RCX == 0x0000000080030201ULL);
+}
+
+static void test_processor_movsxd64_4()
+{
+    unsigned char code[10] = 
+    {
+        0x66, 0x63, 0x4C, 0x24, 0x05, 1, 2, 3, 0x80        //movsxd  cx, [rsp+5]
+    }; 
+
+    CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
+    DianaProcessor * pCallContext = proc.GetSelf();
+
+    SET_REG_RCX(0xFFFFFFFFFFFFFFFFULL);
+    int res = proc.ExecOnce();
+    DIANA_TEST_ASSERT(res == DI_SUCCESS);
+
+    // 66: a 16-bit destination, the rest of rcx stays
+    DIANA_TEST_ASSERT(GET_REG_RCX == 0xFFFFFFFFFFFF0201ULL);
+}
+
+// 64-bit mode: a write to a 32-bit register clears the upper half of the 64-bit one. rcx = all ones before, rbx = 64
+// (the memory there: 0x80030201, 0x80030201), rdx = 0x40; the results of an Intel Core i7-11800H
+struct ZeroExtendCase
+{
+    const char * pName;
+    unsigned char bytes[8];
+    int size;
+    unsigned long long rcx;
+};
+
+static void test_processor_zero_extends()
+{
+    static const ZeroExtendCase cases[] =
+    {
+        {"movsxd ecx, [rbx]", {0x63, 0x0b}, 2, 0x0000000080030201ULL},
+        {"movsxd cx, [rbx]", {0x66, 0x63, 0x0b}, 3, 0xffffffffffff0201ULL},
+        {"inc ecx", {0xff, 0xc1}, 2, 0x0000000000000000ULL},
+        {"dec ecx", {0xff, 0xc9}, 2, 0x00000000fffffffeULL},
+        {"neg ecx", {0xf7, 0xd9}, 2, 0x0000000000000001ULL},
+        {"not ecx", {0xf7, 0xd1}, 2, 0x0000000000000000ULL},
+        {"imul ecx, ecx, 3", {0x6b, 0xc9, 0x03}, 3, 0x00000000fffffffdULL},
+        {"imul ecx, [rbx]", {0x0f, 0xaf, 0x0b}, 3, 0x000000007ffcfdffULL},
+        {"bsf ecx, [rbx]", {0x0f, 0xbc, 0x0b}, 3, 0x0000000000000000ULL},
+        {"bsr ecx, [rbx]", {0x0f, 0xbd, 0x0b}, 3, 0x000000000000001fULL},
+        {"movsx ecx, byte [rbx]", {0x0f, 0xbe, 0x0b}, 3, 0x0000000000000001ULL},
+        {"xchg ecx, [rbx]", {0x87, 0x0b}, 2, 0x0000000080030201ULL},
+        {"cmovz ecx, [rbx] (zf 0: no move)", {0x0f, 0x44, 0x0b}, 3, 0x00000000ffffffffULL},
+        {"cmovnz ecx, [rbx]", {0x0f, 0x45, 0x0b}, 3, 0x0000000080030201ULL},
+        {"movd ecx, xmm0", {0x66, 0x0f, 0x7e, 0xc1}, 4, 0x0000000000000000ULL},
+        {"cvttsd2si ecx, [rbx+8]", {0xf2, 0x0f, 0x2c, 0x4b, 0x08}, 5, 0x0000000000000001ULL},
+        {"mov cx, 1", {0x66, 0xb9, 0x01, 0x00}, 4, 0xffffffffffff0001ULL},
+        {"mov cl, 1", {0xb1, 0x01}, 2, 0xffffffffffffff01ULL},
+    };
+    int failed = 0;
+    for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i)
+    {
+        unsigned char code[128] = {0};
+        memcpy(code, cases[i].bytes, cases[i].size);
+        static const unsigned int data[4] = {0x80030201, 0x80030201, 0x8f5c28f6, 0x3ff4f5c2};   // [rbx+8]: 1.31
+        memcpy(code + 64, data, sizeof(data));
+
+        CTestProcessor proc(code, sizeof(code), 0, DIANA_MODE64);
+        DianaProcessor * pCallContext = proc.GetSelf();
+        SET_REG_RCX(0xFFFFFFFFFFFFFFFFULL);
+        SET_REG_RBX(64);
+        SET_REG_RDX(0x40);
+        int res = proc.ExecOnce();
+        if (res != DI_SUCCESS || GET_REG_RCX != cases[i].rcx)
+        {
+            printf("%s: status %d, rcx %016llx, the cpu: %016llx\n", cases[i].pName, res,
+                   (unsigned long long)GET_REG_RCX, cases[i].rcx);
+            ++failed;
+        }
+    }
+    DIANA_TEST_ASSERT(!failed);
+}
+
 void test_processor_m()
 {
     DIANA_TEST(test_processor_movzx_64());
     DIANA_TEST(test_processor_movs());
     DIANA_TEST(test_processor_movsxd64());
     DIANA_TEST(test_processor_movsxd64_2());
+    DIANA_TEST(test_processor_movsxd64_3());
+    DIANA_TEST(test_processor_movsxd64_4());
+    DIANA_TEST(test_processor_zero_extends());
     DIANA_TEST(test_processor_mov64());
     DIANA_TEST(test_processor_mov64_2());
     DIANA_TEST(test_processor_mov64_3());

@@ -71,6 +71,16 @@ typedef struct _DianaRegInfo
 #define DI_FPU_CW_INVALID             0x0001  // invalid operation mask 
 #define DI_FPU_CW_ALL_EXCEPTIONS     0x003f  
 
+// MXCSR
+#define DI_MXCSR_FLAGS               0x003f  // IE DE ZE OE UE PE, the order of the softfloat flags
+#define DI_MXCSR_DAZ                 0x0040  // denormals are zeros
+#define DI_MXCSR_MASKS               0x1f80  // IM DM ZM OM UM PM
+#define DI_MXCSR_UM                  0x0800  // underflow mask
+#define DI_MXCSR_RC                  0x6000  // rounding control
+#define DI_MXCSR_FZ                  0x8000  // flush to zero
+#define DI_MXCSR_RESERVED            0xffff0000UL
+#define DI_MXCSR_DEFAULT             0x1f80
+
 
 #define DI_FPU_EX_PRECISION            0x0020  // loss of precision
 #define DI_FPU_EX_UNDERFLOW         0x0010  // underflow
@@ -117,6 +127,16 @@ typedef union _DianaRegisterValue128
 {
     DI_CHAR value[16];
 } DianaRegisterValue128_type;
+
+typedef union _DianaRegisterValue256
+{
+    DI_CHAR value[32];
+} DianaRegisterValue256_type;
+
+typedef union _DianaRegisterValue512
+{
+    DI_CHAR value[64];
+} DianaRegisterValue512_type;
 
 
 // SIGNED
@@ -245,6 +265,10 @@ typedef struct _dianaProcessor
     OPERAND_SIZE m_lastCallRIP;
     OPERAND_SIZE m_lastCallRSP;
     DianaProcessRandom m_random;
+    // SSE control and status (rounding, DAZ, FTZ, the masks, the exception flags); 0x1F80 after the init
+    DI_UINT32 m_mxcsr;
+    // PKU: PKRU (rdpkru, wrpkru), 0 after the init; the keys don't check memory accesses
+    DI_UINT32 m_pkru;
 }DianaProcessor;
 
 #define UPDATE_PSZ(X, highMask) \
