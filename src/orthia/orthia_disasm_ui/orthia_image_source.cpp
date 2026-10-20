@@ -1,5 +1,6 @@
 #include "orthia_image_source.h"
 #include "orthia_model_modules.h"
+#include "formats/orthia_image_format.h"
 #include "orthia_files.h"
 #include "orthia_log.h"
 #include <algorithm>
@@ -9,7 +10,6 @@
 extern "C"
 {
 #include "diana_pe.h"
-#include "diana_executable.h"
 }
 
 namespace orthia
@@ -39,14 +39,14 @@ namespace orthia
         Address_type size,
         const PlatformString_type& path,
         const ImageIdentity& identity,
-        int executableType,
+        const IImageFormat& format,
         int dianaMode)
         :
         m_base(base),
         m_size(size),
         m_path(path),
         m_identity(identity),
-        m_executableType(executableType),
+        m_format(format),
         m_dianaMode(dianaMode),
         m_state((int)ImageState::NotLoaded)
     {
@@ -102,7 +102,7 @@ namespace orthia
             MapFileParameters params;
             // both formats use 1 for "keep the preferred base": the relocation below moves it
             params.mapFlags = DIANA_PE_MAP_DO_NOT_RELOCATE;
-            image = MakeSimpleFile(m_executableType, raw, params);
+            image = m_format.MapFile(raw, params);
         }
         catch (const std::exception& e)
         {

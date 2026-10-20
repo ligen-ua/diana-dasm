@@ -523,17 +523,4 @@ namespace orthia
             classicDatabase->DoneSave();
         }
     }
-
-    // MakeSimpleFile factory
-    std::shared_ptr<ISimpleFile> MakeSimpleFile(int executableType,
-        const std::vector<char>& data,
-        const MapFileParameters& params)
-    {
-        auto* format = FindFormatByExecutableType(executableType);
-        if (!format)
-        {
-            throw std::runtime_error("Unknown executable format");
-        }
-        return format->MapFile(data, params);
-    }
 }

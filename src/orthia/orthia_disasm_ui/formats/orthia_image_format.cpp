@@ -86,16 +86,4 @@ namespace orthia
         return nullptr;
     }
 
-    const IImageFormat* FindFormatByExecutableType(int executableType)
-    {
-        for (auto* format : GetImageFormats())
-        {
-            auto* dianaFormat = dynamic_cast<const CDianaImageFormat*>(format);
-            if (dianaFormat && dianaFormat->GetExecutableType() == executableType)
-            {
-                return format;
-            }
-        }
-        return nullptr;
-    }
 }

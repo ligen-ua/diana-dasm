@@ -150,12 +150,11 @@ bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process)
 oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COpenFileDialog> dialog,
     std::shared_ptr<oui::IFile2> file,
     oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
-    int fileType,
     oui::OpenFileModelInfo modelInfo)
 { 
     if (dialog && file && completeHandler)
     {
-        if (fileType == DIANA_EXECUTABLE_TYPE_NONE && !(oui::model_flag_already_opened & modelInfo.flags))
+        if (modelInfo.formatId.empty() && !(oui::model_flag_already_opened & modelInfo.flags))
         {
             ShowShellcodeDialog(file, completeHandler);
             return oui::fsui::OpenResult();
@@ -179,7 +178,7 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
             rawHandler(op, file, result);
         });
 
-        if (fileType == DIANA_EXECUTABLE_TYPE_NONE
+        if (modelInfo.formatId.empty()
             && (oui::model_flag_already_opened & modelInfo.flags)
             && modelInfo.dianaMode != 0)
         {
@@ -274,10 +273,10 @@ void CMainWindow::OpenExecutable()
 
     auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenFileDialog>(oui::String(),
         dialogStrings,
-        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile2> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler, int fileType, oui::OpenFileModelInfo modelInfo) {
+        [=](std::shared_ptr<oui::COpenFileDialog> dlg, std::shared_ptr<oui::IFile2> file, oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> handler, oui::OpenFileModelInfo modelInfo) {
             if (auto p = weakMe.lock())
             {
-                return p->HandleOpenExecutable(dlg, file, handler, fileType, std::move(modelInfo));
+                return p->HandleOpenExecutable(dlg, file, handler, std::move(modelInfo));
             }
             oui::fsui::OpenResult result(OUI_TCSTR("Error"));
             return result;

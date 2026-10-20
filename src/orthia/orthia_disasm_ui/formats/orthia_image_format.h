@@ -89,6 +89,9 @@ namespace orthia
             bool deepAnalysis) const = 0;
     };
 
+    // how much of a file's start FindFormatByData needs to tell every format apart
+    const size_t c_formatDetectSize = 0x1000;
+
     // every format, in detection order
     const std::vector<const IImageFormat*>& GetImageFormats();
     // nullptr when no format recognizes the bytes
@@ -99,6 +102,4 @@ namespace orthia
     // IModuleImage::QueryNames of a file mapped by format.MapFile; false when its headers don't parse
     bool QueryMappedFileNames(const IImageFormat& format, const ISimpleFile& file, std::vector<NameInfo>& out);
 
-    // transitional, for the code that still passes DIANA_EXECUTABLE_TYPE_* around
-    const IImageFormat* FindFormatByExecutableType(int executableType);
 }

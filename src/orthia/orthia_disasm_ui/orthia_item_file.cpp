@@ -2,10 +2,7 @@
 #include "orthia_image_source.h"
 #include "orthia_helpers.h"
 #include <map>
-extern "C"
-{
-#include "diana_executable.h"
-}
+#include "formats/orthia_image_format.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
@@ -647,7 +644,7 @@ namespace orthia
             database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress, true);
         }
     }
-    void FileWorkplaceItem::InitImageSources(int executableType)
+    void FileWorkplaceItem::InitImageSources(const IImageFormat* mainFormat)
     {
         auto table = std::make_shared<ImageSourceTable>();
         table->SetMain(std::make_shared<CMainImageSource>(file));
@@ -699,20 +696,24 @@ namespace orthia
                 table->Add(std::make_shared<CNullImageSource>(dbm.address, dbm.size, PlatformString_type()));
                 continue;
             }
-            int moduleType = executableType;
-            if (record.builtInFlags & ModuleInfo::builtInFlags_moduleTypeElf)
+            // a dependency recorded before the type bits existed has its importer's format
+            ModuleInfo recorded;
+            recorded.builtInFlags = record.builtInFlags;
+            const IImageFormat* format = FindFormatByModule(recorded);
+            if (!format)
             {
-                moduleType = DIANA_EXECUTABLE_TYPE_ELF;
+                format = mainFormat;
             }
-            else if (record.builtInFlags & ModuleInfo::builtInFlags_moduleTypePe)
+            if (!format)
             {
-                moduleType = DIANA_EXECUTABLE_TYPE_PE;
+                table->Add(std::make_shared<CNullImageSource>(dbm.address, dbm.size, PlatformString_type()));
+                continue;
             }
             auto source = std::make_shared<CLinkedFileImageSource>(dbm.address,
                 dbm.size,
                 record.fullName,
                 record.identity,
-                moduleType,
+                *format,
                 file->GetDianaMode());
             linked.push_back(source);
             table->Add(source);

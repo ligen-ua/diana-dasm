@@ -82,8 +82,4 @@ namespace orthia
         // the main module's import rows carry the IAT slot address
         bool ImportsKeyedBySlot() const override { return true; }
     };
-
-    std::shared_ptr<ISimpleFile> MakeSimpleFile(int executableType,
-        const std::vector<char>& data,
-        const MapFileParameters& params);
 }

@@ -8,6 +8,11 @@
 
 namespace orthia
 {
+    struct IImageFormat;
+}
+
+namespace orthia
+{
     // Where a module's bytes come from. The layout (which modules exist and at which base)
     // lives in tbl_modules; the source says how to get the image for a range.
     enum class ImageSourceKind : int
@@ -94,7 +99,7 @@ namespace orthia
         Address_type m_base, m_size;
         PlatformString_type m_path;
         ImageIdentity m_identity;
-        int m_executableType;
+        const IImageFormat& m_format;
         int m_dianaMode;
 
         std::atomic<int> m_state;
@@ -109,7 +114,7 @@ namespace orthia
             Address_type size,
             const PlatformString_type& path,
             const ImageIdentity& identity,
-            int executableType,
+            const IImageFormat& format,
             int dianaMode);
 
         ImageSourceKind GetKind() const override { return ImageSourceKind::LinkedFile; }

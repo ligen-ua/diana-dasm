@@ -10,6 +10,7 @@ namespace orthia
     class CCommonFormatBuilder;
     class ImageSourceTable;
     struct IImageSource;
+    struct IImageFormat;
 
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, BaseWorkPlaceItem
     {
@@ -26,7 +27,8 @@ namespace orthia
 
         // Builds imageSources from tbl_modules and the module metainfo (identity, src_kind).
         // Runs the cheap header pre-check of linked PE dependencies, so call it off the UI thread.
-        void InitImageSources(int executableType);
+        // mainFormat: the opened file's format, nullptr for raw code
+        void InitImageSources(const IImageFormat* mainFormat);
 
         // public interface
         WorkAddressData ReadData(Address_type address, Address_type size) override;

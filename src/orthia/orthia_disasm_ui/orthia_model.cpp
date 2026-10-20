@@ -438,8 +438,7 @@ namespace orthia
             }
 
             // detect format and map
-            const int executableType = DianaExecutable_DetectType(binPeFile.data(), binPeFile.size());
-            const IImageFormat* format = FindFormatByExecutableType(executableType);
+            const IImageFormat* format = FindFormatByData(binPeFile.data(), binPeFile.size());
             if (!format)
             {
                 // Unknown format: store the IFile2 so the UI can offer shellcode loading
@@ -605,7 +604,7 @@ namespace orthia
                     info->UpdateModuleFlags(imageBase, ModuleInfo::flags_analyzeDone, 0);
                 }
             }
-            info->InitImageSources(executableType);
+            info->InitImageSources(format);
 
             auto workspaceId = RegisterItem(info, false);
             result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
@@ -631,7 +630,7 @@ namespace orthia
             {
                 if (error || !file || !folderName.native.empty())
                 {
-                    resultCallback(file, error, folderName, DIANA_EXECUTABLE_TYPE_NONE, oui::OpenFileModelInfo());
+                    resultCallback(file, error, folderName, oui::OpenFileModelInfo());
                     return;
                 }
                 auto operation = std::make_shared<oui::Operation<oui::FileWithTypeRecipientHandler_type>>(
@@ -639,20 +638,24 @@ namespace orthia
                 fileSystem->AsyncExecute(thread,
                     [file, operation, config]()
                     {
-                        int fileType = DIANA_EXECUTABLE_TYPE_NONE;
+                        const IImageFormat* format = nullptr;
                         oui::OpenFileModelInfo modelInfo;
                         auto [sizeErr, fileSize] = file->GetSizeInBytes();
                         if (!sizeErr && fileSize >= 2)
                         {
-                            size_t bytesToRead = (size_t)std::min(fileSize, (unsigned long long)DIANA_EXECUTABLE_DETECT_MIN_SIZE);
+                            size_t bytesToRead = (size_t)std::min(fileSize, (unsigned long long)c_formatDetectSize);
                             std::vector<char> header;
                             if (file->ReadExact(nullptr, 0, bytesToRead, header) == 0)
                             {
-                                fileType = DianaExecutable_DetectType(header.data(), (OPERAND_SIZE)header.size());
+                                format = FindFormatByData(header.data(), header.size());
                             }
                         }
 
-                        if (fileType == DIANA_EXECUTABLE_TYPE_NONE)
+                        if (format)
+                        {
+                            modelInfo.formatId = format->GetId();
+                        }
+                        else
                         {
                             std::vector<char> fullContent;
                             if (fileSize <= g_maxSizeBytes &&
@@ -693,7 +696,7 @@ namespace orthia
                                 }
                             }
                         }
-                        operation->ReplyWithRetain(operation, file, 0, oui::String(), fileType, std::move(modelInfo));
+                        operation->ReplyWithRetain(operation, file, 0, oui::String(), std::move(modelInfo));
                     });
             });
     }
@@ -850,7 +853,7 @@ namespace orthia
                     ModuleInfo::flags_analyzeDone,
                     0);
             }
-            info->InitImageSources(DIANA_EXECUTABLE_TYPE_NONE);
+            info->InitImageSources(nullptr);
 
             auto workspaceId = RegisterItem(info, false);
             result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);

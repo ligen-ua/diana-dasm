@@ -7,7 +7,6 @@
 #include "orthia_config.h"
 #include "orthia_external_symbols.h"
 #include "formats/orthia_image_format.h"
-#include "diana_executable.h"
 #ifndef _WIN32
 #include "oui_privileges_posix.h"
 #endif
@@ -535,10 +534,6 @@ TEST(ImageFormats, Registry)
     EXPECT_EQ(nullptr, orthia::FindFormatById("PE"));
     EXPECT_EQ(nullptr, orthia::FindFormatById(""));
     EXPECT_EQ(nullptr, orthia::FindFormatById("raw"));
-
-    EXPECT_EQ(orthia::FindFormatById("pe"), orthia::FindFormatByExecutableType(DIANA_EXECUTABLE_TYPE_PE));
-    EXPECT_EQ(orthia::FindFormatById("elf"), orthia::FindFormatByExecutableType(DIANA_EXECUTABLE_TYPE_ELF));
-    EXPECT_EQ(nullptr, orthia::FindFormatByExecutableType(DIANA_EXECUTABLE_TYPE_NONE));
 }
 
 TEST(ImageFormats, Detect)
