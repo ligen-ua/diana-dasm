@@ -57,7 +57,7 @@ namespace orthia
             Address_type size) const final;
         std::shared_ptr<ISimpleFile> MapFile(const std::vector<char>& data,
             const MapFileParameters& params) const final;
-        void RegisterMainModule(CModuleManager& manager,
+        bool RegisterMainModule(CModuleManager& manager,
             ISimpleFile& file,
             IMemoryReader& reader,
             const PlatformString_type& shortName,

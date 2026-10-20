@@ -48,6 +48,7 @@ namespace orthia
         static const int builtInFlags_moduleTypeElf = 2;
         // a dependency that could not be located: it owns an address range but has no image data
         static const int builtInFlags_unresolved    = 4;
+        static const int builtInFlags_moduleTypeRaw = 8;
 
         PlatformString_type fullName;
         int flags = 0;

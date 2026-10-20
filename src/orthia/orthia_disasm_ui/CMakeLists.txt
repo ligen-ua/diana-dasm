@@ -24,6 +24,7 @@ set(SOURCES
     orthia_model_interfaces.cpp
     orthia_model_modules.cpp
     orthia_model_modules_elf.cpp
+    formats/orthia_format_raw.cpp
     formats/orthia_image_format.cpp
     formats/orthia_diana_image_format.cpp
     formats/orthia_format_pe.cpp

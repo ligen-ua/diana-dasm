@@ -13,9 +13,9 @@ namespace orthia
     // --format/--base/--bits: how to open the --file. Empty format = detect it from the file
     struct FileFormatOptions
     {
-        PlatformString_type format;                     // "raw" or empty
-        unsigned long long base = 0;                    // raw: where the bytes are placed
-        int dianaMode = 0;                              // raw: DIANA_MODE32 / DIANA_MODE64
+        PlatformString_type format;                     // a format id (pe, elf, raw) or empty
+        unsigned long long base = 0;                    // formats opened by hand (raw): where the bytes go
+        int dianaMode = 0;                              // and DIANA_MODE32 / DIANA_MODE64
     };
 
     struct ConsoleModeOptions

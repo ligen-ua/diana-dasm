@@ -527,13 +527,15 @@ TEST(ImageFormats, Registry)
         EXPECT_EQ(0, flag & orthia::ModuleInfo::builtInFlags_unresolved) << format->GetId();
         typeFlags |= flag;
     }
-    EXPECT_EQ((std::set<std::string>{ "pe", "elf" }), ids);
+    EXPECT_EQ((std::set<std::string>{ "pe", "elf", "raw" }), ids);
     EXPECT_STREQ("PE", orthia::FindFormatById("pe")->GetDisplayName());
     EXPECT_STREQ("ELF", orthia::FindFormatById("elf")->GetDisplayName());
     // the ids are stored, so they stay lowercase and exact
     EXPECT_EQ(nullptr, orthia::FindFormatById("PE"));
     EXPECT_EQ(nullptr, orthia::FindFormatById(""));
-    EXPECT_EQ(nullptr, orthia::FindFormatById("raw"));
+    // raw code is chosen by the user, never detected
+    EXPECT_TRUE(orthia::FindFormatById("raw")->NeedsUserParameters());
+    EXPECT_FALSE(orthia::FindFormatById("raw")->Detect("MZ", 2));
 }
 
 TEST(ImageFormats, Detect)

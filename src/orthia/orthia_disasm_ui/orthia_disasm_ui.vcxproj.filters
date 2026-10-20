@@ -119,6 +119,9 @@
     <ClCompile Include="orthia_model_modules_elf.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="formats\orthia_format_raw.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="formats\orthia_image_format.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

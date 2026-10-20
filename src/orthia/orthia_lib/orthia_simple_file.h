@@ -8,6 +8,14 @@ extern "C"
 
 namespace orthia
 {
+    // how to map a file: the formats with headers read most of it from there
+    struct MapFileParameters
+    {
+        DI_UINT64 imageBase = (DI_UINT64)(-1);     // -1: the image's preferred base
+        int mapFlags = 0;
+        int dianaMode = 0;                          // raw code only: DIANA_MODE32 / DIANA_MODE64
+    };
+
     class ISimpleFile
     {
     public:

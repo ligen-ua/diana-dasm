@@ -215,6 +215,7 @@
     <ClCompile Include="orthia_model_interfaces.cpp" />
     <ClCompile Include="orthia_model_modules.cpp" />
     <ClCompile Include="orthia_model_modules_elf.cpp" />
+    <ClCompile Include="formats\orthia_format_raw.cpp" />
     <ClCompile Include="formats\orthia_image_format.cpp" />
     <ClCompile Include="formats\orthia_diana_image_format.cpp" />
     <ClCompile Include="formats\orthia_format_pe.cpp" />

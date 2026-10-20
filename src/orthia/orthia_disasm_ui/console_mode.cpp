@@ -2,6 +2,7 @@
 #include "orthia_core.h"
 #include "oui_editbox.h"
 #include "orthia_commands.h"
+#include "formats/orthia_image_format.h"
 #include "diana_core_cpp.h"
 #include <cstdio>
 #include <climits>
@@ -253,15 +254,19 @@ namespace
         return OpenTargetAndWait<oui::fsui::FileCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::FileCompleteHandler_type>> handler) {
                 model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler, fileFormat]() {
-                    if (fileFormat.format.empty())
+                    // ParseFileFormatOptions checked the format and its parameters
+                    const IImageFormat* format = nullptr;
+                    MapFileParameters params;
+                    if (!fileFormat.format.empty())
                     {
-                        model->AddExecutable(file, handler);
+                        format = FindFormatById(PlatformStringToUtf8(fileFormat.format));
+                        if (format->NeedsUserParameters())
+                        {
+                            params.imageBase = fileFormat.base;
+                            params.dianaMode = fileFormat.dianaMode;
+                        }
                     }
-                    else
-                    {
-                        // ParseFileFormatOptions accepts only raw
-                        model->AddExecutableAsShellcode(file, fileFormat.base, fileFormat.dianaMode, handler);
-                    }
+                    model->AddExecutable(file, handler, format, params);
                 });
             });
     }
@@ -491,14 +496,32 @@ namespace
             }
             return true;
         }
-        if (*format != ORTHIA_TCSTR("raw"))
+        const std::string formatId = PlatformStringToUtf8(*format);
+        const IImageFormat* imageFormat = FindFormatById(formatId);
+        if (!imageFormat)
         {
-            error = "Unknown format: " + PlatformStringToUtf8(*format) + " (supported: raw)";
+            std::string supported;
+            for (auto* known : GetImageFormats())
+            {
+                supported += (supported.empty() ? "" : ", ") + std::string(known->GetId());
+            }
+            error = "Unknown format: " + formatId + " (supported: " + supported + ")";
             return false;
+        }
+        if (!imageFormat->NeedsUserParameters())
+        {
+            // the headers say where and how
+            if (base || bits)
+            {
+                error = std::string(base ? "--base" : "--bits") + " doesn't apply to --format " + formatId;
+                return false;
+            }
+            result.format = *format;
+            return true;
         }
         if (!base || !bits)
         {
-            error = std::string("--format raw needs ") + (base ? "--bits" : "--base");
+            error = "--format " + formatId + " needs " + (base ? "--bits" : "--base");
             return false;
         }
         if (!ParsePidArgument(*base, &result.base))

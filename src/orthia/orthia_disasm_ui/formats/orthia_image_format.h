@@ -2,7 +2,6 @@
 
 #include "../orthia_model_interfaces.h"
 #include "orthia_simple_file.h"
-#include "orthia_pe.h"          // MapFileParameters
 
 namespace orthia
 {
@@ -75,18 +74,24 @@ namespace orthia
         virtual std::unique_ptr<IModuleImage> OpenModuleImage(IMemoryReader& reader,
             Address_type base,
             Address_type size) const = 0;
+        // whether MapFile needs MapFileParameters from the user (raw code: base and mode).
+        // They are saved next to the database, so a reopen doesn't ask again
+        virtual bool NeedsUserParameters() const { return false; }
         // throws std::exception with a message for the user when the image is malformed
         virtual std::shared_ptr<ISimpleFile> MapFile(const std::vector<char>& data,
             const MapFileParameters& params) const = 0;
         // nullptr: the format has no dependencies to load
         virtual std::unique_ptr<IDependencyLoader> CreateDependencyLoader(
             std::shared_ptr<oui::BaseOperation> operation) const { return nullptr; }
-        // adds the opened file's own module to a new database; reader reads the mapped file
-        virtual void RegisterMainModule(CModuleManager& manager,
+        // adds the opened file's own module to a new database; reader reads the mapped file.
+        // Returns whether the module's code was analyzed (ModuleInfo::flags_analyzeDone)
+        virtual bool RegisterMainModule(CModuleManager& manager,
             ISimpleFile& file,
             IMemoryReader& reader,
             const PlatformString_type& shortName,
             bool deepAnalysis) const = 0;
+        // where the UI starts showing a newly opened file; 0: its own choice
+        virtual Address_type GetInitialAddress(ISimpleFile& file) const { return 0; }
     };
 
     // how much of a file's start FindFormatByData needs to tell every format apart

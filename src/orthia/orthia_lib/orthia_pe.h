@@ -11,12 +11,6 @@ extern "C"
 
 namespace orthia
 {
-    struct MapFileParameters
-    {
-        DI_UINT64 imageBase = (DI_UINT64)(-1);
-        int mapFlags = 0;
-    };
-
     struct PeDianaContext
     {
         Diana_PeFile mappedPE;

@@ -4,6 +4,7 @@ The blobs are written here, so every expected value is known up front. The same 
 differently in 32 and 64 bit (0x48 is a REX prefix in 64-bit code, `dec eax` in 32-bit code),
 which shows that --bits reaches the disassembler.
 """
+import hashlib
 import re
 
 import pytest
@@ -105,17 +106,33 @@ def test_sections(orthia, blob, module):
     res.assert_line(rf"^Error: No sections found in module: {module}$")
 
 
-@pytest.mark.xfail(reason="B19: only the UI reads the saved base and bits back; the CLI can't reopen a raw DB")
 def test_reopen_without_format(orthia, blob, module):
+    # base and bits are saved next to the DB
     orthia.run("lm", file=blob, options=raw_options()).assert_ok()
-    rows = lm_rows(orthia.run("lm", file=blob).assert_ok())
-    assert rows == {module: (BASE, BASE + len(CODE), "analysis")}, rows
+    res = orthia.run("lm", file=blob).assert_ok()
+    assert lm_rows(res) == {module: (BASE, BASE + len(CODE), "analysis")}, res
+    res = orthia.run(f"u {BASE:x} L2", file=blob).assert_ok()
+    assert re.search(r"\bmov\s+RBP, RSP$", res.instructions()[1]), res
 
 
-def test_reopen_without_format_today(orthia, blob):
+def test_reopen_with_parameters_saved_before_formats(orthia, data):
+    # parameters.xml from before the format was saved in it: raw code
+    blob = data.text_file("raw/old_params.bin", CODE + b"\2")
     orthia.run("lm", file=blob, options=raw_options()).assert_ok()
+    params = orthia.home / "db" / hashlib.sha1(blob.read_bytes()).hexdigest() / "parameters.xml"
+    text = params.read_text()
+    assert 'format="raw"' in text, text
+    params.write_text(text.replace('format="raw" ', ""))
+    res = orthia.run("lm", file=blob).assert_ok()
+    assert lm_rows(res) == {region_name(BASE, len(CODE) + 1): (BASE, BASE + len(CODE) + 1, "analysis")}, res
+
+
+def test_unknown_file_is_not_saved(orthia, data):
+    # no DB folder for a file that didn't open
+    blob = data.text_file("raw/never_opened.bin", CODE + b"\3")
     res = orthia.run("lm", file=blob)
     assert res.code == EXIT_OPEN_FAILED, res
+    assert not (orthia.home / "db" / hashlib.sha1(blob.read_bytes()).hexdigest()).exists()
 
 
 @pytest.mark.xfail(reason="B20: reopening raw code at another base keeps the old region in its DB")
@@ -125,6 +142,18 @@ def test_reopen_other_base(orthia, data):
     other = 0x20000
     rows = lm_rows(orthia.run("lm", file=blob, options=raw_options(base=other)).assert_ok())
     assert rows == {region_name(other, len(CODE) + 1): (other, other + len(CODE) + 1, "analysis")}, rows
+
+
+def test_forced_detected_format(orthia, data):
+    own = "pe" if data.self_is_pe else "elf"
+    orthia.run("lm", file=data.self_file, options=("--format", own)).assert_ok()
+
+
+def test_forced_wrong_format(orthia, data):
+    other, name = ("elf", "ELF") if data.self_is_pe else ("pe", "PE")
+    res = orthia.run("lm", file=data.self_file, options=("--format", other))
+    assert res.code == EXIT_OPEN_FAILED, res
+    assert f"Invalid {name} image" in res.stderr, res
 
 
 def test_forced_on_executable(orthia, data):
@@ -137,7 +166,9 @@ def test_forced_on_executable(orthia, data):
 # argument parsing
 
 @pytest.mark.parametrize("options, message", [
-    (["--format", "pe"], r"Unknown format: pe \(supported: raw\)"),
+    (["--format", "bogus"], r"Unknown format: bogus \(supported: pe, elf, raw\)"),
+    (["--format", "pe", "--base", "0x1000"], r"--base doesn't apply to --format pe"),
+    (["--format", "elf", "--bits", "64"], r"--bits doesn't apply to --format elf"),
     (["--format", "raw", "--bits", "64"], r"--format raw needs --base"),
     (["--format", "raw", "--base", "0x1000"], r"--format raw needs --bits"),
     (["--base", "0x1000"], r"--base needs --format raw"),

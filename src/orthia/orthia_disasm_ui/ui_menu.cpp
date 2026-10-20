@@ -2,6 +2,7 @@
 #include "oui_open_process_dialog.h"
 #include "ui_help.h"
 #include "oui_goto_dialog.h"
+#include "formats/orthia_image_format.h"
 
 void CMainWindow::ToggleMenu(bool openPopup)
 {
@@ -94,7 +95,10 @@ bool CMainWindow::AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI
 
     m_model->GetFileSystem()->AsyncExecute(GetThread(),
         [file, baseAddress, dianaMode, model = m_model, innerHandler = std::move(innerHandler)]() {
-        model->AddExecutableAsShellcode(file, baseAddress, dianaMode, innerHandler);
+        orthia::MapFileParameters params;
+        params.imageBase = baseAddress;
+        params.dianaMode = dianaMode;
+        model->AddExecutable(file, innerHandler, orthia::FindFormatById("raw"), params);
     });
     return true;
 }
@@ -178,23 +182,10 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
             rawHandler(op, file, result);
         });
 
-        if (modelInfo.formatId.empty()
-            && (oui::model_flag_already_opened & modelInfo.flags)
-            && modelInfo.dianaMode != 0)
-        {
-            auto baseAddress = modelInfo.baseAddress;
-            auto dianaMode = modelInfo.dianaMode;
-            m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(),
-                [file, model = m_model, completeHandler = std::move(completeHandler), baseAddress, dianaMode]() {
-                    model->AddExecutableAsShellcode(file, baseAddress, dianaMode, completeHandler);
-                });
-        }
-        else
-        {
-            m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
-                model->AddExecutable(file, completeHandler);
-            });
-        }
+        // a file opened by hand before is reopened by the model with the saved parameters
+        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
+            model->AddExecutable(file, completeHandler);
+        });
     }
     return oui::fsui::OpenResult();
 };

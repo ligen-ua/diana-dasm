@@ -8,11 +8,13 @@
 #include <optional>
 #include "orthia_commands.h"
 #include "orthia_module_analyzer.h"
+#include "orthia_simple_file.h"
 
 namespace orthia
 {
     class CSimplePeFile;
     class CModuleManager;
+    struct IImageFormat;
     struct WorkplaceItem
     {
         int uid = 0;
@@ -82,13 +84,12 @@ namespace orthia
         void AddProcess(std::shared_ptr<oui::IProcess> proc,
             oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
 
+        // forcedFormat: open as this format instead of the detected one; params: what a
+        // format opened by hand needs (raw code: base and mode)
         void AddExecutable(std::shared_ptr<oui::IFile2> file,
-            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
-
-        void AddExecutableAsShellcode(std::shared_ptr<oui::IFile2> file,
-            DI_UINT64 baseAddress,
-            int dianaMode,
-            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler);
+            oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+            const IImageFormat* forcedFormat = nullptr,
+            MapFileParameters params = MapFileParameters());
 
         void AsyncOpenFileWithType(oui::ThreadPtr_type thread,
             const oui::FileUnifiedId& fileId,

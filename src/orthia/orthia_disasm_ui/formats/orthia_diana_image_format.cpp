@@ -188,7 +188,7 @@ namespace orthia
         }
     }
 
-    void CDianaImageFormat::RegisterMainModule(CModuleManager& manager,
+    bool CDianaImageFormat::RegisterMainModule(CModuleManager& manager,
         ISimpleFile& file,
         IMemoryReader& reader,
         const PlatformString_type& shortName,
@@ -202,5 +202,6 @@ namespace orthia
         {
             manager.RegisterModule(file.GetImageBase(), &reader, shortName);
         }
+        return deepAnalysis;
     }
 }

@@ -41,8 +41,10 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "                    (repeatable, one command per --cmd, executed in order)\n";
     out << "  --analyze         with --cmd: deep code analysis and symbol loading on open\n";
     out << "                    (default: headers, modules, imports and exports only)\n";
-    out << "  --format raw --base <address> --bits 32|64\n";
-    out << "                    with --cmd: open the --file as raw code placed at <address>\n";
+    out << "  --format <format> with --cmd: open the --file as pe, elf or raw (code without\n";
+    out << "                    headers) instead of the format it is detected as\n";
+    out << "  --base <address>  with --format raw: where the code is placed\n";
+    out << "  --bits 32|64      with --format raw: how it is disassembled\n";
     out << "                    (the UI asks for these when it doesn't recognize a file)\n";
     out << "  --no-sandbox     no privilege drop under sudo and no syscall filter\n";
     out << "  --run-tests       run the built-in tests and exit\n";

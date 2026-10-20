@@ -61,8 +61,6 @@ namespace oui
         std::string formatId;           // the detected image format, empty when not recognized
         int flags = 0;
         String dbFileName;
-        unsigned long long baseAddress = 0;
-        int dianaMode = 0;
     };
 
     using ThreadPtr_type = std::shared_ptr<CWindowThread>;

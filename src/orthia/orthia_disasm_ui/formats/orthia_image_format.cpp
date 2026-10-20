@@ -4,6 +4,8 @@
 
 namespace orthia
 {
+    const IImageFormat& GetRawImageFormat();
+
     void CModuleImageBase::AddName(std::vector<NameInfo>& out, int flags, Address_type address, const std::string& utf8Name)
     {
         NameInfo info;
@@ -33,6 +35,7 @@ namespace orthia
         static const std::vector<const IImageFormat*> formats = {
             &GetPeImageFormat(),
             &GetElfImageFormat(),
+            &GetRawImageFormat(),
         };
         return formats;
     }
