@@ -19,7 +19,7 @@ def target(data):
 def test_help(orthia, flag):
     res = orthia.raw(flag)
     assert res.code == EXIT_OK, res
-    for option in ("--file", "--pid", "--cmd", "--analyze", "--no-sandbox", "Exit codes", "ORTHIA_HOME",
+    for option in ("--file", "--pid", "--cmd", "--analyze", "--format", "--no-sandbox", "Exit codes", "ORTHIA_HOME",
                    "ORTHIA_SYMBOL_PATH"):
         assert option in res.stdout, res
 

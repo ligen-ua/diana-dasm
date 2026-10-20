@@ -3,6 +3,7 @@
 #include "oui_editbox.h"
 #include "orthia_config.h"
 #include <iostream>
+#include <optional>
 #include "diana_core_cpp.h"
 #include "orthia_log.h"
 
@@ -40,7 +41,10 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "                    (repeatable, one command per --cmd, executed in order)\n";
     out << "  --analyze         with --cmd: deep code analysis and symbol loading on open\n";
     out << "                    (default: headers, modules, imports and exports only)\n";
-    out << "  --no-sandbox      no privilege drop under sudo and no syscall filter\n";
+    out << "  --format raw --base <address> --bits 32|64\n";
+    out << "                    with --cmd: open the --file as raw code placed at <address>\n";
+    out << "                    (the UI asks for these when it doesn't recognize a file)\n";
+    out << "  --no-sandbox     no privilege drop under sudo and no syscall filter\n";
     out << "  --run-tests       run the built-in tests and exit\n";
     out << "  -h, --help        show this help and exit\n";
     out << "  --version         show the version and exit\n";
@@ -92,9 +96,17 @@ int main(int argc, const char* argv[])
         bool nextIsCmd = false;
         bool nextIsFile = false;
         bool dropPrivileges = true;
+        std::optional<std::string> formatArg, baseArg, bitsArg;
+        std::optional<std::string>* nextValue = nullptr;      // --format, --base, --bits
         for (int i = 1; i < argc; ++i)
         {
             // checked first, so that a value starting with -- is taken as a value
+            if (nextValue)
+            {
+                *nextValue = argv[i];
+                nextValue = nullptr;
+                continue;
+            }
             if (nextIsCmd)
             {
                 commandsToRun.push_back(argv[i]);
@@ -145,6 +157,21 @@ int main(int argc, const char* argv[])
                 nextIsFile = true;
                 continue;
             }
+            if (strcmp(argv[i], "--format") == 0)
+            {
+                nextValue = &formatArg;
+                continue;
+            }
+            if (strcmp(argv[i], "--base") == 0)
+            {
+                nextValue = &baseArg;
+                continue;
+            }
+            if (strcmp(argv[i], "--bits") == 0)
+            {
+                nextValue = &bitsArg;
+                continue;
+            }
             if (strcmp(argv[i], "--analyze") == 0)
             {
                 // the UI always analyzes, so it only matters with --cmd
@@ -179,14 +206,35 @@ int main(int argc, const char* argv[])
             PrintUsage(std::cerr, programName);
             return orthia::consoleExit_Usage;
         }
-        if (nextIsPid || nextIsCmd || nextIsFile)
+        if (nextIsPid || nextIsCmd || nextIsFile || nextValue)
         {
             std::cerr << "Missing value for " << argv[argc - 1] << "\n\n";
             PrintUsage(std::cerr, programName);
             return orthia::consoleExit_Usage;
         }
 
+        orthia::FileFormatOptions fileFormat;
+        {
+            std::string error;
+            if (!orthia::ParseFileFormatOptions(formatArg ? &*formatArg : nullptr,
+                baseArg ? &*baseArg : nullptr,
+                bitsArg ? &*bitsArg : nullptr,
+                fileFormat,
+                error))
+            {
+                std::cerr << error << "\n\n";
+                PrintUsage(std::cerr, programName);
+                return orthia::consoleExit_Usage;
+            }
+        }
+
         const bool consoleMode = !commandsToRun.empty();
+        if (!consoleMode && !fileFormat.format.empty())
+        {
+            std::cerr << "--format needs --cmd (the UI asks how to open a file it doesn't recognize)\n\n";
+            PrintUsage(std::cerr, programName);
+            return orthia::consoleExit_Usage;
+        }
         if (!consoleMode)
         {
             if (!orthia::HasInteractiveConsole())
@@ -236,7 +284,7 @@ int main(int argc, const char* argv[])
         if (consoleMode)
         {
             const int result = orthia::RunConsoleMode(programModel,
-                { commandsToRun, filenamesToOpen, processesToOpen, analyze });
+                { commandsToRun, filenamesToOpen, processesToOpen, analyze, fileFormat });
             programModel.reset();
             return result;
         }

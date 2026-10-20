@@ -188,6 +188,7 @@
     <ClCompile Include="ot_pe_test.cpp" />
     <ClCompile Include="ot_sections_test.cpp" />
     <ClCompile Include="ot_startup_routines_test.cpp" />
+    <ClCompile Include="ot_shellcode_test.cpp" />
     <ClCompile Include="ot_shuttle_utils_test.cpp" />
     <ClCompile Include="ot_tokenizer.cpp" />
     <ClCompile Include="ot_utils.cpp" />

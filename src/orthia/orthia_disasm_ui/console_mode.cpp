@@ -237,7 +237,8 @@ namespace
 
     bool OpenFile(CHeadlessPump& pump,
         const std::shared_ptr<CProgramModel>& model,
-        const PlatformString_type& name_in)
+        const PlatformString_type& name_in,
+        const FileFormatOptions& fileFormat)
     {
         // on error the name is returned as given, SyncOpenFile reports the real problem
         const PlatformString_type name = std::get<1>(model->GetFileSystem()->SyncGetFullPathName(name_in)).native;
@@ -251,8 +252,16 @@ namespace
         }
         return OpenTargetAndWait<oui::fsui::FileCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::FileCompleteHandler_type>> handler) {
-                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler]() {
-                    model->AddExecutable(file, handler);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler, fileFormat]() {
+                    if (fileFormat.format.empty())
+                    {
+                        model->AddExecutable(file, handler);
+                    }
+                    else
+                    {
+                        // ParseFileFormatOptions accepts only raw
+                        model->AddExecutableAsShellcode(file, fileFormat.base, fileFormat.dianaMode, handler);
+                    }
                 });
             });
     }
@@ -358,6 +367,11 @@ namespace
             WriteLine(stderr, ORTHIA_TCSTR("--cmd accepts a single target: one --file or one --pid"));
             return consoleExit_Usage;
         }
+        if (!options.fileFormat.format.empty() && options.files.empty())
+        {
+            WriteLine(stderr, ORTHIA_TCSTR("--format applies to --file only"));
+            return consoleExit_Usage;
+        }
         if (options.files.empty() && options.pids.empty())
         {
             // the data folder commands (.database) need no target
@@ -384,7 +398,7 @@ namespace
 
         for (auto& name : options.files)
         {
-            if (!OpenFile(pump, model, name))
+            if (!OpenFile(pump, model, name, options.fileFormat))
             {
                 return consoleExit_OpenFail;
             }
@@ -458,6 +472,56 @@ namespace
             value = value * base + digit;
         }
         *pid = value;
+        return true;
+    }
+
+    bool ParseFileFormatOptions(const PlatformString_type* format,
+        const PlatformString_type* base,
+        const PlatformString_type* bits,
+        FileFormatOptions& result,
+        std::string& error)
+    {
+        result = FileFormatOptions();
+        if (!format)
+        {
+            if (base || bits)
+            {
+                error = std::string(base ? "--base" : "--bits") + " needs --format raw";
+                return false;
+            }
+            return true;
+        }
+        if (*format != ORTHIA_TCSTR("raw"))
+        {
+            error = "Unknown format: " + PlatformStringToUtf8(*format) + " (supported: raw)";
+            return false;
+        }
+        if (!base || !bits)
+        {
+            error = std::string("--format raw needs ") + (base ? "--bits" : "--base");
+            return false;
+        }
+        if (!ParsePidArgument(*base, &result.base))
+        {
+            error = "Invalid value for --base: " + PlatformStringToUtf8(*base) +
+                " (expected a decimal or 0x-prefixed hex number)";
+            return false;
+        }
+        // the same choice the shellcode dialog offers
+        if (*bits == ORTHIA_TCSTR("32"))
+        {
+            result.dianaMode = DIANA_MODE32;
+        }
+        else if (*bits == ORTHIA_TCSTR("64"))
+        {
+            result.dianaMode = DIANA_MODE64;
+        }
+        else
+        {
+            error = "Invalid value for --bits: " + PlatformStringToUtf8(*bits) + " (expected 32 or 64)";
+            return false;
+        }
+        result.format = *format;
         return true;
     }
 
