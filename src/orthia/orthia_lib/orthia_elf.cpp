@@ -259,6 +259,81 @@ namespace orthia
         buildId.assign(buffer, buffer + buildIdSize);
         return DI_SUCCESS;
     }
+    int QueryElfStartupRoutines(Diana_ElfFile* pElfFile,
+        DianaMovableReadStream* pStream,
+        DI_UINT64 moduleAddress,
+        std::vector<ElfStartupRoutine>& routines)
+    {
+        routines.clear();
+        struct Context
+        {
+            std::vector<ElfStartupRoutine>* routines;
+            DI_UINT64 bias;
+        } context = { &routines, moduleAddress };
+        // module offsets are link-time addresses: an ET_EXEC stays at them
+        if (pElfFile->pImpl->elfHeader.e_type == DIANA_ET_EXEC)
+            context.bias = 0;
+
+        return DianaElfFile_QueryStartupRoutines(pElfFile,
+            pStream,
+            moduleAddress,
+            0,
+            0,
+            [](void* pContext, const DianaElfStartupRoutine* pRoutine) -> int {
+                auto& ctx = *static_cast<Context*>(pContext);
+                ElfStartupRoutine routine;
+                routine.kind = pRoutine->kind;
+                routine.index = pRoutine->index;
+                routine.address = ctx.bias + pRoutine->offset;
+                routine.slotAddress = pRoutine->slotOffset ? ctx.bias + pRoutine->slotOffset : 0;
+                if (pRoutine->pName)
+                    routine.name = pRoutine->pName;
+                ctx.routines->push_back(routine);
+                return DI_SUCCESS;
+            },
+            &context,
+            0);
+    }
+
+    std::string GetElfStartupRoutineName(const ElfStartupRoutine& routine)
+    {
+        auto number = ToAnsiStringAsHex((unsigned short)routine.index);
+        switch (routine.kind)
+        {
+        case DIANA_ELF_STARTUP_IFUNC:
+            return "$ifunc_" + (routine.name.empty() ? number : routine.name);
+        case DIANA_ELF_STARTUP_PREINIT_ARRAY:
+            return "$preinit_array_" + number;
+        case DIANA_ELF_STARTUP_INIT:
+            return "$init";
+        case DIANA_ELF_STARTUP_INIT_ARRAY:
+            return "$init_array_" + number;
+        }
+        return "$startup_" + number;
+    }
+
+    int CSimpleElfFile::QueryStartupRoutines(std::vector<ElfStartupRoutine>& routines) const
+    {
+        routines.clear();
+        if (m_mappedElfFile.empty() || !m_dianaContext)
+            return DI_ERROR;
+
+        // module-mode stream rooted at the image start; the mapping relocated the pointers by m_imageBase
+        SimpleElfFileStreamWithContext stream;
+        Diana_InitMemoryStreamEx2(&stream,
+            const_cast<char*>(m_mappedElfFile.data()),
+            m_mappedElfFile.size(),
+            0,
+            0);
+        stream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+        stream.elf = const_cast<CSimpleElfFile*>(this);
+
+        return QueryElfStartupRoutines(const_cast<Diana_ElfFile*>(&m_dianaContext->mappedElf),
+            &stream.parent.parent,
+            m_imageBase,
+            routines);
+    }
+
     int CSimpleElfFile::QueryExports(diana::CBasePeLinkImportsObserver* observer)
     {
         if (m_mappedElfFile.empty() || !m_dianaContext)

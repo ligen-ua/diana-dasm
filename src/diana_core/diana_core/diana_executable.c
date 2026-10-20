@@ -108,6 +108,21 @@ int DianaExecutable_QueryTLSCallbacks(DianaExecutable* pExe,
     return DI_SUCCESS;
 }
 
+int DianaExecutable_QueryStartupRoutines(DianaExecutable* pExe,
+    DianaMovableReadStream* pStream,
+    OPERAND_SIZE moduleAddress,
+    DianaElfFile_StartupRoutine_Callback callback,
+    void* pContext,
+    int streamFlags)
+{
+    if (pExe->type == DIANA_EXECUTABLE_TYPE_ELF)
+    {
+        return DianaElfFile_QueryStartupRoutines(&pExe->u.elfFile, pStream, moduleAddress,
+            0, 0, callback, pContext, streamFlags);
+    }
+    return DI_SUCCESS;
+}
+
 int DianaExecutable_DetectType(const char* pData, OPERAND_SIZE size)
 {
     if (size >= 4 &&

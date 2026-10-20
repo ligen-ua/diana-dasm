@@ -130,6 +130,27 @@ def test_sections_of_runtime_library(orthia, runtime):
     assert base < text_address <= export < text_address + text_size <= end + 1, res
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="ELF only: libc's IFUNC resolvers and init array")
+def test_elf_startup_routines_of_runtime_library(orthia, runtime):
+    module, _ = runtime
+    res = orthia.run("lm", f"sections {module}", f"x {module}!$ifunc_*", f"x {module}!$init*",
+                     f"x {module}!memcpy", **SELF).assert_ok()
+    names = res.symbols
+    (text_address, text_size, _), = res.sections()[".text"]
+
+    def in_text(name):
+        return all(text_address <= a < text_address + text_size for a in names.get(name, [None]) if a)
+
+    ifuncs = [n for n in names if n.startswith(f"{module}!$ifunc_")]
+    # glibc picks memcpy, strlen, ... by CPU through IFUNC resolvers
+    assert len(ifuncs) >= 10, res
+    assert all(in_text(n) for n in ifuncs), res
+    # the resolver keeps its export name: the export (symbol value) and the resolver are one address
+    assert names[f"{module}!$ifunc_memcpy"] == names[f"{module}!memcpy"], res
+    # the init array is relocated in memory, its entries are code too
+    assert names.get(f"{module}!$init_array_0000") and in_text(f"{module}!$init_array_0000"), res
+
+
 @pytest.mark.skipif(sys.platform != "linux" or os.geteuid() == 0, reason="Linux, run as a normal user")
 def test_process_of_another_user_explains_ptrace(orthia):
     # pid 1 belongs to root: without ptrace access its memory can't be read

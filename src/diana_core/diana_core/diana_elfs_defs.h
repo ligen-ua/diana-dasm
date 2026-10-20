@@ -142,6 +142,7 @@
 #define DIANA_STT_FILE     4
 #define DIANA_STT_COMMON   5
 #define DIANA_STT_TLS      6
+#define DIANA_STT_GNU_IFUNC 10  /* st_value is a resolver, the loader calls it and binds to what it returns */
 
 // Symbol visibility
 #define DIANA_STV_DEFAULT   0
@@ -303,6 +304,7 @@ typedef struct
 #define DIANA_R_X86_64_GLOB_DAT     6   /* S             */
 #define DIANA_R_X86_64_JUMP_SLOT    7   /* S             */
 #define DIANA_R_X86_64_32          10   /* S + A (trunc) */
+#define DIANA_R_X86_64_IRELATIVE   37   /* the resolver at B + A returns the value */
 
 // i386
 #define DIANA_R_386_NONE            0
@@ -310,6 +312,7 @@ typedef struct
 #define DIANA_R_386_RELATIVE        8   /* B + A         */
 #define DIANA_R_386_GLOB_DAT        6   /* S             */
 #define DIANA_R_386_JMP_SLOT        7   /* S             */
+#define DIANA_R_386_IRELATIVE      42   /* the resolver at B + A returns the value */
 
 // AArch64
 #define DIANA_R_AARCH64_NONE            0
@@ -317,6 +320,7 @@ typedef struct
 #define DIANA_R_AARCH64_GLOB_DAT      1025  /* S + A - P     */
 #define DIANA_R_AARCH64_JUMP_SLOT     1026  /* S + A         */
 #define DIANA_R_AARCH64_ABS64          257  /* S + A         */
+#define DIANA_R_AARCH64_IRELATIVE     1032  /* the resolver at B + A returns the value */
 
 // ARM (32-bit)
 #define DIANA_R_ARM_NONE                0
@@ -324,6 +328,7 @@ typedef struct
 #define DIANA_R_ARM_GLOB_DAT           21   /* S             */
 #define DIANA_R_ARM_JUMP_SLOT          22   /* S             */
 #define DIANA_R_ARM_ABS32               2   /* S + A         */
+#define DIANA_R_ARM_IRELATIVE         160   /* the resolver at B + A returns the value */
 
 #endif
 

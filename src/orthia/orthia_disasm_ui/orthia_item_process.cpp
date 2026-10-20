@@ -1,6 +1,7 @@
 #include "orthia_item_process.h"
 #include <filesystem>
 #include "orthia_pe.h"
+#include "orthia_elf.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
@@ -166,6 +167,18 @@ namespace orthia
                 pTls += exe.dianaMode;
             }
             DIANA_FREE(pTlsCallbacks);
+        }
+        // the ELF counterpart: IFUNC resolvers and initializers. A global IFUNC's resolver
+        // keeps its export name too: $ifunc_memcpy and memcpy are the same address
+        if (exe.type == DIANA_EXECUTABLE_TYPE_ELF)
+        {
+            std::vector<orthia::ElfStartupRoutine> routines;
+            orthia::QueryElfStartupRoutines(&exe.u.elfFile, &stream.parent, moduleAddress, routines);
+            for (const auto& routine : routines)
+            {
+                OPERAND_SIZE address = routine.address;
+                exportsCollector.QueryFunctionByName("$", orthia::GetElfStartupRoutineName(routine).c_str(), 0, &address);
+            }
         }
     }
     void CProcessWorkplaceItem::ReloadModules()

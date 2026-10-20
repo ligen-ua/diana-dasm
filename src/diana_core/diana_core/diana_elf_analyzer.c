@@ -161,6 +161,73 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
     return DI_SUCCESS;
 }
 
+typedef struct Diana_ElfAnalyzerStartupContext_
+{
+    Diana_ElfAnalyzerCommonParams_type * pParams;
+    int analyzeStatus;
+} Diana_ElfAnalyzerStartupContext;
+
+/* A pointer the loader relocated is an absolute address in the module; others are link-time addresses */
+static int ElfAnalyzer_PointerToOffset(void * pContext, OPERAND_SIZE pointer, OPERAND_SIZE * pOffset)
+{
+    Diana_ElfAnalyzerStartupContext * pStartup = (Diana_ElfAnalyzerStartupContext *)pContext;
+    Diana_ElfAnalyzerCommonParams_type * pParams = pStartup->pParams;
+    Diana_ElfFile_impl * pImpl = pParams->pElfFile->pImpl;
+    OPERAND_SIZE relativeAddress = 0;
+    DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+
+    *pOffset = pointer;
+    /* ET_EXEC: module offsets are the link-time addresses */
+    if (pImpl->elfHeader.e_type == DIANA_ET_EXEC && pointer < pImpl->sizeOfModule)
+        return DI_SUCCESS;
+    DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                   pointer,
+                                                   DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                   &relativeAddress,
+                                                   &result));
+    if (result == diaJumpNormal)
+        *pOffset = relativeAddress;
+    return DI_SUCCESS;
+}
+
+static int ElfAnalyzer_OnStartupRoutine(void * pContext, const DianaElfStartupRoutine * pRoutine)
+{
+    Diana_ElfAnalyzerStartupContext * pStartup = (Diana_ElfAnalyzerStartupContext *)pContext;
+    Diana_ElfAnalyzerCommonParams_type * pParams = pStartup->pParams;
+    OPERAND_SIZE sizeOfModule = pParams->pElfFile->pImpl->sizeOfModule;
+
+    if (!pRoutine->offset || pRoutine->offset >= sizeOfModule)
+        return DI_SUCCESS;
+    pStartup->analyzeStatus = Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                                   pParams->pObserver,
+                                                   pParams->pElfFile->dianaMode,
+                                                   pRoutine->offset,
+                                                   sizeOfModule,
+                                                   pParams->pStack,
+                                                   0,
+                                                   &pParams->analyzeParams);
+    return pStartup->analyzeStatus;
+}
+
+/* IFUNC resolvers and initializers: the loader runs them before main, often nothing calls them */
+static int Diana_ELF_AnalyzeStartupRoutines(Diana_ElfAnalyzerCommonParams_type * pParams)
+{
+    Diana_ElfAnalyzerStartupContext startup;
+    startup.pParams = pParams;
+    startup.analyzeStatus = DI_SUCCESS;
+
+    /* a malformed dynamic section only costs these roots; a failed analysis fails it all */
+    DianaElfFile_QueryStartupRoutines(pParams->pElfFile,
+                                      pParams->pObserver->m_pStream,
+                                      0,
+                                      ElfAnalyzer_PointerToOffset,
+                                      &startup,
+                                      ElfAnalyzer_OnStartupRoutine,
+                                      &startup,
+                                      0);
+    return startup.analyzeStatus;
+}
+
 // AArch64: 8-byte pointers at 8-aligned offsets; pPage starts with the last pointer of the previous page
 static int ELF_ScanPageArm64(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSize)
 {
@@ -298,6 +365,7 @@ static int Diana_ELF_AnalyzeELFImplUsingBuffer(Diana_ElfAnalyzerCommonParams_typ
     }
 
     DI_CHECK(Diana_ELF_AnalyzeSymbols(pParams));
+    DI_CHECK(Diana_ELF_AnalyzeStartupRoutines(pParams));
     DI_CHECK(Diana_ELF_AnalyzeData(pParams));
     // AArch64: BTI landing pads nothing else reached (C++ exception landing pads)
     DI_CHECK(Diana_AnalyzeLandingPads(pParams->pOwner,

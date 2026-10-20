@@ -238,6 +238,23 @@ namespace orthia
             }
         } collector(mod);
 
+        // IFUNC resolvers and initializers first: a global IFUNC's resolver is named $ifunc_<name>,
+        // not like the function. The PE loader does the same for TLS callbacks.
+        std::vector<orthia::ElfStartupRoutine> routines;
+        int startupErr = mod.elfFile->QueryStartupRoutines(routines);
+        if (startupErr)
+        {
+            ORTHIA_LOG(orthia::LogSeverity::Error, "QueryStartupRoutines failed: ", startupErr);
+        }
+        for (const auto& routine : routines)
+        {
+            orthia::NameInfo info;
+            info.flags   = orthia::NameInfo::flags_Export;
+            info.address = routine.address;
+            info.name    = orthia::Utf8ToPlatformString(orthia::GetElfStartupRoutineName(routine));
+            mod.names.insert({ routine.address, info });
+        }
+
         int err = mod.elfFile->QueryExports(&collector);
         if (err && err != DI_END)
         {

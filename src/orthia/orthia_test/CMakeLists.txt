@@ -21,6 +21,7 @@ ot_utils.cpp
 ot_elf_test.cpp
 ot_image_identity_test.cpp
 ot_sections_test.cpp
+ot_startup_routines_test.cpp
 )
 
 add_executable(${PROJECT_NAME} 

@@ -61,6 +61,15 @@ int DianaExecutable_QueryTLSCallbacks(DianaExecutable* pExe,
     OPERAND_SIZE* pAddressOfTLSIndex,
     int streamFlags);
 
+/* Unified QueryStartupRoutines - ELF only (IFUNC resolvers, init arrays); returns DI_SUCCESS
+   with no routines for PE, whose counterpart is QueryTLSCallbacks */
+int DianaExecutable_QueryStartupRoutines(DianaExecutable* pExe,
+    DianaMovableReadStream* pStream,
+    OPERAND_SIZE moduleAddress,
+    DianaElfFile_StartupRoutine_Callback callback,
+    void* pContext,
+    int streamFlags);
+
 /* Minimum number of bytes required by DianaExecutable_DetectType */
 #define DIANA_EXECUTABLE_DETECT_MIN_SIZE 4
 

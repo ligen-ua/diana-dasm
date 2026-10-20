@@ -201,6 +201,101 @@ int Diana_AnalyzeExports(Diana_PeAnalyzerCommonParams_type * pParams)
     return DI_SUCCESS;
 }
 
+#define DIANA_PE_ANALYZER_MAX_TLS_CALLBACKS  256
+
+static DI_UINT64 PeAnalyzer_ReadPointer(const unsigned char * p, int pointerSize)
+{
+    DI_UINT64 value = 0;
+    int i;
+    for (i = pointerSize - 1; i >= 0; --i)
+        value = (value << 8) | p[i];
+    return value;
+}
+
+/* A pointer stored in the image as a module offset: the observer knows where a relocated
+   image is; an image left at its preferred base has pointers from imageBase */
+static int PeAnalyzer_PointerToOffset(Diana_PeAnalyzerCommonParams_type * pParams,
+                                      OPERAND_SIZE pointer,
+                                      OPERAND_SIZE * pOffset)
+{
+    Diana_PeFile_impl * pImpl = pParams->pPeFile->pImpl;
+    DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+    OPERAND_SIZE relativeAddress = 0;
+
+    DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                   pointer,
+                                                   DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                   &relativeAddress,
+                                                   &result));
+    if (result == diaJumpNormal && relativeAddress < pImpl->sizeOfModule)
+    {
+        *pOffset = relativeAddress;
+        return DI_SUCCESS;
+    }
+    if (pointer >= pImpl->imageBase && pointer - pImpl->imageBase < pImpl->sizeOfModule)
+    {
+        *pOffset = pointer - pImpl->imageBase;
+        return DI_SUCCESS;
+    }
+    return DI_NOT_FOUND;
+}
+
+/* TLS callbacks: the loader calls them before the entry point, often nothing in the code does */
+static
+int Diana_AnalyzeTlsCallbacks(Diana_PeAnalyzerCommonParams_type * pParams)
+{
+    Diana_PeFile_impl * pImpl = pParams->pPeFile->pImpl;
+    const DIANA_IMAGE_DATA_DIRECTORY * pDirectory = pImpl->pImageDataDirectoryArray + DIANA_IMAGE_DIRECTORY_ENTRY_TLS;
+    int pointerSize = pImpl->dianaMode == DIANA_MODE64 ? 8 : 4;
+    unsigned char buffer[4 * 8];
+    OPERAND_SIZE callbacksOffset = 0;
+    int i;
+
+    /* StartAddressOfRawData, EndAddressOfRawData, AddressOfIndex, AddressOfCallBacks */
+    if (!pDirectory->VirtualAddress || pDirectory->Size < (DI_UINT32)(4 * pointerSize))
+        return DI_SUCCESS;
+    if (pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream, pDirectory->VirtualAddress) ||
+        DianaExactRead(&pParams->pObserver->m_pStream->parent, buffer, 4 * pointerSize))
+    {
+        return DI_SUCCESS;  /* a broken directory costs only these roots */
+    }
+    if (PeAnalyzer_PointerToOffset(pParams,
+                                   (OPERAND_SIZE)PeAnalyzer_ReadPointer(buffer + 3 * pointerSize, pointerSize),
+                                   &callbacksOffset) != DI_SUCCESS)
+    {
+        return DI_SUCCESS;
+    }
+
+    /* the array ends with 0 */
+    for (i = 0; i < DIANA_PE_ANALYZER_MAX_TLS_CALLBACKS; ++i)
+    {
+        OPERAND_SIZE callback = 0;
+        OPERAND_SIZE callbackOffset = 0;
+
+        /* the analysis moves the stream */
+        if (pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream,
+                                                   callbacksOffset + (OPERAND_SIZE)i * pointerSize) ||
+            DianaExactRead(&pParams->pObserver->m_pStream->parent, buffer, pointerSize))
+        {
+            break;
+        }
+        callback = (OPERAND_SIZE)PeAnalyzer_ReadPointer(buffer, pointerSize);
+        if (!callback)
+            break;
+        if (PeAnalyzer_PointerToOffset(pParams, callback, &callbackOffset) != DI_SUCCESS)
+            continue;
+        DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                      pParams->pObserver,
+                                      pImpl->dianaMode,
+                                      callbackOffset,
+                                      pImpl->sizeOfModule,
+                                      pParams->pStack,
+                                      0,
+                                      &pParams->analyzeParams));
+    }
+    return DI_SUCCESS;
+}
+
 // .pdata: RUNTIME_FUNCTION entries, the first field is the start of a function with unwind data.
 // x64 entries are {Begin, End, UnwindInfo}, ARM64 entries are {Begin, UnwindData}
 static
@@ -264,6 +359,7 @@ int Diana_PE_AnalyzePEImplUsingBuffer(Diana_PeAnalyzerCommonParams_type * pParam
                                      0,
                                      &pParams->analyzeParams));
     }
+    DI_CHECK(Diana_AnalyzeTlsCallbacks(pParams));
     // functions with unwind data, roots before the pointer scan below
     DI_CHECK(Diana_AnalyzePData(pParams));
     {

@@ -101,6 +101,42 @@ int DianaElfFile_GetNeededLibraries(/* in */ Diana_ElfFile* pElfFile,
     /* in */ void* pContext,
     /* in */ int streamFlags);
 
+/* Startup routines: the code the dynamic linker runs before main, the ELF counterpart of PE TLS callbacks */
+#define DIANA_ELF_STARTUP_IFUNC          1  /* an IFUNC resolver: a STT_GNU_IFUNC symbol or an R_*_IRELATIVE relocation */
+#define DIANA_ELF_STARTUP_PREINIT_ARRAY  2  /* an entry of DT_PREINIT_ARRAY */
+#define DIANA_ELF_STARTUP_INIT           3  /* DT_INIT */
+#define DIANA_ELF_STARTUP_INIT_ARRAY     4  /* an entry of DT_INIT_ARRAY */
+
+typedef struct _DianaElfStartupRoutine
+{
+    int kind;                   /* DIANA_ELF_STARTUP_* */
+    int index;                  /* the array position; for IFUNCs without a name, their number */
+    OPERAND_SIZE offset;        /* the routine as a module offset (a link-time address, like st_value) */
+    OPERAND_SIZE slotOffset;    /* the GOT slot an IRELATIVE fills or the array entry; 0 otherwise */
+    const char* pName;          /* the IFUNC symbol name or 0; valid during the callback only */
+} DianaElfStartupRoutine;
+
+typedef int (*DianaElfFile_StartupRoutine_Callback)(void* pContext, const DianaElfStartupRoutine* pRoutine);
+
+/* Converts a pointer stored in the image to a module offset */
+typedef int (*DianaElfFile_PointerToOffset_Callback)(void* pContext, OPERAND_SIZE pointer, OPERAND_SIZE* pOffset);
+
+/* Reports IFUNC resolvers first (named ones, then the IRELATIVE-only ones), then the
+   initializers in the order the loader calls them.
+   pStream is a module-mode stream; reads use module offsets and streamFlags.
+   moduleAddress: the loader relocates some pointers in the image (most dynamic tags, the
+   init arrays) and leaves the others at their link-time addresses. A pointer within
+   [moduleAddress, moduleAddress + sizeOfModule) is taken as relocated. pointerToOffset,
+   when given, does this conversion instead. */
+int DianaElfFile_QueryStartupRoutines(/* in */ Diana_ElfFile* pElfFile,
+    /* in */ DianaMovableReadStream* pStream,
+    /* in */ OPERAND_SIZE moduleAddress,
+    /* in, optional */ DianaElfFile_PointerToOffset_Callback pointerToOffset,
+    /* in, optional */ void* pPointerContext,
+    /* in */ DianaElfFile_StartupRoutine_Callback callback,
+    /* in */ void* pContext,
+    /* in */ int streamFlags);
+
 // Scans the PT_NOTE segments for an NT_GNU_BUILD_ID note (name "GNU") and
 // returns its descriptor bytes (the raw build-id, typically 20 bytes for a
 // SHA1-based id). Returns DI_NOT_FOUND if no such note is present.
