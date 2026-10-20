@@ -643,7 +643,7 @@ namespace orthia
         return NameInfo();
     }
 
-    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, ImageSections& sections)
+    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections)
     {
         // the file the module was mapped from: ELF section headers are not in memory
         PlatformString_type imageFile;
@@ -656,7 +656,7 @@ namespace orthia
             }
         }
         auto reader = CreateMemoryReader();
-        QueryImageSections(reader.get(), moduleBase, imageFile, sections);
+        QueryImageSections(reader.get(), moduleBase, imageFile, openFile, sections);
     }
 
 }

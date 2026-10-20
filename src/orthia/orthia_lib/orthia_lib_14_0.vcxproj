@@ -214,6 +214,7 @@
     <ClInclude Include="orthia_files.h" />
     <ClInclude Include="orthia_image_identity.h" />
     <ClInclude Include="orthia_sections.h" />
+    <ClInclude Include="orthia_file_reader.h" />
     <ClInclude Include="orthia_interfaces.h" />
     <ClInclude Include="orthia_interfaces_vm.h" />
     <ClInclude Include="orthia_json.h" />

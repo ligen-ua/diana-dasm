@@ -1,6 +1,6 @@
 #include "orthia_sections.h"
-#include <filesystem>
-#include <fstream>
+#include <algorithm>
+#include <cstring>
 extern "C"
 {
 #include "diana_pe_defs.h"
@@ -368,43 +368,58 @@ void ListElfSegments(const MappedElf& elf, std::vector<ImageSection>& out)
     }
 }
 
-class CFileRangeReader
+// the target file, opened through the filesystem interface; reads are checked against its size
+class CTargetFile
 {
-    std::ifstream m_file;
+    std::unique_ptr<IFileRangeReader> m_file;
     unsigned long long m_size = 0;
 public:
-    bool Open(const PlatformString_type& name)
+    bool Open(const FileOpener_type& openFile, const PlatformString_type& name)
     {
-        std::error_code error;
-        std::filesystem::path path(name);
-        m_size = std::filesystem::file_size(path, error);
-        if (error)
+        if (!openFile)
             return false;
-        m_file.open(path, std::ios::binary);
-        return m_file.is_open();
+        m_file = openFile(name);
+        if (!m_file)
+            return false;
+        m_size = m_file->GetSize();
+        return true;
     }
     unsigned long long GetSize() const { return m_size; }
     bool Read(unsigned long long offset, std::vector<char>& data)
     {
         if (offset > m_size || data.size() > m_size - offset)
             return false;
-        m_file.clear();
-        m_file.seekg((std::streamoff)offset);
-        m_file.read(data.data(), (std::streamsize)data.size());
-        return (size_t)m_file.gcount() == data.size();
+        return m_file->Read(offset, data);
     }
 };
+
+const char c_debugLinkSection[] = ".gnu_debuglink";
+const size_t c_maxDebugLinkSize = 0x1000;
+
+// the file name .gnu_debuglink holds (it is followed by padding and a CRC); empty if unreadable
+PlatformString_type ReadDebugLink(CTargetFile& file, const ElfSection& sec)
+{
+    if (sec.type == DIANA_SHT_NOBITS || !sec.size)
+        return PlatformString_type();
+    std::vector<char> data((size_t)std::min<unsigned long long>(sec.size, c_maxDebugLinkSize));
+    if (!file.Read(sec.offset, data))
+        return PlatformString_type();
+    return Utf8ToPlatformString(std::string(data.data(), strnlen(data.data(), data.size())));
+}
+
+std::string GetSectionName(const ElfSection& sec, const std::vector<char>& shstrtab)
+{
+    if (sec.name >= shstrtab.size())
+        return std::string();
+    const char* namePtr = shstrtab.data() + sec.name;
+    return std::string(namePtr, strnlen(namePtr, shstrtab.size() - sec.name));
+}
 
 void AddElfSection(const ElfLayout& layout, const ElfSection& sec, const std::vector<char>& shstrtab,
     Address_type loadBias, std::vector<ImageSection>& out)
 {
     ImageSection info;
-    if (sec.name < shstrtab.size())
-    {
-        const char* namePtr = shstrtab.data() + sec.name;
-        size_t len = strnlen(namePtr, shstrtab.size() - sec.name);
-        info.name = Utf8ToPlatformString(std::string(namePtr, len));
-    }
+    info.name = Utf8ToPlatformString(GetSectionName(sec, shstrtab));
     // only SHF_ALLOC sections are loaded; the others have no address in memory
     if (sec.flags & DIANA_SHF_ALLOC)
         info.address = loadBias + sec.addr;
@@ -444,13 +459,13 @@ void AddElfSection(const ElfLayout& layout, const ElfSection& sec, const std::ve
 
 // Returns an empty string on success, otherwise why the file's section headers can't be used.
 std::string ReadElfFileSections(const MappedElf& mapped, const PlatformString_type& imageFile,
-    std::vector<ImageSection>& out)
+    const FileOpener_type& openFile, ImageSections& result)
 {
     if (imageFile.empty())
         return "section headers are not loaded in memory and the module has no file";
 
-    CFileRangeReader file;
-    if (!file.Open(imageFile))
+    CTargetFile file;
+    if (!file.Open(openFile, imageFile))
         return "can't open " + PlatformStringToUtf8(imageFile);
 
     // the file must be the image that is mapped: same ELF header, same program headers
@@ -508,25 +523,28 @@ std::string ReadElfFileSections(const MappedElf& mapped, const PlatformString_ty
 
     for (size_t i = 1; i < sections.size(); ++i)
     {
-        AddElfSection(layout, sections[i], shstrtab, mapped.loadBias, out);
+        AddElfSection(layout, sections[i], shstrtab, mapped.loadBias, result.sections);
+        if (result.debugLink.empty() && GetSectionName(sections[i], shstrtab) == c_debugLinkSection)
+            result.debugLink = ReadDebugLink(file, sections[i]);
     }
     return std::string();
 }
 
 bool TryParseElfSections(IMemoryReader* reader, Address_type moduleBase, const PlatformString_type& imageFile,
-    ImageSections& result)
+    const FileOpener_type& openFile, ImageSections& result)
 {
     MappedElf mapped;
     if (!ReadMappedElf(reader, moduleBase, mapped))
         return false;
 
-    auto reason = ReadElfFileSections(mapped, imageFile, result.sections);
+    auto reason = ReadElfFileSections(mapped, imageFile, openFile, result);
     if (reason.empty())
     {
         result.source = imageFile;
         return true;
     }
     result.sections.clear();
+    result.debugLink.clear();
     result.segments = true;
     result.reason = Utf8ToPlatformString(reason);
     ListElfSegments(mapped, result.sections);
@@ -538,6 +556,7 @@ bool TryParseElfSections(IMemoryReader* reader, Address_type moduleBase, const P
 void QueryImageSections(IMemoryReader* reader,
     Address_type moduleBase,
     const PlatformString_type& imageFile,
+    const FileOpener_type& openFile,
     ImageSections& result)
 {
     result = ImageSections();
@@ -545,7 +564,7 @@ void QueryImageSections(IMemoryReader* reader,
         return;
     if (TryParsePeSections(reader, moduleBase, result.sections))
         return;
-    TryParseElfSections(reader, moduleBase, imageFile, result);
+    TryParseElfSections(reader, moduleBase, imageFile, openFile, result);
 }
 
 } // namespace orthia

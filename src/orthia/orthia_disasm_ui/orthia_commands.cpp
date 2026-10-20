@@ -854,7 +854,7 @@ namespace orthia
         CheckImageReadable(args.item->CreateMemoryReader().get(), module);
 
         orthia::ImageSections result;
-        args.item->QuerySections(module.address, result);
+        args.item->QuerySections(module.address, orthia::CreateFileOpener(args.model->GetFileSystem()), result);
         if (result.sections.empty())
         {
             throw std::runtime_error("No sections found in module: " + orthia::PlatformStringToUtf8(module.name));

@@ -773,7 +773,7 @@ namespace orthia
         return applied;
     }
 
-    void FileWorkplaceItem::QuerySections(Address_type moduleBase, ImageSections& sections)
+    void FileWorkplaceItem::QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections)
     {
         if (!moduleBase)
         {
@@ -794,7 +794,7 @@ namespace orthia
             }
         }
         auto reader = CreateMemoryReader();
-        QueryImageSections(reader.get(), moduleBase, imageFile, sections);
+        QueryImageSections(reader.get(), moduleBase, imageFile, openFile, sections);
     }
 
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)

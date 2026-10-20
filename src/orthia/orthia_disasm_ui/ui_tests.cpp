@@ -5,9 +5,12 @@
 #include "orthia_databases.h"
 #include "orthia_module_names.h"
 #include "orthia_config.h"
+#include "orthia_external_symbols.h"
 #ifndef _WIN32
 #include "oui_privileges_posix.h"
 #endif
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <set>
 
@@ -471,6 +474,39 @@ TEST(Privileges, ParseIdText)
     EXPECT_FALSE(orthia::ParseIdText("0x10", &id));
 }
 #endif
+
+TEST(ElfDebugFile, HostLookup)
+{
+    namespace fs = std::filesystem;
+    std::error_code error;
+    const fs::path root = fs::temp_directory_path() / ORTHIA_TCSTR("orthia_test_elf_debug_file");
+    fs::remove_all(root, error);
+    const fs::path symbols = root / ORTHIA_TCSTR("symbols");
+    const fs::path moduleDir = root / ORTHIA_TCSTR("lib");
+    fs::create_directories(symbols / ORTHIA_TCSTR(".build-id") / ORTHIA_TCSTR("ab"));
+    fs::create_directories(moduleDir / ORTHIA_TCSTR(".debug"));
+    auto touch = [](const fs::path& path) { std::ofstream file(path); };
+    const fs::path module = moduleDir / ORTHIA_TCSTR("libx.so");
+    touch(module);
+    const fs::path byBuildId = symbols / ORTHIA_TCSTR(".build-id") / ORTHIA_TCSTR("ab") / ORTHIA_TCSTR("cdef.debug");
+    touch(byBuildId);
+    const fs::path byLink = moduleDir / ORTHIA_TCSTR(".debug") / ORTHIA_TCSTR("libx.so.debug");
+    touch(byLink);
+    const std::vector<orthia::PlatformString_type> folders = { symbols.native() };
+
+    // the build-id comes first
+    EXPECT_EQ(byBuildId.native(), orthia::FindElfDebugFile(module.native(), ORTHIA_TCSTR("abcdef"), ORTHIA_TCSTR("libx.so.debug"), folders));
+    // then the debug link; a directory part in it is ignored
+    EXPECT_EQ(byLink.native(), orthia::FindElfDebugFile(module.native(), ORTHIA_TCSTR("ab0000"), ORTHIA_TCSTR("libx.so.debug"), folders));
+    EXPECT_EQ(byLink.native(), orthia::FindElfDebugFile(module.native(), orthia::PlatformString_type(), ORTHIA_TCSTR("../x/libx.so.debug"), folders));
+    // a debug link or a build-id alone, with nothing installed, is not reported
+    EXPECT_TRUE(orthia::FindElfDebugFile(module.native(), ORTHIA_TCSTR("ab0000"), ORTHIA_TCSTR("other.debug"), folders).empty());
+    EXPECT_TRUE(orthia::FindElfDebugFile(module.native(), orthia::PlatformString_type(), orthia::PlatformString_type(), folders).empty());
+    // a debug link naming the module itself
+    EXPECT_TRUE(orthia::FindElfDebugFile(module.native(), orthia::PlatformString_type(), ORTHIA_TCSTR("libx.so"), folders).empty());
+
+    fs::remove_all(root, error);
+}
 
 int RunTests()
 {

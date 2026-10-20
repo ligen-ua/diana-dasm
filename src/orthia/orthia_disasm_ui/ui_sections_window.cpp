@@ -3,6 +3,7 @@
 
 #include "ui_sections_window.h"
 #include "orthia_model.h"
+#include "orthia_helpers.h"
 #include "oui_menu.h"
 
 CSectionsWindow::CSectionsWindow(std::function<oui::String()> getCaption,
@@ -196,7 +197,7 @@ void CSectionsWindow::UpdateSections()
         }
     }
     orthia::ImageSections sections;
-    activeItem->QuerySections(address, sections);
+    activeItem->QuerySections(address, orthia::CreateFileOpener(m_model->GetFileSystem()), sections);
     m_cachedSections = std::move(sections.sections);
 
     m_sectionsBox->SetOffset(0);
@@ -264,7 +265,7 @@ void CSectionsWindow::NavigateTo(orthia::Address_type moduleBase, const oui::Str
     if (activeItem && moduleBase)
     {
         orthia::ImageSections sections;
-        activeItem->QuerySections(moduleBase, sections);
+        activeItem->QuerySections(moduleBase, orthia::CreateFileOpener(m_model->GetFileSystem()), sections);
         m_cachedSections = std::move(sections.sections);
         m_sectionsBox->SetOffset(0);
         m_sectionsBox->SetSelectedPosition(0);

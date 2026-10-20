@@ -74,7 +74,7 @@ namespace orthia
     void CProgramModel::SetUILog(std::shared_ptr<IUILogInterface> uiLog)
     {
         m_uiLog = uiLog;
-        m_analyzer.Init(uiLog, m_config);
+        m_analyzer.Init(uiLog, m_config, m_fileSystem);
     }
     std::shared_ptr<oui::CFileSystem> CProgramModel::GetFileSystem()
     {

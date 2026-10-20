@@ -106,9 +106,10 @@ def test_elf_with_bad_section_headers(orthia, data):
     assert "DiException" not in res.stderr, res
 
 
-def test_reload_reports_result(orthia_cold, me):
+def test_reload_is_quiet_without_debug_file(orthia_cold, me):
+    # a local build has no separate debug file: ELF symbol support is not reported per module
     res = orthia_cold.run(".reload", **me).assert_ok()
-    assert re.search(r"(?i)symbol.*\borthia\b|\borthia\b.*symbol", res.stdout + res.stderr), res
+    assert not re.search(r"(?i)ELF symbol loading is not supported", res.stdout + res.stderr), res
 
 
 @pytest.mark.xfail(reason="B2: module name comes from the SHA1-keyed DB, not the opened file")

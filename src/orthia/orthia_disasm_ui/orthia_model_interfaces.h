@@ -246,7 +246,7 @@ namespace orthia
         virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
         virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
         virtual ModuleStorage* GetModuleStorage() { return nullptr; }
-        virtual void QuerySections(Address_type moduleBase, ImageSections& sections) {}
+        virtual void QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections) {}
         // the db/<sha1> or proc/ folder of this item, without a trailing slash
         virtual PlatformString_type GetDatabaseFolder() const { return PlatformString_type(); }
     };
