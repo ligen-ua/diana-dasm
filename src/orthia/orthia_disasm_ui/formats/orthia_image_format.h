@@ -7,6 +7,36 @@
 namespace orthia
 {
     class CModuleManager;
+    struct IImageFormat;
+
+    // One parsed module, the same in file mode and process mode. Opened per use, not cached
+    struct IModuleImage
+    {
+        virtual ~IModuleImage() = default;
+        virtual const IImageFormat& GetFormat() const = 0;
+        // address and size as opened, entryPoint absolute (0 = none), dianaMode
+        virtual WorkAddressRangeInfo GetRange() const = 0;
+        // Every name the image gives an address, in this order: $entrypoint, the format's own
+        // "$" names, exports. flags_Export, an absolute address, and the name without "module!":
+        // "memcpy", "$tls_0001", "$ifunc_memcpy", "$ordinal_0005". Several names can share an
+        // address; whether a caller keeps all of them or the first one is up to the caller
+        virtual void QueryNames(std::vector<NameInfo>& out) = 0;
+        // flags_Import, address = the value in the import slot, name = the function name,
+        // "$ordinal_XXXX" or empty; the caller resolves the target's own name
+        virtual void QueryImports(std::vector<NameInfo>& out) = 0;
+    };
+
+    // Gives every format the same order and the same $entrypoint rule
+    class CModuleImageBase : public IModuleImage
+    {
+    public:
+        void QueryNames(std::vector<NameInfo>& out) final;
+        void QueryImports(std::vector<NameInfo>& out) override {}
+    protected:
+        virtual void QuerySpecialNames(std::vector<NameInfo>& out) {}
+        virtual void QueryExports(std::vector<NameInfo>& out) {}
+        static void AddName(std::vector<NameInfo>& out, int flags, Address_type address, const std::string& utf8Name);
+    };
 
     // How to read an image (PE, ELF, ...): one stateless object per format, found through the
     // registry below. Not to be confused with IImageSource (orthia_image_source.h), which says
@@ -23,6 +53,11 @@ namespace orthia
 
         // whether the first bytes of a file are this format; false for formats only the user picks
         virtual bool Detect(const char* header, size_t size) const = 0;
+        // the module mapped at base: a process module, or a file mapped by MapFile (read through
+        // CMemoryReaderOnLoadedData). nullptr when it isn't this format or its headers are broken
+        virtual std::unique_ptr<IModuleImage> OpenModuleImage(IMemoryReader& reader,
+            Address_type base,
+            Address_type size) const = 0;
         // throws std::exception with a message for the user when the image is malformed
         virtual std::shared_ptr<ISimpleFile> MapFile(const std::vector<char>& data,
             const MapFileParameters& params) const = 0;
@@ -39,6 +74,11 @@ namespace orthia
     // nullptr when no format recognizes the bytes
     const IImageFormat* FindFormatByData(const char* header, size_t size);
     const IImageFormat* FindFormatById(const std::string& id);
+    // by the type bit in mod.builtInFlags; nullptr when there is none
+    const IImageFormat* FindFormatByModule(const ModuleInfo& mod);
+    // IModuleImage::QueryNames of a file mapped by format.MapFile; false when its headers don't parse
+    bool QueryMappedFileNames(const IImageFormat& format, const ISimpleFile& file, std::vector<NameInfo>& out);
+
     // transitional, for the code that still passes DIANA_EXECUTABLE_TYPE_* around
     const IImageFormat* FindFormatByExecutableType(int executableType);
 }

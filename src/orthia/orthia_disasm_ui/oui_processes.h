@@ -3,21 +3,15 @@
 #include "oui_filesystem.h"
 #include "orthia_model_interfaces.h"
 
-extern "C"
-{
-#include "diana_executable.h"
-}
-
 namespace orthia
 {
-    struct DianaMemoryStream;
+    struct IModuleImage;
 }
 namespace oui
 {
     struct ModuleDisasmContext
     {
-        orthia::DianaMemoryStream * stream = nullptr;
-        DianaExecutable * executable = nullptr;
+        orthia::IModuleImage* image = nullptr;     // valid during the callback only
     };
 
     struct ThreadInfo

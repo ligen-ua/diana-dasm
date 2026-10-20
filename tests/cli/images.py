@@ -22,6 +22,8 @@ class Section(NamedTuple):
 
 PT_LOAD = 1
 SHT_NOTE = 7
+SHT_DYNSYM = 11
+STT_FUNC, STT_GNU_IFUNC = 2, 10
 SHT_NOBITS = 8
 SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR = 0x1, 0x2, 0x4
 DT_NEEDED, DT_RUNPATH, DT_RPATH = 1, 29, 15
@@ -55,6 +57,7 @@ class ElfInfo:
         self.sections: List[Section] = []
         self.build_id: Optional[str] = None
         dynamic = None
+        dynsym = None
         by_index = {}
         for index, (name, sh_type, sh_flags, sh_addr, sh_offset, sh_size, sh_link, _, _, _) in enumerate(raw):
             if index == 0:
@@ -69,6 +72,18 @@ class ElfInfo:
                 self.build_id = self._build_id(data[sh_offset:sh_offset + sh_size])
             if section_name == ".dynamic":
                 dynamic = (sh_offset, sh_size, sh_link)
+            if sh_type == SHT_DYNSYM:
+                dynsym = (sh_offset, sh_size, sh_link)
+
+        # defined functions in .dynsym: name -> st_value (relative to the load bias)
+        self.exported_functions: Dict[str, int] = {}
+        if dynsym:
+            offset, size, link = dynsym
+            strtab = raw[link][4]
+            for pos in range(offset + 24, offset + size, 24):
+                st_name, st_info, _, st_shndx, st_value, _ = struct.unpack_from("<IBBHQQ", data, pos)
+                if st_shndx and st_name and (st_info & 0xF) in (STT_FUNC, STT_GNU_IFUNC):
+                    self.exported_functions[c_string(strtab + st_name)] = st_value
 
         self.needed: List[str] = []
         self.runpath: List[str] = []
@@ -149,6 +164,7 @@ class PeInfo:
         self._export_dir = struct.unpack_from("<II", image, directories)
         self._import_rva = struct.unpack_from("<I", image, directories + 8)[0]
         self._debug_dir = struct.unpack_from("<II", image, directories + 6 * 8)
+        self._tls_dir = struct.unpack_from("<II", image, directories + 9 * 8)
 
         self._raw_sections = []
         self.sections: List[Section] = []
@@ -176,6 +192,24 @@ class PeInfo:
     def bytes_at(self, rva: int, size: int) -> bytes:
         offset = self._offset(rva)
         return self._image[offset:offset + size]
+
+    @property
+    def tls_callbacks(self) -> List[int]:
+        """RVAs of the TLS callbacks, in array order."""
+        rva, _ = self._tls_dir
+        if not rva:
+            return []
+        pointer = "<Q" if self.is64 else "<I"
+        width = 8 if self.is64 else 4
+        array_va = struct.unpack_from(pointer, self._image, self._offset(rva) + 3 * width)[0]
+        result = []
+        position = self._offset(array_va - self.image_base)
+        while True:
+            callback = struct.unpack_from(pointer, self._image, position)[0]
+            if not callback:
+                return result
+            result.append(callback - self.image_base)
+            position += width
 
     @property
     def exports(self) -> Dict[str, int]:

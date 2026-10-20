@@ -6,6 +6,7 @@
 #include "orthia_streams.h"
 #include "orthia_log.h"
 #include "orthia_utils.h"
+#include "formats/orthia_image_format.h"
 
 extern "C"
 {
@@ -402,8 +403,7 @@ namespace oui
             orthia::ProcessReaderAdapter memReader(this);
             orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x1000);
             writeCache.SetCacheReads(true);
-
-            std::vector<char> page(0x4000);
+            const orthia::IImageFormat& elfFormat = *orthia::FindFormatById("elf");
 
             for (auto& c : candidates)
             {
@@ -421,30 +421,18 @@ namespace oui
                 info.size    = c.size;
                 info.lastValidAddress = c.baseAddr + c.size - 1;
 
-                orthia::CMemoryCache moduleCache(&writeCache, c.baseAddr);
-                orthia::DianaMemoryStream stream(0, &moduleCache, c.size);
-
-                DianaExecutable exe = {};
-                exe.type = DIANA_EXECUTABLE_TYPE_ELF;
-                if (!DianaElfFile_Init(&exe.u.elfFile,
-                    &stream.parent,
-                    c.size,
-                    DIANA_ELF_FILE_FLAGS_MODULE_MODE))
+                if (auto image = elfFormat.OpenModuleImage(writeCache, c.baseAddr, c.size))
                 {
-                    diana::Guard<diana::ElfFile> elfGuard(&exe.u.elfFile);
-
-                    exe.dianaMode = exe.u.elfFile.dianaMode;
-                    info.dianaMode = exe.dianaMode;
-
-                    info.entryPoint = c.baseAddr + exe.u.elfFile.pImpl->elfHeader.e_entry;
-
-                    info.builtInFlags |= orthia::ModuleInfo::builtInFlags_moduleTypeElf;
+                    const auto range = image->GetRange();
+                    info.dianaMode = range.dianaMode;
+                    // a module without an entry point gets its base, as before
+                    info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
+                    info.builtInFlags |= elfFormat.GetBuiltInFlag();
 
                     if (contextCallback)
                     {
                         ModuleDisasmContext context;
-                        context.executable = &exe;
-                        context.stream     = &stream;
+                        context.image = image.get();
                         contextCallback(info, context);
                     }
                 }

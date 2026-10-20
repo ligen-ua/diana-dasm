@@ -9,6 +9,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_log.h"
+#include "formats/orthia_image_format.h"
 #include "orthia_plugins_win32.h"
 #include "orthia_exec.h"
 
@@ -467,6 +468,7 @@ namespace oui
             orthia::ProcessReaderAdapter memReader(this);
             orthia::CMemoryStorageOfModifiedData writeCache(&memReader, sysInfo.dwPageSize);
             writeCache.SetCacheReads(true);
+            const orthia::IImageFormat& peFormat = *orthia::FindFormatById("pe");
 
             std::vector<wchar_t> buffer(4096);
             for (auto hmod : modulesVec)
@@ -509,38 +511,19 @@ namespace oui
                 Diana_SafeAdd(&info.lastValidAddress, info.size - 1);
 
 
+                if (auto image = peFormat.OpenModuleImage(writeCache, info.address, info.size))
                 {
-                    // diana PE analyzer uses relative pointers
-                    orthia::CMemoryCache module(&writeCache, info.address);
-                    // adapter to C-code
-                    orthia::DianaMemoryStream stream(0, &module, info.size);
+                    const auto range = image->GetRange();
+                    info.dianaMode = range.dianaMode;
+                    // a module without an entry point gets its base, as before
+                    info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
+                    info.builtInFlags |= peFormat.GetBuiltInFlag();
 
-                    DianaExecutable exe = {};
-                    exe.type = DIANA_EXECUTABLE_TYPE_PE;
-                    if (!DianaPeFile_Init(&exe.u.peFile,
-                        &stream.parent,
-                        info.size,
-                        DIANA_PE_FILE_FLAGS_MODULE_MODE))
+                    if (contextCallback)
                     {
-                        // yahoo, success
-                        diana::Guard<diana::PeFile> peFileGuard(&exe.u.peFile);
-
-                        exe.dianaMode = exe.u.peFile.pImpl->dianaMode;
-                        info.dianaMode = exe.dianaMode;
-
-                        info.entryPoint = exe.u.peFile.pImpl->addressOfEntryPoint;
-                        Diana_SafeAdd(&info.entryPoint, info.address);
-
-                        info.builtInFlags |= orthia::ModuleInfo::builtInFlags_moduleTypePe;
-
-                        if (contextCallback)
-                        {
-                            ModuleDisasmContext context;
-                            context.executable = &exe;
-                            context.stream = &stream;
-
-                            contextCallback(info, context);
-                        }
+                        ModuleDisasmContext context;
+                        context.image = image.get();
+                        contextCallback(info, context);
                     }
                 }
                 modules.push_back(info);

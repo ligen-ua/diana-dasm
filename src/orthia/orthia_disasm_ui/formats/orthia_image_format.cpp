@@ -1,8 +1,32 @@
 #include "orthia_image_format.h"
 #include "orthia_diana_image_format.h"
+#include "../orthia_helpers.h"
 
 namespace orthia
 {
+    void CModuleImageBase::AddName(std::vector<NameInfo>& out, int flags, Address_type address, const std::string& utf8Name)
+    {
+        NameInfo info;
+        info.flags = flags;
+        info.address = address;
+        info.name = Utf8ToPlatformString(utf8Name);
+        out.push_back(std::move(info));
+    }
+
+    void CModuleImageBase::QueryNames(std::vector<NameInfo>& out)
+    {
+        // an entry point at the base is the "no entry point" of a DLL or a shared library
+        const auto range = GetRange();
+        if (range.entryPoint && range.entryPoint != range.address)
+        {
+            AddName(out, NameInfo::flags_Export, range.entryPoint, "$entrypoint");
+        }
+        // before the exports: a global IFUNC's resolver is its export too ($ifunc_memcpy and
+        // memcpy), and a caller that keeps one name per address keeps the "$" one
+        QuerySpecialNames(out);
+        QueryExports(out);
+    }
+
     const std::vector<const IImageFormat*>& GetImageFormats()
     {
         // a new format is one more line here
@@ -30,6 +54,31 @@ namespace orthia
         for (auto* format : GetImageFormats())
         {
             if (id == format->GetId())
+            {
+                return format;
+            }
+        }
+        return nullptr;
+    }
+
+    bool QueryMappedFileNames(const IImageFormat& format, const ISimpleFile& file, std::vector<NameInfo>& out)
+    {
+        const auto& mapped = file.GetMappedFile();
+        CMemoryReaderOnLoadedData reader(file.GetImageBase(), mapped.data(), mapped.size());
+        auto image = format.OpenModuleImage(reader, file.GetImageBase(), mapped.size());
+        if (!image)
+        {
+            return false;
+        }
+        image->QueryNames(out);
+        return true;
+    }
+
+    const IImageFormat* FindFormatByModule(const ModuleInfo& mod)
+    {
+        for (auto* format : GetImageFormats())
+        {
+            if (mod.builtInFlags & format->GetBuiltInFlag())
             {
                 return format;
             }

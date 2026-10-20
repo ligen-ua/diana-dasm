@@ -4,6 +4,7 @@
 #include "orthia_image_source.h"
 #include "orthia_helpers.h"
 #include "orthia_log.h"
+#include "formats/orthia_image_format.h"
 
 namespace orthia
 {
@@ -220,55 +221,16 @@ namespace orthia
         if (!mod.elfFile->GetImpl())
             return;
 
-        struct ExportsCollector : public diana::CBasePeLinkImportsObserver
+        std::vector<orthia::NameInfo> found;
+        if (!QueryMappedFileNames(*FindFormatById("elf"), *mod.elfFile, found))
         {
-            ModuleInfo& m_mod;
-            explicit ExportsCollector(ModuleInfo& m) : m_mod(m) {}
-            void QueryFunctionByOrdinal(const char*, DI_UINT32, OPERAND_SIZE*) override {}
-            void QueryFunctionByName(const char*, const char* pFunctionName,
-                DI_UINT32, OPERAND_SIZE* pAddress) override
-            {
-                if (!pFunctionName || !*pFunctionName || !pAddress || !*pAddress)
-                    return;
-                orthia::NameInfo info;
-                info.flags   = orthia::NameInfo::flags_Export;
-                info.address = *pAddress;
-                info.name    = orthia::Utf8ToPlatformString(pFunctionName);
-                m_mod.names.insert({ *pAddress, info });
-            }
-        } collector(mod);
-
-        // IFUNC resolvers and initializers first: a global IFUNC's resolver is named $ifunc_<name>,
-        // not like the function. The PE loader does the same for TLS callbacks.
-        std::vector<orthia::ElfStartupRoutine> routines;
-        int startupErr = mod.elfFile->QueryStartupRoutines(routines);
-        if (startupErr)
-        {
-            ORTHIA_LOG(orthia::LogSeverity::Error, "QueryStartupRoutines failed: ", startupErr);
+            ORTHIA_LOG(orthia::LogSeverity::Error, "Can't parse the module headers: ", mod.fullName.native);
+            return;
         }
-        for (const auto& routine : routines)
+        // one name per address: the first, so $ifunc_memcpy wins over memcpy at the same address
+        for (auto& info : found)
         {
-            orthia::NameInfo info;
-            info.flags   = orthia::NameInfo::flags_Export;
-            info.address = routine.address;
-            info.name    = orthia::Utf8ToPlatformString(orthia::GetElfStartupRoutineName(routine));
-            mod.names.insert({ routine.address, info });
-        }
-
-        int err = mod.elfFile->QueryExports(&collector);
-        if (err && err != DI_END)
-        {
-            ORTHIA_LOG(orthia::LogSeverity::Error, "QueryExports failed: ", err);
-        }
-
-        DI_UINT64 ep = mod.elfFile->GetEntryPoint();
-        if (ep)
-        {
-            orthia::NameInfo epInfo;
-            epInfo.flags   = orthia::NameInfo::flags_Export;
-            epInfo.address = ep;
-            epInfo.name    = orthia::Utf8ToPlatformString("$entrypoint");
-            mod.names.insert({ ep, epInfo });
+            mod.names.insert({ info.address, std::move(info) });
         }
     }
     void CElfImportsLoader::LoadImports(ModuleInfo& mod)

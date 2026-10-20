@@ -382,53 +382,16 @@ namespace orthia
         {
             return;
         }
-        struct ExportsCollector :public diana::CBasePeLinkImportsObserver
+        std::vector<orthia::NameInfo> found;
+        if (!QueryMappedFileNames(*FindFormatById("pe"), *mod.peFile, found))
         {
-            ModuleInfo& m_mod;
-
-            ExportsCollector(ModuleInfo& mod)
-                : m_mod(mod)
-            {
-            }
-            void QueryFunctionByOrdinal(const char* pDllName,
-                DI_UINT32 ordinal,
-                OPERAND_SIZE* pAddress)
-            {
-            }
-            void QueryFunctionByName(const char* pDllName,
-                const char* pFunctionName,
-                DI_UINT32 hint,
-                OPERAND_SIZE* pAddress)
-            {
-                if (!*pAddress)
-                {
-                    return;
-                }
-                orthia::Address_type fncAddress = m_mod.peFile->GetImageBase() + *pAddress;
-                orthia::NameInfo nameInfo;
-                nameInfo.flags = orthia::NameInfo::flags_Export;
-                nameInfo.address = fncAddress;
-                nameInfo.name = orthia::Utf8ToPlatformString(pFunctionName);
-                m_mod.names.insert({ fncAddress , nameInfo });
-            }
-        } collector(mod);
-        DI_CHECK_CPP(mod.peFile->QueryExports(&collector));
-
-        OPERAND_SIZE entryPoint = mod.peFile->GetImpl()->mappedPE.pImpl->addressOfEntryPoint;
-        if (entryPoint)
-        {
-            collector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
+            throw std::runtime_error("Can't parse the module headers");
         }
-        // report tls callbacks
-        std::vector<OPERAND_SIZE> tlsCallbacks;
-        mod.peFile->QueryTLSCallbacks(tlsCallbacks);
-        for (int i = 0, size = (int)tlsCallbacks.size(); i < size; ++i)
+        // one name per address: the first, so $entrypoint and $tls_ win over an export there
+        for (auto& info : found)
         {
-            auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
-            auto callback = tlsCallbacks[i];
-            collector.QueryFunctionByName("$", name.c_str(), 0, &callback);
+            mod.names.insert({ info.address, std::move(info) });
         }
-
     }
     // CPEImportsLoader
     void CPEImportsLoader::LoadModules(const oui::String & fileName, 

@@ -1,7 +1,5 @@
 #include "orthia_item_process.h"
 #include <filesystem>
-#include "orthia_pe.h"
-#include "orthia_elf.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
@@ -10,6 +8,7 @@
 #include "orthia_common_format.h"
 #include "orthia_module_manager.h"
 #include "orthia_sections.h"
+#include "formats/orthia_image_format.h"
 
 namespace orthia
 {
@@ -97,105 +96,22 @@ namespace orthia
         return m_processModuleAddress;
     }
 
-    struct ExportsCollector:public diana::CBasePeLinkImportsObserver
-    {
-        const orthia::ModuleInfo* m_moduleInfo = 0;
-        orthia::flat_map<orthia::Address_type, NameInfo> m_exports;
-        bool m_fixupAddresses = false;
-
-        ExportsCollector()
-        {
-        }
-        void SetCurrentModule(const orthia::ModuleInfo * moduleInfo)
-        {
-            m_moduleInfo = moduleInfo;
-        }
-        void QueryFunctionByOrdinal(const char* pDllName,
-            DI_UINT32 ordinal,
-            OPERAND_SIZE* pAddress)
-        {
-            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
-            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
-        }
-        void QueryFunctionByName(const char* pDllName,
-            const char* pFunctionName,
-            DI_UINT32 hint,
-            OPERAND_SIZE* pAddress)
-        {
-            if (!*pAddress)
-            {
-                return;
-            }
-            orthia::Address_type fncAddress =  *pAddress;
-            if (m_fixupAddresses)
-            {
-                fncAddress += m_moduleInfo->address;
-            }
-            NameInfo exportInfo;
-            exportInfo.address = fncAddress;
-            exportInfo.name.native = (m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName));
-            exportInfo.flags = NameInfo::flags_Export;
-            m_exports.insert(fncAddress, exportInfo);
-        }
-    };
-    template<class T, class Stream>
-    void DeliverExtraExports(T& exportsCollector, Address_type moduleAddress, OPERAND_SIZE entryPoint, Stream& stream,
-        DianaExecutable& exe)
-    {
-        if (entryPoint && entryPoint != moduleAddress)
-        {
-            exportsCollector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
-        }
-        // report tls callbacks
-        void* pTlsCallbacks = 0;
-        int tlsCallbacksCount = 0;
-        OPERAND_SIZE addressOfTLSIndex = 0;
-        if (!DianaExecutable_QueryTLSCallbacks(&exe,
-            moduleAddress,
-            &stream,
-            &pTlsCallbacks,
-            &tlsCallbacksCount,
-            &addressOfTLSIndex,
-            DIANA_ANALYZE_RANDOM_READ_ABSOLUTE))
-        {
-            char* pTls = (char*)pTlsCallbacks;
-            for (int i = 0; i < tlsCallbacksCount; ++i)
-            {
-                OPERAND_SIZE callback = Diana_ReadValue(pTls, exe.dianaMode);
-                auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
-                exportsCollector.QueryFunctionByName("$", name.c_str(), 0, &callback);
-                pTls += exe.dianaMode;
-            }
-            DIANA_FREE(pTlsCallbacks);
-        }
-        // the ELF counterpart: IFUNC resolvers and initializers. A global IFUNC's resolver
-        // keeps its export name too: $ifunc_memcpy and memcpy are the same address
-        if (exe.type == DIANA_EXECUTABLE_TYPE_ELF)
-        {
-            std::vector<orthia::ElfStartupRoutine> routines;
-            orthia::QueryElfStartupRoutines(&exe.u.elfFile, &stream.parent, moduleAddress, routines);
-            for (const auto& routine : routines)
-            {
-                OPERAND_SIZE address = routine.address;
-                exportsCollector.QueryFunctionByName("$", orthia::GetElfStartupRoutineName(routine).c_str(), 0, &address);
-            }
-        }
-    }
     void CProcessWorkplaceItem::ReloadModules()
     {
-        std::vector<char> page(0x4000);
-        ExportsCollector exportsCollector;
+        orthia::flat_map<orthia::Address_type, NameInfo> exports;
         std::vector<orthia::ModuleInfo> modules;
         int processModuleOffset = 0;
         m_proc->QueryModules(modules, processModuleOffset,
             [&](const orthia::ModuleInfo& moduleInfo, oui::ModuleDisasmContext& context) {
 
-            exportsCollector.SetCurrentModule(&moduleInfo);
-
-            exportsCollector.m_fixupAddresses = false;
-            DeliverExtraExports(exportsCollector, moduleInfo.address, moduleInfo.entryPoint, *context.stream, *context.executable);
-            exportsCollector.m_fixupAddresses = true;
-            DianaExecutable_QueryExports(context.executable, &context.stream->parent, page.data(), (int)page.size(), exportsCollector.GetParent(), 0);
+            std::vector<NameInfo> names;
+            context.image->QueryNames(names);
+            for (auto& info : names)
+            {
+                // every name is kept: $ifunc_memcpy and memcpy share an address
+                info.name.native = moduleInfo.name + OUI_STR("!") + info.name.native;
+                exports.insert(info.address, info);
+            }
         });
 
         Address_type processModuleAddress = 0;
@@ -205,12 +121,12 @@ namespace orthia
         }
         std::sort(modules.begin(), modules.begin(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
 
-        exportsCollector.m_exports.sort();
+        exports.sort();
         m_moduleNames.Clear();
 
         orthia::CAutoCriticalSection guard(m_lock);
         m_modules = std::move(modules);
-        m_exports = std::move(exportsCollector.m_exports);
+        m_exports = std::move(exports);
         m_modulesIndex.clear();
         for (int i = 0, size = (int)m_modules.size(); i < size; ++i)
         {
@@ -257,98 +173,9 @@ namespace orthia
     }
 
 
-    class CImportsCollector :public diana::CBasePeLinkImportsObserver
-    {
-        ModuleNames& m_names;
-        std::function<NameInfo(OPERAND_SIZE address)> m_getName;
-    public:
-        CImportsCollector(ModuleNames& names,
-            std::function<NameInfo (OPERAND_SIZE address)> getName)
-            :
-            m_names(names),
-            m_getName(getName)
-        {
-        }
-        void QueryFunctionByOrdinal(const char* pDllName,
-            DI_UINT32 ordinal,
-            OPERAND_SIZE* pAddress)
-        {
-            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
-            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
-        }
-        void QueryFunctionByName(const char* pDllName,
-            const char* pFunctionName,
-            DI_UINT32 hint,
-            OPERAND_SIZE* pAddress)
-        {
-            NameInfo info;
-            info.flags = NameInfo::flags_Import;
-            info.address = *pAddress;
-            auto nameInfo = m_getName(info.address);
-            info.name = nameInfo.name;
-
-            if (info.name.native.empty())
-            {
-                if (pFunctionName)
-                {
-                    info.name.native = orthia::Utf8ToPlatformString(pFunctionName);
-                }
-                else
-                {
-                    info.name.native = OUI_TCSTR("<unknown>");
-                }
-            }
-            m_names.Add(std::move(info));
-        }
-    };
-
-    struct ModuleExportsCollector :public diana::CBasePeLinkImportsObserver
-    {
-        ModuleNames& m_names;
-        OPERAND_SIZE m_moduleStart;
-
-        ModuleExportsCollector(ModuleNames& names,
-            OPERAND_SIZE moduleStart)
-            :
-            m_names(names),
-            m_moduleStart(moduleStart)
-        {
-        }
-        void QueryFunctionByOrdinal(const char* pDllName,
-            DI_UINT32 ordinal,
-            OPERAND_SIZE* pAddress)
-        {
-            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
-            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
-        }
-        void QueryFunctionByName(const char* pDllName,
-            const char* pFunctionName,
-            DI_UINT32 hint,
-            OPERAND_SIZE* pAddressIn)
-        {
-            if (!*pAddressIn)
-            {
-                return;
-            }
-            auto address = *pAddressIn;
-            if (!pDllName || *pDllName != '$') 
-            {
-                if (Diana_SafeAdd(&address, m_moduleStart))
-                {
-                    return;
-                }
-            };
-            NameInfo info;
-            info.flags = NameInfo::flags_Export;
-            info.address = address;
-            info.name = orthia::Utf8ToPlatformString(pFunctionName);
-            m_names.Add(std::move(info));
-        }
-    };
-
     void CProcessWorkplaceItem::BuildModuleNames(Address_type moduleAddress, ModuleNames& names) const
     {
-        Address_type moduleSize = 0, entryPoint = 0;
+        orthia::ModuleInfo module;
         {
             orthia::CAutoCriticalSection guard(m_lock);
 
@@ -357,53 +184,35 @@ namespace orthia
             {
                 return;
             }
-            auto & module = m_modules.at(it->second);
-            moduleSize = module.size;
-            entryPoint = module.entryPoint;
+            module = m_modules.at(it->second);
         }
-       
-        // diana PE analyzer uses relative pointers
+
+        auto* format = FindFormatByModule(module);
         orthia::ProcessReaderAdapter memReader(m_proc.get());
-        orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x1000);
-        writeCache.SetCacheReads(true);
-        orthia::CMemoryCache module(&writeCache, moduleAddress);
-        // adapter to C-code
-        orthia::DianaMemoryStream stream(0, &module, moduleSize);
-
-        DianaExecutable exe = {};
-        if (int status = DianaExecutable_Init(&exe,
-            &stream.parent,
-            moduleSize,
-            DIANA_EXECUTABLE_FILE_FLAGS_MODULE_MODE))
+        if (auto image = format ? format->OpenModuleImage(memReader, moduleAddress, module.size) : nullptr)
         {
-            ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Module: ", orthia::CLogParamEx(moduleAddress, 16), ":",orthia::CLogParamEx(moduleSize, 16), " ->", (long)status);
-        }
-        else
-        {
-            diana::Guard<diana::ExecutableFile> exeGuard(&exe);
-            std::vector<char> page(4096);
+            std::vector<NameInfo> found;
+            image->QueryNames(found);
+            for (auto& info : found)
+            {
+                names.Add(std::move(info));
+            }
 
-            ModuleExportsCollector exportsCollector(names, moduleAddress);
-            DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
-            DianaExecutable_QueryExports(&exe,
-                &stream.parent,
-                page.data(),
-                (int)page.size(),
-                exportsCollector.GetParent(),
-                0);
-
-            CImportsCollector importsCollector(names, [this](auto address) {
-
-                return QueryAddressName(address);
-            });
-            DianaExecutable_QueryImports(&exe,
-                moduleAddress,
-                &stream,
-                page.data(),
-                (int)page.size(),
-                importsCollector.GetParent(),
-                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
-                0);
+            found.clear();
+            image->QueryImports(found);
+            for (auto& import : found)
+            {
+                // the target's own name when it is known, the imported one otherwise
+                NameInfo info;
+                info.flags = NameInfo::flags_Import;
+                info.address = import.address;
+                info.name = QueryAddressName(import.address).name;
+                if (info.name.native.empty())
+                {
+                    info.name = import.name.native.empty() ? oui::String(OUI_TCSTR("<unknown>")) : import.name;
+                }
+                names.Add(std::move(info));
+            }
         }
 
         // in-memory if available, DB fallback otherwise
