@@ -188,6 +188,11 @@ namespace orthia
         }
     }
 
+    bool CDianaImageFormat::QueryIdentity(ISimpleFile& file, ImageIdentity& identity) const
+    {
+        return QueryImageIdentity(file, identity);
+    }
+
     bool CDianaImageFormat::RegisterMainModule(CModuleManager& manager,
         ISimpleFile& file,
         IMemoryReader& reader,

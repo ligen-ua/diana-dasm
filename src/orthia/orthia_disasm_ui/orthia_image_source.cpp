@@ -120,7 +120,7 @@ namespace orthia
             return nullptr;
         }
         ImageIdentity actual;
-        if (!QueryImageIdentity(*image, actual))
+        if (!m_format.QueryIdentity(*image, actual))
         {
             SetState(ImageState::Failed, "unknown format");
             return nullptr;
@@ -149,7 +149,8 @@ namespace orthia
     }
     void CLinkedFileImageSource::PreCheckHeader()
     {
-        if (m_identity.format != ImageIdentity::format_Pe)
+        const size_t headerSize = m_format.GetHeaderIdentitySize();
+        if (!headerSize)
         {
             return;
         }
@@ -158,7 +159,7 @@ namespace orthia
         {
             return;
         }
-        std::vector<char> header(0x1000);
+        std::vector<char> header(headerSize);
         {
             std::ifstream stream(std::filesystem::path(m_path), std::ios::binary);
             if (!stream)
@@ -170,12 +171,12 @@ namespace orthia
             header.resize((size_t)stream.gcount());
         }
         ImageIdentity actual;
-        if (!QueryPeHeaderIdentity(header.data(), header.size(), actual))
+        if (!m_format.QueryHeaderIdentity(header.data(), header.size(), actual))
         {
-            SetState(ImageState::Stale, "not a PE file");
+            SetState(ImageState::Stale, std::string("not a ") + m_format.GetDisplayName() + " file");
             return;
         }
-        // the header has no GUID, so only the timestamp and size are compared here
+        // the header's identity may be partial (PE: no GUID), SameIdentity compares what it has
         if (!SameIdentity(m_identity, actual))
         {
             SetState(ImageState::Stale, DescribeIdentityMismatch(m_identity, actual));

@@ -126,7 +126,8 @@ namespace orthia
         const PlatformString_type& GetPath() const { return m_path; }
 
         // Cheap check of the file's headers against the recorded identity, without mapping:
-        // marks the source Stale when the file is missing or another build. PE only.
+        // marks the source Stale when the file is missing or another build. Only for formats
+        // whose headers tell the build (PE); the others are checked when mapped
         void PreCheckHeader();
     };
 

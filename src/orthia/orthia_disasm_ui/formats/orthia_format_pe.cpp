@@ -64,6 +64,12 @@ namespace orthia
             const char* GetId() const override { return "pe"; }
             const char* GetDisplayName() const override { return "PE"; }
             int GetBuiltInFlag() const override { return ModuleInfo::builtInFlags_moduleTypePe; }
+            // TimeDateStamp and SizeOfImage are in the NT headers; the RSDS GUID is not
+            size_t GetHeaderIdentitySize() const override { return 0x1000; }
+            bool QueryHeaderIdentity(const char* header, size_t size, ImageIdentity& identity) const override
+            {
+                return QueryPeHeaderIdentity(header, size, identity);
+            }
             std::unique_ptr<IDependencyLoader> CreateDependencyLoader(
                 std::shared_ptr<oui::BaseOperation> operation) const override
             {

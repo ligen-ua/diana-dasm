@@ -2,6 +2,7 @@
 
 #include "../orthia_model_interfaces.h"
 #include "orthia_simple_file.h"
+#include "orthia_image_identity.h"
 
 namespace orthia
 {
@@ -92,6 +93,13 @@ namespace orthia
             bool deepAnalysis) const = 0;
         // where the UI starts showing a newly opened file; 0: its own choice
         virtual Address_type GetInitialAddress(ISimpleFile& file) const { return 0; }
+
+        // what tells this build of a file mapped by MapFile from another one; false: nothing
+        virtual bool QueryIdentity(ISimpleFile& file, ImageIdentity& identity) const { return false; }
+        // a cheaper check from the file's first bytes, without mapping it: how many bytes it
+        // needs (0: the format has no such check), and the identity they give (maybe partial)
+        virtual size_t GetHeaderIdentitySize() const { return 0; }
+        virtual bool QueryHeaderIdentity(const char* header, size_t size, ImageIdentity& identity) const { return false; }
     };
 
     // how much of a file's start FindFormatByData needs to tell every format apart
