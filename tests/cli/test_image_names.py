@@ -10,6 +10,7 @@ import pytest
 
 from data import REPO_ROOT
 from images import ElfInfo, PeInfo
+from orthia_runner import Orthia
 
 _LM_START = re.compile(r"^([0-9a-f`]{17})\s+[0-9a-f`]{17}\s+(\S+)", re.M)
 
@@ -91,3 +92,39 @@ def test_elf_ifunc_resolver_is_the_export(orthia, name):
     bias, names = module_names(orthia, path)
     assert names["$ifunc_exp_ifunc"] == [bias + elf.exported_functions["exp_ifunc"]], names
     assert "$init_array_0000" in names and "$init" in names, names
+
+
+
+def _addr_text(address):
+    return f"{address >> 32:08x}`{address & 0xFFFFFFFF:08x}"
+
+
+def _slot_values(res):
+    """{slot address: (value, label)} of the `dps` lines"""
+    return {int(m.group(1).replace("`", ""), 16): (int(m.group(2).replace("`", ""), 16), m.group(3))
+            for m in re.finditer(r"^([0-9a-f`]{17})\s+([0-9a-f`]{17})\s*(\S*)$", res.stdout, re.M)}
+
+
+@pytest.mark.elf
+def test_elf_plt_slots_are_linked(orthia_exe, empty_symbols, tmp_path):
+    # linked_x64 imports from libexports_gnu.so beside it: each PLT slot holds the address of the
+    # export where the library is mapped, on the first open and on a warm reopen (replayed from the DB)
+    exe = ElfInfo(REPO_ROOT / "data/elf/linked_x64")
+    lib = ElfInfo(REPO_ROOT / "data/elf/libexports_gnu.so")
+    assert sorted(exe.plt_slots) == ["exp_func_07", "exp_func_21"], exe.plt_slots
+
+    # where the two are mapped (a first open of its own)
+    res = Orthia(orthia_exe, tmp_path / "probe", empty_symbols).run("lm", file=exe.path).assert_ok()
+    res.assert_line(r"\blibexports_gnu\.so\s+linked$")
+    starts = {m.group(2): int(m.group(1).replace("`", ""), 16) for m in _LM_START.finditer(res.stdout)}
+    # both are linked at 0: the module start is the load bias
+    bias, lib_bias = starts["linked_x64"], starts["libexports_gnu.so"]
+
+    orthia = Orthia(orthia_exe, tmp_path / "home", empty_symbols)
+    dps = [f"dps {_addr_text(bias + slot)} L1" for slot in exe.plt_slots.values()]
+    for run in ("first open", "reopen"):
+        res = orthia.run(*dps, file=exe.path).assert_ok()
+        slots = _slot_values(res)
+        for name, slot in exe.plt_slots.items():
+            expected = (lib_bias + lib.exported_functions[name], f"libexports_gnu.so!{name}")
+            assert slots.get(bias + slot) == expected, (run, name, res)

@@ -1629,6 +1629,7 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                 const char* dllName = 0;
                 OPERAND_SIZE stValue = 0;
                 OPERAND_SIZE gotSlotAddr = 0;
+                OPERAND_SIZE slotAddr = 0;
                 int bind = DI_ELF_ST_BIND(sym.st_info);
                 int type = DI_ELF_ST_TYPE(sym.st_info);
                 if ((bind != DIANA_STB_GLOBAL && bind != DIANA_STB_WEAK) ||
@@ -1637,10 +1638,18 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                     continue;
                 }
 
+                /* the GOT slot the PLT relocation fills, as a module offset plus baseAddress */
+                slotAddr = 0;
+                if (DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)r_offset, &slotAddr) == DI_SUCCESS)
+                {
+                    DI_CHECK_GOTO(Diana_SafeAdd(&slotAddr, baseAddress));
+                }
+
                 symNameAddr = strtabAddr + sym.st_name;
                 if (pObserver->reportInfo_fnc)
                 {
-                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, symNameAddr));
+                    /* an import is reported at its slot, like a PE import at its IAT slot */
+                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, bImports ? slotAddr : symNameAddr));
                 }
                 DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
                     symNameAddr,
@@ -1655,12 +1664,7 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                 stValue = sym.st_value;
 
                 /* GOT slot address for write-back (only used when stValue==0, i.e. external import) */
-                gotSlotAddr = 0;
-                if (!stValue && bImports &&
-                    DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)r_offset, &gotSlotAddr) == DI_SUCCESS)
-                {
-                    DI_CHECK_GOTO(Diana_SafeAdd(&gotSlotAddr, baseAddress));
-                }
+                gotSlotAddr = !stValue && bImports ? slotAddr : 0;
 
                 DI_CHECK_GOTO(pObserver->queryFunctionByName(
                     pObserver,

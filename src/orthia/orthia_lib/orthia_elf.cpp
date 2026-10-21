@@ -160,9 +160,10 @@ namespace orthia
             &stream.parent.parent,
             pFunctionName,
             &result);
-        if (err)
+        if (err || !result)
             return 0;
-        return result;
+        // st_value is a link-time address: the export is where the image is mapped, as with PE
+        return m_imageBase - m_dianaContext->mappedElf.pImpl->linkBase + result;
     }
 
     int CSimpleElfFile::QueryImports(diana::CBasePeLinkImportsObserver* observer)

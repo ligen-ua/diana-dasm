@@ -46,7 +46,6 @@ namespace orthia
 
         void CheckCancel();
         void LoadExports(ModuleInfo& mod);
-        void LoadImports(ModuleInfo& mod);
         void LinkImports(ModuleInfo& mod);
         void InsertNames(std::shared_ptr<CModuleManager> moduleManager, const ModuleInfo& mod);
 
@@ -58,5 +57,7 @@ namespace orthia
             std::shared_ptr<ISimpleFile> file,
             std::shared_ptr<oui::IFileSystem> pFs) override;
         void ReportModules(std::shared_ptr<CModuleManager> moduleManager) override;
+        // the main module's import rows carry the GOT slot address
+        bool ImportsKeyedBySlot() const override { return true; }
     };
 }

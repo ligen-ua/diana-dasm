@@ -274,14 +274,74 @@ static void test_elf_exports(const orthia::PlatformString_type& fileName)
     DIANA_TEST_ASSERT(observer.exports["vfunc"] == observer.exports["vfunc_v2"]);
     DIANA_TEST_ASSERT(observer.exports["vfunc"] != observer.exports["vfunc_v1"]);
 
-    // the hash-table lookup finds every export at the enumerated address
+    // the hash-table lookup finds every export at the enumerated value, moved to where the image is
+    const DI_UINT64 bias = elf.GetImageBase() - elf.GetImpl()->mappedElf.pImpl->linkBase;
     for (auto& entry : observer.exports)
     {
-        DIANA_TEST_ASSERT(elf.DiGetProcAddress(entry.first.c_str()) == entry.second);
+        DIANA_TEST_ASSERT(elf.DiGetProcAddress(entry.first.c_str()) == bias + entry.second);
     }
     DIANA_TEST_ASSERT(elf.DiGetProcAddress("hidden_func") == 0);
     DIANA_TEST_ASSERT(elf.DiGetProcAddress("ext_import_1") == 0);
     DIANA_TEST_ASSERT(elf.DiGetProcAddress("no_such_export") == 0);
+}
+
+// resolves every import from one library, as the file-mode dependency loader does
+class LibraryResolver : public diana::CBasePeLinkImportsObserver
+{
+    orthia::CSimpleElfFile& m_library;
+public:
+    std::map<std::string, OPERAND_SIZE> resolved;
+
+    explicit LibraryResolver(orthia::CSimpleElfFile& library)
+        : m_library(library)
+    {
+    }
+    void QueryFunctionByOrdinal(const char*, DI_UINT32, OPERAND_SIZE*)
+    {
+    }
+    void QueryFunctionByName(const char*, const char* pFunctionName, DI_UINT32, OPERAND_SIZE* pAddress)
+    {
+        *pAddress = m_library.DiGetProcAddress(pFunctionName);
+        resolved[pFunctionName] = *pAddress;
+    }
+};
+
+static DI_UINT64 ReadMappedPointer(const orthia::CSimpleElfFile& elf, DI_UINT64 address)
+{
+    const auto& image = elf.GetMappedFile();
+    const auto offset = address - elf.GetImageBase();
+    DIANA_TEST_ASSERT(offset + 8 <= image.size());
+    DI_UINT64 value = 0;
+    memcpy(&value, image.data() + offset, 8);
+    return value;
+}
+
+// data/elf/linked_x64, built from data/elf/linked_exec: a PIE that imports exp_func_07 and
+// exp_func_21 from libexports_gnu.so through the PLT slots at 0x4008 and 0x4000.
+// Linking writes the address of each export where the library is mapped into its slot.
+static void test_elf_link_imports()
+{
+    const DI_UINT64 libraryBase = 0x10000;
+    orthia::CSimpleElfFile library;
+    orthia::MapFileParameters libraryParams;
+    libraryParams.imageBase = libraryBase;
+    library.MapFile(LoadElfTestFile(ORTHIA_TCSTR("libexports_gnu.so")), libraryParams);
+    DIANA_TEST_ASSERT(library.GetImageBase() == libraryBase);
+
+    // an export is where the library is: its base plus the symbol value
+    DIANA_TEST_ASSERT(library.DiGetProcAddress("exp_func_07") == libraryBase + 0x10d8);
+    DIANA_TEST_ASSERT(library.DiGetProcAddress("exp_func_21") == libraryBase + 0x1164);
+
+    orthia::CSimpleElfFile exe;
+    orthia::MapFileParameters exeParams;
+    exe.MapFile(LoadElfTestFile(ORTHIA_TCSTR("linked_x64")), exeParams);
+    const DI_UINT64 exeBias = exe.GetImageBase();
+
+    LibraryResolver resolver(library);
+    DIANA_TEST_ASSERT(exe.QueryImports(&resolver) == DI_SUCCESS);
+    DIANA_TEST_ASSERT(resolver.resolved.size() == 2);
+    DIANA_TEST_ASSERT(ReadMappedPointer(exe, exeBias + 0x4008) == libraryBase + 0x10d8);
+    DIANA_TEST_ASSERT(ReadMappedPointer(exe, exeBias + 0x4000) == libraryBase + 0x1164);
 }
 
 // data/elf/libstartup_{x64,arm64}.so, built from data/elf/startup_lib: module offsets (link-time addresses)
@@ -299,15 +359,6 @@ struct StartupFixture
 static const StartupFixture g_startupX64 = { ORTHIA_TCSTR("libstartup_x64.so"), 0x1044, 0x1050, 0x4000, 0x107a, 0x106e, 0x3e90 };
 static const StartupFixture g_startupArm64 = { ORTHIA_TCSTR("libstartup_arm64.so"), 0x2f0, 0x2fc, 0x20000, 0x330, 0x31c, 0x1fe88 };
 
-static DI_UINT64 ReadMappedPointer(const orthia::CSimpleElfFile& elf, DI_UINT64 address)
-{
-    const auto& image = elf.GetMappedFile();
-    const auto offset = address - elf.GetImageBase();
-    DIANA_TEST_ASSERT(offset + 8 <= image.size());
-    DI_UINT64 value = 0;
-    memcpy(&value, image.data() + offset, 8);
-    return value;
-}
 
 static void VerifyStartupRoutines(const StartupFixture& fixture, const orthia::CSimpleElfFile& elf)
 {
@@ -400,6 +451,7 @@ void test_elf()
     }
     DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_gnu.so")));
     DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_sysv.so")));
+    DIANA_TEST(test_elf_link_imports());
     DIANA_TEST(test_elf_startup_routines(g_startupX64));
     DIANA_TEST(test_elf_startup_routines(g_startupArm64));
     DIANA_TEST(test_elf_startup_routines_analyzed(g_startupX64));

@@ -22,6 +22,7 @@ class Section(NamedTuple):
 
 PT_LOAD = 1
 ET_EXEC, ET_DYN = 2, 3
+SHT_RELA = 4
 SHT_NOTE = 7
 SHT_DYNSYM = 11
 STT_FUNC, STT_GNU_IFUNC = 2, 10
@@ -59,6 +60,7 @@ class ElfInfo:
         self.build_id: Optional[str] = None
         dynamic = None
         dynsym = None
+        rela_plt = None
         by_index = {}
         for index, (name, sh_type, sh_flags, sh_addr, sh_offset, sh_size, sh_link, _, _, _) in enumerate(raw):
             if index == 0:
@@ -75,16 +77,30 @@ class ElfInfo:
                 dynamic = (sh_offset, sh_size, sh_link)
             if sh_type == SHT_DYNSYM:
                 dynsym = (sh_offset, sh_size, sh_link)
+            if sh_type == SHT_RELA and section_name == ".rela.plt":
+                rela_plt = (sh_offset, sh_size)
 
         # defined functions in .dynsym: name -> st_value (relative to the load bias)
         self.exported_functions: Dict[str, int] = {}
+        dynsym_names: List[str] = []
         if dynsym:
             offset, size, link = dynsym
             strtab = raw[link][4]
-            for pos in range(offset + 24, offset + size, 24):
+            for pos in range(offset, offset + size, 24):
                 st_name, st_info, _, st_shndx, st_value, _ = struct.unpack_from("<IBBHQQ", data, pos)
+                dynsym_names.append(c_string(strtab + st_name))
                 if st_shndx and st_name and (st_info & 0xF) in (STT_FUNC, STT_GNU_IFUNC):
                     self.exported_functions[c_string(strtab + st_name)] = st_value
+
+        # imports through the PLT: symbol name -> GOT slot (r_offset, relative to the load bias)
+        self.plt_slots: Dict[str, int] = {}
+        if rela_plt:
+            offset, size = rela_plt
+            for pos in range(offset, offset + size, 24):
+                r_offset, r_info, _ = struct.unpack_from("<QQq", data, pos)
+                symbol = r_info >> 32
+                if symbol:
+                    self.plt_slots[dynsym_names[symbol]] = r_offset
 
         self.needed: List[str] = []
         self.runpath: List[str] = []
