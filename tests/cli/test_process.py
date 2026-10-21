@@ -188,7 +188,6 @@ def test_non_pie_executable_entry_point(orthia, non_pie_process):
 
 
 @RUNS_X64_ELF
-@pytest.mark.xfail(reason="B23: ET_EXEC process module: Diana reads the dynamic section at base + p_vaddr, so no exports")
 def test_non_pie_executable_exports(orthia, non_pie_process):
     pid, elf = non_pie_process
     names = orthia.run("x nopie_x64!nopie_*", pid=str(pid)).assert_ok().symbols

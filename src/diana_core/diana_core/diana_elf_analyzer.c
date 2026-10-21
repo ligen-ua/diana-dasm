@@ -85,12 +85,15 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
     OPERAND_SIZE symtabAddr = 0;
     DI_UINT64    symEntSize = is64bit ? 24 : 16;
 
+    OPERAND_SIZE dynAddr = 0;
+
     if (!pImpl->dynamicAddress || !pImpl->dynamicSize)
+        return DI_SUCCESS;
+    if (DianaElfFile_LinkToOffset(pImpl, pImpl->dynamicAddress, &dynAddr))
         return DI_SUCCESS;
 
     /* Walk dynamic section to find DT_SYMTAB and DT_SYMENT */
     {
-        OPERAND_SIZE dynAddr = pImpl->dynamicAddress;
         OPERAND_SIZE dynEnd  = dynAddr + (OPERAND_SIZE)pImpl->dynamicSize;
         OPERAND_SIZE entSize = is64bit ? 16 : 8;
 
@@ -122,6 +125,9 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
 
     if (!symtabAddr || !symEntSize)
         return DI_SUCCESS;
+    /* a link-time address; a loader that relocated it leaves it out of the image */
+    if (DianaElfFile_LinkToOffset(pImpl, symtabAddr, &symtabAddr))
+        return DI_SUCCESS;
 
     /* Iterate symbols; no explicit count in MODULE_MODE so cap at 65536 */
     {
@@ -131,6 +137,7 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
         {
             Diana_ElfAnalyzerSym64 sym;
             int symType;
+            OPERAND_SIZE symOffset = 0;
 
             if (ElfAnalyzer_ReadSym(pParams->pObserver, symAddr, is64bit, isLE, &sym))
                 break;
@@ -145,13 +152,13 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
                 continue;
             if (sym.st_value == 0)
                 continue;
-            if (sym.st_value >= pImpl->sizeOfModule)
+            if (DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)sym.st_value, &symOffset))
                 break;
 
             DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                           pParams->pObserver,
                                           pParams->pElfFile->dianaMode,
-                                          (OPERAND_SIZE)sym.st_value,
+                                          symOffset,
                                           pImpl->sizeOfModule,
                                           pParams->pStack,
                                           0,
@@ -177,9 +184,12 @@ static int ElfAnalyzer_PointerToOffset(void * pContext, OPERAND_SIZE pointer, OP
     DianaAnalyzeAddressResult_type result = diaJumpInvalid;
 
     *pOffset = pointer;
-    /* ET_EXEC: module offsets are the link-time addresses */
-    if (pImpl->elfHeader.e_type == DIANA_ET_EXEC && pointer < pImpl->sizeOfModule)
+    /* ET_EXEC: the loader does not move it, every pointer is a link-time address */
+    if (pImpl->elfHeader.e_type == DIANA_ET_EXEC &&
+        DianaElfFile_LinkToOffset(pImpl, pointer, pOffset) == DI_SUCCESS)
+    {
         return DI_SUCCESS;
+    }
     DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
                                                    pointer,
                                                    DIANA_ANALYZE_ABSOLUTE_ADDRESS,
@@ -305,13 +315,16 @@ static int Diana_ELF_AnalyzeData(Diana_ElfAnalyzerCommonParams_type * pParams)
     {
         DIANA_ELF_PROGRAM_HEADER * pSeg = pImpl->pCapturedSegments + i;
         OPERAND_SIZE allReadBytes = 0;
+        OPERAND_SIZE segOffset = 0;
         DIANA_SIZE_T pageLastPointer = 0;
 
         if (pSeg->p_type != DIANA_PT_LOAD)
             continue;
 
+        if (DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)pSeg->p_vaddr, &segOffset))
+            continue;
         DI_CHECK(pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream,
-                                                        pSeg->p_vaddr));
+                                                        segOffset));
         for (;;)
         {
             OPERAND_SIZE sizeToRead = pParams->pageSize;
@@ -351,13 +364,15 @@ static int Diana_ELF_AnalyzeELFImplUsingBuffer(Diana_ElfAnalyzerCommonParams_typ
                                                 int analyserFlags)
 {
     Diana_ElfFile_impl * pImpl = pParams->pElfFile->pImpl;
+    OPERAND_SIZE entry = 0;
 
-    if (pImpl->elfHeader.e_entry && pImpl->elfHeader.e_entry < pImpl->sizeOfModule)
+    if (pImpl->elfHeader.e_entry &&
+        DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)pImpl->elfHeader.e_entry, &entry) == DI_SUCCESS)
     {
         DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                      pParams->pObserver,
                                      pParams->pElfFile->dianaMode,
-                                     (OPERAND_SIZE)pImpl->elfHeader.e_entry,
+                                     entry,
                                      pImpl->sizeOfModule,
                                      pParams->pStack,
                                      0,

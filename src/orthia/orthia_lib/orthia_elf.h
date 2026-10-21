@@ -27,7 +27,7 @@ namespace orthia
         std::string name;               // the IFUNC symbol name, empty for the others
     };
 
-    // moduleAddress: where the module is (an ET_DYN's load bias); stream: a module-mode stream over it
+    // moduleAddress: where the module starts; stream: a module-mode stream over it
     int QueryElfStartupRoutines(Diana_ElfFile* pElfFile,
         DianaMovableReadStream* pStream,
         DI_UINT64 moduleAddress,

@@ -10,19 +10,19 @@ namespace orthia
     {
         class CElfModuleImage : public CDianaModuleImage
         {
-            bool IsExecutable() const
+            // the module starts at its link base moved by the load bias (0 for ET_EXEC)
+            Address_type GetLoadBias() const
             {
-                return GetExecutable().u.elfFile.pImpl->elfHeader.e_type == DIANA_ET_EXEC;
+                return m_base - GetExecutable().u.elfFile.pImpl->linkBase;
             }
         public:
             using CDianaModuleImage::CDianaModuleImage;
 
         protected:
-            // ET_EXEC values are link-time addresses and the module stays at them;
-            // everything else is relative to where the module was loaded
+            // symbol values and the entry point are link-time addresses
             Address_type ToAbsolute(OPERAND_SIZE value) const override
             {
-                return IsExecutable() ? value : CDianaModuleImage::ToAbsolute(value);
+                return GetLoadBias() + value;
             }
             Address_type QueryEntryPoint() const override
             {

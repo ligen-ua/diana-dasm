@@ -16,6 +16,9 @@ typedef struct _diana_ElfSectionWithInfo
 #define DIANA_ELF_INTERNAL_FLAG_64BIT   1
 #define DIANA_ELF_INTERNAL_FLAG_LE      2
 
+// the page the loader maps an image's lowest PT_LOAD to
+#define DIANA_ELF_PAGE_MASK             0xfff
+
 typedef struct _diana_ElfFile_impl
 {
     DIANA_ELF_HEADER elfHeader;
@@ -29,6 +32,10 @@ typedef struct _diana_ElfFile_impl
     Diana_ElfSectionWithInfo* pStringTableSection;
     Diana_ElfSectionWithInfo* pDynamicStringTableSection;
 
+    // where the image starts in link-time addresses: the lowest PT_LOAD page (0 for most
+    // ET_DYN, the link address of an ET_EXEC). A module offset is a link-time address minus
+    // linkBase, and sizeOfModule counts from it.
+    OPERAND_SIZE linkBase;
     OPERAND_SIZE sizeOfModule;
     DI_UINT64 dynamicAddress;
     DI_UINT64 dynamicSize;
@@ -54,6 +61,12 @@ int DianaElfFile_Init(/* out */ Diana_ElfFile* pElfFile,
     /* in*/ int flags);
 
 void DianaElfFile_Free(Diana_ElfFile* pElfFile);
+
+// A link-time address (p_vaddr, st_value, e_entry, a pointer the loader did not relocate)
+// as a module offset; DI_END_OF_STREAM when it is outside the image
+int DianaElfFile_LinkToOffset(const Diana_ElfFile_impl* pImpl,
+    OPERAND_SIZE address,
+    OPERAND_SIZE* pOffset);
 
 
 int DianaElfFile_GetProcAddress(Diana_ElfFile* pElfFile,
@@ -84,6 +97,8 @@ int DianaElfFile_QueryExports(Diana_ElfFile* pPeFile,
 #define DIANA_ELF_MAP_DO_NOT_RELOCATE  1
 
 
+// address is the load bias: a segment goes to address + p_vaddr, the module starts at
+// address + linkBase (0 keeps an ET_EXEC at its link-time addresses)
 int DianaElfFile_MapEx(/* in */  Diana_ElfFile* pElfFile,
     /* in */  DianaMovableReadStream* pStream,
     /* in */  OPERAND_SIZE                 address,
@@ -111,7 +126,7 @@ typedef struct _DianaElfStartupRoutine
 {
     int kind;                   /* DIANA_ELF_STARTUP_* */
     int index;                  /* the array position; for IFUNCs without a name, their number */
-    OPERAND_SIZE offset;        /* the routine as a module offset (a link-time address, like st_value) */
+    OPERAND_SIZE offset;        /* the routine as a module offset (its link-time address minus linkBase) */
     OPERAND_SIZE slotOffset;    /* the GOT slot an IRELATIVE fills or the array entry; 0 otherwise */
     const char* pName;          /* the IFUNC symbol name or 0; valid during the callback only */
 } DianaElfStartupRoutine;
@@ -140,9 +155,9 @@ int DianaElfFile_QueryStartupRoutines(/* in */ Diana_ElfFile* pElfFile,
 // Scans the PT_NOTE segments for an NT_GNU_BUILD_ID note (name "GNU") and
 // returns its descriptor bytes (the raw build-id, typically 20 bytes for a
 // SHA1-based id). Returns DI_NOT_FOUND if no such note is present.
-// `address` is added to each segment's p_vaddr before reading, same
-// convention as DianaElfFile_MapEx (0 when pOutStream is already rooted at
-// the module's base, e.g. a module-mode stream over a live process image).
+// `address` is added to each segment's module offset before reading (0 when
+// pOutStream is already rooted at the module's start, e.g. a module-mode
+// stream over a live process image).
 int DianaElfFile_QueryBuildId(/* in */ Diana_ElfFile* pElfFile,
     /* inout */ DianaMovableReadStream* pOutStream,
     /* in */ OPERAND_SIZE address,

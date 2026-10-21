@@ -231,17 +231,20 @@ static DI_UINT64 ReadLE(const unsigned char * p, int size)
     return value;
 }
 
-// a little-endian ELF64 as loaded at its link addresses: every PT_LOAD at p_vaddr. Module offsets are the addresses
+// a little-endian ELF64 as loaded at its link addresses: every PT_LOAD at p_vaddr, the image from
+// the lowest PT_LOAD page (the link base). Module offsets are the addresses minus the link base
 struct MappedElf
 {
     std::vector<unsigned char> image;
     OPERAND_SIZE lowest;
+    OPERAND_SIZE linkBase;
     std::unique_ptr<TestAnalyzeEnvironment> env;
     Diana_ElfFile elf;
     Diana_InstructionsOwner owner;
 
     MappedElf(const unsigned char * pFile, size_t size)
-        : lowest(~(OPERAND_SIZE)0)
+        : lowest(~(OPERAND_SIZE)0),
+          linkBase(0)
     {
         DI_UINT64 phoff = ReadLE(pFile + 0x20, 8);
         int phentsize = (int)ReadLE(pFile + 0x36, 2);
@@ -263,18 +266,17 @@ struct MappedElf
                 }
                 else
                 {
-                    memcpy(&image[(size_t)vaddr], pFile + offset, (size_t)std::min(filesz, (DI_UINT64)size - offset));
+                    memcpy(&image[(size_t)(vaddr - linkBase)], pFile + offset, (size_t)std::min(filesz, (DI_UINT64)size - offset));
                 }
             }
             if (pass == 0)
-                image.resize((size_t)end);
+            {
+                linkBase = lowest & ~(OPERAND_SIZE)0xfff;
+                image.resize((size_t)(end - linkBase));
+            }
         }
-        // the module mode reads the header at offset 0 and takes offsets for addresses (a module based at 0, ET_DYN);
-        // a non-PIE executable (ET_EXEC at 0x400000) gets its header there too
-        if (lowest)
-            memcpy(&image[0], pFile, (size_t)(phoff + phnum * phentsize));
         env.reset(new TestAnalyzeEnvironment((OPERAND_SIZE)&image[0], 0, image.size()));
-        env->minimalAddress = lowest;
+        env->imageBase = linkBase;     // loaded at its link addresses
         DIANA_TEST_ASSERT(DianaElfFile_Init(&elf, &env->stream, image.size(), DIANA_ELF_FILE_FLAGS_MODULE_MODE) == DI_SUCCESS);
         DIANA_TEST_ASSERT(Diana_ELF_AnalyzeELF(&elf, &env->observer, &owner, 0) == DI_SUCCESS);
     }
@@ -283,9 +285,14 @@ struct MappedElf
         Diana_InstructionsOwner_Free(&owner);
         DianaElfFile_Free(&elf);
     }
-    Diana_Instruction * At(OPERAND_SIZE offset)
+    // a link-time address as a module offset
+    OPERAND_SIZE Off(OPERAND_SIZE address) const
     {
-        Diana_Instruction * pInstruction = owner.m_ppPresenceVec[offset];
+        return address - linkBase;
+    }
+    Diana_Instruction * At(OPERAND_SIZE address)
+    {
+        Diana_Instruction * pInstruction = owner.m_ppPresenceVec[Off(address)];
         return pInstruction && !(pInstruction->m_flags & DI_INSTRUCTION_INVALID) ? pInstruction : 0;
     }
 };
@@ -313,17 +320,17 @@ static void test_arm_exe_analyze_executable()
 {
     MappedElf file(g_arm64_app, sizeof(g_arm64_app));
     DIANA_TEST_ASSERT(file.At(0x400280) && (file.At(0x400280)->m_flags & DI_INSTRUCTION_ROOT));
-    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400288), 0x400270, 0) != 0);         // bl lib_add@plt
+    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400288), file.Off(0x400270), 0) != 0);         // bl lib_add@plt
     // the slot of lib_add holds PLT0 until the dynamic linker binds it
-    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400274), 0x402000, DI_XREF_DATA) != 0);
-    Diana_XRef * pJump = FindXRefFrom(file.At(0x40027c), 0x400250, 0);
+    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400274), file.Off(0x402000), DI_XREF_DATA) != 0);
+    Diana_XRef * pJump = FindXRefFrom(file.At(0x40027c), file.Off(0x400250), 0);
     DIANA_TEST_ASSERT(pJump && !(pJump->m_flags & (DI_XREF_DATA|DI_XREF_INVALID)));
     DIANA_TEST_ASSERT(file.At(0x400250) && file.At(0x400260));
     // PLT0 loads a slot that is 0 in the file: no target
     DIANA_TEST_ASSERT(Diana_FList_First(&file.At(0x400260)->m_referencesFromThisInstruction) == 0);
     // adrp x1, value; ldr x1, [x1, #8]: .data; ldr x2, =0x1122334455667788: the literal pool
-    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400290), 0x402008, DI_XREF_DATA) != 0);
-    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400294), 0x4002b0, DI_XREF_DATA) != 0);
+    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400290), file.Off(0x402008), DI_XREF_DATA) != 0);
+    DIANA_TEST_ASSERT(FindXRefFrom(file.At(0x400294), file.Off(0x4002b0), DI_XREF_DATA) != 0);
     DIANA_TEST_ASSERT(!file.At(0x4002b0) && !file.At(0x4002b4));
 }
 

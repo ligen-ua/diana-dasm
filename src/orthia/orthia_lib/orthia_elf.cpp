@@ -31,16 +31,17 @@ namespace orthia
         orthia::DianaAnalyzerReadWriteStream writeStream(&mappedFile);
         std::vector<char> page(0x4000);
 
-        // Determine image base:
-        // - if caller specified one, use it
-        // - for ET_EXEC: use the lowest PT_LOAD p_vaddr (absolute)
-        // - for ET_DYN (PIE/shared lib): load at 0 so the flat image starts from 0
-        OPERAND_SIZE imageBase = 0;
+        // The image base is where the module starts (its lowest PT_LOAD page):
+        // - if the caller specified one, use it
+        // - ET_EXEC: its link base, the loader does not move it
+        // - ET_DYN (PIE/shared lib): the first nonzero p_vaddr, to keep the image off address 0
+        const OPERAND_SIZE linkBase = dianaElfFile.pImpl->linkBase;
+        OPERAND_SIZE imageBase = linkBase;
         if (params.imageBase != (DI_UINT64)(-1))
         {
             imageBase = params.imageBase;
         }
-        else
+        else if (dianaElfFile.pImpl->elfHeader.e_type != DIANA_ET_EXEC)
         {
             for (int i = 0; i < dianaElfFile.pImpl->capturedSegmentCount; ++i)
             {
@@ -52,10 +53,12 @@ namespace orthia
                 }
             }
         }
+        // MapEx puts every segment at loadBias + p_vaddr
+        const OPERAND_SIZE loadBias = imageBase - linkBase;
 
         DI_CHECK_CPP(DianaElfFile_MapEx(&dianaElfFile,
             &elfFileStream.stream,
-            imageBase,
+            loadBias,
             &writeStream,
             page.data(),
             (int)page.size(),
@@ -131,11 +134,11 @@ namespace orthia
     {
         if (!m_dianaContext)
             return 0;
-        auto e_type  = m_dianaContext->mappedElf.pImpl->elfHeader.e_type;
-        auto e_entry = m_dianaContext->mappedElf.pImpl->elfHeader.e_entry;
-        if (e_type == DIANA_ET_DYN && e_entry)
-            return m_imageBase + e_entry;
-        return e_entry;
+        const auto* pImpl = m_dianaContext->mappedElf.pImpl;
+        if (!pImpl->elfHeader.e_entry)
+            return 0;
+        // a link-time address, moved by the load bias
+        return m_imageBase - pImpl->linkBase + pImpl->elfHeader.e_entry;
     }
     struct SimpleElfFileStreamWithContext : public ::DianaMemoryStream
     {
@@ -265,14 +268,12 @@ namespace orthia
         std::vector<ElfStartupRoutine>& routines)
     {
         routines.clear();
+        // the routines come as module offsets
         struct Context
         {
             std::vector<ElfStartupRoutine>* routines;
             DI_UINT64 bias;
         } context = { &routines, moduleAddress };
-        // module offsets are link-time addresses: an ET_EXEC stays at them
-        if (pElfFile->pImpl->elfHeader.e_type == DIANA_ET_EXEC)
-            context.bias = 0;
 
         return DianaElfFile_QueryStartupRoutines(pElfFile,
             pStream,

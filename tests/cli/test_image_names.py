@@ -69,8 +69,7 @@ def test_elf_exports(orthia, name):
 @pytest.mark.elf
 @pytest.mark.parametrize("name", [
     "libstartup_x64.so",
-    pytest.param("nopie_x64", marks=pytest.mark.xfail(
-        reason="B24: an ET_EXEC file is mapped with vaddr 0 at its first p_vaddr, its code 0x400000 too high")),
+    "nopie_x64",
 ])
 def test_elf_export_bytes(orthia, name):
     # the names are where the code is: the bytes at each exported function are the file's
