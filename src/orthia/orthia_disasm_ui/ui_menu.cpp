@@ -22,10 +22,7 @@ void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::
     // final result
     if (result.error.native.empty())
     {
-        // no error
-        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-        m_outputWindow->AddLine(mainNode->QueryValue(ORTHIA_TCSTR("done-opened")));
-
+        // no error; the model has logged what was opened
         OnWorkspaceItemChanged(result);
         return;
     }

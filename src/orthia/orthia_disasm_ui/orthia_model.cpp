@@ -286,6 +286,27 @@ namespace orthia
             WriteLog(completeHandler->GetThread(), oui::String(orthia::Utf8ToPlatformString(e.what())));
         }
     }
+    // "x64", "arm64", "thumb", ... for the line logged when a target is opened
+    static oui::String GetArchNameForUI(int dianaMode, int dianaArch)
+    {
+        if (const DianaArchChoice* choice = FindDianaArchChoice(dianaMode, dianaArch))
+        {
+            return Utf8ToPlatformString(choice->name);
+        }
+        return dianaMode == DIANA_MODE16 ? ORTHIA_TCSTR("x86-16") : ORTHIA_TCSTR("?");
+    }
+
+    // "base X, entry Y, size Z"; an entry point at the base is none (a PE without one, raw code)
+    static oui::String FormatImageLayoutForUI(const intrusive_ptr<CTextNode>& mainNode,
+        Address_type base, Address_type entryPoint, Address_type size, int dianaMode)
+    {
+        const oui::String noValue(ORTHIA_TCSTR("-"));
+        return oui::PassParameter3(mainNode->QueryValue(ORTHIA_TCSTR("opened-layout")),
+            base ? oui::String(AddressToString(base, dianaMode)) : noValue,
+            entryPoint && entryPoint != base ? oui::String(AddressToString(entryPoint, dianaMode)) : noValue,
+            size ? oui::String(ToWideStringAsHex_Short((unsigned long long)size)) : noValue);
+    }
+
     void CProgramModel::AddProcess(std::shared_ptr<oui::IProcess> proc,
         oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler)
     {
@@ -317,15 +338,20 @@ namespace orthia
 
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
+        WorkAddressRangeInfo mainModule;
         if (auto address = info->GetMainModuleAddress())
         {
-            auto rangeInfo = info->GetRangeInfo(address);
-            auto addressToStart = std::max(rangeInfo.entryPoint, rangeInfo.address);
+            mainModule = info->GetRangeInfo(address);
+            auto addressToStart = std::max(mainModule.entryPoint, mainModule.address);
             result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(addressToStart);
         }
 
         auto workspaceId = RegisterItem(info, false);
         result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
+
+        WriteLog(completeHandler->GetThread(), oui::PassParameter2(mainNode->QueryValue(ORTHIA_TCSTR("opened-process")),
+            GetArchNameForUI(dianaMode, dianaArch),
+            FormatImageLayoutForUI(mainNode, mainModule.address, mainModule.entryPoint, mainModule.size, dianaMode)));
 
         // OK
         result.error.native.clear();
@@ -685,6 +711,13 @@ namespace orthia
             {
                 result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(initialAddress);
             }
+
+            const int dianaMode = mappedExe->GetDianaMode();
+            WriteLog(completeHandler->GetThread(), oui::PassParameter3(mainNode->QueryValue(ORTHIA_TCSTR("opened-file")),
+                Utf8ToPlatformString(format->GetDisplayName()),
+                GetArchNameForUI(dianaMode, mappedExe->GetDianaArch()),
+                FormatImageLayoutForUI(mainNode, imageBase, mappedExe->GetEntryPoint(), mappedFile.size(), dianaMode)));
+
             // OK
             result.error.native.clear();
 
