@@ -160,7 +160,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 |---|---|
 | `x [/a\|/n] [/v] <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched. `/a` sorts by address, `/n` by name (default: by type), `/v` shows the symbol type |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
-| `lm` | List modules with their status: `unresolved`, `linked`, `stale`, `unlinked`, `analysis`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)) |
+| `lm` | List modules with their status: `.NET`, `unresolved`, `linked`, `stale`, `unlinked`, `analyzed`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)). `.NET` marks a managed image: an IL-only one has no native entry point and almost no native code |
 | `db`, `dw`, `dd`, `dq`, `dp`, `dps` | Display memory as bytes, words, dwords, qwords, pointers, or pointers with symbols |
 | `threads` | Display threads (processes only) |
 | `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from |

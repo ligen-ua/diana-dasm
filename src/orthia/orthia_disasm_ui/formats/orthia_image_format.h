@@ -41,6 +41,8 @@ namespace orthia
         virtual const IImageFormat& GetFormat() const = 0;
         // address and size as opened, entryPoint absolute (0 = none), dianaMode
         virtual WorkAddressRangeInfo GetRange() const = 0;
+        // ModuleInfo::builtInFlags_* the headers tell beyond the format's own bit (builtInFlags_managed)
+        virtual int GetExtraBuiltInFlags() const { return 0; }
         // Every name the image gives an address, in this order: $entrypoint, the format's own
         // "$" names, exports. flags_Export, an absolute address, and the name without "module!":
         // "memcpy", "$tls_0001", "$ifunc_memcpy", "$ordinal_0005". Several names can share an

@@ -12,6 +12,22 @@ namespace orthia
         public:
             using CDianaModuleImage::CDianaModuleImage;
 
+            // .NET: the CLR header directory is set. The header itself is not read
+            int GetExtraBuiltInFlags() const override
+            {
+                const Diana_PeFile_impl* pImpl = GetExecutable().u.peFile.pImpl;
+                // the optional header layout goes with the mode, see DianaPeFile_Init
+                const DI_UINT32 directoryCount = pImpl->dianaMode == DIANA_MODE64
+                    ? ((const Diana_PeFile64_impl*)pImpl)->pOptionalHeader->NumberOfRvaAndSizes
+                    : ((const Diana_PeFile32_impl*)pImpl)->pOptionalHeader->NumberOfRvaAndSizes;
+                if (directoryCount <= DIANA_IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR)
+                {
+                    return 0;
+                }
+                const DIANA_IMAGE_DATA_DIRECTORY& clr = pImpl->pImageDataDirectoryArray[DIANA_IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR];
+                return clr.VirtualAddress && clr.Size ? ModuleInfo::builtInFlags_managed : 0;
+            }
+
         protected:
             Address_type QueryEntryPoint() const override
             {

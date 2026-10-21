@@ -167,7 +167,7 @@ namespace orthia
             DianaUnifiedRegister selectorHint) override;
     };
 
-    // `lm` and the modules window status: unresolved | linked | stale | unlinked, then analysis, symbols
+    // `lm` and the modules window status: .NET, then unresolved | linked | stale | unlinked, then analyzed, symbols
     PlatformString_type ModuleStatusText(const ModuleInfo& mod);
     // the image source line of `modinfo`, e.g. "linked C:\...\hal.dll" or "stale (timestamp mismatch)"
     PlatformString_type ModuleImageSourceText(const ModuleInfo& mod);

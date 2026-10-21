@@ -284,28 +284,6 @@ namespace orthia
     PlatformString_type ModuleStatusText(const ModuleInfo& mod)
     {
         PlatformString_type text;
-        if (mod.builtInFlags & ModuleInfo::builtInFlags_unresolved)
-        {
-            text = ORTHIA_TCSTR("unresolved");
-        }
-        else
-        {
-            switch ((ImageSourceKind)mod.imageSourceKind)
-            {
-            case ImageSourceKind::LinkedFile:
-                text = ((ImageState)mod.imageState == ImageState::Stale || (ImageState)mod.imageState == ImageState::Failed)
-                    ? ORTHIA_TCSTR("stale") : ORTHIA_TCSTR("linked");
-                break;
-            case ImageSourceKind::None:
-                if (mod.imageState == (int)ImageState::Unavailable && mod.imageSourceKnown)
-                {
-                    text = ORTHIA_TCSTR("unlinked");
-                }
-                break;
-            default:
-                break;
-            }
-        }
         auto append = [&](const PlatformString_type::value_type* part)
         {
             if (!text.empty())
@@ -314,9 +292,36 @@ namespace orthia
             }
             text += part;
         };
+        // first: the column is narrow and cuts the end, and it explains an empty module
+        if (mod.builtInFlags & ModuleInfo::builtInFlags_managed)
+        {
+            append(ORTHIA_TCSTR(".NET"));
+        }
+        if (mod.builtInFlags & ModuleInfo::builtInFlags_unresolved)
+        {
+            append(ORTHIA_TCSTR("unresolved"));
+        }
+        else
+        {
+            switch ((ImageSourceKind)mod.imageSourceKind)
+            {
+            case ImageSourceKind::LinkedFile:
+                append(((ImageState)mod.imageState == ImageState::Stale || (ImageState)mod.imageState == ImageState::Failed)
+                    ? ORTHIA_TCSTR("stale") : ORTHIA_TCSTR("linked"));
+                break;
+            case ImageSourceKind::None:
+                if (mod.imageState == (int)ImageState::Unavailable && mod.imageSourceKnown)
+                {
+                    append(ORTHIA_TCSTR("unlinked"));
+                }
+                break;
+            default:
+                break;
+            }
+        }
         if (mod.flags & ModuleInfo::flags_analyzeDone)
         {
-            append(ORTHIA_TCSTR("analysis"));
+            append(ORTHIA_TCSTR("analyzed"));
         }
         if (mod.flags & ModuleInfo::flags_symbolsLoaded)
         {

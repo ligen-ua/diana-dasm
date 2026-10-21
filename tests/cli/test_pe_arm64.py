@@ -34,7 +34,7 @@ def test_lm(orthia, drv):
 
 
 def test_lm_analyze(orthia_full, drv):
-    orthia_full.run("lm", **drv).assert_ok().assert_line(r"\bQcTrEE850\.sys\s+analysis$")
+    orthia_full.run("lm", **drv).assert_ok().assert_line(r"\bQcTrEE850\.sys\s+analyzed$")
 
 
 def test_modinfo(orthia, drv):

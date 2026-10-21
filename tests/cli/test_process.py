@@ -47,7 +47,7 @@ def test_lm_lists_self(orthia):
 
 def test_lm_lists_self_analyze(orthia_full):
     res = orthia_full.run("lm", **SELF).assert_ok()
-    res.assert_line(r"\borthia(\.exe|_disasm_ui)?\s+analysis")
+    res.assert_line(r"\borthia(\.exe|_disasm_ui)?\s+analyzed")
 
 
 def test_export_resolves(orthia, runtime):

@@ -63,7 +63,7 @@ def test_modinfo_dependency(orthia, nt):
 @windows_only
 def test_analyze_dependency(orthia_cold, nt):
     res = orthia_cold.run(f".analyze {DEP}", "lm", **nt).assert_ok()
-    res.assert_line(rf"\b{DEP}\s+linked, analysis$")
+    res.assert_line(rf"\b{DEP}\s+linked, analyzed$")
 
 
 @windows_only

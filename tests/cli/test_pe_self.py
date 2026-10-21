@@ -38,7 +38,7 @@ def test_lm(orthia, me, self_pe):
 
 
 def test_lm_analyze(orthia_full, me):
-    orthia_full.run("lm", **me).assert_ok().assert_line(r"\borthia\.exe\s+analysis$")
+    orthia_full.run("lm", **me).assert_ok().assert_line(r"\borthia\.exe\s+analyzed$")
 
 
 def test_modinfo(orthia, me, self_pe):
@@ -85,7 +85,7 @@ def test_cold_open_of_fresh_copy(orthia_cold, data):
 def test_cold_open_of_fresh_copy_analyze(orthia_cold, data):
     fresh = data.fresh_copy(data.self_file, "orthia_fresh_analyze.exe")
     res = orthia_cold.with_(analyze=True).run("lm", file=fresh).assert_ok()
-    res.assert_line(r"\borthia_fresh_analyze\.exe\s+analysis$")
+    res.assert_line(r"\borthia_fresh_analyze\.exe\s+analyzed$")
 
 
 def test_u_length_counts_instructions(orthia_full, me, export_addr):

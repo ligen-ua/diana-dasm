@@ -33,7 +33,7 @@ def db_counts(home: Path):
 
 def assert_names_intact(orthia, nt):
     res = orthia.run("lm", "x ntoskrnl!KeBugCheck", **nt).assert_ok()
-    res.assert_line(r"\bntoskrnl\.exe\s+analysis")
+    res.assert_line(r"\bntoskrnl\.exe\s+analyzed")
     assert res.symbols["ntoskrnl.exe!KeBugCheck"][0] == KE_BUG_CHECK
     assert orthia.resolve("KeBugCheck", **nt) == KE_BUG_CHECK
 
@@ -45,7 +45,7 @@ def nt(data):
 
 def test_quick_open(orthia_cold, nt):
     res = orthia_cold.run("lm", "x ntoskrnl!KeBugCheck", "u KeBugCheck L6", **nt).assert_ok()
-    res.assert_line(r"\bntoskrnl\.exe$")                  # no "analysis"
+    res.assert_line(r"\bntoskrnl\.exe$")                  # no "analyzed"
     assert res.symbols["ntoskrnl.exe!KeBugCheck"] == [KE_BUG_CHECK]
     assert res.instructions(), res
     assert not any(re.search(XREF, line) for line in res.lines), res
@@ -55,7 +55,7 @@ def test_quick_open(orthia_cold, nt):
 
 def test_analyze_open(orthia_cold, nt):
     res = orthia_cold.with_(analyze=True).run("lm", "u KeBugCheck L6", **nt).assert_ok()
-    res.assert_line(r"\bntoskrnl\.exe\s+analysis$")
+    res.assert_line(r"\bntoskrnl\.exe\s+analyzed$")
     res.assert_line(XREF)
     assert db_counts(orthia_cold.home)[1] > 0
 
@@ -74,7 +74,7 @@ def test_upgrade_in_a_later_session(orthia_cold, nt):
 def test_analyze_command_in_the_creating_session(orthia_cold, nt):
     """.analyze right after a quick first open: the connection that created the DB."""
     res = orthia_cold.run(".analyze ntoskrnl", "lm", "x ntoskrnl!KeBugCheck", **nt).assert_ok()
-    res.assert_line(r"\bntoskrnl\.exe\s+analysis$")
+    res.assert_line(r"\bntoskrnl\.exe\s+analyzed$")
     assert res.symbols["ntoskrnl.exe!KeBugCheck"][0] == KE_BUG_CHECK
     assert_names_intact(orthia_cold, nt)
     assert db_counts(orthia_cold.home)[1] > 0

@@ -50,7 +50,7 @@ def module(blob):
 
 def test_lm(orthia, blob, module):
     rows = lm_rows(orthia.run("lm", file=blob, options=raw_options()).assert_ok())
-    assert rows == {module: (BASE, BASE + len(CODE), "analysis")}, rows
+    assert rows == {module: (BASE, BASE + len(CODE), "analyzed")}, rows
 
 
 def test_bytes(orthia, blob):
@@ -110,7 +110,7 @@ def test_reopen_without_format(orthia, blob, module):
     # base and architecture are saved next to the DB
     orthia.run("lm", file=blob, options=raw_options()).assert_ok()
     res = orthia.run("lm", file=blob).assert_ok()
-    assert lm_rows(res) == {module: (BASE, BASE + len(CODE), "analysis")}, res
+    assert lm_rows(res) == {module: (BASE, BASE + len(CODE), "analyzed")}, res
     res = orthia.run(f"u {BASE:x} L2", file=blob).assert_ok()
     assert re.search(r"\bmov\s+RBP, RSP$", res.instructions()[1]), res
 
@@ -124,7 +124,7 @@ def test_reopen_with_parameters_saved_before_formats(orthia, data):
     assert 'format="raw"' in text, text
     params.write_text(text.replace('format="raw" ', ""))
     res = orthia.run("lm", file=blob).assert_ok()
-    assert lm_rows(res) == {region_name(BASE, len(CODE) + 1): (BASE, BASE + len(CODE) + 1, "analysis")}, res
+    assert lm_rows(res) == {region_name(BASE, len(CODE) + 1): (BASE, BASE + len(CODE) + 1, "analyzed")}, res
 
 
 def test_unknown_file_is_not_saved(orthia, data):
@@ -141,7 +141,7 @@ def test_reopen_other_base(orthia, data):
     orthia.run("lm", file=blob, options=raw_options(base=BASE)).assert_ok()
     other = 0x20000
     rows = lm_rows(orthia.run("lm", file=blob, options=raw_options(base=other)).assert_ok())
-    assert rows == {region_name(other, len(CODE) + 1): (other, other + len(CODE) + 1, "analysis")}, rows
+    assert rows == {region_name(other, len(CODE) + 1): (other, other + len(CODE) + 1, "analyzed")}, rows
 
 
 def test_forced_detected_format(orthia, data):

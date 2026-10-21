@@ -647,7 +647,7 @@ namespace oui
                     info.dianaArch = range.dianaArch;
                     // a module without an entry point gets its base, as before
                     info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
-                    info.builtInFlags |= peFormat.GetBuiltInFlag();
+                    info.builtInFlags |= peFormat.GetBuiltInFlag() | image->GetExtraBuiltInFlags();
 
                     if (contextCallback)
                     {

@@ -50,6 +50,8 @@ namespace orthia
         // a dependency that could not be located: it owns an address range but has no image data
         static const int builtInFlags_unresolved    = 4;
         static const int builtInFlags_moduleTypeRaw = 8;
+        // a .NET image (a PE with a CLR header): an IL-only one has no native entry point
+        static const int builtInFlags_managed       = 16;
 
         PlatformString_type fullName;
         int flags = 0;

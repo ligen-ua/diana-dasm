@@ -45,7 +45,7 @@ def test_lm_header(orthia, me):
 
 
 def test_lm_analyze(orthia_full, me):
-    orthia_full.run("lm", **me).assert_ok().assert_line(r"\borthia\s+analysis$")
+    orthia_full.run("lm", **me).assert_ok().assert_line(r"\borthia\s+analyzed$")
 
 
 def test_modinfo(orthia, me, self_elf):

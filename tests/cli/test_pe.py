@@ -22,7 +22,7 @@ def test_lm(orthia, nt):
 
 
 def test_lm_analyze(orthia_full, nt):
-    orthia_full.run("lm", **nt).assert_ok().assert_line(r"\bntoskrnl\.exe\s+analysis$")
+    orthia_full.run("lm", **nt).assert_ok().assert_line(r"\bntoskrnl\.exe\s+analyzed$")
 
 
 def test_modinfo(orthia, nt):
@@ -55,7 +55,7 @@ def test_cold_open_of_fresh_copy(orthia_cold, data):
 def test_cold_open_of_fresh_copy_analyze(orthia_cold, data):
     fresh = data.fresh_copy(data.ntoskrnl, "nt_fresh_analyze.exe")
     res = orthia_cold.with_(analyze=True).run("lm", file=fresh).assert_ok()
-    res.assert_line(r"\bnt_fresh_analyze\.exe\s+analysis$")
+    res.assert_line(r"\bnt_fresh_analyze\.exe\s+analyzed$")
 
 
 def test_u_length_counts_instructions(orthia_full, nt):
@@ -201,7 +201,7 @@ def test_analyze_dependency(orthia_cold, nt, request, module):
         assert f"No image data for module: {module}" in res.stdout + res.stderr, res
     else:
         res = orthia_cold.run(f".analyze {module}", "lm", **nt).assert_ok()
-        res.assert_line(rf"\b{re.escape(module)}\s+linked, analysis$")
+        res.assert_line(rf"\b{re.escape(module)}\s+linked, analyzed$")
 
 
 def test_sections(orthia, nt):

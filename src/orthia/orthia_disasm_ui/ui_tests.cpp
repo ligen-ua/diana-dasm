@@ -10,6 +10,7 @@
 #include "formats/orthia_image_format.h"
 #include "orthia_item_process.h"
 #include "orthia_process_adapter.h"
+#include "orthia_image_source.h"
 #ifndef _WIN32
 #include "oui_privileges_posix.h"
 #endif
@@ -612,6 +613,7 @@ TEST(ImageFormats, Registry)
         EXPECT_EQ(0, flag & (flag - 1)) << format->GetId();
         EXPECT_EQ(0, flag & typeFlags) << format->GetId();
         EXPECT_EQ(0, flag & orthia::ModuleInfo::builtInFlags_unresolved) << format->GetId();
+        EXPECT_EQ(0, flag & orthia::ModuleInfo::builtInFlags_managed) << format->GetId();
         typeFlags |= flag;
     }
     EXPECT_EQ((std::set<std::string>{ "pe", "elf", "raw" }), ids);
@@ -623,6 +625,21 @@ TEST(ImageFormats, Registry)
     // raw code is chosen by the user, never detected
     EXPECT_TRUE(orthia::FindFormatById("raw")->NeedsUserParameters());
     EXPECT_FALSE(orthia::FindFormatById("raw")->Detect("MZ", 2));
+}
+
+TEST(ImageFormats, ModuleStatusText)
+{
+    orthia::ModuleInfo mod;
+    EXPECT_EQ(orthia::PlatformString_type(), orthia::ModuleStatusText(mod));
+    mod.flags = orthia::ModuleInfo::flags_analyzeDone | orthia::ModuleInfo::flags_symbolsLoaded;
+    EXPECT_EQ(ORTHIA_TCSTR("analyzed, symbols"), orthia::ModuleStatusText(mod));
+    // .NET first: the modules window column cuts the end
+    mod.builtInFlags = orthia::ModuleInfo::builtInFlags_moduleTypePe | orthia::ModuleInfo::builtInFlags_managed;
+    mod.imageSourceKind = (int)orthia::ImageSourceKind::LinkedFile;
+    EXPECT_EQ(ORTHIA_TCSTR(".NET, linked, analyzed, symbols"), orthia::ModuleStatusText(mod));
+    mod.builtInFlags |= orthia::ModuleInfo::builtInFlags_unresolved;
+    mod.flags = 0;
+    EXPECT_EQ(ORTHIA_TCSTR(".NET, unresolved"), orthia::ModuleStatusText(mod));
 }
 
 TEST(ImageFormats, Detect)
@@ -756,7 +773,7 @@ namespace
                     info.dianaMode = range.dianaMode;
                     info.dianaArch = range.dianaArch;
                     info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
-                    info.builtInFlags |= image.format->GetBuiltInFlag();
+                    info.builtInFlags |= image.format->GetBuiltInFlag() | moduleImage->GetExtraBuiltInFlags();
                     oui::ModuleDisasmContext context;
                     context.image = moduleImage.get();
                     contextCallback(info, context);

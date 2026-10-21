@@ -66,7 +66,7 @@ def test_modinfo_dependency(orthia, me, dep):
 def test_analyze_dependency(orthia_cold, me, dep):
     dll, _ = dep
     res = orthia_cold.run(f".analyze {dll}", "lm", **me).assert_ok()
-    res.assert_line(rf"\b{re.escape(dll)}\s+linked, analysis$")
+    res.assert_line(rf"\b{re.escape(dll)}\s+linked, analyzed$")
 
 
 def test_iat_slot_is_linked(orthia, me, dep, data):

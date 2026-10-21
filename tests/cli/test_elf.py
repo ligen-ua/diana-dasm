@@ -23,7 +23,7 @@ def test_lm(orthia, dmesg):
 
 
 def test_lm_analyze(orthia_full, dmesg):
-    orthia_full.run("lm", **dmesg).assert_ok().assert_line(r"\bdmesg\s+analysis$")
+    orthia_full.run("lm", **dmesg).assert_ok().assert_line(r"\bdmesg\s+analyzed$")
 
 
 def test_modinfo(orthia, dmesg):

@@ -335,15 +335,21 @@ namespace orthia
         return dianaMode == DIANA_MODE16 ? ORTHIA_TCSTR("x86-16") : ORTHIA_TCSTR("?");
     }
 
-    // "base X, entry Y, size Z"; an entry point at the base is none (a PE without one, raw code)
+    // "base X, entry Y, size Z"; an entry point at the base is none (a PE without one, raw code).
+    // A .NET image says so first: that is why an IL-only one has no entry
     static oui::String FormatImageLayoutForUI(const intrusive_ptr<CTextNode>& mainNode,
-        Address_type base, Address_type entryPoint, Address_type size, int dianaMode)
+        Address_type base, Address_type entryPoint, Address_type size, int dianaMode, int builtInFlags)
     {
         const oui::String noValue(ORTHIA_TCSTR("-"));
-        return oui::PassParameter3(mainNode->QueryValue(ORTHIA_TCSTR("opened-layout")),
+        oui::String layout = oui::PassParameter3(mainNode->QueryValue(ORTHIA_TCSTR("opened-layout")),
             base ? oui::String(AddressToString(base, dianaMode)) : noValue,
             entryPoint && entryPoint != base ? oui::String(AddressToString(entryPoint, dianaMode)) : noValue,
             size ? oui::String(ToWideStringAsHex_Short((unsigned long long)size)) : noValue);
+        if (builtInFlags & ModuleInfo::builtInFlags_managed)
+        {
+            layout = oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opened-managed")), layout);
+        }
+        return layout;
     }
 
     void CProgramModel::AddProcess(std::shared_ptr<oui::IProcess> proc,
@@ -378,11 +384,24 @@ namespace orthia
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
         WorkAddressRangeInfo mainModule;
+        int mainModuleFlags = 0;
         if (auto address = info->GetMainModuleAddress())
         {
             mainModule = info->GetRangeInfo(address);
             auto addressToStart = std::max(mainModule.entryPoint, mainModule.address);
             result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(addressToStart);
+
+            std::vector<ModuleInfo> modules;
+            info->GetModules(modules);
+            // the main module address of a process is its entry point
+            for (const auto& mod : modules)
+            {
+                if (mod.IsInRange(address))
+                {
+                    mainModuleFlags = mod.builtInFlags;
+                    break;
+                }
+            }
         }
 
         auto workspaceId = RegisterItem(info, false);
@@ -390,7 +409,7 @@ namespace orthia
 
         WriteLog(completeHandler->GetThread(), oui::PassParameter2(mainNode->QueryValue(ORTHIA_TCSTR("opened-process")),
             GetArchNameForUI(dianaMode, dianaArch),
-            FormatImageLayoutForUI(mainNode, mainModule.address, mainModule.entryPoint, mainModule.size, dianaMode)));
+            FormatImageLayoutForUI(mainNode, mainModule.address, mainModule.entryPoint, mainModule.size, dianaMode, mainModuleFlags)));
 
         // OK
         result.error.native.clear();
@@ -717,6 +736,12 @@ namespace orthia
                 meta.sha1 = PlatformStringToUtf8(fileHashStr);
                 WriteFolderMeta(metaFileName, meta);
             }
+            // what the headers tell beyond the format (.NET)
+            int extraBuiltInFlags = 0;
+            if (auto mainImage = format->OpenModuleImage(reader, imageBase, mappedFile.size()))
+            {
+                extraBuiltInFlags = mainImage->GetExtraBuiltInFlags();
+            }
             if (firstOpen || needsAnalysis)
             {
                 // warn user it may take quite a time
@@ -742,18 +767,32 @@ namespace orthia
                         dependencies->ReportModules(info->moduleManager);
                     }
                 }
-                const int builtInTypeFlag = format->GetBuiltInFlag();
                 ModuleSourceMeta source;
                 source.iatSlots = importsKeyedBySlot;
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     imageBase,
                     info->fullName.native,
                     analyzed ? ModuleInfo::flags_analyzeDone : 0,
-                    builtInTypeFlag,
+                    format->GetBuiltInFlag() | extraBuiltInFlags,
                     &source);
             }
             else
             {
+                // a database made before these bits existed gets them now
+                if (extraBuiltInFlags)
+                {
+                    UpdateModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(), imageBase,
+                        [&](CCommonFormatParser& parser, CCommonFormatBuilder& builder) {
+                            int builtInFlags = 0;
+                            parser.QueryMetadata("builtinflags", &builtInFlags);
+                            if ((builtInFlags & extraBuiltInFlags) == extraBuiltInFlags)
+                            {
+                                return false;
+                            }
+                            builder.AddMetadata("builtinflags", builtInFlags | extraBuiltInFlags);
+                            return true;
+                        });
+                }
                 // the dependencies are not loaded again: the linked IAT comes from the database
                 info->ApplyLinkedImports();
                 if (needsAnalysis)
@@ -776,7 +815,8 @@ namespace orthia
             WriteLog(completeHandler->GetThread(), oui::PassParameter3(mainNode->QueryValue(ORTHIA_TCSTR("opened-file")),
                 Utf8ToPlatformString(format->GetDisplayName()),
                 GetArchNameForUI(dianaMode, mappedExe->GetDianaArch()),
-                FormatImageLayoutForUI(mainNode, imageBase, mappedExe->GetEntryPoint(), mappedFile.size(), dianaMode)));
+                FormatImageLayoutForUI(mainNode, imageBase, mappedExe->GetEntryPoint(), mappedFile.size(), dianaMode,
+                    format->GetBuiltInFlag() | extraBuiltInFlags)));
 
             // OK
             result.error.native.clear();

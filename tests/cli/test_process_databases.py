@@ -92,7 +92,7 @@ def test_reopen_keeps_the_analysis(orthia_cold, child):
     assert REUSED in res.stderr, res
     # the main module is not analyzed again: its saved flag is trusted
     assert "Reloading" not in res.stderr, res
-    res.assert_line(r"\s+analysis")
+    res.assert_line(r"\s+analyzed")
 
 
 def test_folder_of_exited_process_is_cleaned_up(orthia_cold, child):

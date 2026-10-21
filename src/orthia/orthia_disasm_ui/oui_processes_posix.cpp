@@ -503,7 +503,7 @@ namespace oui
                     info.dianaArch = range.dianaArch;
                     // a module without an entry point gets its base, as before
                     info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
-                    info.builtInFlags |= elfFormat.GetBuiltInFlag();
+                    info.builtInFlags |= elfFormat.GetBuiltInFlag() | image->GetExtraBuiltInFlags();
 
                     if (contextCallback)
                     {
