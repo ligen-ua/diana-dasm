@@ -307,10 +307,10 @@ namespace oui
         }
         m_openFileCallback(this->GetThread(),
             FileUnifiedId(targetFile),
-            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile2> file, int error, const oui::String& folderName, int fileType, OpenFileModelInfo modelInfo) {
+            [=, openFileSeq = m_openFileSeq](std::shared_ptr<IFile2> file, int error, const oui::String& folderName, OpenFileModelInfo modelInfo) {
             if (auto p = weakMe.lock())
             {
-                me->SetOpenFileResult(openFileSeq, file, error, folderName, fileType, std::move(modelInfo));
+                me->SetOpenFileResult(openFileSeq, file, error, folderName, std::move(modelInfo));
             }
         });
     }
@@ -340,7 +340,7 @@ namespace oui
             m_waitBox->Invalidate();
         }
     }
-    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName, int fileType, OpenFileModelInfo modelInfo)
+    void COpenFileDialog::SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName, OpenFileModelInfo modelInfo)
     {
         if (openFileSeq != m_openFileSeq)
         {
@@ -365,7 +365,6 @@ namespace oui
             }
             return;
         }
-        m_lastFileType = fileType;
         m_lastModelInfo = std::move(modelInfo);
         m_result = file;
         auto me = GetPtr_t<COpenFileDialog>(this);
@@ -382,7 +381,7 @@ namespace oui
                 }
             });
             m_openOperation = operation;
-            auto errorText = m_resultCallback(me, m_result, m_openOperation, m_lastFileType, m_lastModelInfo);
+            auto errorText = m_resultCallback(me, m_result, m_openOperation, m_lastModelInfo);
             if (errorText.error.native.empty())
             {
                 return;
@@ -519,7 +518,7 @@ namespace oui
         {
             // report nothing
             auto me = GetPtr_t<COpenFileDialog>(this);
-            m_resultCallback(me, m_result, nullptr, 0, OpenFileModelInfo{});
+            m_resultCallback(me, m_result, nullptr, OpenFileModelInfo{});
             m_resultCallback = nullptr;
         }
         Parent_type::OnFinishDialog();

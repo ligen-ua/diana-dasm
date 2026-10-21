@@ -11,7 +11,10 @@ extern "C"
 
 //no changes:
 static unsigned char mov[] = {0x67, 0x66, 0x8C, 0xCC};          // mov         sp,cs
-static unsigned char mov1[] = {0x67, 0x3E, 0xA2, 0x34, 0x12, 0x00, 0x00}; // mov         byte ptr ds:[00001234h],al 
+
+//changes:
+// the offset of A0-A3 has the address size: 16 bits after 67 (objdump: addr16 mov ds:0x1234,al)
+static unsigned char mov1[] = {0x67, 0x3E, 0xA2, 0x34, 0x12}; // mov         byte ptr ds:[1234h],al 
 
 //changes:
 static unsigned char mov2[] = {0x67, 0x2E, 0xC6, 0x02, 0x34};         // mov         byte ptr cs:[bp+si],34h 
@@ -38,7 +41,7 @@ static void test_mov_as_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.recognizedRegister == reg_CS);
     }
 
-    //static unsigned char mov1[] = {0x67, 0x3E, 0xA2, 0x34, 0x12, 0x00, 0x00}; // mov         byte ptr ds:[00001234h],al 
+    //static unsigned char mov1[] = {0x67, 0x3E, 0xA2, 0x34, 0x12}; // mov         byte ptr ds:[1234h],al 
     iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE32,mov1, sizeof(mov1), Diana_GetRootLine(), &result, &read);
     DIANA_TEST_ASSERT_IF(!iRes)
     {
@@ -51,7 +54,7 @@ static void test_mov_as_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS)
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.dispValue == 0x1234);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.dispSize == 0x4);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.dispSize == 0x2);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.index == 0);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_register);

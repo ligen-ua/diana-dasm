@@ -1,10 +1,15 @@
-"""Process mode on orthia's own process (--pid self)."""
+"""Process mode on orthia's own process (--pid self), and on a test executable it starts."""
 import os
+import platform
 import re
+import shutil
+import subprocess
 import sys
 
 import pytest
 
+from data import REPO_ROOT
+from images import ET_EXEC, ElfInfo
 from orthia_runner import EXIT_COMMAND_ERROR, EXIT_OPEN_FAILED, check_x_sort_orders
 
 pytestmark = pytest.mark.process
@@ -42,7 +47,7 @@ def test_lm_lists_self(orthia):
 
 def test_lm_lists_self_analyze(orthia_full):
     res = orthia_full.run("lm", **SELF).assert_ok()
-    res.assert_line(r"\borthia(\.exe|_disasm_ui)?\s+analysis")
+    res.assert_line(r"\borthia(\.exe|_disasm_ui)?\s+analyzed")
 
 
 def test_export_resolves(orthia, runtime):
@@ -128,6 +133,66 @@ def test_sections_of_runtime_library(orthia, runtime):
     assert text_flags == "R-X", res
     export = base + offset
     assert base < text_address <= export < text_address + text_size <= end + 1, res
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="ELF only: libc's IFUNC resolvers and init array")
+def test_elf_startup_routines_of_runtime_library(orthia, runtime):
+    module, _ = runtime
+    res = orthia.run("lm", f"sections {module}", f"x {module}!$ifunc_*", f"x {module}!$init*",
+                     f"x {module}!memcpy", **SELF).assert_ok()
+    names = res.symbols
+    (text_address, text_size, _), = res.sections()[".text"]
+
+    def in_text(name):
+        return all(text_address <= a < text_address + text_size for a in names.get(name, [None]) if a)
+
+    ifuncs = [n for n in names if n.startswith(f"{module}!$ifunc_")]
+    # glibc picks memcpy, strlen, ... by CPU through IFUNC resolvers
+    assert len(ifuncs) >= 10, res
+    assert all(in_text(n) for n in ifuncs), res
+    # the resolver keeps its export name: the export (symbol value) and the resolver are one address
+    assert names[f"{module}!$ifunc_memcpy"] == names[f"{module}!memcpy"], res
+    # the init array is relocated in memory, its entries are code too
+    assert names.get(f"{module}!$init_array_0000") and in_text(f"{module}!$init_array_0000"), res
+
+
+@pytest.fixture
+def non_pie_process(tmp_path):
+    """data/elf/nopie_x64 running (an ET_EXEC: loaded at its link-time addresses): (pid, ElfInfo)"""
+    exe = tmp_path / "nopie_x64"
+    shutil.copyfile(REPO_ROOT / "data/elf/nopie_x64", exe)
+    exe.chmod(0o755)
+    proc = subprocess.Popen([str(exe)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    try:
+        assert proc.stdout.readline().startswith("ready"), "the test executable didn't start"
+        yield proc.pid, ElfInfo(exe)
+    finally:
+        # it exits when its stdin is closed
+        proc.stdin.close()
+        proc.wait(timeout=30)
+
+
+RUNS_X64_ELF = pytest.mark.skipif(sys.platform != "linux" or platform.machine() != "x86_64",
+                                  reason="Linux x86-64: runs an ELF")
+
+
+@RUNS_X64_ELF
+def test_non_pie_executable_entry_point(orthia, non_pie_process):
+    pid, elf = non_pie_process
+    assert elf.e_type == ET_EXEC
+    res = orthia.run("lm", "x nopie_x64!$entrypoint", pid=str(pid)).assert_ok()
+    # loaded where it was linked
+    assert module_base(res, "nopie_x64") == min(vaddr for vaddr, _, _, _ in elf.loads), res
+    # e_entry is an address already: the base is not added to it
+    assert res.symbols["nopie_x64!$entrypoint"] == [elf.e_entry], res
+
+
+@RUNS_X64_ELF
+def test_non_pie_executable_exports(orthia, non_pie_process):
+    pid, elf = non_pie_process
+    names = orthia.run("x nopie_x64!nopie_*", pid=str(pid)).assert_ok().symbols
+    for export in ("nopie_func_a", "nopie_func_b"):
+        assert names.get(f"nopie_x64!{export}") == [elf.exported_functions[export]], names
 
 
 @pytest.mark.skipif(sys.platform != "linux" or os.geteuid() == 0, reason="Linux, run as a normal user")

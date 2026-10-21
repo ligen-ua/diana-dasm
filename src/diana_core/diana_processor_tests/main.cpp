@@ -29,6 +29,9 @@ void di_gen();
 void test_processor_fpu();
 void test_processor_fpu_integration();
 void test_processor_fpu_sse();
+void test_processor_cpu();
+void test_processor_avx();
+void test_processor_avx512();
 
 int main()
 {
@@ -57,5 +60,8 @@ int main()
     test_processor_m_xmm();
     test_processor_fpu();
     test_processor_fpu_integration();
+    test_processor_cpu();
+    test_processor_avx();
+    test_processor_avx512();
     return g_diana_resultCode;
 }

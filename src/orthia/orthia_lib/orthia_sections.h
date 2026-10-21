@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_interfaces.h"
+#include "orthia_file_reader.h"
 
 namespace orthia
 {
@@ -23,16 +24,27 @@ struct ImageSections
     PlatformString_type reason;
     // ELF only: the file the section headers were read from
     PlatformString_type source;
+    // ELF only: the file name in .gnu_debuglink (the separate debug file), empty when there is none
+    PlatformString_type debugLink;
 };
 
 // PE section headers are mapped with the image, so they are read from memory.
 // ELF section headers are not part of any PT_LOAD segment: in a process (or a dump of one)
-// the memory at e_shoff is something else. They are read from imageFile, after checking that
-// its ELF and program headers are the ones mapped at moduleBase; otherwise the program headers
-// from memory are listed instead. imageFile may be empty.
+// the memory at e_shoff is something else. They are read from imageFile, opened with openFile,
+// after checking that its ELF and program headers are the ones mapped at moduleBase; otherwise
+// the program headers from memory are listed instead. imageFile and openFile may be empty.
 void QueryImageSections(IMemoryReader* reader,
     Address_type moduleBase,
     const PlatformString_type& imageFile,
+    const FileOpener_type& openFile,
+    ImageSections& result);
+
+// the same for a module whose format is known; false when its headers don't parse as it
+bool QueryPeImageSections(IMemoryReader* reader, Address_type moduleBase, ImageSections& result);
+bool QueryElfImageSections(IMemoryReader* reader,
+    Address_type moduleBase,
+    const PlatformString_type& imageFile,
+    const FileOpener_type& openFile,
     ImageSections& result);
 
 }

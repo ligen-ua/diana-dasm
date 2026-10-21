@@ -11,6 +11,7 @@ namespace orthia
         std::shared_ptr<oui::IProcess> m_proc;
         oui::String m_shortName;
         int m_dianaMode = 0;
+        int m_dianaArch = DIANA_ARCH_X86;
         PlatformString_type m_procFolder;
 
         std::vector<orthia::ModuleInfo> m_modules;
@@ -28,18 +29,23 @@ namespace orthia
         std::shared_ptr<const ModuleNames> QueryModuleNames(Address_type moduleAddress) const;
         NameInfo QueryAddressNameNoLock(Address_type address) const;
         NameInfo QueryAddressNameImpl(Address_type address, orthia::ModuleInfo& moduleInfo) const;
+        void SaveModuleFlags(const ModuleInfo& module, int flags);
 
     public:
         ~CProcessWorkplaceItem();
         CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
             const oui::String& shortName,
             int dianaMode,
+            int dianaArch,
             std::shared_ptr<IPeristentItemStorage> persistentStorage);
 
         void SetProcFolder(const PlatformString_type& folder);
         void Init(std::shared_ptr<CModuleManager> moduleManager,
             std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
             std::shared_ptr<ModuleStorage> moduleStorage);
+        // after Init, on a database reused from an earlier open of the same process: the
+        // analysis flags of the modules that are still the same
+        void LoadSavedModuleFlags();
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;
@@ -49,6 +55,7 @@ namespace orthia
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
         int GetModulesCount() const override;
         int GetDianaMode() const override { return m_dianaMode;}
+        int GetDianaArch() const override { return m_dianaArch; }
         Address_type GetMainModuleAddress() const override;
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
@@ -66,7 +73,7 @@ namespace orthia
         std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
         void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
         ModuleStorage* GetModuleStorage() override;
-        void QuerySections(Address_type moduleBase, ImageSections& sections) override;
+        void QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections) override;
         PlatformString_type GetDatabaseFolder() const override { return m_procFolder; }
     };
 

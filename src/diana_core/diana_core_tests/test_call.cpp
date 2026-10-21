@@ -67,7 +67,8 @@ static void test_call_impl()
         DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "call")==0);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
+        // the base is EBP/ESP/RSP: SS is the default segment
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_EBP);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.index == 0);

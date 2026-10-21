@@ -24,6 +24,7 @@ typedef struct _diana_PeFile_impl
     DIANA_IMAGE_DATA_DIRECTORY * pImageDataDirectoryArray;
     DI_UINT32  sizeOfHeaders;
     OPERAND_SIZE   imageBase;
+    int arch;   // DIANA_ARCH_*, dianaMode is the pointer size
 }Diana_PeFile_impl;
 
 typedef struct _diana_PeFile32_impl

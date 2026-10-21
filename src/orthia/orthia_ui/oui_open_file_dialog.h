@@ -30,7 +30,7 @@ namespace oui
     class COpenFileDialog:public oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>, IListBoxOwner
     {
     public:
-        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile2>, OperationPtr_type<fsui::FileCompleteHandler_type>, int fileType, OpenFileModelInfo modelInfo)>;
+        using FileRecipientHandler_type = std::function<fsui::OpenResult(std::shared_ptr<COpenFileDialog>, std::shared_ptr<IFile2>, OperationPtr_type<fsui::FileCompleteHandler_type>, OpenFileModelInfo modelInfo)>;
 
     private:
         using Parent_type = oui::ChildSwitcher<oui::SimpleBrush<CModalWindow>>;
@@ -59,7 +59,6 @@ namespace oui
         int m_typesToHighlight = 0;
         bool m_readyToExit = false;
         AsyncOpenFileWithTypeCallback_type m_openFileCallback;
-        int m_lastFileType = 0;
         OpenFileModelInfo m_lastModelInfo;
 
         void OnOpCompleted(std::shared_ptr<BaseOperation> operation,
@@ -76,7 +75,7 @@ namespace oui
             const String& fileName,
             bool combine);
         void OnWaitBoxDestroyed();
-        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName, int fileType, OpenFileModelInfo modelInfo);
+        void SetOpenFileResult(int openFileSeq, std::shared_ptr<IFile2> file, int error, const String& folderName, OpenFileModelInfo modelInfo);
         void FinishFileOpen(std::shared_ptr<BaseOperation> op, const oui::fsui::OpenResult& result);
 
         template<class OwnerType, class ContainerType, class Predicate>

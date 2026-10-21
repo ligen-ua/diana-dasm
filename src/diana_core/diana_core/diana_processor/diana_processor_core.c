@@ -3,6 +3,8 @@
 #include "diana_core_gen_tags.h"
 #include "diana_processor_commands.h"
 #include "diana_processor_cmd_fpu.h"
+#include "diana_processor_cmd_fpu_internal.h"
+#include "diana_processor_cmd_avx512.h"
 #include "diana_disable_warnings.h"
 #include "diana_analyze2.h"
 
@@ -228,6 +230,9 @@ int DianaProcessor_ExecOnce(DianaProcessor * pThis)
     
     // query context 
     pCommand = DIANA_QUERY_PROCESSOR_TAG(pThis->m_result.pInfo->m_pGroupInfo);
+    // EVEX (AVX-512): one handler for every instruction (a mnemonic may be VEX too: vaddps)
+    if (pThis->m_result.evex.isEvex)
+        pCommand = Diana_Call_evex;
 
     // apply custom rules
     if (pThis->m_customProvider)
@@ -265,6 +270,11 @@ int DianaProcessor_ExecOnce(DianaProcessor * pThis)
         break;
     default:
         res = Call(pCommand, pCallContext);
+    }
+
+    if (res == DI_SUCCESS)
+    {
+        Diana_FPU_MmxTransition(pCallContext);
     }
 
     // clear DI_PROC_STATE_CMD_USES_NORMAL_REP flag

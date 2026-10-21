@@ -30,7 +30,8 @@ namespace orthia
         Address_type lastValidAddress = 0;
         Address_type entryPoint = 0;
         Address_type size = 0;
-        int dianaMode = 0;
+        int dianaMode = 0;                  // the pointer size
+        int dianaArch = DIANA_ARCH_X86;     // DIANA_ARCH_*: how the code decodes
 
         bool IsInRange(Address_type offset) const
         {
@@ -48,6 +49,9 @@ namespace orthia
         static const int builtInFlags_moduleTypeElf = 2;
         // a dependency that could not be located: it owns an address range but has no image data
         static const int builtInFlags_unresolved    = 4;
+        static const int builtInFlags_moduleTypeRaw = 8;
+        // a .NET image (a PE with a CLR header): an IL-only one has no native entry point
+        static const int builtInFlags_managed       = 16;
 
         PlatformString_type fullName;
         int flags = 0;
@@ -231,6 +235,8 @@ namespace orthia
         virtual Address_type GetMainModuleAddress() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
         virtual int GetDianaMode() const = 0;
+        // DIANA_ARCH_* of the main module
+        virtual int GetDianaArch() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
         // drops the cached names of the module, the next QueryNames reads them again
@@ -246,7 +252,7 @@ namespace orthia
         virtual std::shared_ptr<IMemoryReader> CreateMemoryReader() = 0;
         virtual void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) = 0;
         virtual ModuleStorage* GetModuleStorage() { return nullptr; }
-        virtual void QuerySections(Address_type moduleBase, ImageSections& sections) {}
+        virtual void QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections) {}
         // the db/<sha1> or proc/ folder of this item, without a trailing slash
         virtual PlatformString_type GetDatabaseFolder() const { return PlatformString_type(); }
     };
@@ -375,6 +381,7 @@ namespace orthia
     const static int g_database_type_fnc_Import = 2;
     const static int g_database_type_fnc_Export = 3;
     const static int g_database_type_fnc_PrivateSymbol = 4;
+    // 5: orthia::g_database_type_armCodeMap (orthia_diana_arch.h), saved with the analysis
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address, const oui::String& moduleName, Address_type moduleAddress);

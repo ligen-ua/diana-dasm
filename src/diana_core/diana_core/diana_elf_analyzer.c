@@ -18,6 +18,7 @@ typedef struct Diana_ElfAnalyzerCommonParams_
     void                    * pPage;
     int                       pageSize;
     Diana_Stack             * pStack;
+    DianaAnalyzeParams analyzeParams;
 } Diana_ElfAnalyzerCommonParams_type;
 
 static DI_UINT16 ElfAnalyzer_rd16(const unsigned char * p, int isLE)
@@ -41,6 +42,31 @@ static DI_UINT64 ElfAnalyzer_rd64(const unsigned char * p, int isLE)
              | ((DI_UINT64)p[4] << 32) | ((DI_UINT64)p[5] << 40) | ((DI_UINT64)p[6] << 48) | ((DI_UINT64)p[7] << 56);
     return (DI_UINT64)p[7]       | ((DI_UINT64)p[6] << 8)  | ((DI_UINT64)p[5] << 16) | ((DI_UINT64)p[4] << 24)
          | ((DI_UINT64)p[3] << 32) | ((DI_UINT64)p[2] << 40) | ((DI_UINT64)p[1] << 48) | ((DI_UINT64)p[0] << 56);
+}
+
+static int IsElfArm32(const Diana_ElfAnalyzerCommonParams_type * pParams)
+{
+    return pParams->pElfFile->arch == DIANA_ARCH_ARM32 || pParams->pElfFile->arch == DIANA_ARCH_THUMB;
+}
+
+/* a route from an offset of the module. AArch32: bit 0 of the address (a symbol, the entry, a pointer)
+   selects T32, as BX and the loader see it */
+static int ElfAnalyzer_AnalyzeAt(Diana_ElfAnalyzerCommonParams_type * pParams, OPERAND_SIZE offset, int flags)
+{
+    DianaAnalyzeParams analyzeParams = pParams->analyzeParams;
+    if (IsElfArm32(pParams))
+    {
+        analyzeParams.arch = (offset & 1) ? DIANA_ARCH_THUMB : DIANA_ARCH_ARM32;
+        offset &= ~(OPERAND_SIZE)1;
+    }
+    return Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                pParams->pObserver,
+                                pParams->pElfFile->dianaMode,
+                                offset,
+                                pParams->pElfFile->pImpl->sizeOfModule,
+                                pParams->pStack,
+                                flags,
+                                &analyzeParams);
 }
 
 static int ElfAnalyzer_ReadSym(DianaAnalyzeObserver * pObserver,
@@ -76,6 +102,35 @@ static int ElfAnalyzer_ReadSym(DianaAnalyzeObserver * pObserver,
     return DI_SUCCESS;
 }
 
+/* A pointer the loader relocated (most dynamic tags, the init arrays) is an absolute address in the module;
+   others are link-time addresses */
+static int ElfAnalyzer_ImagePointerToOffset(Diana_ElfAnalyzerCommonParams_type * pParams,
+                                            OPERAND_SIZE pointer,
+                                            OPERAND_SIZE * pOffset)
+{
+    Diana_ElfFile_impl * pImpl = pParams->pElfFile->pImpl;
+    OPERAND_SIZE relativeAddress = 0;
+    DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+
+    *pOffset = pointer;
+    /* ET_EXEC: the loader does not move it, every pointer is a link-time address */
+    if (pImpl->elfHeader.e_type == DIANA_ET_EXEC &&
+        DianaElfFile_LinkToOffset(pImpl, pointer, pOffset) == DI_SUCCESS)
+    {
+        return DI_SUCCESS;
+    }
+    DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                   pointer,
+                                                   DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                   &relativeAddress,
+                                                   &result));
+    if (result == diaJumpNormal)
+        *pOffset = relativeAddress;
+    else
+        DianaElfFile_LinkToOffset(pImpl, pointer, pOffset);
+    return DI_SUCCESS;
+}
+
 static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams)
 {
     Diana_ElfFile_impl * pImpl = pParams->pElfFile->pImpl;
@@ -84,12 +139,15 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
     OPERAND_SIZE symtabAddr = 0;
     DI_UINT64    symEntSize = is64bit ? 24 : 16;
 
+    OPERAND_SIZE dynAddr = 0;
+
     if (!pImpl->dynamicAddress || !pImpl->dynamicSize)
+        return DI_SUCCESS;
+    if (DianaElfFile_LinkToOffset(pImpl, pImpl->dynamicAddress, &dynAddr))
         return DI_SUCCESS;
 
     /* Walk dynamic section to find DT_SYMTAB and DT_SYMENT */
     {
-        OPERAND_SIZE dynAddr = pImpl->dynamicAddress;
         OPERAND_SIZE dynEnd  = dynAddr + (OPERAND_SIZE)pImpl->dynamicSize;
         OPERAND_SIZE entSize = is64bit ? 16 : 8;
 
@@ -121,6 +179,10 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
 
     if (!symtabAddr || !symEntSize)
         return DI_SUCCESS;
+    /* relocated in a mapped image, a link-time address otherwise */
+    DI_CHECK(ElfAnalyzer_ImagePointerToOffset(pParams, symtabAddr, &symtabAddr));
+    if (symtabAddr >= pImpl->sizeOfModule)
+        return DI_SUCCESS;
 
     /* Iterate symbols; no explicit count in MODULE_MODE so cap at 65536 */
     {
@@ -130,6 +192,7 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
         {
             Diana_ElfAnalyzerSym64 sym;
             int symType;
+            OPERAND_SIZE symOffset = 0;
 
             if (ElfAnalyzer_ReadSym(pParams->pObserver, symAddr, is64bit, isLE, &sym))
                 break;
@@ -144,15 +207,111 @@ static int Diana_ELF_AnalyzeSymbols(Diana_ElfAnalyzerCommonParams_type * pParams
                 continue;
             if (sym.st_value == 0)
                 continue;
-            if (sym.st_value >= pImpl->sizeOfModule)
+            if (DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)sym.st_value, &symOffset))
                 break;
 
-            DI_CHECK(Diana_AnalyzeCode(pParams->pOwner,
-                                       pParams->pObserver,
-                                       pParams->pElfFile->dianaMode,
-                                       (OPERAND_SIZE)sym.st_value,
-                                       pImpl->sizeOfModule));
+            DI_CHECK(ElfAnalyzer_AnalyzeAt(pParams, symOffset, 0));
         }
+    }
+    return DI_SUCCESS;
+}
+
+typedef struct Diana_ElfAnalyzerStartupContext_
+{
+    Diana_ElfAnalyzerCommonParams_type * pParams;
+    int analyzeStatus;
+} Diana_ElfAnalyzerStartupContext;
+
+/* A pointer the loader relocated is an absolute address in the module; others are link-time addresses */
+static int ElfAnalyzer_PointerToOffset(void * pContext, OPERAND_SIZE pointer, OPERAND_SIZE * pOffset)
+{
+    Diana_ElfAnalyzerStartupContext * pStartup = (Diana_ElfAnalyzerStartupContext *)pContext;
+    return ElfAnalyzer_ImagePointerToOffset(pStartup->pParams, pointer, pOffset);
+}
+
+static int ElfAnalyzer_OnStartupRoutine(void * pContext, const DianaElfStartupRoutine * pRoutine)
+{
+    Diana_ElfAnalyzerStartupContext * pStartup = (Diana_ElfAnalyzerStartupContext *)pContext;
+    Diana_ElfAnalyzerCommonParams_type * pParams = pStartup->pParams;
+    OPERAND_SIZE sizeOfModule = pParams->pElfFile->pImpl->sizeOfModule;
+
+    if (!pRoutine->offset || pRoutine->offset >= sizeOfModule)
+        return DI_SUCCESS;
+    pStartup->analyzeStatus = ElfAnalyzer_AnalyzeAt(pParams, pRoutine->offset, 0);
+    return pStartup->analyzeStatus;
+}
+
+/* IFUNC resolvers and initializers: the loader runs them before main, often nothing calls them */
+static int Diana_ELF_AnalyzeStartupRoutines(Diana_ElfAnalyzerCommonParams_type * pParams)
+{
+    Diana_ElfAnalyzerStartupContext startup;
+    startup.pParams = pParams;
+    startup.analyzeStatus = DI_SUCCESS;
+
+    /* a malformed dynamic section only costs these roots; a failed analysis fails it all */
+    DianaElfFile_QueryStartupRoutines(pParams->pElfFile,
+                                      pParams->pObserver->m_pStream,
+                                      0,
+                                      ElfAnalyzer_PointerToOffset,
+                                      &startup,
+                                      ElfAnalyzer_OnStartupRoutine,
+                                      &startup,
+                                      0);
+    return startup.analyzeStatus;
+}
+
+// AArch64: 8-byte pointers at 8-aligned offsets; pPage starts with the last pointer of the previous page
+static int ELF_ScanPageArm64(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSize)
+{
+    const int isLE = pParams->pElfFile->pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
+    const unsigned char * p = (const unsigned char *)pParams->pPage + sizeof(DIANA_SIZE_T);
+    const unsigned char * pEnd = (const unsigned char *)pParams->pPage + pageSize - 8 + 1;
+    for (; p < pEnd; p += 8)
+    {
+        DI_UINT64 address = ElfAnalyzer_rd64(p, isLE);
+        OPERAND_SIZE relativeAddress = 0;
+        DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+        DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                       address,
+                                                       DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                       &relativeAddress,
+                                                       &result));
+        if (result == diaJumpNormal)
+        {
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                          pParams->pObserver,
+                                          pParams->pElfFile->dianaMode,
+                                          relativeAddress,
+                                          pParams->pElfFile->pImpl->sizeOfModule,
+                                          pParams->pStack,
+                                          DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                          &pParams->analyzeParams));
+        }
+    }
+    return DI_SUCCESS;
+}
+
+/* AArch32: 4-byte pointers at 4-aligned offsets. Bit 0 set is T32 code; an even pointer is A32 code only
+   in a module that is A32 by default, in T32 code data is what even pointers point to */
+static int ELF_ScanPageArm32(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSize)
+{
+    const int isLE = pParams->pElfFile->pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
+    const unsigned char * p = (const unsigned char *)pParams->pPage + sizeof(DIANA_SIZE_T);
+    const unsigned char * pEnd = (const unsigned char *)pParams->pPage + pageSize - 4 + 1;
+    for (; p < pEnd; p += 4)
+    {
+        DI_UINT32 address = ElfAnalyzer_rd32(p, isLE);
+        OPERAND_SIZE relativeAddress = 0;
+        DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+        if (!(address & 1) && pParams->pElfFile->arch == DIANA_ARCH_THUMB)
+            continue;
+        DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                       address,
+                                                       DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                       &relativeAddress,
+                                                       &result));
+        if (result == diaJumpNormal)
+            DI_CHECK(ElfAnalyzer_AnalyzeAt(pParams, relativeAddress, DI_ANALYSE_BREAK_ON_INVALID_CMD));
     }
     return DI_SUCCESS;
 }
@@ -163,6 +322,10 @@ static int ELF_ScanPage(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSi
     char * pEnd = p + pageSize - sizeof(DIANA_SIZE_T) + 1;
     if (pageSize < (int)sizeof(DIANA_SIZE_T))
         return DI_SUCCESS;
+    if (pParams->analyzeParams.arch == DIANA_ARCH_AARCH64)
+        return ELF_ScanPageArm64(pParams, pageSize);
+    if (IsElfArm32(pParams))
+        return ELF_ScanPageArm32(pParams, pageSize);
 
     for (++p; p < pEnd; ++p)
     {
@@ -180,13 +343,14 @@ static int ELF_ScanPage(Diana_ElfAnalyzerCommonParams_type * pParams, int pageSi
                                               &result));
         if (result == diaJumpNormal)
         {
-            DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                          pParams->pObserver,
                                          pParams->pElfFile->dianaMode,
                                          relativeAddress,
                                          pParams->pElfFile->pImpl->sizeOfModule,
                                          pParams->pStack,
-                                         DI_ANALYSE_BREAK_ON_INVALID_CMD));
+                                         DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                     &pParams->analyzeParams));
         }
     }
     return DI_SUCCESS;
@@ -200,13 +364,16 @@ static int Diana_ELF_AnalyzeData(Diana_ElfAnalyzerCommonParams_type * pParams)
     {
         DIANA_ELF_PROGRAM_HEADER * pSeg = pImpl->pCapturedSegments + i;
         OPERAND_SIZE allReadBytes = 0;
+        OPERAND_SIZE segOffset = 0;
         DIANA_SIZE_T pageLastPointer = 0;
 
         if (pSeg->p_type != DIANA_PT_LOAD)
             continue;
 
+        if (DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)pSeg->p_vaddr, &segOffset))
+            continue;
         DI_CHECK(pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream,
-                                                        pSeg->p_vaddr));
+                                                        segOffset));
         for (;;)
         {
             OPERAND_SIZE sizeToRead = pParams->pageSize;
@@ -246,33 +413,53 @@ static int Diana_ELF_AnalyzeELFImplUsingBuffer(Diana_ElfAnalyzerCommonParams_typ
                                                 int analyserFlags)
 {
     Diana_ElfFile_impl * pImpl = pParams->pElfFile->pImpl;
+    OPERAND_SIZE entry = 0;
 
-    if (pImpl->elfHeader.e_entry && pImpl->elfHeader.e_entry < pImpl->sizeOfModule)
+    if (pImpl->elfHeader.e_entry &&
+        DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)pImpl->elfHeader.e_entry, &entry) == DI_SUCCESS)
     {
-        DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
-                                     pParams->pObserver,
-                                     pParams->pElfFile->dianaMode,
-                                     (OPERAND_SIZE)pImpl->elfHeader.e_entry,
-                                     pImpl->sizeOfModule,
-                                     pParams->pStack,
-                                     0));
+        DI_CHECK(ElfAnalyzer_AnalyzeAt(pParams, entry, 0));
     }
 
     DI_CHECK(Diana_ELF_AnalyzeSymbols(pParams));
+    DI_CHECK(Diana_ELF_AnalyzeStartupRoutines(pParams));
     DI_CHECK(Diana_ELF_AnalyzeData(pParams));
+    // AArch64: BTI landing pads nothing else reached (C++ exception landing pads)
+    DI_CHECK(Diana_AnalyzeLandingPads(pParams->pOwner,
+                                      pParams->pObserver,
+                                      pParams->pElfFile->dianaMode,
+                                      0,
+                                      pImpl->sizeOfModule,
+                                      pImpl->sizeOfModule,
+                                      pParams->pStack,
+                                      &pParams->analyzeParams));
 
+    if ((DI_ANALYSE_PE_FILE_SCAN_THROUGH & analyserFlags) && IsElfArm32(pParams))
+    {
+        /* every aligned offset, in the module's own mode, never inside an instruction */
+        DI_CHECK(Diana_AnalyzeScanThrough(pParams->pOwner,
+                                          pParams->pObserver,
+                                          pParams->pElfFile->dianaMode,
+                                          0,
+                                          pImpl->sizeOfModule,
+                                          pImpl->sizeOfModule,
+                                          pParams->pStack,
+                                          &pParams->analyzeParams));
+    }
+    else
     if (DI_ANALYSE_PE_FILE_SCAN_THROUGH & analyserFlags)
     {
         OPERAND_SIZE i = 0;
         for (; i < pImpl->sizeOfModule; i += 4ULL)
         {
-            DI_CHECK(Diana_AnalyzeCodeEx(pParams->pOwner,
+            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
                                          pParams->pObserver,
                                          pParams->pElfFile->dianaMode,
                                          i,
                                          pImpl->sizeOfModule,
                                          pParams->pStack,
-                                         DI_ANALYSE_BREAK_ON_INVALID_CMD));
+                                         DI_ANALYSE_BREAK_ON_INVALID_CMD,
+                                     &pParams->analyzeParams));
         }
     }
     return DI_SUCCESS;
@@ -288,8 +475,16 @@ static int Diana_ELF_AnalyzeELFImpl(Diana_ElfFile * pElfFile,
     int status = 0;
     int stackInited = 0;
     Diana_ElfAnalyzerCommonParams_type params;
+    void * pPage = 0;
 
-    void * pPage = DIANA_MALLOC(pageSize + sizeof(OPERAND_SIZE));
+    /* x86, AArch64 and AArch32 */
+    if (pElfFile->arch != DIANA_ARCH_X86 && pElfFile->arch != DIANA_ARCH_AARCH64 &&
+        pElfFile->arch != DIANA_ARCH_ARM32 && pElfFile->arch != DIANA_ARCH_THUMB)
+    {
+        return DI_UNSUPPORTED;
+    }
+
+    pPage = DIANA_MALLOC(pageSize + sizeof(OPERAND_SIZE));
     DI_CHECK_ALLOC(pPage);
 
     DI_CHECK_GOTO(Diana_Stack_Init(&stack, 4096, sizeof(Diana_RouteInfo)));
@@ -301,6 +496,26 @@ static int Diana_ELF_AnalyzeELFImpl(Diana_ElfFile * pElfFile,
     params.pOwner    = pOwner;
     params.pObserver = pObserver;
     params.pStack    = &stack;
+    DianaAnalyzeParams_Init(&params.analyzeParams, pElfFile->arch);
+    if (pElfFile->arch != DIANA_ARCH_X86)
+    {
+        // the observer knows where the image is, ADRP needs only offset 0 page-aligned
+        params.analyzeParams.flags = DIANA_ANALYZE_ADDRESSES_RELATIVE;
+    }
+    if (pElfFile->arch == DIANA_ARCH_ARM32 || pElfFile->arch == DIANA_ARCH_THUMB)
+    {
+        /* AArch32: the module's own mode, T32 for most armhf code */
+        Diana_ElfAnalyzerStartupContext pointers;
+        int arch = pElfFile->arch;
+        pointers.pParams = &params;
+        pointers.analyzeStatus = DI_SUCCESS;
+        if (DianaElfFile_QueryArmCodeArch(pElfFile, pObserver->m_pStream, 0, ElfAnalyzer_PointerToOffset, &pointers,
+                                          0, &arch) == DI_SUCCESS)
+        {
+            pElfFile->arch = arch;
+            params.analyzeParams.arch = arch;
+        }
+    }
 
     status = Diana_ELF_AnalyzeELFImplUsingBuffer(&params, analyserFlags);
 cleanup:

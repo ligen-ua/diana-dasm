@@ -9,32 +9,53 @@ int Diana_FList_ListForEach(Diana_FList_List * pList,
                             Diana_FList_ListObserver_type pObserver,
                             void * pContext)
 {
-    Diana_FList_ListNode *  pNode = pList->m_pFirst;
+    Diana_FList_ListNode *  pNode = 0;
     int bDone = 0;
-    while(pNode)
+    if (!pList->m_pLast)
+        return DI_SUCCESS;
+
+    pNode = pList->m_pLast->m_pNext;
+    for(;;)
     {
+        // capture before the call: the observer may free pNode
         Diana_FList_ListNode *  pNext = pNode->m_pNext;
+        int bLast = (pNode == pList->m_pLast);
         DI_CHECK(pObserver(pNode, pContext, &bDone));
-        if (bDone)
+        if (bDone || bLast)
             break;
         pNode = pNext;
     }
     return DI_SUCCESS;
 }
 
-void Diana_FList_PushBack(Diana_FList_List * pList, 
+void Diana_FList_PushBack(Diana_FList_List * pList,
                           Diana_FList_ListNode * pNode)
 {
-    pNode->m_pNext = 0;
     if (pList->m_pLast)
     {
+        pNode->m_pNext = pList->m_pLast->m_pNext;
         pList->m_pLast->m_pNext = pNode;
-        pList->m_pLast = pNode;
     }
     else
     {
-        pList->m_pLast = pList->m_pFirst = pNode;
+        pNode->m_pNext = pNode;
     }
+    pList->m_pLast = pNode;
+}
+
+Diana_FList_ListNode * Diana_FList_First(const Diana_FList_List * pList)
+{
+    if (!pList->m_pLast)
+        return 0;
+    return pList->m_pLast->m_pNext;
+}
+
+Diana_FList_ListNode * Diana_FList_Next(const Diana_FList_List * pList,
+                                        const Diana_FList_ListNode * pNode)
+{
+    if (pNode == pList->m_pLast)
+        return 0;
+    return pNode->m_pNext;
 }
 
 //--------------

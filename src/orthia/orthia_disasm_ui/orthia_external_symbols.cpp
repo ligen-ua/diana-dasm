@@ -10,26 +10,20 @@ extern "C"
 #include "orthia_files.h"
 #include "orthia_memory_cache.h"
 #include "orthia_pe.h"
+#include "orthia_sections.h"
 #include "orthia_streams.h"
 #include "orthia_utils.h"
+#include "formats/orthia_image_format.h"
 #include <filesystem>
 #include <optional>
 
 namespace orthia
 {
 
-bool IsPeModule(const ModuleInfo& mod)
+static bool IsModuleOfFormat(const ModuleInfo& mod, const char* formatId)
 {
-    if (mod.builtInFlags & ModuleInfo::builtInFlags_moduleTypePe)
-        return true;
-    if (mod.builtInFlags & ModuleInfo::builtInFlags_moduleTypeElf)
-        return false;
-    // Legacy fallback for modules without builtInFlags (old databases)
-    PlatformString_type ext;
-    GetExtensionOfFile(mod.fullName, &ext);
-    return ext == ORTHIA_TCSTR("dll")
-        || ext == ORTHIA_TCSTR("exe")
-        || ext == ORTHIA_TCSTR("sys");
+    const IImageFormat* format = FindFormatByModule(mod);
+    return format && format == FindFormatById(formatId);
 }
 
 bool IsModuleImageReadable(IMemoryReader* memoryReader, const ModuleInfo& mod)
@@ -174,6 +168,8 @@ static constexpr int maxPdbScanDepth = 4;
 // first (each scanned recursively up to maxPdbScanDepth levels), then the
 // module's own directory. Call FindNextPdb() until it returns false;
 // Current() holds the last successfully located path.
+// Symbol folders are host-side: read directly on purpose, not through the target
+// filesystem interface (the user may collect PDBs locally for a remote target).
 class CPdbFileFinder
 {
     PlatformString_type m_pdbName;
@@ -271,7 +267,7 @@ public:
 
     bool CanLoad(const ModuleInfo& mod) const override
     {
-        return IsPeModule(mod);
+        return IsModuleOfFormat(mod, "pe");
     }
 
     void Load(const ModuleInfo& mod, IMemoryReader* memoryReader, ModuleSymbols& out,
@@ -460,29 +456,111 @@ public:
 // -----------------------------------------------------------------------
 // ELF loader (stub — placeholder for future DWARF / .debug support)
 
+bool IsHostFile(const std::filesystem::path& path)
+{
+    std::error_code error;
+    return std::filesystem::is_regular_file(path, error);
+}
+
+}  // anonymous namespace
+
+PlatformString_type FindElfDebugFile(const PlatformString_type& moduleFile,
+                                     const PlatformString_type& buildIdHex,
+                                     const PlatformString_type& debugLink,
+                                     const std::vector<PlatformString_type>& symbolFolders)
+{
+    namespace fs = std::filesystem;
+    std::vector<fs::path> debugRoots(symbolFolders.begin(), symbolFolders.end());
+#ifndef DIANA_HAS_WIN32
+    const fs::path systemDebugRoot = ORTHIA_TCSTR("/usr/lib/debug");
+    debugRoots.push_back(systemDebugRoot);
+#endif
+
+    // <root>/.build-id/ab/cdef....debug
+    if (buildIdHex.size() > 2)
+    {
+        for (const auto& root : debugRoots)
+        {
+            auto path = root / ORTHIA_TCSTR(".build-id") / buildIdHex.substr(0, 2) /
+                (buildIdHex.substr(2) + ORTHIA_TCSTR(".debug"));
+            if (IsHostFile(path))
+                return path.native();
+        }
+    }
+
+    // the .gnu_debuglink name, without any directory part it may carry
+    const fs::path linkName = fs::path(debugLink).filename();
+    if (linkName.empty())
+        return PlatformString_type();
+
+    std::vector<fs::path> candidates;
+    const fs::path moduleDir = fs::path(moduleFile).parent_path();
+    if (!moduleDir.empty())
+    {
+        candidates.push_back(moduleDir / linkName);
+        candidates.push_back(moduleDir / ORTHIA_TCSTR(".debug") / linkName);
+#ifndef DIANA_HAS_WIN32
+        candidates.push_back(systemDebugRoot / moduleDir.relative_path() / linkName);
+#endif
+    }
+    for (const auto& folder : symbolFolders)
+    {
+        candidates.push_back(fs::path(folder) / linkName);
+    }
+    for (const auto& path : candidates)
+    {
+        // a debug link naming the module itself is not a debug file
+        if (IsHostFile(path) && path != fs::path(moduleFile))
+            return path.native();
+    }
+    return PlatformString_type();
+}
+
+namespace
+{
+
 class CElfExternalSymbolsLoader : public IExternalSymbolsLoader
 {
+    std::vector<PlatformString_type> m_symbolFolders;
     std::shared_ptr<CLoaderUILogger> m_logger;
+    FileOpener_type m_openFile;
 public:
-    explicit CElfExternalSymbolsLoader(std::shared_ptr<CLoaderUILogger> logger)
-        : m_logger(std::move(logger))
+    CElfExternalSymbolsLoader(std::vector<PlatformString_type> symbolFolders,
+                              std::shared_ptr<CLoaderUILogger> logger,
+                              FileOpener_type openFile)
+        : m_symbolFolders(std::move(symbolFolders))
+        , m_logger(std::move(logger))
+        , m_openFile(std::move(openFile))
     {
     }
 
     bool CanLoad(const ModuleInfo& mod) const override
     {
-        return !IsPeModule(mod);
+        return IsModuleOfFormat(mod, "elf");
     }
 
-    void Load(const ModuleInfo& mod, IMemoryReader* /*memoryReader*/, ModuleSymbols& /*out*/,
+    void Load(const ModuleInfo& mod, IMemoryReader* memoryReader, ModuleSymbols& /*out*/,
               OnPrivateSymbolLoaded /*onSymbol*/ = nullptr) override
     {
-        // Not yet implemented; say so, or .reload looks like it found nothing
-        if (m_logger)
-        {
-            auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-            m_logger->WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("symbols-elf-unsupported")), mod.name));
-        }
+        // Not yet implemented. Distro binaries point to debug files (build-id, .gnu_debuglink)
+        // that are usually not installed, so only a debug file that exists is reported.
+        if (!m_logger || !IsModuleImageReadable(memoryReader, mod))
+            return;
+
+        PlatformString_type buildIdHex;
+        QueryModuleElfDebugInfo(memoryReader, mod, buildIdHex);
+
+        // .gnu_debuglink is not mapped: read it from the module's (target) file
+        ImageSections sections;
+        QueryImageSections(memoryReader, mod.address, mod.fullName, m_openFile, sections);
+
+        auto debugFile = FindElfDebugFile(mod.fullName, buildIdHex, sections.debugLink, m_symbolFolders);
+        if (debugFile.empty())
+            return;
+
+        auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        m_logger->WriteLog(oui::PassParameter2(node->QueryValue(ORTHIA_TCSTR("symbols-elf-unsupported")),
+            mod.name, debugFile));
     }
 };
 
@@ -526,13 +604,33 @@ public:
 
 } // anonymous namespace
 
+std::unique_ptr<IExternalSymbolsLoader> CreatePdbSymbolsLoader(const SymbolsLoaderParams& params)
+{
+    return std::make_unique<CPdbExternalSymbolsLoader>(params.symbolFolders, params.logger);
+}
+
+std::unique_ptr<IExternalSymbolsLoader> CreateElfDebugFileLoader(const SymbolsLoaderParams& params)
+{
+    return std::make_unique<CElfExternalSymbolsLoader>(params.symbolFolders, params.logger, params.openFile);
+}
+
 std::unique_ptr<IExternalSymbolsLoader> CreateExternalSymbolsLoader(
     const std::vector<PlatformString_type>& symbolFolders,
-    std::shared_ptr<CLoaderUILogger> logger)
+    std::shared_ptr<CLoaderUILogger> logger,
+    FileOpener_type openFile)
 {
+    SymbolsLoaderParams params;
+    params.symbolFolders = symbolFolders;
+    params.logger = std::move(logger);
+    params.openFile = std::move(openFile);
     auto composite = std::make_unique<CCompositeExternalSymbolsLoader>();
-    composite->Add(std::make_unique<CPdbExternalSymbolsLoader>(symbolFolders, logger));
-    composite->Add(std::make_unique<CElfExternalSymbolsLoader>(std::move(logger)));
+    for (auto* format : GetImageFormats())
+    {
+        if (auto loader = format->CreateSymbolsLoader(params))
+        {
+            composite->Add(std::move(loader));
+        }
+    }
     return composite;
 }
 

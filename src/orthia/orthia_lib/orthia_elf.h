@@ -17,6 +17,25 @@ namespace orthia
         diana::Guard<diana::ElfFile> mappedElf_Guard;
     };
 
+    // code the dynamic linker runs before main: IFUNC resolvers and initializers
+    struct ElfStartupRoutine
+    {
+        int kind = 0;                   // DIANA_ELF_STARTUP_*
+        int index = 0;
+        DI_UINT64 address = 0;          // absolute, like the entry point
+        DI_UINT64 slotAddress = 0;      // the GOT slot of an IRELATIVE or the array entry; 0 if none
+        std::string name;               // the IFUNC symbol name, empty for the others
+    };
+
+    // moduleAddress: where the module starts; stream: a module-mode stream over it
+    int QueryElfStartupRoutines(Diana_ElfFile* pElfFile,
+        DianaMovableReadStream* pStream,
+        DI_UINT64 moduleAddress,
+        std::vector<ElfStartupRoutine>& routines);
+
+    // the "$" name of a startup routine: $ifunc_<name>, $ifunc_NNNN, $preinit_array_NNNN, $init, $init_array_NNNN
+    std::string GetElfStartupRoutineName(const ElfStartupRoutine& routine);
+
     class CSimpleElfFile : public ISimpleFile
     {
         std::vector<char> m_mappedElfFile;
@@ -41,6 +60,7 @@ namespace orthia
         void Relocate(OPERAND_SIZE newAddress) override;
         DI_UINT64 DiGetProcAddress(const char* pFunctionName, OPERAND_SIZE* pForwardOffset = 0, DI_UINT16 ordinal = DIANA_PE_INVALID_ORDINAL_VALUE) override;
         int GetDianaMode() const override;
+        int GetDianaArch() const override;
         DI_UINT64 GetEntryPoint() const override;
         int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
@@ -48,5 +68,7 @@ namespace orthia
         std::vector<std::string> GetNeededLibraries() const;
         // the GNU build-id note bytes; DI_SUCCESS with an empty vector when the file has none
         int QueryBuildId(std::vector<DI_UINT8>& buildId) const;
+        // IFUNC resolvers and initializers at their addresses in the mapped image
+        int QueryStartupRoutines(std::vector<ElfStartupRoutine>& routines) const;
     };
 }

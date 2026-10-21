@@ -8,7 +8,10 @@
 #include "orthia_log.h"
 #include "orthia_module_symbols.h"
 #include "orthia_shellcode.h"
+#include "orthia_diana_arch.h"
 #include "orthia_common_format.h"
+#include "orthia_databases.h"
+#include "formats/orthia_image_format.h"
 
 namespace orthia
 {
@@ -74,7 +77,7 @@ namespace orthia
     void CProgramModel::SetUILog(std::shared_ptr<IUILogInterface> uiLog)
     {
         m_uiLog = uiLog;
-        m_analyzer.Init(uiLog, m_config);
+        m_analyzer.Init(uiLog, m_config, m_fileSystem);
     }
     std::shared_ptr<oui::CFileSystem> CProgramModel::GetFileSystem()
     {
@@ -239,13 +242,29 @@ namespace orthia
     {
         try
         {
-            auto folderName = GetFileSystem()->SyncSanitizeName(proc->GetFullFileNameForUI());
+            // the start in the name: a later process with the same pid gets its own folder
+            const auto startInfo = proc->GetStartInfo();
+            const auto processName = proc->GetFullFileNameForUI();
+            auto folderName = GetFileSystem()->SyncSanitizeName(oui::String(
+                MakeProcFolderName(processName.native, startInfo.IsKnown() ? startInfo.unixSeconds : 0)));
             auto dbFolder = m_config->GetProcDBFolder() + AddSlash2(folderName.native);
             auto dbFileName = dbFolder + m_config->GetDBFileName();
-            auto binFileName = dbFolder + m_config->GetBinFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
+            auto metaFileName = dbFolder + m_config->GetMetaFileName();
             CreateAllDirectoriesForFile(dbFileName);
             info->SetProcFolder(dbFolder);
+
+            // the database of an earlier open is reused only for the same process: the folder
+            // name has the start in seconds, meta.xml has it exactly
+            bool reuse = false;
+            if (!m_config->GetOverwriteDatabases() && startInfo.IsKnown() && IsFileExist(dbFileName))
+            {
+                FolderMeta saved;
+                reuse = ReadFolderMeta(metaFileName, saved) &&
+                    IsFolderReadable(saved) &&
+                    saved.kind == g_folderKindProcess &&
+                    saved.startKey == startInfo.key;
+            }
 
             // save readme file 
             orthia::CFile readmeFile;
@@ -263,11 +282,28 @@ namespace orthia
 
             WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
                 dbFileName));
+            if (reuse)
+            {
+                WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("database-reused")));
+            }
 
             // done readme, create db
             auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto moduleManager = std::make_shared<CModuleManager>();
-            moduleManager->Reinit(dbFileName, true);
+            moduleManager->Reinit(dbFileName, !reuse);
+
+            if (!reuse)
+            {
+                FolderMeta meta;
+                meta.kind = g_folderKindProcess;
+                meta.dianaMode = proc->GetDianaMode();
+                meta.dianaArch = proc->GetDianaArch();
+                meta.pid = ParseProcFolderPid(processName.native);
+                meta.name = processName.native;
+                meta.startUnix = startInfo.unixSeconds;
+                meta.startKey = startInfo.key;
+                WriteFolderMeta(metaFileName, meta);
+            }
 
             persistentItemStorage->Init(moduleManager->QueryDatabaseManager());
 
@@ -275,6 +311,11 @@ namespace orthia
                 moduleManager->QueryDatabaseManager()->GetClassicDatabase());
             info->Init(moduleManager, persistentItemStorage, moduleStorage);
             persistentItemStorage->CPersistentItemStorage::Init(info);
+            if (reuse)
+            {
+                // the analysis saved by the earlier open, for the modules that are still the same
+                info->LoadSavedModuleFlags();
+            }
         }
         catch (std::exception& e)
         {
@@ -284,6 +325,33 @@ namespace orthia
             WriteLog(completeHandler->GetThread(), oui::String(orthia::Utf8ToPlatformString(e.what())));
         }
     }
+    // "x64", "arm64", "thumb", ... for the line logged when a target is opened
+    static oui::String GetArchNameForUI(int dianaMode, int dianaArch)
+    {
+        if (const DianaArchChoice* choice = FindDianaArchChoice(dianaMode, dianaArch))
+        {
+            return Utf8ToPlatformString(choice->name);
+        }
+        return dianaMode == DIANA_MODE16 ? ORTHIA_TCSTR("x86-16") : ORTHIA_TCSTR("?");
+    }
+
+    // "base X, entry Y, size Z"; an entry point at the base is none (a PE without one, raw code).
+    // A .NET image says so first: that is why an IL-only one has no entry
+    static oui::String FormatImageLayoutForUI(const intrusive_ptr<CTextNode>& mainNode,
+        Address_type base, Address_type entryPoint, Address_type size, int dianaMode, int builtInFlags)
+    {
+        const oui::String noValue(ORTHIA_TCSTR("-"));
+        oui::String layout = oui::PassParameter3(mainNode->QueryValue(ORTHIA_TCSTR("opened-layout")),
+            base ? oui::String(AddressToString(base, dianaMode)) : noValue,
+            entryPoint && entryPoint != base ? oui::String(AddressToString(entryPoint, dianaMode)) : noValue,
+            size ? oui::String(ToWideStringAsHex_Short((unsigned long long)size)) : noValue);
+        if (builtInFlags & ModuleInfo::builtInFlags_managed)
+        {
+            layout = oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opened-managed")), layout);
+        }
+        return layout;
+    }
+
     void CProgramModel::AddProcess(std::shared_ptr<oui::IProcess> proc,
         oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler)
     {
@@ -303,25 +371,45 @@ namespace orthia
         unsigned long long fileSize = 0;
         std::tie(platformError, fileSize) = proc->GetSizeInBytes();
         int dianaMode = proc->GetDianaMode();
+        int dianaArch = proc->GetDianaArch();
 
         WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
 
         auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
-        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
+        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, dianaArch,
+            persistentItemStorage);
         info->ReloadModules();
         persistentItemStorage->Init(info);
 
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
 
+        WorkAddressRangeInfo mainModule;
+        int mainModuleFlags = 0;
         if (auto address = info->GetMainModuleAddress())
         {
-            auto rangeInfo = info->GetRangeInfo(address);
-            auto addressToStart = std::max(rangeInfo.entryPoint, rangeInfo.address);
+            mainModule = info->GetRangeInfo(address);
+            auto addressToStart = std::max(mainModule.entryPoint, mainModule.address);
             result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(addressToStart);
+
+            std::vector<ModuleInfo> modules;
+            info->GetModules(modules);
+            // the main module address of a process is its entry point
+            for (const auto& mod : modules)
+            {
+                if (mod.IsInRange(address))
+                {
+                    mainModuleFlags = mod.builtInFlags;
+                    break;
+                }
+            }
         }
 
         auto workspaceId = RegisterItem(info, false);
         result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
+
+        WriteLog(completeHandler->GetThread(), oui::PassParameter2(mainNode->QueryValue(ORTHIA_TCSTR("opened-process")),
+            GetArchNameForUI(dianaMode, dianaArch),
+            FormatImageLayoutForUI(mainNode, mainModule.address, mainModule.entryPoint, mainModule.size, dianaMode, mainModuleFlags)));
 
         // OK
         result.error.native.clear();
@@ -403,8 +491,71 @@ namespace orthia
         return false;
     }
 
+    // The format and MapFileParameters of a file opened by hand (raw code), saved next to its
+    // database so that a reopen doesn't ask again. A file without "format" is from before
+    // formats were saved: raw code then
+    static bool ReadOpenParameters(const PlatformString_type& fileName, const IImageFormat*& format, MapFileParameters& params)
+    {
+        orthia::CFile paramsFile;
+        if (paramsFile.Open_Silent(fileName, g_desired_read, g_share_read, g_open_existing) != 0)
+        {
+            return false;
+        }
+        const auto size = paramsFile.GetSize();
+        if (size <= 0 || size >= 4096)
+        {
+            return false;
+        }
+        std::vector<char> data((size_t)size);
+        orthia::CCommonFormatParser parser;
+        if (paramsFile.ExactRead_Silent(data.data(), (unsigned int)size) != 0 || !parser.Parse(data, false))
+        {
+            return false;
+        }
+        std::string formatId;
+        unsigned long long base = 0;
+        int mode = 0;
+        // saved before ARM: x86
+        int arch = DIANA_ARCH_X86;
+        if (!parser.QueryMetadata(std::string("format"), &formatId) || formatId.empty())
+        {
+            formatId = "raw";
+        }
+        parser.QueryMetadata("base_address", &base);
+        parser.QueryMetadata("diana_mode", &mode);
+        parser.QueryMetadata("diana_arch", &arch);
+        const IImageFormat* saved = FindFormatById(formatId);
+        if (!saved || !mode || !FindDianaArchChoice(mode, arch))
+        {
+            return false;
+        }
+        format = saved;
+        params.imageBase = base;
+        params.dianaMode = mode;
+        params.dianaArch = arch;
+        return true;
+    }
+
+    static void WriteOpenParameters(const PlatformString_type& fileName, const IImageFormat& format, const MapFileParameters& params)
+    {
+        orthia::CFile paramsFile;
+        if (paramsFile.Open_Silent(fileName, g_desired_write, g_share_read, g_create_always) == 0)
+        {
+            orthia::CCommonFormatBuilder builder;
+            builder.AddMetadata(std::string("format"), std::string(format.GetId()));
+            builder.AddMetadata("base_address", (unsigned long long)params.imageBase);
+            builder.AddMetadata("diana_mode", params.dianaMode);
+            builder.AddMetadata("diana_arch", params.dianaArch);
+            std::vector<char> data;
+            builder.Produce(&data);
+            paramsFile.WriteToFile(data.data(), data.size());
+        }
+    }
+
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
+        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+        const IImageFormat* forcedFormat,
+        MapFileParameters params)
     {
         // non-ui thread
         oui::fsui::OpenResult result;
@@ -436,27 +587,33 @@ namespace orthia
                 return;
             }
 
-            // detect format and map
-            const int executableType = DianaExecutable_DetectType(binPeFile.data(), binPeFile.size());
-            if (executableType == DIANA_EXECUTABLE_TYPE_NONE)
-            {
-                // Unknown format: store the IFile2 so the UI can offer shellcode loading
-                result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
-                return;
-            }
-            orthia::MapFileParameters params;
-            auto mappedExe = orthia::MakeSimpleFile(executableType, binPeFile, params);
-
-            // check folder
+            // the database folder
             auto fileHash = CalcSha1(binPeFile);
             auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
             auto dbFolder = m_config->GetDBFolder() + AddSlash2(fileHashStr);
             auto dbFileName = dbFolder + m_config->GetDBFileName();
             auto binFileName = dbFolder + m_config->GetBinFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
+            auto paramsFileName = dbFolder + m_config->GetParamsFileName();
+
+            // the format asked for, the one the headers show, or the one saved when the
+            // file was opened by hand before
+            const IImageFormat* format = forcedFormat ? forcedFormat : FindFormatByData(binPeFile.data(), binPeFile.size());
+            if (!format && !ReadOpenParameters(paramsFileName, format, params))
+            {
+                // the UI offers to open it as raw code
+                result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
+                return;
+            }
+            auto mappedExe = format->MapFile(binPeFile, params);
+
             CreateAllDirectoriesForFile(dbFileName);
             WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
                 dbFileName));
+            if (forcedFormat && format->NeedsUserParameters())
+            {
+                WriteOpenParameters(paramsFileName, *format, params);
+            }
 
             // check binary file
             bool hashIsValid = false;
@@ -524,8 +681,17 @@ namespace orthia
                 orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
                 info->shortName = std::move(shortName);
             }
+            const bool overwrite = m_config->GetOverwriteDatabases();
+            const auto metaFileName = dbFolder + m_config->GetMetaFileName();
+            FolderMeta savedMeta;
+            const bool hasMeta = ReadFolderMeta(metaFileName, savedMeta);
+            if (hasMeta && !overwrite && !IsFolderReadable(savedMeta))
+            {
+                throw std::runtime_error("The database of this file was made by a newer Orthia (" + savedMeta.orthiaVersion +
+                    "), --overwrite-db replaces it with a new one: " + PlatformStringToUtf8(dbFolder));
+            }
             info->moduleManager = std::make_shared<CModuleManager>();
-            info->moduleManager->Reinit(dbFileName, false);
+            info->moduleManager->Reinit(dbFileName, overwrite);
             persistentItemStorage->Init(info->moduleManager->QueryDatabaseManager());
 
             if (info->shortName.native == m_config->GetBinFileName())
@@ -558,6 +724,24 @@ namespace orthia
             const bool deepAnalysis = m_config->GetDeepAnalysis();
             const bool firstOpen = !info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(imageBase);
             const bool needsAnalysis = deepAnalysis && (firstOpen || !IsModuleAnalyzed(info, imageBase));
+            if (firstOpen || !hasMeta)
+            {
+                FolderMeta meta;
+                meta.kind = g_folderKindFile;
+                meta.format = format->GetId();
+                meta.dianaMode = mappedExe->GetDianaMode();
+                meta.dianaArch = mappedExe->GetDianaArch();
+                meta.imageBase = imageBase;
+                meta.size = binPeFile.size();
+                meta.sha1 = PlatformStringToUtf8(fileHashStr);
+                WriteFolderMeta(metaFileName, meta);
+            }
+            // what the headers tell beyond the format (.NET)
+            int extraBuiltInFlags = 0;
+            if (auto mainImage = format->OpenModuleImage(reader, imageBase, mappedFile.size()))
+            {
+                extraBuiltInFlags = mainImage->GetExtraBuiltInFlags();
+            }
             if (firstOpen || needsAnalysis)
             {
                 // warn user it may take quite a time
@@ -566,40 +750,49 @@ namespace orthia
 
             if (firstOpen)
             {
+                bool importsKeyedBySlot = false;
+                bool analyzed = false;
                 {
-                    orthia::CImportsLoader importsLoader(executableType, completeHandler);
-                    importsLoader.LoadModules(file->GetFullFileName(), mappedExe, file->GetFileSystem());
-
-                    if (deepAnalysis)
+                    auto dependencies = format->CreateDependencyLoader(completeHandler);
+                    if (dependencies)
                     {
-                        info->moduleManager->ReloadModule(imageBase,
-                            &reader,
-                            false,
-                            info->shortName.native,
-                            0);
-                    }
-                    else
-                    {
-                        info->moduleManager->RegisterModule(imageBase, &reader, info->shortName.native);
+                        dependencies->LoadModules(file->GetFullFileName(), mappedExe, file->GetFileSystem());
+                        importsKeyedBySlot = dependencies->ImportsKeyedBySlot();
                     }
 
-                    importsLoader.ReportModules(info->moduleManager);
+                    analyzed = format->RegisterMainModule(*info->moduleManager, *mappedExe, reader, info->shortName.native, deepAnalysis);
+
+                    if (dependencies)
+                    {
+                        dependencies->ReportModules(info->moduleManager);
+                    }
                 }
-                const int builtInTypeFlag =
-                    (executableType == DIANA_EXECUTABLE_TYPE_ELF) ? ModuleInfo::builtInFlags_moduleTypeElf :
-                    (executableType == DIANA_EXECUTABLE_TYPE_PE)  ? ModuleInfo::builtInFlags_moduleTypePe : 0;
                 ModuleSourceMeta source;
-                // PE only: the ELF GOT slot keys are not verified for the replay yet
-                source.iatSlots = (executableType == DIANA_EXECUTABLE_TYPE_PE);
+                source.iatSlots = importsKeyedBySlot;
                 InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
                     imageBase,
                     info->fullName.native,
-                    deepAnalysis ? ModuleInfo::flags_analyzeDone : 0,
-                    builtInTypeFlag,
+                    analyzed ? ModuleInfo::flags_analyzeDone : 0,
+                    format->GetBuiltInFlag() | extraBuiltInFlags,
                     &source);
             }
             else
             {
+                // a database made before these bits existed gets them now
+                if (extraBuiltInFlags)
+                {
+                    UpdateModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(), imageBase,
+                        [&](CCommonFormatParser& parser, CCommonFormatBuilder& builder) {
+                            int builtInFlags = 0;
+                            parser.QueryMetadata("builtinflags", &builtInFlags);
+                            if ((builtInFlags & extraBuiltInFlags) == extraBuiltInFlags)
+                            {
+                                return false;
+                            }
+                            builder.AddMetadata("builtinflags", builtInFlags | extraBuiltInFlags);
+                            return true;
+                        });
+                }
                 // the dependencies are not loaded again: the linked IAT comes from the database
                 info->ApplyLinkedImports();
                 if (needsAnalysis)
@@ -609,10 +802,22 @@ namespace orthia
                     info->UpdateModuleFlags(imageBase, ModuleInfo::flags_analyzeDone, 0);
                 }
             }
-            info->InitImageSources(executableType);
+            info->InitImageSources(format);
 
             auto workspaceId = RegisterItem(info, false);
             result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
+            if (const Address_type initialAddress = format->GetInitialAddress(*mappedExe))
+            {
+                result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(initialAddress);
+            }
+
+            const int dianaMode = mappedExe->GetDianaMode();
+            WriteLog(completeHandler->GetThread(), oui::PassParameter3(mainNode->QueryValue(ORTHIA_TCSTR("opened-file")),
+                Utf8ToPlatformString(format->GetDisplayName()),
+                GetArchNameForUI(dianaMode, mappedExe->GetDianaArch()),
+                FormatImageLayoutForUI(mainNode, imageBase, mappedExe->GetEntryPoint(), mappedFile.size(), dianaMode,
+                    format->GetBuiltInFlag() | extraBuiltInFlags)));
+
             // OK
             result.error.native.clear();
 
@@ -635,7 +840,7 @@ namespace orthia
             {
                 if (error || !file || !folderName.native.empty())
                 {
-                    resultCallback(file, error, folderName, DIANA_EXECUTABLE_TYPE_NONE, oui::OpenFileModelInfo());
+                    resultCallback(file, error, folderName, oui::OpenFileModelInfo());
                     return;
                 }
                 auto operation = std::make_shared<oui::Operation<oui::FileWithTypeRecipientHandler_type>>(
@@ -643,20 +848,24 @@ namespace orthia
                 fileSystem->AsyncExecute(thread,
                     [file, operation, config]()
                     {
-                        int fileType = DIANA_EXECUTABLE_TYPE_NONE;
+                        const IImageFormat* format = nullptr;
                         oui::OpenFileModelInfo modelInfo;
                         auto [sizeErr, fileSize] = file->GetSizeInBytes();
                         if (!sizeErr && fileSize >= 2)
                         {
-                            size_t bytesToRead = (size_t)std::min(fileSize, (unsigned long long)DIANA_EXECUTABLE_DETECT_MIN_SIZE);
+                            size_t bytesToRead = (size_t)std::min(fileSize, (unsigned long long)c_formatDetectSize);
                             std::vector<char> header;
                             if (file->ReadExact(nullptr, 0, bytesToRead, header) == 0)
                             {
-                                fileType = DianaExecutable_DetectType(header.data(), (OPERAND_SIZE)header.size());
+                                format = FindFormatByData(header.data(), header.size());
                             }
                         }
 
-                        if (fileType == DIANA_EXECUTABLE_TYPE_NONE)
+                        if (format)
+                        {
+                            modelInfo.formatId = format->GetId();
+                        }
+                        else
                         {
                             std::vector<char> fullContent;
                             if (fileSize <= g_maxSizeBytes &&
@@ -666,207 +875,20 @@ namespace orthia
                                 auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
                                 auto dbFolder = config->GetDBFolder() + AddSlash2(fileHashStr);
                                 auto dbFileName = dbFolder + config->GetDBFileName();
-                                if (orthia::IsFileExist(dbFileName))
+                                // opened by hand before: AddExecutable reopens it the same way
+                                const IImageFormat* saved = nullptr;
+                                MapFileParameters savedParams;
+                                if (orthia::IsFileExist(dbFileName) &&
+                                    ReadOpenParameters(dbFolder + config->GetParamsFileName(), saved, savedParams))
                                 {
                                     modelInfo.flags |= oui::model_flag_already_opened;
                                     modelInfo.dbFileName = dbFileName;
-
-                                    auto paramsFileName = dbFolder + config->GetParamsFileName();
-                                    orthia::CFile paramsFile;
-                                    if (paramsFile.Open_Silent(paramsFileName, g_desired_read, g_share_read, g_open_existing) == 0)
-                                    {
-                                        auto paramsSize = paramsFile.GetSize();
-                                        if (paramsSize > 0 && paramsSize < 4096)
-                                        {
-                                            std::vector<char> paramsData((size_t)paramsSize);
-                                            if (paramsFile.ExactRead_Silent(paramsData.data(), (unsigned int)paramsSize) == 0)
-                                            {
-                                                orthia::CCommonFormatParser parser;
-                                                if (parser.Parse(paramsData, false))
-                                                {
-                                                    unsigned long long base = 0;
-                                                    int mode = 0;
-                                                    parser.QueryMetadata("base_address", &base);
-                                                    parser.QueryMetadata("diana_mode", &mode);
-                                                    modelInfo.baseAddress = base;
-                                                    modelInfo.dianaMode = mode;
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }
-                        operation->ReplyWithRetain(operation, file, 0, oui::String(), fileType, std::move(modelInfo));
+                        operation->ReplyWithRetain(operation, file, 0, oui::String(), std::move(modelInfo));
                     });
             });
-    }
-
-    void CProgramModel::AddExecutableAsShellcode(std::shared_ptr<oui::IFile2> file,
-        DI_UINT64 baseAddress,
-        int dianaMode,
-        oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler)
-    {
-        // non-ui thread
-        oui::fsui::OpenResult result;
-        oui::ScopedGuard handlerGuard([&]() {
-            completeHandler->Reply(completeHandler, file, result);
-        });
-        try
-        {
-            auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-            auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
-            result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
-
-            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opening")),
-                file->GetFullFileNameForUI()));
-
-            std::vector<char> binPeFile;
-            result.error = ReadFileToVector(file, binPeFile, completeHandler, errorNode);
-            if (!result.error.native.empty())
-                return;
-
-            if (completeHandler->IsCancelled())
-            {
-                handlerGuard.Release();
-                return;
-            }
-
-            auto mappedExe = std::make_shared<CSimpleShellcodeFile>(binPeFile, baseAddress, dianaMode);
-
-            auto fileHash = CalcSha1(binPeFile);
-            auto fileHashStr = orthia::ToHexString(fileHash.data(), fileHash.size());
-            auto dbFolder = m_config->GetDBFolder() + AddSlash2(fileHashStr);
-            auto dbFileName = dbFolder + m_config->GetDBFileName();
-            auto binFileName = dbFolder + m_config->GetBinFileName();
-            auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
-            CreateAllDirectoriesForFile(dbFileName);
-            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
-                dbFileName));
-
-            {
-                auto paramsFileName = dbFolder + m_config->GetParamsFileName();
-                orthia::CFile paramsFile;
-                if (paramsFile.Open_Silent(paramsFileName, g_desired_write, g_share_read, g_create_always) == 0)
-                {
-                    orthia::CCommonFormatBuilder builder;
-                    builder.AddMetadata("base_address", (unsigned long long)baseAddress);
-                    builder.AddMetadata("diana_mode", dianaMode);
-                    std::vector<char> paramsData;
-                    builder.Produce(&paramsData);
-                    paramsFile.WriteToFile(paramsData.data(), paramsData.size());
-                }
-            }
-
-            bool hashIsValid = false;
-            int error = 0;
-            try
-            {
-                orthia::CFile existingFile;
-                error = existingFile.Open_Silent(binFileName, g_desired_read, g_share_read, g_open_existing);
-                if (!error)
-                {
-                    auto savedFileHash = CalcSha1(existingFile, completeHandler);
-                    hashIsValid = savedFileHash == fileHash;
-                }
-            }
-            catch (std::exception&)
-            {
-                hashIsValid = false;
-            }
-
-            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("module-sha1")),
-                fileHashStr));
-
-            if (!hashIsValid)
-            {
-                orthia::CFile localFile;
-                error = localFile.Open_Silent(binFileName, g_desired_write, g_share_read, g_create_always);
-                if (error)
-                {
-                    result.error = oui::PassParameter2(errorNode->QueryValue(ORTHIA_TCSTR("file-error-name-code")),
-                        binFileName,
-                        oui::GetErrorText(error));
-                    return;
-                }
-                localFile.WriteToFile(binPeFile.data(), binPeFile.size());
-
-                orthia::CFile readmeFile;
-                error = readmeFile.Open_Silent(readmeFileName, g_desired_write, g_share_read, g_create_always);
-                if (!error)
-                {
-                    auto readmeHeader = mainNode->QueryValue(ORTHIA_TCSTR("readme-header"));
-                    auto originalName = oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("original-name")),
-                        file->GetFullFileNameForUI());
-                    std::stringstream textInfo;
-                    textInfo << PlatformStringToUtf8(readmeHeader) << "\n";
-                    textInfo << PlatformStringToUtf8(originalName.native) << "\n";
-                    auto str = textInfo.str();
-                    readmeFile.WriteToFile_Silent(str.c_str(), str.size());
-                }
-            }
-
-            auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
-            auto info = std::make_shared<FileWorkplaceItem>(persistentItemStorage);
-            persistentItemStorage->CPersistentItemStorage::Init(info);
-
-            info->fullName = file->GetFullFileName();
-            info->databaseFolder = dbFolder;
-            EraseLastSlash(info->databaseFolder);
-            info->file = mappedExe;
-            {
-                oui::String shortName;
-                orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
-                info->shortName = std::move(shortName);
-            }
-            info->moduleManager = std::make_shared<CModuleManager>();
-            info->moduleManager->Reinit(dbFileName, false);
-            persistentItemStorage->Init(info->moduleManager->QueryDatabaseManager());
-
-            const auto& mappedFile = info->file->GetMappedFile();
-            if (mappedFile.empty())
-            {
-                result.error = errorNode->QueryValue(ORTHIA_TCSTR("empty"));
-                return;
-            }
-            info->moduleLastValidAddress = mappedFile.size() - 1;
-            if (Diana_SafeAdd(&info->moduleLastValidAddress, info->file->GetImageBase()))
-            {
-                result.error = errorNode->QueryValue(ORTHIA_TCSTR("invalid-image-base"));
-                return;
-            }
-
-            CMemoryReaderOnLoadedData reader(info->file->GetImageBase(), mappedFile.data(), mappedFile.size());
-
-            if (!info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(info->file->GetImageBase()))
-            {
-                WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
-
-                info->moduleManager->ReloadRange(info->file->GetImageBase(),
-                    mappedFile.size(),
-                    &reader,
-                    info->file->GetDianaMode(),
-                    0);
-
-                InsertModuleMetaInfo(info->moduleManager->QueryDatabaseManager()->GetClassicDatabase(),
-                    info->file->GetImageBase(),
-                    info->fullName.native,
-                    ModuleInfo::flags_analyzeDone,
-                    0);
-            }
-            info->InitImageSources(DIANA_EXECUTABLE_TYPE_NONE);
-
-            auto workspaceId = RegisterItem(info, false);
-            result.extraInfo[model_OpenResult_extraInfo_WorkspaceId] = std::any(workspaceId);
-            result.extraInfo[model_OpenResult_extraInfo_InitalAddress] = std::any(baseAddress);
-            result.error.native.clear();
-
-            EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, baseAddress, nullptr);
-        }
-        catch (std::exception& e)
-        {
-            result.error.native = orthia::Utf8ToPlatformString(e.what());
-        }
     }
 
     bool CProgramModel::RemoveItem(int uid)

@@ -6,6 +6,8 @@
 #include "orthia_streams.h"
 #include "orthia_log.h"
 #include "orthia_utils.h"
+#include "formats/orthia_image_format.h"
+#include "orthia_diana_arch.h"
 
 extern "C"
 {
@@ -75,26 +77,48 @@ namespace oui
         return 0;
     }
 
-    // Detect bitness by reading the ELF header of /proc/<pid>/exe.
-    // Returns pointer size in bytes (4 or 8). Returns 8 on error (safe default).
-    static int DetectPointerSize(pid_t pid)
+    struct ProcessArch
     {
+        int dianaMode = DIANA_MODE64;
+        int dianaArch = DIANA_ARCH_X86;
+    };
+
+    // what orthia itself is built for
+    static ProcessArch GetHostArch()
+    {
+        ProcessArch arch;
+#if defined(__aarch64__)
+        arch.dianaArch = DIANA_ARCH_AARCH64;
+#elif defined(__arm__)
+        arch.dianaMode = DIANA_MODE32;
+        arch.dianaArch = DIANA_ARCH_ARM32;
+#elif defined(__i386__)
+        arch.dianaMode = DIANA_MODE32;
+#endif
+        return arch;
+    }
+
+    // The ELF header of /proc/<pid>/exe: the class gives the pointer size, e_machine the architecture.
+    // A process whose image can't be read (no access, a kernel thread) is taken as one like orthia
+    static ProcessArch DetectProcessArch(pid_t pid)
+    {
+        ProcessArch arch = GetHostArch();
+
         char path[64];
         snprintf(path, sizeof(path), "/proc/%d/exe", (int)pid);
 
         int fd = open(path, O_RDONLY);
-        if (fd < 0) return 8;
+        if (fd < 0) return arch;
 
-        unsigned char ident[5] = {};
-        ssize_t r = read(fd, ident, sizeof(ident));
+        unsigned char header[20] = {};
+        ssize_t r = read(fd, header, sizeof(header));
         close(fd);
 
-        if (r < 5) return 8;
-        // EI_MAG0..3 = 0x7f 'E' 'L' 'F'
-        if (ident[0] != 0x7f || ident[1] != 'E' || ident[2] != 'L' || ident[3] != 'F')
-            return 8;
-        // EI_CLASS: 1=32bit, 2=64bit
-        return (ident[4] == 1) ? 4 : 8;
+        if (r > 0)
+        {
+            orthia::FindDianaArchOfElfHeader(header, (size_t)r, &arch.dianaMode, &arch.dianaArch);
+        }
+        return arch;
     }
 
     // Read the short name of a process from /proc/<pid>/comm
@@ -123,6 +147,80 @@ namespace oui
         return name;
     }
 
+    // field 22 (starttime) of /proc/<pid>/stat or /proc/<pid>/task/<tid>/stat: clock ticks since boot
+    static bool ReadStartTicks(const char* statPath, unsigned long long& ticks)
+    {
+        std::ifstream f(statPath);
+        std::string line;
+        if (!f.is_open() || !std::getline(f, line))
+            return false;
+        // the comm field may hold spaces and ')': the fields start after the last ')'
+        auto pos = line.rfind(')');
+        if (pos == std::string::npos)
+            return false;
+        std::istringstream ss(line.substr(pos + 1));
+        std::string skipped;
+        for (int field = 3; field < 22; ++field)
+        {
+            if (!(ss >> skipped))
+                return false;
+        }
+        return (bool)(ss >> ticks);
+    }
+
+    // seconds since 1970 when the system booted, from /proc/stat; 0 when unknown
+    static long long ReadBootTime()
+    {
+        std::ifstream fstat("/proc/stat");
+        std::string statLine;
+        while (std::getline(fstat, statLine))
+        {
+            if (statLine.compare(0, 6, "btime ") == 0)
+            {
+                return std::strtoll(statLine.c_str() + 6, nullptr, 10);
+            }
+        }
+        return 0;
+    }
+
+    static long long StartTicksToUnixTime(unsigned long long ticks)
+    {
+        const long long btime = ReadBootTime();
+        if (btime <= 0)
+            return 0;
+        long long clkTck = sysconf(_SC_CLK_TCK);
+        if (clkTck <= 0)
+            clkTck = 100;
+        return btime + (long long)(ticks / (unsigned long long)clkTck);
+    }
+
+    // changes on every boot; the start ticks only mean something together with it
+    static std::string ReadBootId()
+    {
+        std::ifstream f("/proc/sys/kernel/random/boot_id");
+        std::string id;
+        std::getline(f, id);
+        while (!id.empty() && (id.back() == '\n' || id.back() == '\r' || id.back() == ' '))
+            id.pop_back();
+        return id;
+    }
+
+    // needs no ptrace access: /proc/<pid>/stat is readable for every process
+    static ProcessStartInfo QueryProcessStartInfo(pid_t pid)
+    {
+        ProcessStartInfo info;
+        char path[64];
+        snprintf(path, sizeof(path), "/proc/%d/stat", (int)pid);
+        unsigned long long ticks = 0;
+        if (!ReadStartTicks(path, ticks))
+            return info;
+        info.unixSeconds = StartTicksToUnixTime(ticks);
+        const std::string bootId = ReadBootId();
+        if (!bootId.empty())
+            info.key = bootId + ":" + std::to_string(ticks);
+        return info;
+    }
+
     // -------------------------------------------------------------------------
     // PosixThread
     // -------------------------------------------------------------------------
@@ -141,52 +239,14 @@ namespace oui
             info.tid = (unsigned long long)m_tid;
             info.startAddress = 0;
 
-            // Read start time from /proc/<pid>/task/<tid>/stat field 22 (starttime)
             char path[128];
             snprintf(path, sizeof(path), "/proc/%d/task/%d/stat", (int)m_pid, (int)m_tid);
-            std::ifstream f(path);
-            if (f.is_open())
+            unsigned long long ticks = 0;
+            if (ReadStartTicks(path, ticks))
             {
-                std::string line;
-                std::getline(f, line);
-                // skip past the closing ')' of the comm field
-                auto pos = line.rfind(')');
-                if (pos != std::string::npos)
+                if (const long long startUnix = StartTicksToUnixTime(ticks))
                 {
-                    std::istringstream ss(line.substr(pos + 1));
-                    std::string state;
-                    int ppid, pgrp, session, tty, tpgid;
-                    unsigned flags, minflt, cminflt, majflt, cmajflt;
-                    unsigned long utime, stime, cutime, cstime, priority, nice, numthreads, itrealvalue;
-                    unsigned long long starttime = 0;
-                    ss >> state >> ppid >> pgrp >> session >> tty >> tpgid
-                       >> flags >> minflt >> cminflt >> majflt >> cmajflt
-                       >> utime >> stime >> cutime >> cstime >> priority >> nice
-                       >> numthreads >> itrealvalue >> starttime;
-
-                    // Convert starttime (clock ticks since boot) to a Unix timestamp:
-                    //   1. Read the boot time in seconds since Unix epoch from /proc/stat.
-                    //   2. thread_start = btime + starttime / CLK_TCK
-                    long long btime = 0;
-                    {
-                        std::ifstream fstat("/proc/stat");
-                        std::string statLine;
-                        while (std::getline(fstat, statLine))
-                        {
-                            if (statLine.compare(0, 6, "btime ") == 0)
-                            {
-                                btime = std::stoll(statLine.substr(6));
-                                break;
-                            }
-                        }
-                    }
-                    if (btime > 0)
-                    {
-                        long long clkTck = sysconf(_SC_CLK_TCK);
-                        if (clkTck <= 0) clkTck = 100;
-                        long long threadStartUnix = btime + (long long)starttime / clkTck;
-                        info.startTime.InitFromUnixTime(threadStartUnix);
-                    }
+                    info.startTime.InitFromUnixTime(startUnix);
                 }
             }
             return 0;
@@ -299,12 +359,28 @@ namespace oui
         pid_t  m_pid;
         String m_name;
         bool   m_is32bit;
+        int    m_dianaArch;
         unsigned long long m_pos = 0;
+        ProcessStartInfo m_startInfo;
 
     public:
-        CPosixProcess(pid_t pid, const String& name, bool is32bit)
-            : m_pid(pid), m_name(name), m_is32bit(is32bit)
+        CPosixProcess(pid_t pid, const String& name, const ProcessArch& arch)
+            : m_pid(pid), m_name(name), m_is32bit(arch.dianaMode == DIANA_MODE32), m_dianaArch(arch.dianaArch),
+              m_startInfo(QueryProcessStartInfo(pid))
         {}
+
+        ProcessStartInfo GetStartInfo() const override { return m_startInfo; }
+        bool IsRunning() const override
+        {
+            // the pid may run another process by now: the start tells them apart
+            const ProcessStartInfo now = QueryProcessStartInfo(m_pid);
+            if (m_startInfo.IsKnown())
+                return now.key == m_startInfo.key;
+            char path[64];
+            snprintf(path, sizeof(path), "/proc/%d", (int)m_pid);
+            struct stat st;
+            return stat(path, &st) == 0;
+        }
 
         // IFile
         std::tuple<int, unsigned long long> GetSizeInBytes() const override
@@ -402,8 +478,7 @@ namespace oui
             orthia::ProcessReaderAdapter memReader(this);
             orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x1000);
             writeCache.SetCacheReads(true);
-
-            std::vector<char> page(0x4000);
+            const orthia::IImageFormat& elfFormat = *orthia::FindFormatById("elf");
 
             for (auto& c : candidates)
             {
@@ -421,30 +496,19 @@ namespace oui
                 info.size    = c.size;
                 info.lastValidAddress = c.baseAddr + c.size - 1;
 
-                orthia::CMemoryCache moduleCache(&writeCache, c.baseAddr);
-                orthia::DianaMemoryStream stream(0, &moduleCache, c.size);
-
-                DianaExecutable exe = {};
-                exe.type = DIANA_EXECUTABLE_TYPE_ELF;
-                if (!DianaElfFile_Init(&exe.u.elfFile,
-                    &stream.parent,
-                    c.size,
-                    DIANA_ELF_FILE_FLAGS_MODULE_MODE))
+                if (auto image = elfFormat.OpenModuleImage(writeCache, c.baseAddr, c.size))
                 {
-                    diana::Guard<diana::ElfFile> elfGuard(&exe.u.elfFile);
-
-                    exe.dianaMode = exe.u.elfFile.dianaMode;
-                    info.dianaMode = exe.dianaMode;
-
-                    info.entryPoint = c.baseAddr + exe.u.elfFile.pImpl->elfHeader.e_entry;
-
-                    info.builtInFlags |= orthia::ModuleInfo::builtInFlags_moduleTypeElf;
+                    const auto range = image->GetRange();
+                    info.dianaMode = range.dianaMode;
+                    info.dianaArch = range.dianaArch;
+                    // a module without an entry point gets its base, as before
+                    info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
+                    info.builtInFlags |= elfFormat.GetBuiltInFlag() | image->GetExtraBuiltInFlags();
 
                     if (contextCallback)
                     {
                         ModuleDisasmContext context;
-                        context.executable = &exe;
-                        context.stream     = &stream;
+                        context.image = image.get();
                         contextCallback(info, context);
                     }
                 }
@@ -471,6 +535,11 @@ namespace oui
                 return DIANA_MODE64;
             }
         }
+
+        int GetDianaArch() const override
+        {
+            return m_dianaArch;
+        }
     };
 
     // -------------------------------------------------------------------------
@@ -495,10 +564,7 @@ namespace oui
             if (int error = CheckReadAccess((int)pid))
                 return { error, nullptr };
 
-            int pointerSize = DetectPointerSize(pid);
-            bool is32bit    = (pointerSize == 4);
-
-            auto proc = std::make_shared<CPosixProcess>(pid, FormatProcessName(pid), is32bit);
+            auto proc = std::make_shared<CPosixProcess>(pid, FormatProcessName(pid), DetectProcessArch(pid));
             return { 0, proc };
         }
 
@@ -511,6 +577,16 @@ namespace oui
             if (stat(path, &st) != 0)
                 return { errno, String() };
             return { 0, FormatProcessName((pid_t)pid) };
+        }
+
+        std::tuple<int, ProcessStartInfo> SyncQueryProcessStartInfo(unsigned long long pid) override
+        {
+            char path[64];
+            snprintf(path, sizeof(path), "/proc/%d", (int)pid);
+            struct stat st;
+            if (stat(path, &st) != 0)
+                return { errno, ProcessStartInfo() };
+            return { 0, QueryProcessStartInfo((pid_t)pid) };
         }
 
         void AsyncStartQueryProcess(ThreadPtr_type targetThread,
@@ -591,7 +667,7 @@ namespace oui
                     }
                 }
 
-                info.pointerSize = DetectPointerSize(pid);
+                info.pointerSize = DetectProcessArch(pid).dianaMode;
 
                 result.push_back(std::move(info));
             }

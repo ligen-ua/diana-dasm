@@ -98,6 +98,8 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
             routeStart = 0;
         }
     }
+    // ARM: decoding starts where an instruction can
+    routeStart -= routeStart % (orthia::Address_type)orthia::GetDianaInstructionAlignment(rangeInfo.dianaArch);
 
     {
         // check if route start is in another range
@@ -110,6 +112,7 @@ void CDisasmWindow::ReloadVisibleData(const ReloadVisibleDataContext& context)
     oui::DisasmWriter writer;
     oui::MemoryPrinter printer(&writer,
         rangeInfo.dianaMode,
+        rangeInfo.dianaArch,
         m_peAddress,
         requiredLinesCount,
         oui::LimitKind::Lines,
@@ -232,8 +235,10 @@ void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1_in, const oui:
         }
     }
     writer;
+    const int dianaArch = item->GetRangeInfo(p1.y.GetIndex()).dianaArch;
     oui::MemoryPrinter printer(&writer,
         item->GetDianaMode(),
+        dianaArch,
         p1.y,
         DI_MAX_OPERAND_SIZE,
         oui::LimitKind::Lines,
@@ -242,7 +247,7 @@ void CDisasmWindow::CopySelected(const oui::MultiLineSelPoint& p1_in, const oui:
     printer.SetEndAddress(p2.y);
 
     oui::MemoryPrinter::DianaPrintContext context;
-    Diana_InitContext(&context.context, item->GetDianaMode());
+    orthia::InitDianaContext(&context.context, item->GetDianaMode(), dianaArch);
 
     context.pStream = stream.get();
     printer.OnStream(&context, p1.y, false);
@@ -782,8 +787,10 @@ void CDisasmWindow::CopySelectedAssembler(const oui::MultiLineSelPoint& p1_in, c
         }
     } writer;
 
+    const int dianaArch = item->GetRangeInfo(p1.y.GetIndex()).dianaArch;
     oui::MemoryPrinter printer(&writer,
         item->GetDianaMode(),
+        dianaArch,
         p1.y,
         DI_MAX_OPERAND_SIZE,
         oui::LimitKind::Lines,
@@ -792,7 +799,7 @@ void CDisasmWindow::CopySelectedAssembler(const oui::MultiLineSelPoint& p1_in, c
     printer.SetEndAddress(p2.y);
 
     oui::MemoryPrinter::DianaPrintContext context;
-    Diana_InitContext(&context.context, item->GetDianaMode());
+    orthia::InitDianaContext(&context.context, item->GetDianaMode(), dianaArch);
 
     context.pStream = stream.get();
     printer.OnStream(&context, p1.y, false);

@@ -22,6 +22,7 @@ namespace orthia
         std::shared_ptr<oui::CWindowThread> m_uiThread;
         std::weak_ptr<IUILogInterface> m_uiLog;
         std::shared_ptr<CConfigOptionsStorage> m_config;
+        std::shared_ptr<oui::IFileSystem> m_fileSystem;
 
         void Cleanup(int workspaceId);
 
@@ -31,7 +32,8 @@ namespace orthia
         void Stop();
 
         void Init(std::weak_ptr<IUILogInterface> uiLog,
-                  std::shared_ptr<CConfigOptionsStorage> config);
+                  std::shared_ptr<CConfigOptionsStorage> config,
+                  std::shared_ptr<oui::IFileSystem> fileSystem);
 
         void EnqueueAnalyze(std::shared_ptr<IWorkPlaceItem> item,
                      std::shared_ptr<oui::BaseOperation> op,

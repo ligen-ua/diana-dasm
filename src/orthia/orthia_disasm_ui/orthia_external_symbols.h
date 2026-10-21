@@ -2,14 +2,13 @@
 
 #include "orthia_model_interfaces.h"
 #include "orthia_module_symbols.h"
+#include "orthia_file_reader.h"
 #include <memory>
 #include <vector>
 
 namespace orthia
 {
     class CClassicDatabase;
-
-    bool IsPeModule(const ModuleInfo& mod);
 
     // Whether the module's image can be read at mod.address: an unresolved dependency owns
     // an address range with nothing mapped there, and so does, in file mode, any dependency
@@ -36,6 +35,15 @@ namespace orthia
     bool QueryModuleElfDebugInfo(IMemoryReader* memoryReader,
                                  const ModuleInfo& mod,
                                  PlatformString_type& buildIdHex);
+
+    // Host-side lookup of an ELF module's separate debug file, where GDB looks for it:
+    // <root>/.build-id/ab/cdef.debug for each symbol folder and /usr/lib/debug, then the
+    // .gnu_debuglink name next to the module, in its .debug/ subfolder, under /usr/lib/debug
+    // and in the symbol folders. Returns the path found, empty when there is none.
+    PlatformString_type FindElfDebugFile(const PlatformString_type& moduleFile,
+                                         const PlatformString_type& buildIdHex,
+                                         const PlatformString_type& debugLink,
+                                         const std::vector<PlatformString_type>& symbolFolders);
 
     class CLoaderUILogger
     {
@@ -73,7 +81,21 @@ namespace orthia
                           OnPrivateSymbolLoaded onSymbol = nullptr) = 0;
     };
 
+    struct SymbolsLoaderParams
+    {
+        std::vector<PlatformString_type> symbolFolders;     // host-side
+        std::shared_ptr<CLoaderUILogger> logger;
+        FileOpener_type openFile;                           // the modules' own (target) files
+    };
+    // the loaders behind the formats (IImageFormat::CreateSymbolsLoader):
+    // PDB files for PE modules, separate debug files for ELF modules
+    std::unique_ptr<IExternalSymbolsLoader> CreatePdbSymbolsLoader(const SymbolsLoaderParams& params);
+    std::unique_ptr<IExternalSymbolsLoader> CreateElfDebugFileLoader(const SymbolsLoaderParams& params);
+
+    // every format's loader; a module is loaded by the first one that can
     std::unique_ptr<IExternalSymbolsLoader> CreateExternalSymbolsLoader(
         const std::vector<PlatformString_type>& symbolFolders,
-        std::shared_ptr<CLoaderUILogger> logger = nullptr);
+        std::shared_ptr<CLoaderUILogger> logger = nullptr,
+        // opens the modules' own (target) files; PDBs come from host-side symbol folders
+        FileOpener_type openFile = FileOpener_type());
 }

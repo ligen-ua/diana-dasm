@@ -79,6 +79,10 @@ namespace orthia
     {
         return ORTHIA_TCSTR("parameters.xml");
     }
+    PlatformString_type CConfigOptionsStorage::GetMetaFileName() const
+    {
+        return ORTHIA_TCSTR("meta.xml");
+    }
     PlatformString_type CConfigOptionsStorage::GetBinFileName() const
     {
         return ORTHIA_TCSTR("target.bin");

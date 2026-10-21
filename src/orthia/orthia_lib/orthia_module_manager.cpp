@@ -48,6 +48,7 @@ void CModuleManager::ReloadRange(Address_type offset,
                                  Address_type size,
                                  IMemoryReader * pMemoryReader,
                                  int mode,
+                                 int arch,
                                  int analyserFlags)
 {
     CAutoCriticalSection guard(m_writeLock);
@@ -56,7 +57,7 @@ void CModuleManager::ReloadRange(Address_type offset,
     regionName<<ORTHIA_TCSTR("region_")<<offset<<ORTHIA_TCSTR("_")<<size;
 
     CDianaModule module;
-    module.InitRaw(offset, size, pMemoryReader, mode);
+    module.InitRaw(offset, size, pMemoryReader, mode, arch);
 
     if (QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(offset))
     {

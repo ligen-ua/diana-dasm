@@ -149,7 +149,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"),    ORTHIA_TCSTR("Open as Shellcode"))
         << textManager->RegisterValue(ORTHIA_TCSTR("message"),    ORTHIA_TCSTR("File format not recognized. Open as raw shellcode?"))
         << textManager->RegisterValue(ORTHIA_TCSTR("addr-label"), ORTHIA_TCSTR("Load address:"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("mode-label"), ORTHIA_TCSTR("Architecture (32 or 64):"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("mode-label"), ORTHIA_TCSTR("Architecture (Left/Right to change):"))
         ;
 
     // main
@@ -164,14 +164,18 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("analyzing-private-symbols"), ORTHIA_TCSTR("Analyzing private symbols: \"%1\" ..."))
         << textManager->RegisterValue(ORTHIA_TCSTR("analyzing-private-symbols-done"), ORTHIA_TCSTR("Private symbols analysis complete: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("symbols-mismatch"), ORTHIA_TCSTR("Symbol file mismatched: \"%1\" ..."))
-        << textManager->RegisterValue(ORTHIA_TCSTR("symbols-elf-unsupported"), ORTHIA_TCSTR("Symbols for \"%1\": ELF symbol loading is not supported yet"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("done-opened"), ORTHIA_TCSTR("Opened Successfully"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("symbols-elf-unsupported"), ORTHIA_TCSTR("Symbols for \"%1\": debug file \"%2\" found, but ELF symbol loading is not supported yet"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("opened-file"), ORTHIA_TCSTR("Opened: %1 %2, %3"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("opened-layout"), ORTHIA_TCSTR("base %1, entry %2, size %3"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("opened-managed"), ORTHIA_TCSTR(".NET, %1"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("opened-process"), ORTHIA_TCSTR("Opened: process %1, main module: %2"))
         << textManager->RegisterValue(ORTHIA_TCSTR("module-sha1"), ORTHIA_TCSTR("SHA1: %1"))
         << textManager->RegisterValue(ORTHIA_TCSTR("opening"), ORTHIA_TCSTR("Opening: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("closing"), ORTHIA_TCSTR("Closing: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("readme-header"), ORTHIA_TCSTR("Orthia Disasm Database Folder"))
         << textManager->RegisterValue(ORTHIA_TCSTR("original-name"), ORTHIA_TCSTR("Original Name: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("database-file"), ORTHIA_TCSTR("Database file: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("database-reused"), ORTHIA_TCSTR("Using the database of an earlier open of this process (--overwrite-db for a new one)"))
         ;
 
     // model

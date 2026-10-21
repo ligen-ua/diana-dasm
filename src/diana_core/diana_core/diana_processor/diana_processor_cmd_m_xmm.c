@@ -16,7 +16,8 @@ int Diana_Call_pandn(struct _dianaContext * pDianaContext,
         int i;
         for(i = 0; i < dest_size; ++i)
         {
-            dest.u8[i] &= ~(src.u8[i]);
+            // NOT DEST AND SRC
+            dest.u8[i] = (DI_CHAR)(~dest.u8[i] & src.u8[i]);
         }
     }
 
@@ -217,6 +218,17 @@ int Diana_Call_movhps(struct _dianaContext * pDianaContext,
     DI_DEF_LOCAL_XMM(dest)
     DI_DEF_LOCAL_XMM(src)
 
+    if (pCallContext->m_result.linkedOperands[0].type == diana_index)
+    {
+        // movhps m64, xmm: the high quadword of xmm
+        src_size = 16;
+        DI_MEM_GET_SRC_XMM(src)
+        dest_size = 8;
+        dest.u64[0] = src.u64[1];
+        DI_MEM_SET_DEST_XMM(dest)
+        DI_PROC_END
+    }
+
     dest_size = 16;
     DI_MEM_GET_DEST_XMM(dest)
 
@@ -317,8 +329,9 @@ int Diana_Call_andnpd(struct _dianaContext * pDianaContext,
     DI_MEM_GET_DEST_XMM(dest)
     DI_MEM_GET_SRC_XMM(src)
 
-    dest.u64[0] &= ~src.u64[0];
-    dest.u64[1] &= ~src.u64[1];
+    // NOT DEST AND SRC
+    dest.u64[0] = ~dest.u64[0] & src.u64[0];
+    dest.u64[1] = ~dest.u64[1] & src.u64[1];
 
     DI_MEM_SET_DEST_XMM(dest)
     DI_PROC_END

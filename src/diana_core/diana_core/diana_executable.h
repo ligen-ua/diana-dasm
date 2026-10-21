@@ -15,8 +15,9 @@ extern "C" {
 typedef struct _DianaExecutable
 {
     int type;              /* DIANA_EXECUTABLE_TYPE_PE or DIANA_EXECUTABLE_TYPE_ELF */
-    int dianaMode;         /* DIANA_MODE32 or DIANA_MODE64 */
+    int dianaMode;         /* DIANA_MODE32 or DIANA_MODE64, the pointer size */
     OPERAND_SIZE sizeOfModule;
+    int arch;              /* DIANA_ARCH_*, pass it to Diana_InitContextEx */
     union
     {
         Diana_PeFile  peFile;
@@ -58,6 +59,15 @@ int DianaExecutable_QueryTLSCallbacks(DianaExecutable* pExe,
     void** ppTlsCallbacks,
     int* callbacksCount,
     OPERAND_SIZE* pAddressOfTLSIndex,
+    int streamFlags);
+
+/* Unified QueryStartupRoutines - ELF only (IFUNC resolvers, init arrays); returns DI_SUCCESS
+   with no routines for PE, whose counterpart is QueryTLSCallbacks */
+int DianaExecutable_QueryStartupRoutines(DianaExecutable* pExe,
+    DianaMovableReadStream* pStream,
+    OPERAND_SIZE moduleAddress,
+    DianaElfFile_StartupRoutine_Callback callback,
+    void* pContext,
     int streamFlags);
 
 /* Minimum number of bytes required by DianaExecutable_DetectType */

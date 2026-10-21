@@ -82,4 +82,9 @@ int Diana_Call_fidivr(struct _dianaContext * pDianaContext,
                      DianaProcessor * pCallContext);
 
 
+int Diana_Call_ficom(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_ficomp(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_fimul(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_fisttp(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+
 #endif

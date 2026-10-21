@@ -27,7 +27,7 @@ def expected(data, self_pe):
 
 
 def test_status_shows_symbols(orthia_self_pdb, me):
-    orthia_self_pdb.run("lm", **me).assert_ok().assert_line(r"orthia\.exe\s+analysis, symbols")
+    orthia_self_pdb.run("lm", **me).assert_ok().assert_line(r"orthia\.exe\s+analyzed, symbols")
 
 
 @pytest.mark.parametrize("name", PRIVATE)
@@ -91,6 +91,6 @@ def test_failed_symbol_search_is_summarised(orthia_cold, data):
 def test_mismatched_pdb_is_not_loaded(orthia_cold, data):
     mismatch = data.pdb_mismatch_copy(data.self_file, "orthia_mismatch2.exe")
     res = orthia_cold.with_(analyze=True, symbol_path=data.self_symbols).run("lm", file=mismatch).assert_ok()
-    res.assert_line(r"\borthia_mismatch2\.exe\s+analysis$")
+    res.assert_line(r"\borthia_mismatch2\.exe\s+analyzed$")
     res = orthia_cold.run("db orthia_mismatch2!wmain L1", file=mismatch)
     res.assert_line(r"^Error: Unknown variable: ")

@@ -75,6 +75,7 @@
 
 #if _MSC_VER < 1910 && __cplusplus < 201703L
 #define DIANA_AUTO_PTR std::auto_ptr
+#pragma warning(disable:4067)
 #else
 #define DIANA_AUTO_PTR std::unique_ptr
 
@@ -85,7 +86,7 @@
 
 
 
-#if defined(__has_include) && __has_include(<stdint.h>)
+#if (!defined(DIANA_NO_STDINT)) && defined(__has_include) && __has_include(<stdint.h>)
 #include <stdint.h>
 #define DIANA_HAS_STDINT
 #elif defined(_MSC_VER) && (_MSC_VER < 1600)

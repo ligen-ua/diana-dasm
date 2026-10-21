@@ -28,6 +28,25 @@ namespace oui
         size_t offset = 0;
         int size = 0;
     };
+    // AArch32: what the bytes are (A32, T32, data) by the analysis saved in the database, read a window at a time
+    class CArmCodeMap
+    {
+        std::shared_ptr<orthia::IWorkPlaceItem> m_item;
+        orthia::Address_type m_moduleAddress = 0;
+        orthia::Address_type m_moduleLast = 0;
+        orthia::ArmCodeKind m_moduleKind = orthia::ArmCodeKind::A32;
+        // [m_from, m_to): m_first at m_from, then the changes after it
+        orthia::Address_type m_from = 1;
+        orthia::Address_type m_to = 0;
+        orthia::ArmCodeKind m_first = orthia::ArmCodeKind::A32;
+        std::vector<orthia::ArmCodeChange> m_changes;
+        void Load(orthia::Address_type address);
+    public:
+        explicit CArmCodeMap(std::shared_ptr<orthia::IWorkPlaceItem> item);
+        // the kind at the address and where the next change is (DI_MAX_OPERAND_SIZE: none known)
+        orthia::ArmCodeKind Query(orthia::Address_type address, orthia::Address_type* pNextChange);
+    };
+
     // what the printer's limit counts: screen lines (annotations included) or instructions only
     enum class LimitKind
     {
@@ -56,12 +75,15 @@ namespace oui
         oui::LineIndex m_stopAddress;
         orthia::IMarkupCache* m_referencesCache = nullptr;
         const LimitKind m_limitKind;
+        // AArch32 only
+        std::unique_ptr<CArmCodeMap> m_armCodeMap;
 
         void PackCommand(const orthia::PlatformString_type& command, std::shared_ptr<DisasmLineContextTag> tag);
         Diana_LinkedAdditionalGroupInfo* GetLinkedInfo();
     public:
         MemoryPrinter(DisasmWriter* pTextPrinter,
             int dianaMode,
+            int dianaArch,
             const oui::LineIndex & startAddress,
             orthia::Address_type limit,
             LimitKind limitKind,

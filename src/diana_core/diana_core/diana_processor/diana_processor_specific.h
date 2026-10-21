@@ -82,7 +82,17 @@ void DianaProcessor_SetValueEx(DianaProcessor * pCallContext,
         UPDATE_PSZ(*(unsigned short*)pStart, 0x8000);
         return;
     case 4:
-        *(unsigned int*)pStart = (unsigned int)value;
+        // 64-bit mode: a write to a 32-bit general register clears bits 63:32, implicit operands too
+        // (cdq, mul, div, cmpxchg write edx/eax)
+        if (pCallContext->m_context.iAMD64Mode &&
+            ((regId >= reg_EAX && regId <= reg_EDI) || (regId >= reg_R8D && regId <= reg_R15D)))
+        {
+            *(OPERAND_SIZE*)pStart = (unsigned int)value;
+        }
+        else
+        {
+            *(unsigned int*)pStart = (unsigned int)value;
+        }
         UPDATE_PSZ(*(unsigned int*)pStart, 0x80000000UL);
         return;
     case 8:

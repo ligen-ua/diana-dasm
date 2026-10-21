@@ -21,10 +21,38 @@ int Diana_ParseCmdOnBuffer_test(int iMode,
     if (iRes)
         return iRes;
 
-    if (pResult->iFullCmdSize!=size)
+    if (pResult->iFullCmdSize!=size || *sizeRead!=size)
+    {
+        std::cout<<"[ERROR] instruction size "<<pResult->iFullCmdSize<<", read "<<*sizeRead<<", buffer "<<size<<"\n";
         Diana_FatalBreak();
+        return DIANA_TEST_ERROR_SIZE;
+    }
+    return iRes;
+}
 
-    if (*sizeRead!=size)
+int Diana_ParseCmdOnBufferEx_test(int iMode,
+                                  int iArch,
+                                  void * pBuffer,
+                                  size_t size,
+                                  DianaBaseGenObject_type * pInitialLine, // IN
+                                  DianaParserResult * pResult,            // OUT
+                                  size_t * sizeRead)                      // OUT
+{
+    int iRes = Diana_ParseCmdOnBufferEx(iMode,
+                                        iArch,
+                                        pBuffer,
+                                        size,
+                                        pInitialLine, // IN
+                                        pResult,      // OUT
+                                        sizeRead);    // OUT
+    if (iRes)
+        return iRes;
+
+    if (pResult->iFullCmdSize!=size || *sizeRead!=size)
+    {
+        std::cout<<"[ERROR] instruction size "<<pResult->iFullCmdSize<<", read "<<*sizeRead<<", buffer "<<size<<"\n";
         Diana_FatalBreak();
+        return DIANA_TEST_ERROR_SIZE;
+    }
     return iRes;
 }

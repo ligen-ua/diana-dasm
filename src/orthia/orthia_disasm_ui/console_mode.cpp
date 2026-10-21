@@ -2,6 +2,8 @@
 #include "orthia_core.h"
 #include "oui_editbox.h"
 #include "orthia_commands.h"
+#include "formats/orthia_image_format.h"
+#include "orthia_diana_arch.h"
 #include "diana_core_cpp.h"
 #include <cstdio>
 #include <climits>
@@ -237,7 +239,8 @@ namespace
 
     bool OpenFile(CHeadlessPump& pump,
         const std::shared_ptr<CProgramModel>& model,
-        const PlatformString_type& name_in)
+        const PlatformString_type& name_in,
+        const FileFormatOptions& fileFormat)
     {
         // on error the name is returned as given, SyncOpenFile reports the real problem
         const PlatformString_type name = std::get<1>(model->GetFileSystem()->SyncGetFullPathName(name_in)).native;
@@ -251,8 +254,21 @@ namespace
         }
         return OpenTargetAndWait<oui::fsui::FileCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::FileCompleteHandler_type>> handler) {
-                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler]() {
-                    model->AddExecutable(file, handler);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler, fileFormat]() {
+                    // ParseFileFormatOptions checked the format and its parameters
+                    const IImageFormat* format = nullptr;
+                    MapFileParameters params;
+                    if (!fileFormat.format.empty())
+                    {
+                        format = FindFormatById(PlatformStringToUtf8(fileFormat.format));
+                        if (format->NeedsUserParameters())
+                        {
+                            params.imageBase = fileFormat.base;
+                            params.dianaMode = fileFormat.dianaMode;
+                            params.dianaArch = fileFormat.dianaArch;
+                        }
+                    }
+                    model->AddExecutable(file, handler, format, params);
                 });
             });
     }
@@ -358,6 +374,11 @@ namespace
             WriteLine(stderr, ORTHIA_TCSTR("--cmd accepts a single target: one --file or one --pid"));
             return consoleExit_Usage;
         }
+        if (!options.fileFormat.format.empty() && options.files.empty())
+        {
+            WriteLine(stderr, ORTHIA_TCSTR("--format applies to --file only"));
+            return consoleExit_Usage;
+        }
         if (options.files.empty() && options.pids.empty())
         {
             // the data folder commands (.database) need no target
@@ -384,7 +405,7 @@ namespace
 
         for (auto& name : options.files)
         {
-            if (!OpenFile(pump, model, name))
+            if (!OpenFile(pump, model, name, options.fileFormat))
             {
                 return consoleExit_OpenFail;
             }
@@ -458,6 +479,76 @@ namespace
             value = value * base + digit;
         }
         *pid = value;
+        return true;
+    }
+
+    bool ParseFileFormatOptions(const PlatformString_type* format,
+        const PlatformString_type* base,
+        const PlatformString_type* arch,
+        FileFormatOptions& result,
+        std::string& error)
+    {
+        result = FileFormatOptions();
+        if (!format)
+        {
+            if (base || arch)
+            {
+                error = std::string(base ? "--base" : "--arch") + " needs --format raw";
+                return false;
+            }
+            return true;
+        }
+        const std::string formatId = PlatformStringToUtf8(*format);
+        const IImageFormat* imageFormat = FindFormatById(formatId);
+        if (!imageFormat)
+        {
+            std::string supported;
+            for (auto* known : GetImageFormats())
+            {
+                supported += (supported.empty() ? "" : ", ") + std::string(known->GetId());
+            }
+            error = "Unknown format: " + formatId + " (supported: " + supported + ")";
+            return false;
+        }
+        if (!imageFormat->NeedsUserParameters())
+        {
+            // the headers say where and how
+            if (base || arch)
+            {
+                error = std::string(base ? "--base" : "--arch") + " doesn't apply to --format " + formatId;
+                return false;
+            }
+            result.format = *format;
+            return true;
+        }
+        if (!base || !arch)
+        {
+            error = "--format " + formatId + " needs " + (base ? "--arch" : "--base");
+            return false;
+        }
+        if (!ParsePidArgument(*base, &result.base))
+        {
+            error = "Invalid value for --base: " + PlatformStringToUtf8(*base) +
+                " (expected a decimal or 0x-prefixed hex number)";
+            return false;
+        }
+        // the same choice the shellcode dialog offers
+        const auto* choice = FindDianaArchChoice(PlatformStringToUtf8(*arch));
+        if (!choice)
+        {
+            error = "Invalid value for --arch: " + PlatformStringToUtf8(*arch) + " (expected " + GetDianaArchChoiceNames() + ")";
+            return false;
+        }
+        const int alignment = GetDianaInstructionAlignment(choice->dianaArch);
+        if (result.base % alignment)
+        {
+            error = "Invalid value for --base: " + PlatformStringToUtf8(*base) + " (" + choice->name +
+                " code starts at a multiple of " + std::to_string(alignment) + ")";
+            return false;
+        }
+        result.dianaMode = choice->dianaMode;
+        result.dianaArch = choice->dianaArch;
+        result.format = *format;
         return true;
     }
 

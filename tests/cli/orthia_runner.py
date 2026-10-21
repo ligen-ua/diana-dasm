@@ -8,7 +8,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 # Exit codes documented in `orthia --help`
 EXIT_OK = 0
@@ -187,11 +187,13 @@ class Orthia:
         return Result(argv, proc.returncode, proc.stdout, proc.stderr)
 
     def run(self, *cmds: str, file: Optional[Path] = None, pid: Optional[str] = None,
-            timeout: Optional[float] = None) -> Result:
-        """Open one target and run each command as its own --cmd."""
+            options: Sequence[str] = (), timeout: Optional[float] = None) -> Result:
+        """Open one target and run each command as its own --cmd.
+        `options` go before the commands, e.g. ("--format", "raw", "--base", "0x1000", "--arch", "x64")."""
         if (file is None) == (pid is None):
             raise ValueError("pass exactly one of file= or pid=")
         args: List[str] = ["--file", str(file)] if file is not None else ["--pid", str(pid)]
+        args += list(options)
         if self.analyze:
             args.append("--analyze")
         for cmd in cmds:

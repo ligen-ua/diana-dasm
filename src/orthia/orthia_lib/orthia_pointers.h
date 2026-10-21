@@ -130,10 +130,11 @@ public:
     {
         AddRef();
     }
+    // const is shallow, as in the copy constructor: newer compilers take `return local;` here
     template<class OtherType>
     intrusive_ptr(const intrusive_ptr<OtherType> & p)
         :
-            m_pObject(p.get())
+            m_pObject(const_cast<OtherType*>(p.get()))
     {
         AddRef();
     }

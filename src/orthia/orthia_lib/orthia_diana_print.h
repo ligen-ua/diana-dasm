@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_common_print.h"
+#include "orthia_diana_arch.h"
 
 namespace orthia
 {
@@ -19,6 +20,7 @@ namespace orthia
 
         orthia::ITextPrinter* m_pTextPrinter;
         int m_dianaMode;
+        int m_dianaArch;
         AsmCommandWriterType m_writer;
         orthia::PlatformString_type m_currentBlock;
         orthia::Address_type m_sizeInCommands;
@@ -35,6 +37,7 @@ namespace orthia
             :
             m_pTextPrinter(pTextPrinter),
             m_dianaMode(dianaMode),
+            m_dianaArch(DIANA_ARCH_X86),
             m_sizeInCommands(sizeInCommands),
             m_currentCommand(0),
             m_bytesIdent(0),
@@ -53,6 +56,15 @@ namespace orthia
         int GetDianaMode() const
         {
             return m_dianaMode;
+        }
+        // DIANA_ARCH_*, x86 unless set
+        void SetDianaArch(int dianaArch)
+        {
+            m_dianaArch = dianaArch;
+        }
+        int GetDianaArch() const
+        {
+            return m_dianaArch;
         }
         void SetSpacesCount(int spacesCount)
         {
@@ -118,7 +130,7 @@ namespace orthia
 
             m_pDianaPrintContext = &ctx;
 
-            Diana_InitContext(&context, m_dianaMode);
+            InitDianaContext(&context, m_dianaMode, m_dianaArch);
             Diana_InitMemoryStream(&stream, (void*)pDataStart, (size_t)vmRange.size);
 
             orthia::PlatformString_type temp, binaryData;
@@ -167,7 +179,17 @@ namespace orthia
                 Preprocess(iRes, context, result, virtualOffset, &print, &exit);
                 if (iRes)
                 {
-                    temp = orthia::ToHexString(pDataStart + offsetInPage, 1);
+                    // undecodable: the next place an instruction can start (1 byte on x86, a word on ARM)
+                    size_t step = prevWasBad ? 1 : (size_t)GetDianaInstructionAlignment(m_dianaArch);
+                    if (step > vmRange.size - offsetInPage)
+                    {
+                        step = (size_t)(vmRange.size - offsetInPage);
+                    }
+                    if (!step)
+                    {
+                        step = 1;
+                    }
+                    temp = orthia::ToHexString(pDataStart + offsetInPage, step);
                     if (print)
                     {
                         if (prevWasBad)
@@ -181,8 +203,8 @@ namespace orthia
                             PrintCommand(virtualOffset, temp, dbCommand + temp);
                         }
                     }
-                    ++offsetInPage;
-                    ++virtualOffset;
+                    offsetInPage += step;
+                    virtualOffset += step;
                     DI_CHECK_CPP(stream.parent.parent.pMoveTo(&stream.parent.parent, offsetInPage));
                     Diana_ClearCache(&context);
 

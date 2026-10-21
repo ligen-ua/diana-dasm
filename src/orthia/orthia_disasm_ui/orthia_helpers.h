@@ -2,6 +2,7 @@
 #include "orthia_utils.h"
 #include "oui_filesystem.h"
 #include "orthia_interfaces.h"
+#include "orthia_file_reader.h"
 
 namespace orthia
 {
@@ -35,6 +36,10 @@ namespace orthia
     // For display: "\\?\C:\x" -> "C:\x", "\\?\UNC\srv\x" -> "\\srv\x". The stored name keeps
     // the prefix, file access needs it for long paths.
     PlatformString_type StripLongPathPrefix(const PlatformString_type& fullName);
+
+    // Opens target files (the debugged modules' images) through the filesystem interface,
+    // which may lead to a remote machine. Returns an empty opener when fs is null.
+    FileOpener_type CreateFileOpener(std::shared_ptr<oui::IFileSystem> fs);
 
 
 }

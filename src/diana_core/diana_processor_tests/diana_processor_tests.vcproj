@@ -334,11 +334,23 @@
 				>
 			</File>
 			<File
+				RelativePath="..\diana_core_tests\test_common.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_processor.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\test_processor_a.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_processor_avx.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\test_processor_avx512.cpp"
 				>
 			</File>
 			<File
@@ -354,6 +366,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_processor_cpu.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_processor_d.cpp"
 				>
 			</File>
@@ -366,19 +382,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_processor_fpu2.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_processor_fpu_integration.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\test_processor_fpu_sse.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\test_processor_fpu2.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\test_processor_sse2.cpp"
 				>
 			</File>
 			<File
@@ -418,6 +430,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_processor_sse2.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_processor_x.cpp"
 				>
 			</File>
@@ -427,6 +443,10 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath="..\diana_core_tests\test_common.h"
+				>
+			</File>
 			<File
 				RelativePath=".\test_processor.h"
 				>

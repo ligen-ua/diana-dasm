@@ -35,6 +35,15 @@ int Diana_ParseCmdOnBuffer(int iMode,
                            DianaParserResult * pResult,  //OUT
                            DIANA_SIZE_T * sizeRead);    // OUT
 
+// the same for any architecture, iArch is DIANA_ARCH_*
+int Diana_ParseCmdOnBufferEx(int iMode,
+                             int iArch,
+                             void * pBuffer,
+                             DIANA_SIZE_T size,
+                             DianaBaseGenObject_type * pInitialLine,  // IN
+                             DianaParserResult * pResult,  //OUT
+                             DIANA_SIZE_T * sizeRead);    // OUT
+
 int Diana_ParseCmdOnBuffer_testmode(int iMode,
                                     void * pBuffer,
                                     DIANA_SIZE_T size,

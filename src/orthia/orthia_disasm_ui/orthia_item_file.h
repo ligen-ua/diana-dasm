@@ -10,6 +10,7 @@ namespace orthia
     class CCommonFormatBuilder;
     class ImageSourceTable;
     struct IImageSource;
+    struct IImageFormat;
 
     struct FileWorkplaceItem :std::enable_shared_from_this<FileWorkplaceItem>, BaseWorkPlaceItem
     {
@@ -26,7 +27,8 @@ namespace orthia
 
         // Builds imageSources from tbl_modules and the module metainfo (identity, src_kind).
         // Runs the cheap header pre-check of linked PE dependencies, so call it off the UI thread.
-        void InitImageSources(int executableType);
+        // mainFormat: the opened file's format, nullptr for raw code
+        void InitImageSources(const IImageFormat* mainFormat);
 
         // public interface
         WorkAddressData ReadData(Address_type address, Address_type size) override;
@@ -39,6 +41,7 @@ namespace orthia
         Address_type GetMainModuleAddress() const override;
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         int GetDianaMode() const override;
+        int GetDianaArch() const override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
         void InvalidateNames(Address_type moduleAddress) override;
@@ -52,7 +55,7 @@ namespace orthia
         std::shared_ptr<IMemoryReader> CreateMemoryReader() override;
         void UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove) override;
         void OnModuleSymbolsLoaded(Address_type moduleAddress) override;
-        void QuerySections(Address_type moduleBase, ImageSections& sections) override;
+        void QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections) override;
         PlatformString_type GetDatabaseFolder() const override { return databaseFolder; }
 
         // Writes the import targets recorded in the database back into the main module's IAT.

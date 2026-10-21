@@ -1,4 +1,6 @@
 #include "diana_core.h"
+#include "diana_arm.h"
+#include "diana_arm32.h"
 
 #include "diana_operands.h"
 #include "diana_stream_proxy.h"
@@ -15,6 +17,13 @@ static Diana_LinkedAdditionalGroupInfo g_infoForCalls = {DIANA_GT_CAN_CHANGE_RIP
 static Diana_LinkedAdditionalGroupInfo g_infoForJmps =  {DIANA_GT_CAN_CHANGE_RIP|DIANA_GT_IS_JUMP, 0};
 static Diana_LinkedAdditionalGroupInfo g_infoForLoops = {DIANA_GT_CAN_CHANGE_RIP|DIANA_GT_IS_JUMP|DIANA_GT_CAN_GO_TO_THE_NEXT_INSTRUCTION, 0};
 static Diana_LinkedAdditionalGroupInfo g_infoForJecxz = {DIANA_GT_CAN_CHANGE_RIP|DIANA_GT_IS_JUMP|DIANA_GT_CAN_GO_TO_THE_NEXT_INSTRUCTION, 1};
+
+const DianaEvexCmdAttributes * Diana_GetEvexAttributes(const DianaCmdInfo * pInfo)
+{
+    if (!pInfo || !(pInfo->m_parent.m_flags & DIANA_BASE_GEN_OBJECT_EVEX))
+        return 0;
+    return &DIANA_CONTAINING_RECORD(pInfo, DianaEvexCmdInfo, m_cmd)->m_evex;
+}
 static Diana_LinkedAdditionalGroupInfo g_infoForJcc =   {DIANA_GT_CAN_CHANGE_RIP|DIANA_GT_IS_JUMP|DIANA_GT_CAN_GO_TO_THE_NEXT_INSTRUCTION, 0};
 
 #define DI_PROXY_BYTES_SIZE  DI_MAX_INSTRUCTION_SIZE_ALIGNED*2
@@ -73,16 +82,6 @@ int DianaExactReadSafe(DianaReadStream* pThis,
     }
     return DianaExactRead(pThis, pBuffer, (int)iBufferSize);
 }
-void DianaResult_AddByte(DianaParserResult* result, DI_CHAR ch)
-{
-    if (result->bytesCount >= DI_MAX_INSTRUCTION_SIZE)
-    {
-        Diana_FatalBreak();
-        return;
-    }
-    result->bytes[ch] = ch;
-    ++result->bytesCount;
-}
 
 void DianaMovableReadStream_Init(DianaMovableReadStream * pStream,
                                  DianaRead_fnc pReadFnc, 
@@ -117,8 +116,25 @@ int Diana_ParseCmd(DianaContext * pContext, //IN
     DianaProxyReadStream proxy;
     DianaParseParams parseParams;
     unsigned char prevCache[DI_CACHE_SIZE];
-    int prevCacheIt = pContext->cacheIt;
+    int prevCacheIt = 0;
 
+#ifndef DIANA_NO_ARM
+    if (pContext->iArch == DIANA_ARCH_AARCH64)
+    {
+        // fixed size instructions, the root line and the cache are x86 only
+        return DianaA64_ParseCmd(pContext, readStream, pResult);
+    }
+    if (pContext->iArch == DIANA_ARCH_ARM32 || pContext->iArch == DIANA_ARCH_THUMB)
+    {
+        return DianaA32_ParseCmd(pContext, readStream, pResult);
+    }
+#endif
+    if (pContext->iArch != DIANA_ARCH_X86)
+    {
+        return DI_UNSUPPORTED;
+    }
+
+    prevCacheIt = pContext->cacheIt;
     memcpy(prevCache, pContext->cache, sizeof(pContext->cache));
 
     proxy.m_iReadSize = 0;
@@ -142,6 +158,58 @@ int Diana_ParseCmd(DianaContext * pContext, //IN
 
     pResult->iPrefix = pContext->iPrefix;
     pResult->iRexPrefix = pContext->iRexPrefix;
+    pResult->iOperandSize = pContext->iCurrentCmd_opsize;
+    // 0f c7 /1 is one table entry: cmpxchg8b m64, with REX.W cmpxchg16b m128
+    if (!iRes && pResult->pInfo && pResult->iLinkedOpCount &&
+        pResult->pInfo->m_pGroupInfo->m_commandId == diana_cmd_cmpxchg16b)
+    {
+        pResult->linkedOperands[0].usedSize = pResult->iOperandSize == 8 ? 16 : 8;
+    }
+    if (!iRes && pResult->pInfo && pResult->pInfo->m_pGroupInfo)
+    {
+        int i = 0, hasLock = 0;
+        int rule = pResult->pInfo->m_parent.m_flags;
+        for (i = 0; i < (int)pContext->prefixesCount; ++i)
+        {
+            hasLock |= pContext->prefixes[i].prefix == 0xF0;
+        }
+        // an F2, F3 or 66 that is not the mandatory prefix of the entry and makes another instruction: no entry here,
+        // #UD (iPrefix and iSizePrefixes have the applied prefixes, the mandatory one isn't applied)
+        if (((rule & DIANA_BASE_GEN_OBJECT_PREFIX_NO_F3) && pContext->iPrefix == DI_PREFIX_REP) ||
+            ((rule & DIANA_BASE_GEN_OBJECT_PREFIX_NO_F2) && pContext->iPrefix == DI_PREFIX_REPN) ||
+            ((rule & DIANA_BASE_GEN_OBJECT_PREFIX_NO_66) && (pContext->iSizePrefixes & DIANA_HAS_OPERAND_SIZE_PREFIX)))
+        {
+            return DI_INVALID_OPCODE;
+        }
+        // the gathers: the destination, the VSIB index and the mask are three different registers, else #UD
+        if (pResult->iLinkedOpCount == 3 && pResult->pInfo->m_operands[1].m_type == diana_orVSIB)
+        {
+            int dest = Diana_VectorRegisterNumber(pResult->linkedOperands[0].value.recognizedRegister, 0);
+            int index = Diana_VectorRegisterNumber(pResult->linkedOperands[1].value.rmIndex.indexed_reg, 0);
+            int mask = Diana_VectorRegisterNumber(pResult->linkedOperands[2].value.recognizedRegister, 0);
+            if (dest == index || dest == mask || index == mask)
+                return DI_INVALID_OPCODE;
+        }
+        // the EVEX gathers (the mask is an opmask): the destination and the index are different registers
+        if (pResult->iLinkedOpCount == 2 && pResult->pInfo->m_operands[1].m_type == diana_orVSIB &&
+            pResult->linkedOperands[0].type == diana_register)
+        {
+            int dest = Diana_VectorRegisterNumber(pResult->linkedOperands[0].value.recognizedRegister, 0);
+            int index = Diana_VectorRegisterNumber(pResult->linkedOperands[1].value.rmIndex.indexed_reg, 0);
+            if (dest >= 0 && dest == index)
+                return DI_INVALID_OPCODE;
+        }
+        // LOCK: a lockable instruction with a memory destination, else #UD (F0 F2: iPrefix is REPN, the byte counts)
+        if (hasLock &&
+            (!(pResult->pInfo->m_flags & DI_FLAG_CMD_PREFIX_LOCK) || !pResult->iLinkedOpCount ||
+             (pResult->linkedOperands[0].type != diana_index && pResult->linkedOperands[0].type != diana_memory)))
+        {
+            return DI_INVALID_OPCODE;
+        }
+        // a locked instruction: F2, F3 are the xacquire, xrelease hints, LOCK is the prefix to report
+        if (hasLock)
+            pResult->iPrefix = DI_PREFIX_LOCK;
+    }
 
     pResult->iFullCmdSize = iPreviousCacheSize + proxy.m_iReadSize - pContext->cacheSize;
     if( pResult->iFullCmdSize > DI_MAX_INSTRUCTION_SIZE )
@@ -179,6 +247,19 @@ int Diana_ParseCmd(DianaContext * pContext, //IN
 DianaGroupInfo * Diana_GetGroupInfo(long lId)
 {
     DianaGroupInfo * pGroups = Diana_GetGroups();
+    switch (DIANA_CMD_SET(lId))
+    {
+    case DIANA_CMD_SET_X86:
+        break;
+#ifndef DIANA_NO_ARM
+    case DIANA_CMD_SET_A64:
+        return DianaA64_GetGroupInfo(lId);
+    case DIANA_CMD_SET_A32:
+        return DianaA32_GetGroupInfo(lId);
+#endif
+    default:
+        return 0;
+    }
     if (lId > Diana_GetGroupsCount())
         return 0;
     if (lId <1)
@@ -202,6 +283,9 @@ void Diana_InitContext(DianaContext * pThis, int Mode)
     DIANA_MEMSET(pThis, 0, sizeof(*pThis));
 
     pThis->cacheIt = DI_CACHE_RESERVED;
+#ifndef DIANA_NO_ARM
+    pThis->armFeatures = DIANA_A64_FEATURE_ALL;
+#endif
     if (Mode == DIANA_MODE64)
     {
         pThis->iAMD64Mode = 1;
@@ -222,6 +306,16 @@ void Diana_InitContext(DianaContext * pThis, int Mode)
 
     pThis->mainMode_sreg = reg_DS;
     pThis->currentCmd_sreg = reg_DS;
+}
+
+void Diana_InitContextEx(DianaContext * pThis, int Mode, int iArch)
+{
+    Diana_InitContext(pThis, Mode);
+    pThis->iArch = iArch;
+#ifndef DIANA_NO_ARM
+    if (iArch == DIANA_ARCH_ARM32 || iArch == DIANA_ARCH_THUMB)
+        pThis->armFeatures = DIANA_A32_FEATURE_ALL;
+#endif
 }
 
 void Diana_InitContextWithTestMode(DianaContext * pThis, int Mode)
@@ -377,6 +471,15 @@ static void ProcessCmdInfo(DianaBaseGenObject_type * pCurrentLine,
             pInfo->m_flags |= DI_FLAG_CMD_I386;
             break;
         }
+    }
+    // not on the root line: les and lds share c4 and c5 with VEX, into (ce) has no 64-bit form
+    switch (pGroupInfo->m_commandId)
+    {
+    case diana_cmd_les:
+    case diana_cmd_lds:
+    case diana_cmd_into:
+        pInfo->m_flags |= DI_FLAG_CMD_I386;
+        break;
     }
 
     // 2) DI_FLAG_CMD_AMD_DEFAULT_OPSIZE_64

@@ -1,5 +1,27 @@
 #include "diana_processor_context.h"
 #include "diana_processor_core.h"
+#include "diana_processor_core_impl_xmm.h"
+
+// reg_MM0..7 of the context, 64 bits of each x87 register: ST(i) in every mode, the order of FSAVE/FXSAVE and of
+// the Windows CONTEXT (32 and 64 bits); the physical register k (MMk of the instructions) is ST((k - TOP) & 7)
+static DianaRegInfo * DianaProcessor_ContextMMRegister(DianaProcessor * pCallContext, int i)
+{
+    return DianaProcessor_FPU_QueryReg(pCallContext, (DianaUnifiedRegister)(reg_fpu_ST0 + i));
+}
+
+static void DianaProcessor_SetContextMM(DianaProcessor * pCallContext, int i, OPERAND_SIZE value)
+{
+    DianaRegInfo * pReg = DianaProcessor_ContextMMRegister(pCallContext, i);
+    DIANA_MEMCPY(pCallContext->m_pRegistersVector + pReg->m_offset, &value, sizeof(value));
+}
+
+static OPERAND_SIZE DianaProcessor_GetContextMM(DianaProcessor * pCallContext, int i)
+{
+    OPERAND_SIZE value = 0;
+    DianaRegInfo * pReg = DianaProcessor_ContextMMRegister(pCallContext, i);
+    DIANA_MEMCPY(&value, pCallContext->m_pRegistersVector + pReg->m_offset, sizeof(value));
+    return value;
+}
 
 int DianaProcessor_InitContext(DianaProcessor * pProcessor, const Diana_Processor_Registers_Context * pContext)
 {
@@ -58,15 +80,6 @@ int DianaProcessor_InitContext(DianaProcessor * pProcessor, const Diana_Processo
     SET_REG_R14(pContext->reg_R14.value);
     SET_REG_R15(pContext->reg_R15.value);
 
-    SET_REG_MM0(pContext->reg_MM0.value); // SET_REG_FPU_ST0
-    SET_REG_MM1(pContext->reg_MM1.value); // SET_REG_FPU_ST1
-    SET_REG_MM2(pContext->reg_MM2.value);
-    SET_REG_MM3(pContext->reg_MM3.value);
-    SET_REG_MM4(pContext->reg_MM4.value);
-    SET_REG_MM5(pContext->reg_MM5.value);
-    SET_REG_MM6(pContext->reg_MM6.value);
-    SET_REG_MM7(pContext->reg_MM7.value); // SET_REG_FPU_ST7
-
     DianaProcessor_InitRawRegister(pCallContext, reg_XMM0, pContext->reg_XMM0.value, 16);
     DianaProcessor_InitRawRegister(pCallContext, reg_XMM1, pContext->reg_XMM1.value, 16);
     DianaProcessor_InitRawRegister(pCallContext, reg_XMM2, pContext->reg_XMM2.value, 16);
@@ -83,6 +96,31 @@ int DianaProcessor_InitContext(DianaProcessor * pProcessor, const Diana_Processo
     DianaProcessor_InitRawRegister(pCallContext, reg_XMM13, pContext->reg_XMM13.value, 16);
     DianaProcessor_InitRawRegister(pCallContext, reg_XMM14, pContext->reg_XMM14.value, 16);
     DianaProcessor_InitRawRegister(pCallContext, reg_XMM15, pContext->reg_XMM15.value, 16);
+    if (pContext->fpuStateFlags & DIANA_PROCESSOR_CONTEXT_YMM_STATE_VALID)
+    {
+        int i;
+        for (i = 0; i < 16; ++i)
+        {
+            DianaRegisterYMM_type value = DianaProcessor_YMM_GetValue(pCallContext, (DianaUnifiedRegister)(reg_YMM0 + i));
+            DIANA_MEMCPY(&value.xmm[1], pContext->reg_YMM_High[i].value, 16);
+            DianaProcessor_YMM_SetValue(pCallContext, (DianaUnifiedRegister)(reg_YMM0 + i), &value);
+        }
+    }
+    if (pContext->fpuStateFlags & DIANA_PROCESSOR_CONTEXT_ZMM_STATE_VALID)
+    {
+        int i;
+        for (i = 0; i < 8; ++i)
+            DianaProcessor_InitRawRegister(pCallContext, (DianaUnifiedRegister)(reg_K0 + i),
+                                            (const DI_CHAR *)&pContext->reg_K[i].value, 8);
+        for (i = 0; i < 16; ++i)
+        {
+            DianaRegisterZMM_type value = DianaProcessor_ZMM_GetValue(pCallContext, (DianaUnifiedRegister)(reg_ZMM0 + i));
+            DIANA_MEMCPY(&value.ymm[1], pContext->reg_ZMM_High[i].value, 32);
+            DianaProcessor_ZMM_SetValue(pCallContext, (DianaUnifiedRegister)(reg_ZMM0 + i), &value);
+            DIANA_MEMCPY(value.u8, pContext->reg_ZMM16_31[i].value, 64);
+            DianaProcessor_ZMM_SetValue(pCallContext, (DianaUnifiedRegister)(reg_ZMM16 + i), &value);
+        }
+    }
 
     if (pContext->fpuStateFlags & DIANA_PROCESSOR_CONTEXT_FPU_STATE_VALID)
     {
@@ -92,6 +130,15 @@ int DianaProcessor_InitContext(DianaProcessor * pProcessor, const Diana_Processo
     {
         DianaProcessor_ResetFPU(pCallContext);
     }
+    // after TOP: ST(i)
+    DianaProcessor_SetContextMM(pCallContext, 0, pContext->reg_MM0.value);
+    DianaProcessor_SetContextMM(pCallContext, 1, pContext->reg_MM1.value);
+    DianaProcessor_SetContextMM(pCallContext, 2, pContext->reg_MM2.value);
+    DianaProcessor_SetContextMM(pCallContext, 3, pContext->reg_MM3.value);
+    DianaProcessor_SetContextMM(pCallContext, 4, pContext->reg_MM4.value);
+    DianaProcessor_SetContextMM(pCallContext, 5, pContext->reg_MM5.value);
+    DianaProcessor_SetContextMM(pCallContext, 6, pContext->reg_MM6.value);
+    DianaProcessor_SetContextMM(pCallContext, 7, pContext->reg_MM7.value);
     pCallContext->m_flags = pContext->flags;
     return DI_SUCCESS;
 }
@@ -154,14 +201,14 @@ int DianaProcessor_QueryContext(DianaProcessor * pProcessor, Diana_Processor_Reg
     pContext->reg_R14.value = GET_REG_R14;
     pContext->reg_R15.value = GET_REG_R15;
 
-    pContext->reg_MM0.value = GET_REG_MM0; // SET_REG_FPU_ST0
-    pContext->reg_MM1.value = GET_REG_MM1; // SET_REG_FPU_ST1
-    pContext->reg_MM2.value = GET_REG_MM2;
-    pContext->reg_MM3.value = GET_REG_MM3;
-    pContext->reg_MM4.value = GET_REG_MM4;
-    pContext->reg_MM5.value = GET_REG_MM5;
-    pContext->reg_MM6.value = GET_REG_MM6;
-    pContext->reg_MM7.value = GET_REG_MM7; // SET_REG_FPU_ST7
+    pContext->reg_MM0.value = DianaProcessor_GetContextMM(pCallContext, 0);
+    pContext->reg_MM1.value = DianaProcessor_GetContextMM(pCallContext, 1);
+    pContext->reg_MM2.value = DianaProcessor_GetContextMM(pCallContext, 2);
+    pContext->reg_MM3.value = DianaProcessor_GetContextMM(pCallContext, 3);
+    pContext->reg_MM4.value = DianaProcessor_GetContextMM(pCallContext, 4);
+    pContext->reg_MM5.value = DianaProcessor_GetContextMM(pCallContext, 5);
+    pContext->reg_MM6.value = DianaProcessor_GetContextMM(pCallContext, 6);
+    pContext->reg_MM7.value = DianaProcessor_GetContextMM(pCallContext, 7);
     
     DIANA_MEMCPY(pContext->reg_XMM0.value, DianaProcessor_QueryRawRegister(pCallContext, reg_XMM0), 16);
     DIANA_MEMCPY(pContext->reg_XMM1.value, DianaProcessor_QueryRawRegister(pCallContext, reg_XMM1), 16);
@@ -179,9 +226,27 @@ int DianaProcessor_QueryContext(DianaProcessor * pProcessor, Diana_Processor_Reg
     DIANA_MEMCPY(pContext->reg_XMM13.value, DianaProcessor_QueryRawRegister(pCallContext, reg_XMM13), 16);
     DIANA_MEMCPY(pContext->reg_XMM14.value, DianaProcessor_QueryRawRegister(pCallContext, reg_XMM14), 16);
     DIANA_MEMCPY(pContext->reg_XMM15.value, DianaProcessor_QueryRawRegister(pCallContext, reg_XMM15), 16);
+    {
+        int i;
+        for (i = 0; i < 16; ++i)
+        {
+            DianaRegisterYMM_type value = DianaProcessor_YMM_GetValue(pCallContext, (DianaUnifiedRegister)(reg_YMM0 + i));
+            DIANA_MEMCPY(pContext->reg_YMM_High[i].value, &value.xmm[1], 16);
+        }
+        for (i = 0; i < 8; ++i)
+            DIANA_MEMCPY(&pContext->reg_K[i].value, DianaProcessor_QueryRawRegister(pCallContext, (DianaUnifiedRegister)(reg_K0 + i)), 8);
+        for (i = 0; i < 16; ++i)
+        {
+            DianaRegisterZMM_type value = DianaProcessor_ZMM_GetValue(pCallContext, (DianaUnifiedRegister)(reg_ZMM0 + i));
+            DIANA_MEMCPY(pContext->reg_ZMM_High[i].value, &value.ymm[1], 32);
+            value = DianaProcessor_ZMM_GetValue(pCallContext, (DianaUnifiedRegister)(reg_ZMM16 + i));
+            DIANA_MEMCPY(pContext->reg_ZMM16_31[i].value, value.u8, 64);
+        }
+    }
 
     pContext->flags = pCallContext->m_flags;
     pContext->fpuState = pCallContext->m_fpu;
-    pContext->fpuStateFlags = DIANA_PROCESSOR_CONTEXT_FPU_STATE_VALID;
+    pContext->fpuStateFlags = DIANA_PROCESSOR_CONTEXT_FPU_STATE_VALID | DIANA_PROCESSOR_CONTEXT_YMM_STATE_VALID |
+                              DIANA_PROCESSOR_CONTEXT_ZMM_STATE_VALID;
     return DI_SUCCESS;
 }

@@ -3,12 +3,37 @@
 #include "orthia_memory_cache.h"
 #include "orthia_files.h"
 #include "orthia_elf.h"
-#include <fstream>
-#include <filesystem>
+#include <algorithm>
 
 std::vector<char> LoadElfTestFile(const orthia::PlatformString_type& name);
 orthia::PlatformString_type ElfTestFilePath(const orthia::PlatformString_type& name);
 bool ElfTestFilesPresent(const char* testName, std::initializer_list<orthia::PlatformString_type> names);
+
+// opens test files directly; in the app the opener goes through the filesystem interface
+class CVectorFileReader : public orthia::IFileRangeReader
+{
+    std::vector<char> m_data;
+public:
+    explicit CVectorFileReader(std::vector<char> data) : m_data(std::move(data)) {}
+    unsigned long long GetSize() const override { return m_data.size(); }
+    bool Read(unsigned long long offset, std::vector<char>& data) override
+    {
+        if (offset > m_data.size() || data.size() > m_data.size() - offset)
+            return false;
+        std::copy(m_data.begin() + (size_t)offset, m_data.begin() + (size_t)offset + data.size(), data.begin());
+        return true;
+    }
+};
+
+static std::unique_ptr<orthia::IFileRangeReader> OpenTestFile(const orthia::PlatformString_type& name)
+{
+    std::vector<char> data;
+    if (orthia::LoadFileToVector_Silent(name, data))
+        return nullptr;
+    return std::make_unique<CVectorFileReader>(std::move(data));
+}
+
+static const orthia::FileOpener_type c_openTestFile = OpenTestFile;
 
 static const orthia::ImageSection* FindSection(const orthia::ImageSections& result, const char* name)
 {
@@ -46,7 +71,7 @@ static void test_sections_process_dump_lists_segments()
 {
     orthia::CReaderOverVector reader(c_dumpBase, LoadElfTestFile(ORTHIA_TCSTR("ls.bin")));
     orthia::ImageSections result;
-    orthia::QueryImageSections(&reader, c_dumpBase, orthia::PlatformString_type(), result);
+    orthia::QueryImageSections(&reader, c_dumpBase, orthia::PlatformString_type(), c_openTestFile, result);
 
     DIANA_TEST_ASSERT(result.segments);
     DIANA_TEST_ASSERT(ReasonContains(result, "no file"));
@@ -77,11 +102,12 @@ static void test_sections_process_dump_ignores_garbage_section_headers()
     // the dump is also its own "file": the headers match, but e_shoff points into the data segment
     orthia::CReaderOverVector reader(c_dumpBase, LoadElfTestFile(ORTHIA_TCSTR("ls.bin")));
     orthia::ImageSections result;
-    orthia::QueryImageSections(&reader, c_dumpBase, ElfTestFilePath(ORTHIA_TCSTR("ls.bin")), result);
+    orthia::QueryImageSections(&reader, c_dumpBase, ElfTestFilePath(ORTHIA_TCSTR("ls.bin")), c_openTestFile, result);
 
     DIANA_TEST_ASSERT(result.segments);
     DIANA_TEST_ASSERT(ReasonContains(result, "invalid section headers"));
     DIANA_TEST_ASSERT(FindAll(result, "LOAD").size() == 4);
+    DIANA_TEST_ASSERT(result.debugLink.empty());
 }
 
 static void test_sections_mapped_file_reads_section_headers_from_disk()
@@ -94,7 +120,7 @@ static void test_sections_mapped_file_reads_section_headers_from_disk()
 
     auto path = ElfTestFilePath(ORTHIA_TCSTR("dmesg"));
     orthia::ImageSections result;
-    orthia::QueryImageSections(&reader, base, path, result);
+    orthia::QueryImageSections(&reader, base, path, c_openTestFile, result);
 
     DIANA_TEST_ASSERT(!result.segments);
     DIANA_TEST_ASSERT(result.reason.empty());
@@ -112,6 +138,8 @@ static void test_sections_mapped_file_reads_section_headers_from_disk()
     // not loaded: no address
     auto shstrtab = FindSection(result, ".shstrtab");
     DIANA_TEST_ASSERT(shstrtab && shstrtab->address == 0 && shstrtab->flagsShort == ORTHIA_TCSTR("---"));
+    // Ubuntu packaging names the debug file after the build-id
+    DIANA_TEST_ASSERT(result.debugLink == ORTHIA_TCSTR("342db32e32e961622c0d19322ad591d56a65a8.debug"));
 }
 
 static void test_sections_other_file_is_rejected()
@@ -123,12 +151,14 @@ static void test_sections_other_file_is_rejected()
     orthia::CReaderOverVector reader(base, elf.GetMappedFile());
 
     orthia::ImageSections result;
-    orthia::QueryImageSections(&reader, base, ElfTestFilePath(ORTHIA_TCSTR("apt-mark")), result);
+    orthia::QueryImageSections(&reader, base, ElfTestFilePath(ORTHIA_TCSTR("apt-mark")), c_openTestFile, result);
     DIANA_TEST_ASSERT(result.segments);
     DIANA_TEST_ASSERT(ReasonContains(result, "is not the loaded image"));
     DIANA_TEST_ASSERT(FindAll(result, "LOAD").size() == 4);
+    // apt-mark has a debug link too, but it is not the loaded image
+    DIANA_TEST_ASSERT(result.debugLink.empty());
 
-    orthia::QueryImageSections(&reader, base, ElfTestFilePath(ORTHIA_TCSTR("no-such-file")), result);
+    orthia::QueryImageSections(&reader, base, ElfTestFilePath(ORTHIA_TCSTR("no-such-file")), c_openTestFile, result);
     DIANA_TEST_ASSERT(result.segments);
     DIANA_TEST_ASSERT(ReasonContains(result, "can't open"));
 }
@@ -142,9 +172,12 @@ static void PutBe(std::vector<char>& image, size_t offset, unsigned long long va
     }
 }
 
-static std::vector<char> MakeElf32Be()
+static const char c_testDebugLink[] = "elf32be.debug";
+
+static std::vector<char> MakeElf32Be(bool withDebugLink)
 {
-    std::vector<char> image(0x200 + 3 * 40);
+    const int sectionCount = withDebugLink ? 4 : 3;
+    std::vector<char> image(0x200 + sectionCount * 40);
     const char ident[] = { 0x7f, 'E', 'L', 'F', 1 /* ELFCLASS32 */, 2 /* ELFDATA2MSB */, 1 };
     memcpy(image.data(), ident, sizeof(ident));
     PutBe(image, 16, 2, 2);             // e_type: ET_EXEC
@@ -157,7 +190,7 @@ static std::vector<char> MakeElf32Be()
     PutBe(image, 42, 32, 2);            // e_phentsize
     PutBe(image, 44, 1, 2);             // e_phnum
     PutBe(image, 46, 40, 2);            // e_shentsize
-    PutBe(image, 48, 3, 2);             // e_shnum
+    PutBe(image, 48, sectionCount, 2);  // e_shnum
     PutBe(image, 50, 2, 2);             // e_shstrndx
 
     PutBe(image, 52 + 0, 1, 4);             // p_type: PT_LOAD
@@ -169,7 +202,7 @@ static std::vector<char> MakeElf32Be()
     PutBe(image, 52 + 24, 5, 4);            // p_flags: R+X
     PutBe(image, 52 + 28, 0x1000, 4);       // p_align
 
-    const char names[] = "\0.text\0.shstrtab";
+    const char names[] = "\0.text\0.shstrtab\0.gnu_debuglink";
     memcpy(image.data() + 0x180, names, sizeof(names));
 
     const size_t text = 0x200 + 40;
@@ -187,23 +220,39 @@ static std::vector<char> MakeElf32Be()
     PutBe(image, strtab + 16, 0x180, 4);    // sh_offset
     PutBe(image, strtab + 20, sizeof(names), 4);
     PutBe(image, strtab + 32, 1, 4);
+
+    if (withDebugLink)
+    {
+        // the file name, padding to 4 and a CRC
+        memcpy(image.data() + 0x1c0, c_testDebugLink, sizeof(c_testDebugLink));
+        PutBe(image, 0x1d0, 0x12345678, 4);
+        const size_t link = 0x200 + 120;
+        PutBe(image, link + 0, 17, 4);      // sh_name
+        PutBe(image, link + 4, 1, 4);       // SHT_PROGBITS
+        PutBe(image, link + 16, 0x1c0, 4);  // sh_offset
+        PutBe(image, link + 20, 0x14, 4);   // sh_size
+        PutBe(image, link + 32, 4, 4);
+    }
     return image;
 }
 
 static void test_sections_elf32_big_endian()
 {
-    auto image = MakeElf32Be();
-    auto path = orthia::GetTempPathWithSlash() + ORTHIA_TCSTR("orthia_test_sections_elf32be");
+    auto image = MakeElf32Be(false);
+    const orthia::PlatformString_type path = ORTHIA_TCSTR("elf32be");
+    orthia::FileOpener_type openFile = [&](const orthia::PlatformString_type& name)
+        -> std::unique_ptr<orthia::IFileRangeReader>
     {
-        std::ofstream file(std::filesystem::path(path), std::ios::binary | std::ios::trunc);
-        file.write(image.data(), (std::streamsize)image.size());
-    }
+        if (name != path)
+            return nullptr;
+        return std::make_unique<CVectorFileReader>(image);
+    };
 
     // only the PT_LOAD part is in memory
     const orthia::Address_type base = 0x10000000;
     orthia::CReaderOverVector reader(base, std::vector<char>(image.begin(), image.begin() + 0x200));
     orthia::ImageSections result;
-    orthia::QueryImageSections(&reader, base, path, result);
+    orthia::QueryImageSections(&reader, base, path, openFile, result);
 
     DIANA_TEST_ASSERT(!result.segments);
     DIANA_TEST_ASSERT(result.sections.size() == 2);
@@ -211,14 +260,25 @@ static void test_sections_elf32_big_endian()
     DIANA_TEST_ASSERT(text && text->address == 0x10000100 && text->size == 0x20 && text->flagsShort == ORTHIA_TCSTR("R-X"));
     auto shstrtab = FindSection(result, ".shstrtab");
     DIANA_TEST_ASSERT(shstrtab && shstrtab->address == 0);
+    DIANA_TEST_ASSERT(result.debugLink.empty());
 
-    orthia::QueryImageSections(&reader, base, orthia::PlatformString_type(), result);
+    // no opener: the file can't be read
+    orthia::QueryImageSections(&reader, base, path, orthia::FileOpener_type(), result);
+    DIANA_TEST_ASSERT(result.segments);
+    DIANA_TEST_ASSERT(ReasonContains(result, "can't open"));
+
+    orthia::QueryImageSections(&reader, base, orthia::PlatformString_type(), openFile, result);
     DIANA_TEST_ASSERT(result.segments);
     auto load = FindSection(result, "LOAD");
     DIANA_TEST_ASSERT(load && load->address == base && load->size == 0x200 && load->flagsShort == ORTHIA_TCSTR("R-X"));
 
-    std::error_code error;
-    std::filesystem::remove(std::filesystem::path(path), error);
+    image = MakeElf32Be(true);
+    orthia::CReaderOverVector linkedReader(base, std::vector<char>(image.begin(), image.begin() + 0x200));
+    orthia::QueryImageSections(&linkedReader, base, path, openFile, result);
+    DIANA_TEST_ASSERT(!result.segments);
+    DIANA_TEST_ASSERT(result.sections.size() == 3);
+    DIANA_TEST_ASSERT(FindSection(result, ".gnu_debuglink"));
+    DIANA_TEST_ASSERT(result.debugLink == orthia::Utf8ToPlatformString(c_testDebugLink));
 }
 
 void test_sections()

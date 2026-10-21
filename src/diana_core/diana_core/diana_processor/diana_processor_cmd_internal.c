@@ -213,6 +213,25 @@ int Di_CheckZeroExtends(DianaProcessor * pCallContext,
     return DI_SUCCESS;
 }
 
+int Di_ClearUpperHalf(DianaProcessor * pCallContext)
+{
+    DianaUnifiedRegister reg64;
+    OPERAND_SIZE value = 0;
+    if (!pCallContext->m_context.iAMD64Mode || pCallContext->m_context.iCurrentCmd_opsize != 4 ||
+        !pCallContext->m_result.iLinkedOpCount || pCallContext->m_result.linkedOperands->type != diana_register)
+    {
+        return DI_SUCCESS;
+    }
+    if (DianaProcessor_Query64RegisterFor32(pCallContext->m_result.linkedOperands->value.recognizedRegister,
+                                            &reg64) == DI_ERROR)
+    {
+        return DI_SUCCESS;
+    }
+    value = DianaProcessor_GetValue(pCallContext, DianaProcessor_QueryReg(pCallContext, reg64));
+    DianaProcessor_SetValue(pCallContext, reg64, DianaProcessor_QueryReg(pCallContext, reg64), value & 0xFFFFFFFFULL);
+    return DI_SUCCESS;
+}
+
 int Di_CheckZeroExtends2(DianaProcessor * pCallContext,
                          OPERAND_SIZE * pDest,
                          int src_size,
@@ -231,7 +250,8 @@ int Di_CheckZeroExtends2(DianaProcessor * pCallContext,
         }
     }
     else if (pCallContext->m_context.iCurrentCmd_opsize == 4) {
-        if (pCallContext->m_result.linkedOperands->type == diana_register) {
+        // the second operand (xchg [mem], r32)
+        if (pCallContext->m_result.linkedOperands[ 1 ].type == diana_register) {
             DianaUnifiedRegister reg64;
             if( DianaProcessor_Query64RegisterFor32(pCallContext->m_result.linkedOperands[ 1 ].value.recognizedRegister,
                                                     &reg64) == DI_ERROR )

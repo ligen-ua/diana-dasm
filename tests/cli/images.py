@@ -21,32 +21,49 @@ class Section(NamedTuple):
 # ELF
 
 PT_LOAD = 1
+ET_EXEC, ET_DYN = 2, 3
+SHT_RELA = 4
+SHT_REL = 9
 SHT_NOTE = 7
+SHT_DYNSYM = 11
+STT_FUNC, STT_GNU_IFUNC = 2, 10
 SHT_NOBITS = 8
 SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR = 0x1, 0x2, 0x4
+EM_ARM = 40
+IMAGE_FILE_MACHINE_ARMNT = 0x1C4
 DT_NEEDED, DT_RUNPATH, DT_RPATH = 1, 29, 15
 NT_GNU_BUILD_ID = 3
 
 
 class ElfInfo:
-    """ELF64 little-endian: what `lm`, `modinfo`, `sections` and dependency tests need."""
+    """ELF64 and ELF32 little-endian: what `lm`, `modinfo`, `sections` and dependency tests need."""
 
     def __init__(self, path: Path):
         self.path = Path(path)
         data = self.path.read_bytes()
         self._data = data
-        assert data[:4] == b"\x7fELF" and data[4] == 2 and data[5] == 1, f"not an ELF64 LE file: {path}"
-        (self.e_type, _, _, self.e_entry, e_phoff, e_shoff, _, _, e_phentsize, e_phnum,
-         e_shentsize, e_shnum, e_shstrndx) = struct.unpack_from("<HHIQQQIHHHHHH", data, 16)
+        assert data[:4] == b"\x7fELF" and data[4] in (1, 2) and data[5] == 1, f"not an ELF LE file: {path}"
+        self.is64 = data[4] == 2
+        if self.is64:
+            (self.e_type, self.e_machine, _, self.e_entry, e_phoff, e_shoff, _, _, e_phentsize, e_phnum,
+             e_shentsize, e_shnum, e_shstrndx) = struct.unpack_from("<HHIQQQIHHHHHH", data, 16)
+        else:
+            (self.e_type, self.e_machine, _, self.e_entry, e_phoff, e_shoff, _, _, e_phentsize, e_phnum,
+             e_shentsize, e_shnum, e_shstrndx) = struct.unpack_from("<HHIIIIIHHHHHH", data, 16)
 
         self.loads = []   # (p_vaddr, p_memsz, p_offset, p_filesz)
         for i in range(e_phnum):
-            p_type, _, p_offset, p_vaddr, _, p_filesz, p_memsz, _ = struct.unpack_from(
-                "<IIQQQQQQ", data, e_phoff + i * e_phentsize)
+            if self.is64:
+                p_type, _, p_offset, p_vaddr, _, p_filesz, p_memsz, _ = struct.unpack_from(
+                    "<IIQQQQQQ", data, e_phoff + i * e_phentsize)
+            else:
+                p_type, p_offset, p_vaddr, _, p_filesz, p_memsz, _, _ = struct.unpack_from(
+                    "<IIIIIIII", data, e_phoff + i * e_phentsize)
             if p_type == PT_LOAD:
                 self.loads.append((p_vaddr, p_memsz, p_offset, p_filesz))
 
-        raw = [struct.unpack_from("<IIQQQQIIQQ", data, e_shoff + i * e_shentsize) for i in range(e_shnum)]
+        shdr = "<IIQQQQIIQQ" if self.is64 else "<IIIIIIIIII"
+        raw = [struct.unpack_from(shdr, data, e_shoff + i * e_shentsize) for i in range(e_shnum)]
         shstr_offset = raw[e_shstrndx][4]
 
         def c_string(offset):
@@ -55,6 +72,8 @@ class ElfInfo:
         self.sections: List[Section] = []
         self.build_id: Optional[str] = None
         dynamic = None
+        dynsym = None
+        rela_plt = None
         by_index = {}
         for index, (name, sh_type, sh_flags, sh_addr, sh_offset, sh_size, sh_link, _, _, _) in enumerate(raw):
             if index == 0:
@@ -69,14 +88,48 @@ class ElfInfo:
                 self.build_id = self._build_id(data[sh_offset:sh_offset + sh_size])
             if section_name == ".dynamic":
                 dynamic = (sh_offset, sh_size, sh_link)
+            if sh_type == SHT_DYNSYM:
+                dynsym = (sh_offset, sh_size, sh_link)
+            if (sh_type == SHT_RELA and section_name == ".rela.plt") or \
+                    (sh_type == SHT_REL and section_name == ".rel.plt"):
+                rela_plt = (sh_offset, sh_size)
+
+        # defined functions in .dynsym: name -> st_value (relative to the load bias)
+        self.exported_functions: Dict[str, int] = {}
+        dynsym_names: List[str] = []
+        if dynsym:
+            offset, size, link = dynsym
+            strtab = raw[link][4]
+            for pos in range(offset, offset + size, 24 if self.is64 else 16):
+                if self.is64:
+                    st_name, st_info, _, st_shndx, st_value, _ = struct.unpack_from("<IBBHQQ", data, pos)
+                else:
+                    st_name, st_value, _, st_info, _, st_shndx = struct.unpack_from("<IIIBBH", data, pos)
+                dynsym_names.append(c_string(strtab + st_name))
+                if st_shndx and st_name and (st_info & 0xF) in (STT_FUNC, STT_GNU_IFUNC):
+                    self.exported_functions[c_string(strtab + st_name)] = st_value
+
+        # imports through the PLT: symbol name -> GOT slot (r_offset, relative to the load bias)
+        self.plt_slots: Dict[str, int] = {}
+        if rela_plt:
+            offset, size = rela_plt
+            for pos in range(offset, offset + size, 24 if self.is64 else 8):
+                if self.is64:
+                    r_offset, r_info, _ = struct.unpack_from("<QQq", data, pos)
+                    symbol = r_info >> 32
+                else:
+                    r_offset, r_info = struct.unpack_from("<II", data, pos)
+                    symbol = r_info >> 8
+                if symbol:
+                    self.plt_slots[dynsym_names[symbol]] = r_offset
 
         self.needed: List[str] = []
         self.runpath: List[str] = []
         if dynamic:
             offset, size, link = dynamic
             strtab = by_index[link][0]
-            for pos in range(offset, offset + size, 16):
-                tag, value = struct.unpack_from("<qQ", data, pos)
+            for pos in range(offset, offset + size, 16 if self.is64 else 8):
+                tag, value = struct.unpack_from("<qQ" if self.is64 else "<iI", data, pos)
                 if tag == 0:
                     break
                 if tag == DT_NEEDED:
@@ -94,6 +147,15 @@ class ElfInfo:
                 return notes[name_end:name_end + descsz].hex()
             pos = name_end + ((descsz + 3) & ~3)
         return None
+
+    def code(self, value: int) -> int:
+        """Where the instruction of a function symbol or e_entry is: ARM (EM_ARM) sets bit 0 for Thumb code."""
+        return value & ~1 if self.e_machine == EM_ARM else value
+
+    def address(self, value: int, bias: int) -> int:
+        """Where a symbol value or e_entry is once the image is loaded at `bias`: ET_EXEC
+        values are link-time addresses and the image stays at them; the others are offsets."""
+        return value if self.e_type == ET_EXEC else bias + value
 
     @property
     def image_size(self) -> int:
@@ -141,14 +203,17 @@ class PeInfo:
         section_count = struct.unpack_from("<H", image, e_lfanew + 6)[0]
         optional_size = struct.unpack_from("<H", image, e_lfanew + 20)[0]
         optional = e_lfanew + 24
+        self.machine = struct.unpack_from("<H", image, e_lfanew + 4)[0]
         self.is64 = struct.unpack_from("<H", image, optional)[0] == 0x20B
         self.entry_rva = struct.unpack_from("<I", image, optional + 16)[0]
-        self.image_base = struct.unpack_from("<Q" if self.is64 else "<I", image, optional + 24)[0]
+        # PE32 has BaseOfData before ImageBase
+        self.image_base = struct.unpack_from("<Q" if self.is64 else "<I", image, optional + (24 if self.is64 else 28))[0]
         self.size_of_image = struct.unpack_from("<I", image, optional + 56)[0]
         directories = optional + (112 if self.is64 else 96)
         self._export_dir = struct.unpack_from("<II", image, directories)
         self._import_rva = struct.unpack_from("<I", image, directories + 8)[0]
         self._debug_dir = struct.unpack_from("<II", image, directories + 6 * 8)
+        self._tls_dir = struct.unpack_from("<II", image, directories + 9 * 8)
 
         self._raw_sections = []
         self.sections: List[Section] = []
@@ -163,6 +228,10 @@ class PeInfo:
                     ("X" if characteristics & IMAGE_SCN_MEM_EXECUTE else "-")
             self.sections.append(Section(name, virtual_address, virtual_size, flags))
 
+    def code(self, rva: int) -> int:
+        """Where the instruction of a code RVA is: ARMNT (Thumb-2) code addresses have bit 0 set."""
+        return rva & ~1 if self.machine == IMAGE_FILE_MACHINE_ARMNT else rva
+
     def _offset(self, rva: int) -> int:
         for virtual_address, size, raw_offset in self._raw_sections:
             if virtual_address <= rva < virtual_address + size:
@@ -176,6 +245,24 @@ class PeInfo:
     def bytes_at(self, rva: int, size: int) -> bytes:
         offset = self._offset(rva)
         return self._image[offset:offset + size]
+
+    @property
+    def tls_callbacks(self) -> List[int]:
+        """RVAs of the TLS callbacks, in array order."""
+        rva, _ = self._tls_dir
+        if not rva:
+            return []
+        pointer = "<Q" if self.is64 else "<I"
+        width = 8 if self.is64 else 4
+        array_va = struct.unpack_from(pointer, self._image, self._offset(rva) + 3 * width)[0]
+        result = []
+        position = self._offset(array_va - self.image_base)
+        while True:
+            callback = struct.unpack_from(pointer, self._image, position)[0]
+            if not callback:
+                return result
+            result.append(callback - self.image_base)
+            position += width
 
     @property
     def exports(self) -> Dict[str, int]:

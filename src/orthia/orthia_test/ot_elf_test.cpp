@@ -3,6 +3,7 @@
 #include "orthia_files.h"
 #include "orthia_streams.h"
 #include "orthia_elf.h"
+#include "orthia_diana_module.h"
 #include <map>
 #include <set>
 
@@ -273,14 +274,238 @@ static void test_elf_exports(const orthia::PlatformString_type& fileName)
     DIANA_TEST_ASSERT(observer.exports["vfunc"] == observer.exports["vfunc_v2"]);
     DIANA_TEST_ASSERT(observer.exports["vfunc"] != observer.exports["vfunc_v1"]);
 
-    // the hash-table lookup finds every export at the enumerated address
+    // the hash-table lookup finds every export at the enumerated value, moved to where the image is
+    const DI_UINT64 bias = elf.GetImageBase() - elf.GetImpl()->mappedElf.pImpl->linkBase;
     for (auto& entry : observer.exports)
     {
-        DIANA_TEST_ASSERT(elf.DiGetProcAddress(entry.first.c_str()) == entry.second);
+        DIANA_TEST_ASSERT(elf.DiGetProcAddress(entry.first.c_str()) == bias + entry.second);
     }
     DIANA_TEST_ASSERT(elf.DiGetProcAddress("hidden_func") == 0);
     DIANA_TEST_ASSERT(elf.DiGetProcAddress("ext_import_1") == 0);
     DIANA_TEST_ASSERT(elf.DiGetProcAddress("no_such_export") == 0);
+}
+
+// resolves every import from one library, as the file-mode dependency loader does
+class LibraryResolver : public diana::CBasePeLinkImportsObserver
+{
+    orthia::CSimpleElfFile& m_library;
+public:
+    std::map<std::string, OPERAND_SIZE> resolved;
+
+    explicit LibraryResolver(orthia::CSimpleElfFile& library)
+        : m_library(library)
+    {
+    }
+    void QueryFunctionByOrdinal(const char*, DI_UINT32, OPERAND_SIZE*)
+    {
+    }
+    void QueryFunctionByName(const char*, const char* pFunctionName, DI_UINT32, OPERAND_SIZE* pAddress)
+    {
+        *pAddress = m_library.DiGetProcAddress(pFunctionName);
+        resolved[pFunctionName] = *pAddress;
+    }
+};
+
+static DI_UINT64 ReadMappedPointer(const orthia::CSimpleElfFile& elf, DI_UINT64 address)
+{
+    const auto& image = elf.GetMappedFile();
+    const auto offset = address - elf.GetImageBase();
+    DIANA_TEST_ASSERT(offset + 8 <= image.size());
+    DI_UINT64 value = 0;
+    memcpy(&value, image.data() + offset, 8);
+    return value;
+}
+
+// data/elf/linked_x64, built from data/elf/linked_exec: a PIE that imports exp_func_07 and
+// exp_func_21 from libexports_gnu.so through the PLT slots at 0x4008 and 0x4000.
+// Linking writes the address of each export where the library is mapped into its slot.
+static void test_elf_link_imports()
+{
+    const DI_UINT64 libraryBase = 0x10000;
+    orthia::CSimpleElfFile library;
+    orthia::MapFileParameters libraryParams;
+    libraryParams.imageBase = libraryBase;
+    library.MapFile(LoadElfTestFile(ORTHIA_TCSTR("libexports_gnu.so")), libraryParams);
+    DIANA_TEST_ASSERT(library.GetImageBase() == libraryBase);
+
+    // an export is where the library is: its base plus the symbol value
+    DIANA_TEST_ASSERT(library.DiGetProcAddress("exp_func_07") == libraryBase + 0x10d8);
+    DIANA_TEST_ASSERT(library.DiGetProcAddress("exp_func_21") == libraryBase + 0x1164);
+
+    orthia::CSimpleElfFile exe;
+    orthia::MapFileParameters exeParams;
+    exe.MapFile(LoadElfTestFile(ORTHIA_TCSTR("linked_x64")), exeParams);
+    const DI_UINT64 exeBias = exe.GetImageBase();
+
+    LibraryResolver resolver(library);
+    DIANA_TEST_ASSERT(exe.QueryImports(&resolver) == DI_SUCCESS);
+    DIANA_TEST_ASSERT(resolver.resolved.size() == 2);
+    DIANA_TEST_ASSERT(ReadMappedPointer(exe, exeBias + 0x4008) == libraryBase + 0x10d8);
+    DIANA_TEST_ASSERT(ReadMappedPointer(exe, exeBias + 0x4000) == libraryBase + 0x1164);
+}
+
+// data/elf/libstartup_{x64,arm64,thumb,arm32}.so, built from data/elf/startup_lib: module offsets (link-time
+// addresses); T32 code has bit 0 set
+struct StartupFixture
+{
+    const orthia::PlatformString_type::value_type* fileName;
+    DI_UINT64 globalResolver;   // exp_ifunc, a STT_GNU_IFUNC symbol
+    DI_UINT64 localResolver;    // local_ifunc, only R_*_IRELATIVE in .rela.plt
+    DI_UINT64 localSlot;        // the GOT slot of that IRELATIVE
+    DI_UINT64 init;             // DT_INIT: startup_init
+    DI_UINT64 ctor;             // DT_INIT_ARRAY[0]: startup_ctor
+    DI_UINT64 ctorSlot;
+};
+
+static const StartupFixture g_startupX64 = { ORTHIA_TCSTR("libstartup_x64.so"), 0x1044, 0x1050, 0x4000, 0x107a, 0x106e, 0x3e90 };
+static const StartupFixture g_startupArm64 = { ORTHIA_TCSTR("libstartup_arm64.so"), 0x2f0, 0x2fc, 0x20000, 0x330, 0x31c, 0x1fe88 };
+static const StartupFixture g_startupThumb = { ORTHIA_TCSTR("libstartup_thumb.so"), 0x1b1, 0x1bd, 0x200c, 0x1e1, 0x1d1, 0x1f74 };
+static const StartupFixture g_startupArm32 = { ORTHIA_TCSTR("libstartup_arm32.so"), 0x1b8, 0x1c8, 0x200c, 0x200, 0x1e4, 0x1f74 };
+
+
+static void VerifyStartupRoutines(const StartupFixture& fixture, const orthia::CSimpleElfFile& elf)
+{
+    const DI_UINT64 base = elf.GetImageBase();
+    std::vector<orthia::ElfStartupRoutine> routines;
+    DIANA_TEST_ASSERT(elf.QueryStartupRoutines(routines) == DI_SUCCESS);
+    DIANA_TEST_ASSERT(routines.size() == 4);
+    if (routines.size() != 4)
+        return;
+
+    // IFUNC resolvers first: the named one, then the one only an IRELATIVE knows
+    DIANA_TEST_ASSERT(routines[0].kind == DIANA_ELF_STARTUP_IFUNC);
+    DIANA_TEST_ASSERT(routines[0].address == base + fixture.globalResolver);
+    DIANA_TEST_ASSERT(routines[0].name == "exp_ifunc");
+    DIANA_TEST_ASSERT(routines[0].slotAddress == 0);
+    DIANA_TEST_ASSERT(orthia::GetElfStartupRoutineName(routines[0]) == "$ifunc_exp_ifunc");
+
+    DIANA_TEST_ASSERT(routines[1].kind == DIANA_ELF_STARTUP_IFUNC);
+    DIANA_TEST_ASSERT(routines[1].address == base + fixture.localResolver);
+    DIANA_TEST_ASSERT(routines[1].name.empty() && routines[1].index == 0);
+    DIANA_TEST_ASSERT(routines[1].slotAddress == base + fixture.localSlot);
+    DIANA_TEST_ASSERT(orthia::GetElfStartupRoutineName(routines[1]).rfind("$ifunc_", 0) == 0);
+
+    // then the initializers in the order the loader calls them
+    DIANA_TEST_ASSERT(routines[2].kind == DIANA_ELF_STARTUP_INIT);
+    DIANA_TEST_ASSERT(routines[2].address == base + fixture.init);
+    DIANA_TEST_ASSERT(orthia::GetElfStartupRoutineName(routines[2]) == "$init");
+
+    DIANA_TEST_ASSERT(routines[3].kind == DIANA_ELF_STARTUP_INIT_ARRAY);
+    DIANA_TEST_ASSERT(routines[3].index == 0);
+    DIANA_TEST_ASSERT(routines[3].address == base + fixture.ctor);
+    DIANA_TEST_ASSERT(routines[3].slotAddress == base + fixture.ctorSlot);
+    DIANA_TEST_ASSERT(orthia::GetElfStartupRoutineName(routines[3]).rfind("$init_array_", 0) == 0);
+
+    // the IRELATIVE slot holds the resolver: the mapping can't call it
+    DIANA_TEST_ASSERT(ReadMappedPointer(elf, base + fixture.localSlot) == base + fixture.localResolver);
+}
+
+static void test_elf_startup_routines(const StartupFixture& fixture)
+{
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    elf.MapFile(LoadElfTestFile(fixture.fileName), params);
+    VerifyStartupRoutines(fixture, elf);
+
+    // relocated: the dynamic tags and the init array point to the new base
+    const DI_UINT64 newBase = 0x10000000;
+    elf.Relocate(newBase);
+    DIANA_TEST_ASSERT(elf.GetImageBase() == newBase);
+    VerifyStartupRoutines(fixture, elf);
+}
+
+// nothing calls the resolvers and the initializers: the analyzer starts at them
+static void test_elf_startup_routines_analyzed(const StartupFixture& fixture)
+{
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    params.imageBase = 0x10000000;
+    elf.MapFile(LoadElfTestFile(fixture.fileName), params);
+    const DI_UINT64 base = elf.GetImageBase();
+
+    orthia::CReaderOverVector reader(base, elf.GetMappedFile());
+    orthia::CDianaModule module;
+    module.Init(base, &reader);
+    module.Analyze(0);
+
+    std::set<orthia::Address_type> instructions;
+    orthia::CDianaInstructionIterator it;
+    module.QueryInstructionIterator(&it);
+    for (it.MoveToFirst(); !it.IsEmpty(); it.MoveToNext())
+    {
+        instructions.insert(it.GetInstructionOffset());
+    }
+    for (DI_UINT64 offset : { fixture.globalResolver, fixture.localResolver, fixture.init, fixture.ctor })
+    {
+        // the instruction of a T32 address is at the even one
+        DIANA_TEST_ASSERT(instructions.count(orthia::GetDianaInstructionAddress(offset, elf.GetDianaArch())) == 1);
+    }
+}
+
+
+
+// what the code map says the bytes at a module offset are
+static orthia::ArmCodeKind ArmCodeKindAt(const std::vector<orthia::ArmCodeChange>& changes, int arch, DI_UINT64 offset)
+{
+    orthia::ArmCodeKind kind = orthia::GetArmCodeKind(arch);
+    for (const auto& change : changes)
+    {
+        if (change.offset > offset)
+            break;
+        kind = change.kind;
+    }
+    return kind;
+}
+
+// AArch32 ELF: armhf code is T32 by default (gcc), -marm builds A32. The analysis follows the T32 bit of
+// symbols and pointers, blx to the A32 .iplt stub and the PIC address of an IFUNC resolver
+static void test_elf_arm32(const orthia::PlatformString_type& fileName, int expectedArch)
+{
+    orthia::CSimpleElfFile elf;
+    orthia::MapFileParameters params;
+    params.imageBase = 0x10000000;
+    elf.MapFile(LoadElfTestFile(fileName), params);
+    DIANA_TEST_ASSERT(elf.GetDianaMode() == DIANA_MODE32);
+    DIANA_TEST_ASSERT(elf.GetDianaArch() == expectedArch);
+
+    // ELF32: the dynamic section has 8-byte entries
+    ExportsMapObserver observer;
+    DI_CHECK_CPP(elf.QueryExports(&observer));
+    DIANA_TEST_ASSERT(observer.exports.count("call_local_ifunc") == 1);
+    DIANA_TEST_ASSERT(observer.exports.count("startup_init") == 1);
+    DIANA_TEST_ASSERT(observer.exports.count("exp_ifunc") == 1);
+
+    const DI_UINT64 base = elf.GetImageBase();
+    orthia::CReaderOverVector reader(base, elf.GetMappedFile());
+    orthia::CDianaModule module;
+    module.Init(base, &reader);
+    module.Analyze(0);
+    DIANA_TEST_ASSERT(module.GetDianaArch() == expectedArch);
+    std::set<orthia::Address_type> instructions;
+    orthia::CDianaInstructionIterator it;
+    module.QueryInstructionIterator(&it);
+    for (it.MoveToFirst(); !it.IsEmpty(); it.MoveToNext())
+    {
+        instructions.insert(it.GetInstructionOffset());
+    }
+    std::vector<orthia::ArmCodeChange> changes;
+    module.QueryArmCodeMap(changes);
+
+    const bool thumb = expectedArch == DIANA_ARCH_THUMB;
+    const orthia::ArmCodeKind code = thumb ? orthia::ArmCodeKind::T32 : orthia::ArmCodeKind::A32;
+    // call_local_ifunc: blx (T32) or bl (A32) to the .iplt stub, which is A32 code
+    const DI_UINT64 caller = thumb ? 0x1c8 : 0x1d8;
+    DIANA_TEST_ASSERT(instructions.count(caller) == 1);
+    DIANA_TEST_ASSERT(ArmCodeKindAt(changes, expectedArch, caller) == code);
+    DIANA_TEST_ASSERT(instructions.count(0x19c) == 1 && instructions.count(0x1a4) == 1);
+    DIANA_TEST_ASSERT(ArmCodeKindAt(changes, expectedArch, 0x19c) == orthia::ArmCodeKind::A32);
+    // global_impl: only the address the resolver returns (ldr r0, [pc]; add r0, pc) leads there
+    DIANA_TEST_ASSERT(instructions.count(0x1a8) == 1);
+    DIANA_TEST_ASSERT(ArmCodeKindAt(changes, expectedArch, 0x1a8) == code);
+    // the resolver's literal is data
+    const DI_UINT64 literal = thumb ? 0x1b8 : 0x1c4;
+    DIANA_TEST_ASSERT(ArmCodeKindAt(changes, expectedArch, literal) == orthia::ArmCodeKind::Data);
+    DIANA_TEST_ASSERT(instructions.count(literal) == 0);
 }
 
 void test_elf()
@@ -296,4 +521,15 @@ void test_elf()
     }
     DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_gnu.so")));
     DIANA_TEST(test_elf_exports(ORTHIA_TCSTR("libexports_sysv.so")));
+    DIANA_TEST(test_elf_link_imports());
+    DIANA_TEST(test_elf_startup_routines(g_startupX64));
+    DIANA_TEST(test_elf_startup_routines(g_startupArm64));
+    DIANA_TEST(test_elf_startup_routines_analyzed(g_startupX64));
+    DIANA_TEST(test_elf_startup_routines_analyzed(g_startupArm64));
+    DIANA_TEST(test_elf_startup_routines(g_startupThumb));
+    DIANA_TEST(test_elf_startup_routines(g_startupArm32));
+    DIANA_TEST(test_elf_startup_routines_analyzed(g_startupThumb));
+    DIANA_TEST(test_elf_startup_routines_analyzed(g_startupArm32));
+    DIANA_TEST(test_elf_arm32(ORTHIA_TCSTR("libstartup_thumb.so"), DIANA_ARCH_THUMB));
+    DIANA_TEST(test_elf_arm32(ORTHIA_TCSTR("libstartup_arm32.so"), DIANA_ARCH_ARM32));
 }

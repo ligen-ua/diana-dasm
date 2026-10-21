@@ -64,7 +64,8 @@ END
 #endif    // English (U.S.) resources
 /////////////////////////////////////////////////////////////////////////////
 
-#if VS_PLATFORM==amd64
+// the x86 host for 32-bit file system views (main.cpp, _M_AMD64 only); ARM64 builds go without it
+#if VS_PLATFORM==amd64 && !defined(ORTHIA_NO_WIN32_HOST)
 ORTHIA_WIN32_HOST  BINARY                    "..\\..\\..\\tmp\\orthia_win32_host.exe"
 #endif
 

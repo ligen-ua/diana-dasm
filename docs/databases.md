@@ -18,7 +18,7 @@ against an empty data folder.
 ```
 Orthia/
   db/      one folder per opened file, named by the SHA-1 of the file
-  proc/    one folder per open process, deleted when the process is closed
+  proc/    one folder per process, kept while the process runs
   bin/     helper executables extracted at start
 ```
 
@@ -35,7 +35,8 @@ and a rebuilt file gets a new one.
 | `data.db` | the SQLite database described below |
 | `target.bin` | a byte-identical copy of the opened file. It is verified by SHA-1 on every open and rewritten when it differs, so the folder stays self-describing. Opening `target.bin` itself prints the folder's `DIRINFO` |
 | `DIRINFO` | two text lines: the header `Orthia Disasm Database Folder` and `Original Name: "<path as opened>"` |
-| `parameters.xml` | raw shellcode only: `base_address` and `diana_mode` chosen in the shellcode dialog, so the file reopens with the same layout |
+| `meta.xml` | what the folder holds and which Orthia wrote it, see [`meta.xml`](#metaxml) |
+| `parameters.xml` | raw shellcode only: `base_address`, `diana_mode` (the pointer size) and `diana_arch` (0 x86, 1 AArch64, 2 A32, 3 T32; missing means x86) chosen in the shellcode dialog or with `--base`/`--arch`, so the file reopens with the same layout |
 
 Dependency files (imported DLLs and shared objects) are **not** copied. See [Dependencies](#dependencies).
 
@@ -46,16 +47,46 @@ The UI, and `--cmd` with `--analyze`, add cross-references, PDB symbols and the 
 A database created by a quick open is upgraded in place by a later deep open, or by `.analyze <module>`;
 nothing is thrown away.
 
-## Processes: `proc/[pid] name/`
+## Processes: `proc/[pid] name <start>/`
 
-A live process gets `data.db` and `DIRINFO` in a folder named after its pid and short name.
-It is temporary: the folder is deleted when the process item is closed, and at start Orthia removes
-any `proc/` folder that has not been written for 48 hours (left behind by a crash).
-`.database cleanup` removes such folders at once, as soon as their process has exited
+A live process gets `data.db`, `DIRINFO` and `meta.xml` in a folder named after its pid, its short name
+and when it started, in UTC: `proc/[1234] notepad.exe 20261021-153012/`. A later process that gets the same
+pid gets its own folder. When the start can't be read the folder is named `[pid] name`, as before
+`meta.xml` existed.
+
+Opening the same process again reuses its database: comments and the analysis survive closing it.
+The folder name has the start in seconds only; `meta.xml` has it exactly (the creation `FILETIME` on Windows,
+the boot id and start ticks on Linux), and a database is reused only when that matches.
+`--overwrite-db` starts with a new, empty database instead.
+
+The folder is deleted when the process item is closed after the process has exited, and when Orthia
+opened itself (`--pid self`). At start Orthia removes any `proc/` folder that has not been written for
+48 hours. `.database cleanup` removes folders at once, as soon as their process has exited
 (see [Managing databases](#managing-databases)).
 
-Only the code analysis of the main module and the comments go into that database. The module list,
-exports, module flags and loaded private symbols are kept in memory and rebuilt from the live process.
+The code analysis and the comments go into that database, and the analysis flags of each module
+(`flags` in its metainfo, with its name and size). A reopen trusts the flags of a module only when
+the module at that address still has the same name and size. The module list, exports and loaded
+private symbols are kept in memory and rebuilt from the live process.
+
+## `meta.xml`
+
+Every `db/` and `proc/` folder made since `meta.xml` was added has one, in the same XML format as
+`parameters.xml`. Folders without it are still read.
+
+| Field | Content |
+|---|---|
+| `format_version` | the folder layout version of the Orthia that wrote it (1) |
+| `min_reader_version` | the lowest layout version that may reuse the folder. An older Orthia refuses a file database it can't read, with a hint to `--overwrite-db`, and replaces a process database |
+| `analysis_version` | the analysis version of the writer. Recorded only: a newer analysis does not throw a database away |
+| `orthia_version`, `created` | the writer and the time it made the folder (UTC seconds since 1970) |
+| `kind` | `file` or `process` |
+| `diana_mode`, `diana_arch` | the pointer size and the architecture, as in `parameters.xml` |
+| `format`, `image_base`, `size`, `sha1` | files: the format the file opened as (`pe`, `elf`, `raw`), where it is mapped, its size and SHA-1 |
+| `pid`, `name`, `start`, `start_key` | processes: the pid, `[pid] name`, the start (UTC seconds) and the exact start that decides reuse |
+
+A file database written before `meta.xml` gets one on its next open. `--overwrite-db` writes a new one with
+the new database.
 
 ## `bin/`
 
@@ -111,8 +142,16 @@ Foreign keys are enforced on every connection, so deleting a module row removes 
 | 2 | import | the import table slot in the module (see [IAT](#import-table)) |
 | 3 | export | the export's address |
 | 4 | private symbol (from a PDB) | the symbol's address |
+| 5 | AArch32 code map: what the bytes are from here on | the address where it changes |
 
 Import, export and symbol records carry `address` (the target) and `name`.
+
+The AArch32 code map is written by the analysis of ARM (A32) and Thumb (T32) code, which can mix both and keep
+literals and switch tables between the instructions. Its `meta_info` is plain text, not XML: `a32`, `t32`,
+`data` (words: literals, tables of addresses), `data16` (a `tbh` table) or `data8` (a `tbb` table). Before the
+first record of a module, its own mode applies: T32 for an ARMNT PE, for raw `thumb` code and for an ELF whose
+entry point or most functions have the Thumb bit; A32 otherwise. The disassembly reads it to decode
+each address in the right mode and to show data as `.word`.
 
 The module description carries:
 
@@ -207,7 +246,7 @@ Removes what is no longer needed, and prints each folder with the reason:
 
 | Folder | Removed when |
 |---|---|
-| `proc/[pid] name` | the process has exited, or the pid now runs another program, or the folder has not been written for 48 hours |
+| `proc/[pid] name <start>` | the process has exited, or the pid now runs another process (another start; for a folder without `meta.xml`, another program), or the folder has not been written for 48 hours |
 | `db/<sha1>` | it has no `data.db` and has not been written for an hour (a younger one may be being created) |
 | `*.deleting` | a `delete` that failed half way |
 
@@ -223,6 +262,9 @@ uses is reported as `Kept` and is not an error.
 - **Reset everything**: close Orthia and delete the data folder, or point `ORTHIA_HOME` at an empty one.
 - A database folder can also be deleted directly while Orthia is closed. The SHA-1 is printed on open
   (`SHA1: ...`), and `DIRINFO` in each folder names the original file.
+
+- **Start over with one target**: open it with `--overwrite-db`. Its database is replaced by an empty one,
+  comments included; the copy of the file, `DIRINFO` and `parameters.xml` stay.
 
 Deleting `data.db` alone is not enough for a partial reset: the next open recreates it and treats the
 file as new, which is the same as deleting the folder.

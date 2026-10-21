@@ -1,6 +1,5 @@
 #include "orthia_item_process.h"
 #include <filesystem>
-#include "orthia_pe.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
@@ -8,10 +7,38 @@
 #include "orthia_common_print.h"
 #include "orthia_common_format.h"
 #include "orthia_module_manager.h"
+#include "orthia_database_module.h"
 #include "orthia_sections.h"
+#include "orthia_databases.h"
+#include "formats/orthia_image_format.h"
+#ifndef DIANA_HAS_WIN32
+#include <unistd.h>
+#endif
 
 namespace orthia
 {
+
+    static unsigned long long GetOwnPid()
+    {
+#ifdef DIANA_HAS_WIN32
+        return GetCurrentProcessId();
+#else
+        return (unsigned long long)getpid();
+#endif
+    }
+
+    // A folder is kept for the next open of the same process: only while it runs, and only when
+    // its start is known (the folder name and meta.xml tell this process from a later one).
+    // Orthia itself exits right after closing it
+    static bool KeepProcFolder(const std::shared_ptr<oui::IProcess>& proc, const PlatformString_type& folder)
+    {
+        if (!proc || !proc->GetStartInfo().IsKnown() || !proc->IsRunning())
+        {
+            return false;
+        }
+        const auto name = std::filesystem::path(folder).filename().native();
+        return ParseProcFolderPid(name) != GetOwnPid();
+    }
 
     // CProcessWorkplaceItem
     CProcessWorkplaceItem::~CProcessWorkplaceItem()
@@ -20,7 +47,7 @@ namespace orthia
         m_persistentStorage = nullptr;
         m_moduleStorage = nullptr;
 
-        if (!m_procFolder.empty())
+        if (!m_procFolder.empty() && !KeepProcFolder(m_proc, m_procFolder))
         {
             std::error_code ec;
             std::filesystem::remove_all(std::filesystem::path(m_procFolder), ec);
@@ -34,11 +61,13 @@ namespace orthia
     CProcessWorkplaceItem::CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
         const oui::String& shortName,
         int dianaMode,
+        int dianaArch,
         std::shared_ptr<IPeristentItemStorage> persistentStorage)
         :
         m_proc(proc),
         m_shortName(shortName),
         m_dianaMode(dianaMode),
+        m_dianaArch(dianaArch),
         m_persistentStorage(persistentStorage)
     {
     }
@@ -80,6 +109,7 @@ namespace orthia
         info.entryPoint = 0;
         info.size = fileSize;
         info.dianaMode = m_dianaMode;
+        info.dianaArch = m_dianaArch;
         return info;
     }
 
@@ -96,93 +126,22 @@ namespace orthia
         return m_processModuleAddress;
     }
 
-    struct ExportsCollector:public diana::CBasePeLinkImportsObserver
-    {
-        const orthia::ModuleInfo* m_moduleInfo = 0;
-        orthia::flat_map<orthia::Address_type, NameInfo> m_exports;
-        bool m_fixupAddresses = false;
-
-        ExportsCollector()
-        {
-        }
-        void SetCurrentModule(const orthia::ModuleInfo * moduleInfo)
-        {
-            m_moduleInfo = moduleInfo;
-        }
-        void QueryFunctionByOrdinal(const char* pDllName,
-            DI_UINT32 ordinal,
-            OPERAND_SIZE* pAddress)
-        {
-            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
-            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
-        }
-        void QueryFunctionByName(const char* pDllName,
-            const char* pFunctionName,
-            DI_UINT32 hint,
-            OPERAND_SIZE* pAddress)
-        {
-            if (!*pAddress)
-            {
-                return;
-            }
-            orthia::Address_type fncAddress =  *pAddress;
-            if (m_fixupAddresses)
-            {
-                fncAddress += m_moduleInfo->address;
-            }
-            NameInfo exportInfo;
-            exportInfo.address = fncAddress;
-            exportInfo.name.native = (m_moduleInfo->name + OUI_STR("!") + orthia::Utf8ToPlatformString(pFunctionName));
-            exportInfo.flags = NameInfo::flags_Export;
-            m_exports.insert(fncAddress, exportInfo);
-        }
-    };
-    template<class T, class Stream>
-    void DeliverExtraExports(T& exportsCollector, Address_type moduleAddress, OPERAND_SIZE entryPoint, Stream& stream,
-        DianaExecutable& exe)
-    {
-        if (entryPoint && entryPoint != moduleAddress)
-        {
-            exportsCollector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
-        }
-        // report tls callbacks
-        void* pTlsCallbacks = 0;
-        int tlsCallbacksCount = 0;
-        OPERAND_SIZE addressOfTLSIndex = 0;
-        if (!DianaExecutable_QueryTLSCallbacks(&exe,
-            moduleAddress,
-            &stream,
-            &pTlsCallbacks,
-            &tlsCallbacksCount,
-            &addressOfTLSIndex,
-            DIANA_ANALYZE_RANDOM_READ_ABSOLUTE))
-        {
-            char* pTls = (char*)pTlsCallbacks;
-            for (int i = 0; i < tlsCallbacksCount; ++i)
-            {
-                OPERAND_SIZE callback = Diana_ReadValue(pTls, exe.dianaMode);
-                auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
-                exportsCollector.QueryFunctionByName("$", name.c_str(), 0, &callback);
-                pTls += exe.dianaMode;
-            }
-            DIANA_FREE(pTlsCallbacks);
-        }
-    }
     void CProcessWorkplaceItem::ReloadModules()
     {
-        std::vector<char> page(0x4000);
-        ExportsCollector exportsCollector;
+        orthia::flat_map<orthia::Address_type, NameInfo> exports;
         std::vector<orthia::ModuleInfo> modules;
         int processModuleOffset = 0;
         m_proc->QueryModules(modules, processModuleOffset,
             [&](const orthia::ModuleInfo& moduleInfo, oui::ModuleDisasmContext& context) {
 
-            exportsCollector.SetCurrentModule(&moduleInfo);
-
-            exportsCollector.m_fixupAddresses = false;
-            DeliverExtraExports(exportsCollector, moduleInfo.address, moduleInfo.entryPoint, *context.stream, *context.executable);
-            exportsCollector.m_fixupAddresses = true;
-            DianaExecutable_QueryExports(context.executable, &context.stream->parent, page.data(), (int)page.size(), exportsCollector.GetParent(), 0);
+            std::vector<NameInfo> names;
+            context.image->QueryNames(names);
+            for (auto& info : names)
+            {
+                // every name is kept: $ifunc_memcpy and memcpy share an address
+                info.name.native = moduleInfo.name + OUI_STR("!") + info.name.native;
+                exports.insert(info.address, info);
+            }
         });
 
         Address_type processModuleAddress = 0;
@@ -190,14 +149,14 @@ namespace orthia
         {
             processModuleAddress = modules[processModuleOffset].entryPoint;
         }
-        std::sort(modules.begin(), modules.begin(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
+        std::sort(modules.begin(), modules.end(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
 
-        exportsCollector.m_exports.sort();
+        exports.sort();
         m_moduleNames.Clear();
 
         orthia::CAutoCriticalSection guard(m_lock);
         m_modules = std::move(modules);
-        m_exports = std::move(exportsCollector.m_exports);
+        m_exports = std::move(exports);
         m_modulesIndex.clear();
         for (int i = 0, size = (int)m_modules.size(); i < size; ++i)
         {
@@ -244,98 +203,9 @@ namespace orthia
     }
 
 
-    class CImportsCollector :public diana::CBasePeLinkImportsObserver
-    {
-        ModuleNames& m_names;
-        std::function<NameInfo(OPERAND_SIZE address)> m_getName;
-    public:
-        CImportsCollector(ModuleNames& names,
-            std::function<NameInfo (OPERAND_SIZE address)> getName)
-            :
-            m_names(names),
-            m_getName(getName)
-        {
-        }
-        void QueryFunctionByOrdinal(const char* pDllName,
-            DI_UINT32 ordinal,
-            OPERAND_SIZE* pAddress)
-        {
-            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
-            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
-        }
-        void QueryFunctionByName(const char* pDllName,
-            const char* pFunctionName,
-            DI_UINT32 hint,
-            OPERAND_SIZE* pAddress)
-        {
-            NameInfo info;
-            info.flags = NameInfo::flags_Import;
-            info.address = *pAddress;
-            auto nameInfo = m_getName(info.address);
-            info.name = nameInfo.name;
-
-            if (info.name.native.empty())
-            {
-                if (pFunctionName)
-                {
-                    info.name.native = orthia::Utf8ToPlatformString(pFunctionName);
-                }
-                else
-                {
-                    info.name.native = OUI_TCSTR("<unknown>");
-                }
-            }
-            m_names.Add(std::move(info));
-        }
-    };
-
-    struct ModuleExportsCollector :public diana::CBasePeLinkImportsObserver
-    {
-        ModuleNames& m_names;
-        OPERAND_SIZE m_moduleStart;
-
-        ModuleExportsCollector(ModuleNames& names,
-            OPERAND_SIZE moduleStart)
-            :
-            m_names(names),
-            m_moduleStart(moduleStart)
-        {
-        }
-        void QueryFunctionByOrdinal(const char* pDllName,
-            DI_UINT32 ordinal,
-            OPERAND_SIZE* pAddress)
-        {
-            auto name = "$ordinal_" + orthia::ToAnsiStringAsHex(ordinal);
-            QueryFunctionByName(pDllName, name.c_str(), 0, pAddress);
-        }
-        void QueryFunctionByName(const char* pDllName,
-            const char* pFunctionName,
-            DI_UINT32 hint,
-            OPERAND_SIZE* pAddressIn)
-        {
-            if (!*pAddressIn)
-            {
-                return;
-            }
-            auto address = *pAddressIn;
-            if (!pDllName || *pDllName != '$') 
-            {
-                if (Diana_SafeAdd(&address, m_moduleStart))
-                {
-                    return;
-                }
-            };
-            NameInfo info;
-            info.flags = NameInfo::flags_Export;
-            info.address = address;
-            info.name = orthia::Utf8ToPlatformString(pFunctionName);
-            m_names.Add(std::move(info));
-        }
-    };
-
     void CProcessWorkplaceItem::BuildModuleNames(Address_type moduleAddress, ModuleNames& names) const
     {
-        Address_type moduleSize = 0, entryPoint = 0;
+        orthia::ModuleInfo module;
         {
             orthia::CAutoCriticalSection guard(m_lock);
 
@@ -344,53 +214,35 @@ namespace orthia
             {
                 return;
             }
-            auto & module = m_modules.at(it->second);
-            moduleSize = module.size;
-            entryPoint = module.entryPoint;
+            module = m_modules.at(it->second);
         }
-       
-        // diana PE analyzer uses relative pointers
+
+        auto* format = FindFormatByModule(module);
         orthia::ProcessReaderAdapter memReader(m_proc.get());
-        orthia::CMemoryStorageOfModifiedData writeCache(&memReader, 0x1000);
-        writeCache.SetCacheReads(true);
-        orthia::CMemoryCache module(&writeCache, moduleAddress);
-        // adapter to C-code
-        orthia::DianaMemoryStream stream(0, &module, moduleSize);
-
-        DianaExecutable exe = {};
-        if (int status = DianaExecutable_Init(&exe,
-            &stream.parent,
-            moduleSize,
-            DIANA_EXECUTABLE_FILE_FLAGS_MODULE_MODE))
+        if (auto image = format ? format->OpenModuleImage(memReader, moduleAddress, module.size) : nullptr)
         {
-            ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "Module: ", orthia::CLogParamEx(moduleAddress, 16), ":",orthia::CLogParamEx(moduleSize, 16), " ->", (long)status);
-        }
-        else
-        {
-            diana::Guard<diana::ExecutableFile> exeGuard(&exe);
-            std::vector<char> page(4096);
+            std::vector<NameInfo> found;
+            image->QueryNames(found);
+            for (auto& info : found)
+            {
+                names.Add(std::move(info));
+            }
 
-            ModuleExportsCollector exportsCollector(names, moduleAddress);
-            DeliverExtraExports(exportsCollector, moduleAddress, entryPoint, stream, exe);
-            DianaExecutable_QueryExports(&exe,
-                &stream.parent,
-                page.data(),
-                (int)page.size(),
-                exportsCollector.GetParent(),
-                0);
-
-            CImportsCollector importsCollector(names, [this](auto address) {
-
-                return QueryAddressName(address);
-            });
-            DianaExecutable_QueryImports(&exe,
-                moduleAddress,
-                &stream,
-                page.data(),
-                (int)page.size(),
-                importsCollector.GetParent(),
-                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
-                0);
+            found.clear();
+            image->QueryImports(found);
+            for (auto& import : found)
+            {
+                // the target's own name when it is known, the imported one otherwise
+                NameInfo info;
+                info.flags = NameInfo::flags_Import;
+                info.address = import.address;
+                info.name = QueryAddressName(import.address).name;
+                if (info.name.native.empty())
+                {
+                    info.name = import.name.native.empty() ? oui::String(OUI_TCSTR("<unknown>")) : import.name;
+                }
+                names.Add(std::move(info));
+            }
         }
 
         // in-memory if available, DB fallback otherwise
@@ -510,17 +362,122 @@ namespace orthia
     {
         return std::make_shared<ProcessReaderAdapter>(m_proc.get());
     }
+    // Saved in the module metainfo for the next open of the same process. Not flags_symbolsLoaded:
+    // the symbols of a process are kept in memory only (ModuleStorage, m_exports)
+    static const int g_savedProcessModuleFlags = ModuleInfo::flags_analyzeDone | ModuleInfo::flags_analyzePrivateDone;
+
+    // what tells a module at an address from another one loaded there later
+    static const PlatformString_type& GetSavedModuleName(const ModuleInfo& module)
+    {
+        return module.fullName.empty() ? module.name : module.fullName;
+    }
+
     void CProcessWorkplaceItem::UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove)
     {
-        orthia::CAutoCriticalSection guard(m_lock);
-        auto & flags = m_moduleFlags[moduleAddress];
-        flags |= flagsToSet;
-        flags &= ~flagsToRemove;
-
-        auto it = m_modulesIndex.find(moduleAddress);
-        if (it != m_modulesIndex.end())
+        ModuleInfo module;
+        bool moduleKnown = false;
+        int flagsToSave = 0;
         {
-            m_modules[it->second].flags = flags;
+            orthia::CAutoCriticalSection guard(m_lock);
+            auto & flags = m_moduleFlags[moduleAddress];
+            flags |= flagsToSet;
+            flags &= ~flagsToRemove;
+            flagsToSave = flags & g_savedProcessModuleFlags;
+
+            auto it = m_modulesIndex.find(moduleAddress);
+            if (it != m_modulesIndex.end())
+            {
+                m_modules[it->second].flags = flags;
+                module = m_modules[it->second];
+                moduleKnown = true;
+            }
+        }
+        if (moduleKnown && ((flagsToSet | flagsToRemove) & g_savedProcessModuleFlags))
+        {
+            SaveModuleFlags(module, flagsToSave);
+        }
+    }
+
+    void CProcessWorkplaceItem::SaveModuleFlags(const ModuleInfo& module, int flags)
+    {
+        auto moduleManager = m_moduleManager;
+        if (!moduleManager)
+        {
+            return;
+        }
+        try
+        {
+            auto database = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            // the metainfo belongs to the tbl_modules row
+            if (!database->IsModuleExists(module.address))
+            {
+                return;
+            }
+            CCommonFormatBuilder builder;
+            builder.AddMetadata(ORTHIA_TCSTR("fullname"), GetSavedModuleName(module));
+            builder.AddMetadata("size", (unsigned long long)module.size);
+            builder.AddMetadata("flags", flags);
+            std::string text;
+            builder.Produce(&text);
+            database->InsertMetaInfo(module.address, g_database_type_moduleMetaInfo, text, module.address, true);
+        }
+        catch (const std::exception& e)
+        {
+            (void)e;
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't save the module flags: ") + e.what());
+        }
+    }
+
+    void CProcessWorkplaceItem::LoadSavedModuleFlags()
+    {
+        auto moduleManager = m_moduleManager;
+        if (!moduleManager)
+        {
+            return;
+        }
+        struct Saved
+        {
+            PlatformString_type name;
+            unsigned long long size = 0;
+            int flags = 0;
+        };
+        std::map<Address_type, Saved> saved;
+        try
+        {
+            moduleManager->QueryDatabaseManager()->GetClassicDatabase()->QueryMetaInfo(g_database_type_moduleMetaInfo,
+                [&](Address_type moduleAddress, int, const std::string& text, Address_type)
+            {
+                CCommonFormatParser parser;
+                if (parser.Parse(text))
+                {
+                    Saved record;
+                    parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &record.name);
+                    parser.QueryMetadata("size", &record.size);
+                    parser.QueryMetadata("flags", &record.flags);
+                    saved[moduleAddress] = std::move(record);
+                }
+                return true;
+            });
+        }
+        catch (const std::exception& e)
+        {
+            (void)e;
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't read the module flags: ") + e.what());
+            return;
+        }
+
+        orthia::CAutoCriticalSection guard(m_lock);
+        for (auto& mod : m_modules)
+        {
+            auto it = saved.find(mod.address);
+            // another module loaded at the same address since: analyzed again
+            if (it == saved.end() || it->second.size != (unsigned long long)mod.size || it->second.name != GetSavedModuleName(mod))
+            {
+                continue;
+            }
+            const int flags = it->second.flags & g_savedProcessModuleFlags;
+            m_moduleFlags[mod.address] |= flags;
+            mod.flags |= flags;
         }
     }
 
@@ -643,20 +600,26 @@ namespace orthia
         return NameInfo();
     }
 
-    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, ImageSections& sections)
+    void CProcessWorkplaceItem::QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections)
     {
-        // the file the module was mapped from: ELF section headers are not in memory
-        PlatformString_type imageFile;
+        orthia::ModuleInfo mod;
         {
             orthia::CAutoCriticalSection guard(m_lock);
             auto it = m_modulesIndex.find(moduleBase);
             if (it != m_modulesIndex.end())
             {
-                imageFile = m_modules[it->second].fullName;
+                mod = m_modules[it->second];
             }
+            mod.address = moduleBase;
         }
         auto reader = CreateMemoryReader();
-        QueryImageSections(reader.get(), moduleBase, imageFile, sections);
+        ModuleAccess access;
+        access.reader = reader.get();
+        access.mod = &mod;
+        // the file the module was mapped from: ELF section headers are not in memory
+        access.imageFile = mod.fullName;
+        access.openFile = openFile;
+        QueryModuleSections(access, sections);
     }
 
 }

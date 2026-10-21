@@ -23,7 +23,7 @@ def test_lm(orthia, dmesg):
 
 
 def test_lm_analyze(orthia_full, dmesg):
-    orthia_full.run("lm", **dmesg).assert_ok().assert_line(r"\bdmesg\s+analysis$")
+    orthia_full.run("lm", **dmesg).assert_ok().assert_line(r"\bdmesg\s+analyzed$")
 
 
 def test_modinfo(orthia, dmesg):
@@ -104,9 +104,29 @@ def test_elf_with_bad_section_headers(orthia, data):
     assert "DiException" not in res.stderr, res
 
 
-def test_reload_reports_result(orthia_cold, dmesg):
+UNSUPPORTED_ELF_SYMBOLS = re.compile(r"(?i)ELF symbol loading is not supported")
+
+
+def test_reload_is_quiet_without_debug_file(orthia_cold, dmesg):
+    # dmesg names a debug file (.gnu_debuglink, build-id) that is not installed: nothing to report
     res = orthia_cold.run(".reload", **dmesg).assert_ok()
-    assert re.search(r"(?i)symbol.*\bdmesg\b|\bdmesg\b.*symbol", res.stdout + res.stderr), res
+    assert not UNSUPPORTED_ELF_SYMBOLS.search(res.stdout + res.stderr), res
+
+
+@pytest.mark.parametrize("layout", ["debuglink", "build-id"])
+def test_reload_reports_installed_debug_file(orthia_cold, dmesg, tmp_path, layout):
+    symbols = tmp_path / "symbols"
+    if layout == "debuglink":
+        # the name in dmesg's .gnu_debuglink
+        debug_file = symbols / (DMESG_BUILD_ID[2:] + ".debug")
+    else:
+        debug_file = symbols / ".build-id" / DMESG_BUILD_ID[:2] / (DMESG_BUILD_ID[2:] + ".debug")
+    debug_file.parent.mkdir(parents=True)
+    debug_file.write_bytes(b"")
+    res = orthia_cold.with_(symbol_path=symbols).run(".reload", **dmesg).assert_ok()
+    out = res.stdout + res.stderr
+    assert UNSUPPORTED_ELF_SYMBOLS.search(out), res
+    assert re.search(r'"dmesg".*' + re.escape(debug_file.name), out), res
 
 
 # DT_NEEDED of apt-mark: a library that cannot be located still gets a module row, as a PE dependency does

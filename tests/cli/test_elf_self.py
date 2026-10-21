@@ -5,6 +5,7 @@ Expected values come from images.ElfInfo. Orthia maps a PIE at a load bias of it
 read from `lm`; every address is that bias plus the vaddr in the file.
 """
 import os
+import platform
 import re
 import shutil
 
@@ -44,7 +45,7 @@ def test_lm_header(orthia, me):
 
 
 def test_lm_analyze(orthia_full, me):
-    orthia_full.run("lm", **me).assert_ok().assert_line(r"\borthia\s+analysis$")
+    orthia_full.run("lm", **me).assert_ok().assert_line(r"\borthia\s+analyzed$")
 
 
 def test_modinfo(orthia, me, self_elf):
@@ -106,9 +107,10 @@ def test_elf_with_bad_section_headers(orthia, data):
     assert "DiException" not in res.stderr, res
 
 
-def test_reload_reports_result(orthia_cold, me):
+def test_reload_is_quiet_without_debug_file(orthia_cold, me):
+    # a local build has no separate debug file: ELF symbol support is not reported per module
     res = orthia_cold.run(".reload", **me).assert_ok()
-    assert re.search(r"(?i)symbol.*\borthia\b|\borthia\b.*symbol", res.stdout + res.stderr), res
+    assert not re.search(r"(?i)ELF symbol loading is not supported", res.stdout + res.stderr), res
 
 
 @pytest.mark.xfail(reason="B2: module name comes from the SHA1-keyed DB, not the opened file")
@@ -195,8 +197,10 @@ def test_libraries_beside_the_binary_are_linked(orthia_cold, self_elf, tmp_path,
 
 
 def test_libc_beside_the_binary_is_linked(orthia_cold, self_elf, tmp_path, data):
-    libc = next((p for p in ["/lib/x86_64-linux-gnu/libc.so.6", "/usr/lib64/libc.so.6", "/lib64/libc.so.6"]
-                 if os.path.isfile(p)), None)
+    # the libc of this machine, as orthia was built for it: Debian keeps it under the multiarch triplet
+    triplet = f"{platform.machine()}-linux-gnu"
+    libc = next((p for p in [f"/lib/{triplet}/libc.so.6", f"/usr/lib/{triplet}/libc.so.6", "/usr/lib64/libc.so.6",
+                             "/lib64/libc.so.6"] if os.path.isfile(p)), None)
     if libc is None or "libc.so.6" not in self_elf.needed:
         pytest.skip("no libc.so.6 in a known place")
     target = tmp_path / "with_libc"

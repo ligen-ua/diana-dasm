@@ -52,12 +52,47 @@ int DianaRecognizeMMX(DI_CHAR regId,
     return DI_ERROR;
 }
 
+DianaUnifiedRegister Diana_VectorRegister(int size, int number)
+{
+    if (number < 0 || number > 31)
+        return reg_none;
+    switch (size)
+    {
+    case 16:
+        return (DianaUnifiedRegister)(number < 16 ? reg_XMM0 + number : reg_XMM16 + number - 16);
+    case 32:
+        return (DianaUnifiedRegister)(number < 16 ? reg_YMM0 + number : reg_YMM16 + number - 16);
+    case 64:
+        return (DianaUnifiedRegister)(reg_ZMM0 + number);
+    }
+    return reg_none;
+}
+
+int Diana_VectorRegisterNumber(DianaUnifiedRegister reg, int * pSize)
+{
+    int size = 0, number = -1;
+    if (reg >= reg_XMM0 && reg <= reg_XMM15)
+        size = 16, number = reg - reg_XMM0;
+    else if (reg >= reg_XMM16 && reg <= reg_XMM31)
+        size = 16, number = reg - reg_XMM16 + 16;
+    else if (reg >= reg_YMM0 && reg <= reg_YMM15)
+        size = 32, number = reg - reg_YMM0;
+    else if (reg >= reg_YMM16 && reg <= reg_YMM31)
+        size = 32, number = reg - reg_YMM16 + 16;
+    else if (reg >= reg_ZMM0 && reg <= reg_ZMM31)
+        size = 64, number = reg - reg_ZMM0;
+    if (pSize)
+        *pSize = size;
+    return number;
+}
+
 int DianaRecognizeXMM(DI_CHAR regId,
                       DianaUnifiedRegister * pOut)
 {
-    if (regId < sizeof(table3[1])/sizeof(table3[1][0]))
+    // 16..31: EVEX only
+    if ((unsigned char)regId < 32)
     {
-        *pOut = table3[1][regId];
+        *pOut = Diana_VectorRegister(16, (unsigned char)regId);
         return DI_SUCCESS;
     }
     return DI_ERROR;
@@ -66,9 +101,9 @@ int DianaRecognizeXMM(DI_CHAR regId,
 int DianaRecognizeYMM(DI_CHAR regId,
                       DianaUnifiedRegister * pOut)
 {
-    if (regId < sizeof(table3[2])/sizeof(table3[2][0]))
+    if ((unsigned char)regId < 32)
     {
-        *pOut = table3[2][regId];
+        *pOut = Diana_VectorRegister(32, (unsigned char)regId);
         return DI_SUCCESS;
     }
     return DI_ERROR;
@@ -232,22 +267,30 @@ static void Diana_Repn(struct _dianaContext * pContext)
 }
 static void Diana_CS(struct _dianaContext * pContext) 
 {  
-    pContext->currentCmd_sreg = reg_CS;
+    // 64-bit mode: no effect on the address, an fs or gs before stays (the override is still reported)
+    if (!pContext->iAMD64Mode || (pContext->currentCmd_sreg != reg_FS && pContext->currentCmd_sreg != reg_GS))
+        pContext->currentCmd_sreg = reg_CS;
     pContext->iRexPrefix = 0;
 }
 static void Diana_SS(struct _dianaContext * pContext) 
 {  
-    pContext->currentCmd_sreg = reg_SS;
+    // 64-bit mode: no effect on the address, an fs or gs before stays (the override is still reported)
+    if (!pContext->iAMD64Mode || (pContext->currentCmd_sreg != reg_FS && pContext->currentCmd_sreg != reg_GS))
+        pContext->currentCmd_sreg = reg_SS;
     pContext->iRexPrefix = 0;
 }
 static void Diana_DS(struct _dianaContext * pContext) 
 {  
-    pContext->currentCmd_sreg = reg_DS;
+    // 64-bit mode: no effect on the address, an fs or gs before stays (the override is still reported)
+    if (!pContext->iAMD64Mode || (pContext->currentCmd_sreg != reg_FS && pContext->currentCmd_sreg != reg_GS))
+        pContext->currentCmd_sreg = reg_DS;
     pContext->iRexPrefix = 0;
 }
 static void Diana_ES(struct _dianaContext * pContext) 
 {  
-    pContext->currentCmd_sreg = reg_ES;
+    // 64-bit mode: no effect on the address, an fs or gs before stays (the override is still reported)
+    if (!pContext->iAMD64Mode || (pContext->currentCmd_sreg != reg_FS && pContext->currentCmd_sreg != reg_GS))
+        pContext->currentCmd_sreg = reg_ES;
     pContext->iRexPrefix = 0;
 }
 static void Diana_FS(struct _dianaContext * pContext) 
@@ -372,6 +415,12 @@ int Di_ProcessVexPrefix(unsigned char firstByte,
         if (cacheSize < 1) return DI_END_OF_STREAM;
 
         b2 = pContext->cache[cacheIt];
+        if (!pContext->iAMD64Mode && (b2 & 0xC0) != 0xC0)
+        {
+            // lds: keep what was read
+            pContext->cacheSize = cacheSize;
+            return DI_SUCCESS;
+        }
         R      = (~b2 >> 7) & 1;
         pContext->iVexVVVV = (~b2 >> 3) & 0xF;
         L      = (b2 >> 2) & 1;
@@ -392,12 +441,24 @@ int Di_ProcessVexPrefix(unsigned char firstByte,
                                            pContext->cache + cacheIt + cacheSize,
                                            2 - cacheSize, &bytesRead);
             if (iResult) return iResult;
+            if (!bytesRead)
+            {
+                // the end of the stream: les/lds or a cut VEX prefix, keep what was read
+                pContext->cacheSize = cacheSize;
+                return pContext->iAMD64Mode ? DI_END_OF_STREAM : DI_SUCCESS;
+            }
             cacheSize += bytesRead;
         }
         if (cacheSize < 2) return DI_END_OF_STREAM;
 
         b2 = pContext->cache[cacheIt];
         b3 = pContext->cache[cacheIt + 1];
+        if (!pContext->iAMD64Mode && (b2 & 0xC0) != 0xC0)
+        {
+            // les: keep what was read
+            pContext->cacheSize = cacheSize;
+            return DI_SUCCESS;
+        }
 
         R = (~b2 >> 7) & 1;
         X = (~b2 >> 6) & 1;
@@ -409,7 +470,10 @@ int Di_ProcessVexPrefix(unsigned char firstByte,
             case 1:  map = 0; break;  // 0F
             case 2:  map = 1; break;  // 0F38
             case 3:  map = 2; break;  // 0F3A
-            default: map = 0; break;
+            default:
+                // a reserved map: #UD (objdump: (bad))
+                pContext->cacheSize = cacheSize;
+                return DI_ERROR;
             }
         }
         W      = (b3 >> 7) & 1;
@@ -421,7 +485,14 @@ int Di_ProcessVexPrefix(unsigned char firstByte,
         cacheSize -= 2;
     }
 
-    pContext->iVexPrefix = 1;
+    // the raw W: a W0 instruction with W1 is #UD in every mode (DIANA_BASE_GEN_OBJECT_VEX_W0)
+    pContext->iVexPrefix = (DI_CHAR)(DI_VEX_PREFIX_PRESENT | (W ? DI_VEX_PREFIX_W : 0));
+    if (!pContext->iAMD64Mode)
+    {
+        // 16/32-bit: no register above 7, W of the general registers is ignored; vvvv bit 3 is ignored where vvvv
+        // is a register (DIANA_VEX_VVVV_REG), an instruction without a vvvv operand needs 1111 (the CPU: #UD)
+        R = X = B = W = 0;
+    }
     pContext->iRexPrefix = (DI_CHAR)(0x40 | (W << 3) | (R << 2) | (X << 1) | B);
     if (W)
         pContext->iCurrentCmd_opsize = 8;
@@ -448,6 +519,114 @@ int Di_ProcessVexPrefix(unsigned char firstByte,
     }
 
     *pbVexFound = 1;
+    return DI_SUCCESS;
+}
+
+int Di_ProcessEvexPrefix(int * pbEvexFound,
+                         DianaContext * pContext,
+                         DianaReadStream * readStream)
+{
+    unsigned char p0, p1, p2;
+    int R, X, B, R1, V1, W, LL, pathLL, pp, map, z, b;
+    unsigned char selectorByte;
+    int cacheIt = pContext->cacheIt;
+    int cacheSize = pContext->cacheSize;
+
+    *pbEvexFound = 0;
+
+    // P0 P1 P2, the opcode and the ModRM byte (EVEX.b on a register form changes the path)
+    while (cacheSize < 5 && cacheIt + cacheSize < DI_CACHE_SIZE)
+    {
+        int bytesRead = 0;
+        int iResult = readStream->pReadFnc(readStream, pContext->cache + cacheIt + cacheSize,
+                                           5 - cacheSize, &bytesRead);
+        if (iResult) return iResult;
+        if (!bytesRead)
+            break;
+        cacheSize += bytesRead;
+    }
+    if (cacheSize < 1 || (!pContext->iAMD64Mode && (pContext->cache[cacheIt] & 0xC0) != 0xC0))
+    {
+        // bound (or the end of the stream): keep what was read
+        pContext->cacheSize = cacheSize;
+        return pContext->iAMD64Mode && cacheSize < 1 ? DI_END_OF_STREAM : DI_SUCCESS;
+    }
+    if (cacheSize < 4)
+    {
+        pContext->cacheSize = cacheSize;
+        return DI_END_OF_STREAM;
+    }
+    p0 = pContext->cache[cacheIt];
+    p1 = pContext->cache[cacheIt + 1];
+    p2 = pContext->cache[cacheIt + 2];
+
+    // P0: R X B R' 0 m m m (bit 3 is APX: #UD here); maps 1, 2, 3, 5, 6
+    // P1: W v v v v 1 p p (bit 2 0 is #UD: AVX10.2/APX)
+    // P2: z L' L b V' a a a
+    map = p0 & 7;
+    if ((p0 & 0x08) || !(p1 & 0x04) || map == 0 || map == 4 || map == 7)
+    {
+        pContext->cacheSize = cacheSize;
+        return DI_ERROR;
+    }
+    R  = (~p0 >> 7) & 1;
+    X  = (~p0 >> 6) & 1;
+    B  = (~p0 >> 5) & 1;
+    R1 = (~p0 >> 4) & 1;
+    W  = (p1 >> 7) & 1;
+    pp = p1 & 3;
+    z  = (p2 >> 7) & 1;
+    LL = (p2 >> 5) & 3;
+    b  = (p2 >> 4) & 1;
+    V1 = (~p2 >> 3) & 1;
+
+    pContext->iVexVVVV = (~p1 >> 3) & 0xF;
+    pContext->iVexPrefix = (DI_CHAR)(DI_VEX_PREFIX_PRESENT | (W ? DI_VEX_PREFIX_W : 0));
+    pContext->iEvexAAA = (DI_CHAR)(p2 & 7);
+    pContext->iEvexLL = (DI_CHAR)LL;
+    if (!pContext->iAMD64Mode)
+    {
+        // 16/32-bit: no register above 7: V' is 1 (not inverted: 0), else #UD; R' and B are ignored (the CPU,
+        // evex_probe.py --mode32), W of the general registers too (W stays in the path: it selects
+        // vmovdqu32/vmovdqu64)
+        if (V1)
+        {
+            pContext->cacheSize = cacheSize;
+            return DI_ERROR;
+        }
+        R = X = B = R1 = 0;
+    }
+    pContext->iEvexPrefix = (DI_CHAR)(DI_EVEX_PREFIX_PRESENT | (R1 ? DI_EVEX_PREFIX_R1 : 0) |
+                                      (V1 ? DI_EVEX_PREFIX_V1 : 0) | (X ? DI_EVEX_PREFIX_X : 0) |
+                                      (b ? DI_EVEX_PREFIX_B : 0) | (z ? DI_EVEX_PREFIX_Z : 0));
+    pContext->iRexPrefix = (DI_CHAR)(0x40 | ((pContext->iAMD64Mode && W) << 3) | (R << 2) | (X << 1) | B);
+    if (pContext->iAMD64Mode && W)
+        pContext->iCurrentCmd_opsize = 8;
+
+    // EVEX.b on a register form: L'L is the rounding, the vector length is 512 (or a scalar)
+    pathLL = LL;
+    if (b && cacheSize >= 5 && (pContext->cache[cacheIt + 4] & 0xC0) == 0xC0)
+        pathLL = 2;
+    selectorByte = (unsigned char)((W << 7) | (pathLL << 5) | (map << 2) | pp);
+
+    cacheIt += 3;
+    cacheSize -= 3;
+    memmove(pContext->cache + DI_CACHE_RESERVED, pContext->cache + cacheIt, cacheSize);
+    pContext->cache[0] = 0x62;
+    pContext->cache[1] = selectorByte;
+    pContext->cacheIt  = 0;
+    pContext->cacheSize = cacheSize + DI_CACHE_RESERVED;
+
+    if (pContext->cacheIt + pContext->cacheSize < DI_CACHE_SIZE)
+    {
+        int bytesRead = 0;
+        readStream->pReadFnc(readStream,
+                             pContext->cache + pContext->cacheIt + pContext->cacheSize,
+                             DI_CACHE_SIZE - pContext->cacheSize - pContext->cacheIt,
+                             &bytesRead);
+        pContext->cacheSize += bytesRead;
+    }
+    *pbEvexFound = 1;
     return DI_SUCCESS;
 }
 

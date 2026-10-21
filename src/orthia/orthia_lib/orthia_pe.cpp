@@ -2,6 +2,7 @@
 #include "orthia_memory_cache.h"
 #include "orthia_files.h"
 #include "orthia_streams.h"
+#include "orthia_diana_arch.h"
 
 #undef max
 
@@ -294,13 +295,20 @@ namespace orthia
             return 0;
         return m_dianaContext->mappedPE.pImpl->dianaMode;
     }
+    int CSimplePeFile::GetDianaArch() const
+    {
+        if (!m_dianaContext)
+            return DIANA_ARCH_X86;
+        return m_dianaContext->mappedPE.pImpl->arch;
+    }
     DI_UINT64 CSimplePeFile::GetEntryPoint() const
     {
         if (!m_dianaContext)
             return 0;
         DI_UINT64 ep = m_imageBase;
         Diana_SafeAdd(&ep, m_dianaContext->mappedPE.pImpl->addressOfEntryPoint);
-        return ep;
+        // ARMNT: T32 code has bit 0 set
+        return GetDianaInstructionAddress(ep, m_dianaContext->mappedPE.pImpl->arch);
     }
     bool CSimplePeFile::WriteImage(DI_UINT64 address, const void* pData, size_t size)
     {

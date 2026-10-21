@@ -86,6 +86,9 @@ void test_expressions();
 void test_elf();
 void test_image_identity();
 void test_sections();
+void test_startup_routines();
+void test_shellcode();
+void test_process_arch();
 
 int main(int argc, char * argv[])
 {
@@ -115,6 +118,9 @@ int main(int argc, char * argv[])
     test_elf();
     test_image_identity();
     test_sections();
+    test_startup_routines();
+    test_shellcode();
+    test_process_arch();
 
     test_expressions();
     test_tokenizer();

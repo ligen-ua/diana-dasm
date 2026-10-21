@@ -44,6 +44,8 @@
 #define ORTHIA_AUDIT_ARCH AUDIT_ARCH_X86_64
 #elif defined(__aarch64__)
 #define ORTHIA_AUDIT_ARCH AUDIT_ARCH_AARCH64
+#else
+#error "seccomp filter: add the AUDIT_ARCH_* of this CPU and check its syscall list"
 #endif
 
 namespace orthia

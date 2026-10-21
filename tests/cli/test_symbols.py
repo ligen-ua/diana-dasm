@@ -18,7 +18,7 @@ def nt(data):
 
 
 def test_status_shows_symbols(orthia_pdb, nt):
-    orthia_pdb.run("lm", **nt).assert_ok().assert_line(r"ntoskrnl\.exe\s+analysis, symbols")
+    orthia_pdb.run("lm", **nt).assert_ok().assert_line(r"ntoskrnl\.exe\s+analyzed, symbols")
 
 
 @pytest.mark.parametrize("expression", ["ntoskrnl!KiSystemCall64", "ntoskrnl.exe!KiSystemCall64"])

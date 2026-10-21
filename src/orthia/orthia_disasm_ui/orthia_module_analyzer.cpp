@@ -3,6 +3,7 @@
 #include "orthia_database_module.h"
 #include "orthia_external_symbols.h"
 #include "orthia_module_symbols.h"
+#include "orthia_helpers.h"
 
 namespace orthia
 {
@@ -16,10 +17,12 @@ namespace orthia
         m_pool.Stop();
     }
     void CModuleAnalyzer::Init(std::weak_ptr<IUILogInterface> uiLog,
-                               std::shared_ptr<CConfigOptionsStorage> config)
+                               std::shared_ptr<CConfigOptionsStorage> config,
+                               std::shared_ptr<oui::IFileSystem> fileSystem)
     {
         m_uiLog = std::move(uiLog);
         m_config = std::move(config);
+        m_fileSystem = std::move(fileSystem);
     }
 
     void CModuleAnalyzer::WriteLog(const oui::String& line)
@@ -305,7 +308,8 @@ namespace orthia
 
             auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
             auto logger = std::make_shared<CLoaderUILogger>(m_uiThread, m_uiLog);
-            auto loader = CreateExternalSymbolsLoader(m_config->GetSymbolsFolders(), logger);
+            auto loader = CreateExternalSymbolsLoader(m_config->GetSymbolsFolders(), logger,
+                                                      CreateFileOpener(m_fileSystem));
             auto memoryReader = item->CreateMemoryReader();
 
             for (auto& mod : modules)

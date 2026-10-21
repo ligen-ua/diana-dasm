@@ -13,7 +13,7 @@ inline int ParseForwarderString(const std::string& fwString, std::string& dllNam
     functionName.clear();
     ordinal = DI_MAX_OPERAND_SIZE;
 
-    auto pos = fwString.find('.');
+    size_t pos = fwString.find('.');
     if (pos == fwString.npos)
     {
         return DI_ERROR;
@@ -67,9 +67,11 @@ class CBasePeLinkImportsObserver
     friend int DianaPeFile_LinkImports_Observer_ReportInfo_fnc_proxy(void* pThis, OPERAND_SIZE address);
 
     DianaPeFile_LinkImports_Observer m_parent;
-    OPERAND_SIZE m_lastAddress = 0;
+    OPERAND_SIZE m_lastAddress;
 public:
-    CBasePeLinkImportsObserver()
+	CBasePeLinkImportsObserver()
+		:
+			m_lastAddress(0)
     {
         DianaPeFile_LinkImports_Observer_Init2(&m_parent, 
                                               DianaPeFile_LinkImports_Observer_QueryFunctionByOrdinal_proxy,

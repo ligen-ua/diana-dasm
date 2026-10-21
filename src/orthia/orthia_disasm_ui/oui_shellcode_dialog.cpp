@@ -1,21 +1,16 @@
 #include "oui_shellcode_dialog.h"
 #include "oui_color.h"
 #include "ui_common.h"
+#include "orthia_diana_arch.h"
 
 namespace oui
 {
-    static bool ParseMode(const String& text, int& dianaMode)
-    {
-        if (text.native == OUI_TCSTR("32")) { dianaMode = DIANA_MODE32; return true; }
-        if (text.native == OUI_TCSTR("64")) { dianaMode = DIANA_MODE64; return true; }
-        return false;
-    }
 
     CShellcodeDialog::CShellcodeDialog(
         std::function<String()> getMessageText,
         std::function<String()> getAddressLabelText,
         std::function<String()> getModeLabelText,
-        std::function<void(DI_UINT64, int)> handler)
+        std::function<void(DI_UINT64, int, int)> handler)
         : m_getMessageText(std::move(getMessageText))
         , m_getAddressLabelText(std::move(getAddressLabelText))
         , m_getModeLabelText(std::move(getModeLabelText))
@@ -36,15 +31,23 @@ namespace oui
         m_addressEdit->SetText(String(OUI_STR("0x400000")));
         m_addressEdit->SetSelectAllOnFocus(true);
 
-        m_modeLabel = std::make_shared<CLabel>(captionProfile, [this]() { return m_getModeLabelText(); });
-        m_modeEdit  = std::make_shared<CEditBox>(m_colorProfile);
-        m_modeEdit->SetText(String(OUI_STR("64")));
-        m_modeEdit->SetSelectAllOnFocus(true);
-
-        m_addressEdit->SetEnterHandler([this](const String&) { m_modeEdit->SetFocus(); });
-        m_modeEdit->SetEnterHandler([this](const String&) { TryConfirm(); });
-
+        // x64 first, as before
+        const auto& choices = orthia::GetDianaArchChoices();
+        for (size_t i = 0; i < choices.size(); ++i)
+        {
+            if (choices[i].dianaArch == DIANA_ARCH_X86 && choices[i].dianaMode == DIANA_MODE64)
+                m_archIndex = i;
+        }
         auto buttonProfile = std::make_shared<ButtonColorProfile>(m_colorProfile->button);
+        m_modeLabel = std::make_shared<CLabel>(captionProfile, [this]() { return m_getModeLabelText(); });
+        m_archButton = std::make_shared<CButton>(buttonProfile, [this]() {
+            const char* name = orthia::GetDianaArchChoices()[m_archIndex].name;
+            return String(OUI_TCSTR("< ") + orthia::Utf8ToPlatformString(name) + OUI_TCSTR(" >"));
+        });
+        m_archButton->SetClickHandler([this]() { ShiftArch(1); });
+
+        m_addressEdit->SetEnterHandler([this](const String&) { m_archButton->SetFocus(); });
+
         m_okButton = std::make_shared<CButton>(buttonProfile, []() { return String(OUI_STR("OK")); });
         m_okButton->SetClickHandler([this]() { TryConfirm(); });
 
@@ -64,6 +67,13 @@ namespace oui
         Parent_type::OnFinishDialog();
     }
 
+    void CShellcodeDialog::ShiftArch(int delta)
+    {
+        const size_t count = orthia::GetDianaArchChoices().size();
+        m_archIndex = (m_archIndex + count + delta) % count;
+        m_archButton->Invalidate();
+    }
+
     void CShellcodeDialog::TryConfirm()
     {
         DI_UINT64 address = 0;
@@ -76,12 +86,16 @@ namespace oui
             return;
         }
 
-        int dianaMode = 0;
-        if (!ParseMode(m_modeEdit->GetText(), dianaMode))
+        // ARM code starts at an aligned address, the same check --base gets
+        const auto& choice = orthia::GetDianaArchChoices()[m_archIndex];
+        if (address % orthia::GetDianaInstructionAlignment(choice.dianaArch))
+        {
+            m_addressEdit->SetFocus();
             return;
+        }
 
         m_confirmed = true;
-        m_handler(address, dianaMode);
+        m_handler(address, choice.dianaMode, choice.dianaArch);
         FinishDialog();
     }
 
@@ -91,7 +105,7 @@ namespace oui
         AddChild(m_addressLabel);
         AddChild(m_addressEdit);
         AddChild(m_modeLabel);
-        AddChild(m_modeEdit);
+        AddChild(m_archButton);
         AddChild(m_okButton);
         AddChild(m_cancelButton);
     }
@@ -106,7 +120,7 @@ namespace oui
             m_addressLabel->Resize(zero);
             m_addressEdit->Resize(zero);
             m_modeLabel->Resize(zero);
-            m_modeEdit->Resize(zero);
+            m_archButton->Resize(zero);
             m_okButton->Resize(zero);
             m_cancelButton->Resize(zero);
             return;
@@ -127,7 +141,7 @@ namespace oui
         placeRow(m_addressLabel, 3, width);
         placeRow(m_addressEdit,  4, width);
         placeRow(m_modeLabel,    6, width);
-        placeRow(m_modeEdit,     7, width);
+        placeRow(m_archButton,   7, 12);
 
         // buttons on row 9: OK on the left, Cancel on the right
         const int btnWidth = 12;
@@ -167,14 +181,24 @@ namespace oui
             auto pool = GetPool();
             if (pool)
             {
-                // cycle: addressEdit → modeEdit → okButton → cancelButton → addressEdit
+                // cycle: addressEdit → archButton → okButton → cancelButton → addressEdit
                 auto focused = pool->GetFocus();
-                if      (focused == m_addressEdit)  m_modeEdit->SetFocus();
-                else if (focused == m_modeEdit)     m_okButton->SetFocus();
+                if      (focused == m_addressEdit)  m_archButton->SetFocus();
+                else if (focused == m_archButton)   m_okButton->SetFocus();
                 else if (focused == m_okButton)     m_cancelButton->SetFocus();
                 else                                m_addressEdit->SetFocus();
             }
             return true;
+        }
+        if (evt.keyEvent.valid &&
+            (evt.keyEvent.virtualKey == VirtualKey::Left || evt.keyEvent.virtualKey == VirtualKey::Right))
+        {
+            auto pool = GetPool();
+            if (pool && pool->GetFocus() == m_archButton)
+            {
+                ShiftArch(evt.keyEvent.virtualKey == VirtualKey::Left ? -1 : 1);
+                return true;
+            }
         }
         return Parent_type::ProcessEvent(evt, evtContext);
     }

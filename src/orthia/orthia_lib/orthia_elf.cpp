@@ -1,6 +1,7 @@
 #include "orthia_elf.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
+#include "orthia_diana_arch.h"
 
 #undef max
 
@@ -31,16 +32,17 @@ namespace orthia
         orthia::DianaAnalyzerReadWriteStream writeStream(&mappedFile);
         std::vector<char> page(0x4000);
 
-        // Determine image base:
-        // - if caller specified one, use it
-        // - for ET_EXEC: use the lowest PT_LOAD p_vaddr (absolute)
-        // - for ET_DYN (PIE/shared lib): load at 0 so the flat image starts from 0
-        OPERAND_SIZE imageBase = 0;
+        // The image base is where the module starts (its lowest PT_LOAD page):
+        // - if the caller specified one, use it
+        // - ET_EXEC: its link base, the loader does not move it
+        // - ET_DYN (PIE/shared lib): the first nonzero p_vaddr, to keep the image off address 0
+        const OPERAND_SIZE linkBase = dianaElfFile.pImpl->linkBase;
+        OPERAND_SIZE imageBase = linkBase;
         if (params.imageBase != (DI_UINT64)(-1))
         {
             imageBase = params.imageBase;
         }
-        else
+        else if (dianaElfFile.pImpl->elfHeader.e_type != DIANA_ET_EXEC)
         {
             for (int i = 0; i < dianaElfFile.pImpl->capturedSegmentCount; ++i)
             {
@@ -52,10 +54,12 @@ namespace orthia
                 }
             }
         }
+        // MapEx puts every segment at loadBias + p_vaddr
+        const OPERAND_SIZE loadBias = imageBase - linkBase;
 
         DI_CHECK_CPP(DianaElfFile_MapEx(&dianaElfFile,
             &elfFileStream.stream,
-            imageBase,
+            loadBias,
             &writeStream,
             page.data(),
             (int)page.size(),
@@ -79,6 +83,12 @@ namespace orthia
             moduleSize,
             DIANA_ELF_FILE_FLAGS_MODULE_MODE));
         dianaContext->mappedElf_Guard.reset(&dianaContext->mappedElf);
+        // AArch32: T32 or A32 by default, from the symbols; the dynamic tags are relocated to imageBase
+        int arch = dianaContext->mappedElf.arch;
+        if (DianaElfFile_QueryArmCodeArch(&dianaContext->mappedElf, &dianaContext->stream.stream, imageBase, 0, 0, 0, &arch) == DI_SUCCESS)
+        {
+            dianaContext->mappedElf.arch = arch;
+        }
 
         // Commit — store original bytes for Relocate
         m_mappedElfFile.swap(ranges.m_data);
@@ -127,15 +137,22 @@ namespace orthia
             return 0;
         return m_dianaContext->mappedElf.dianaMode;
     }
+    int CSimpleElfFile::GetDianaArch() const
+    {
+        if (!m_dianaContext)
+            return DIANA_ARCH_X86;
+        return m_dianaContext->mappedElf.arch;
+    }
     DI_UINT64 CSimpleElfFile::GetEntryPoint() const
     {
         if (!m_dianaContext)
             return 0;
-        auto e_type  = m_dianaContext->mappedElf.pImpl->elfHeader.e_type;
-        auto e_entry = m_dianaContext->mappedElf.pImpl->elfHeader.e_entry;
-        if (e_type == DIANA_ET_DYN && e_entry)
-            return m_imageBase + e_entry;
-        return e_entry;
+        const auto* pImpl = m_dianaContext->mappedElf.pImpl;
+        if (!pImpl->elfHeader.e_entry)
+            return 0;
+        // a link-time address, moved by the load bias; T32 code has bit 0 set
+        return GetDianaInstructionAddress(m_imageBase - pImpl->linkBase + pImpl->elfHeader.e_entry,
+            m_dianaContext->mappedElf.arch);
     }
     struct SimpleElfFileStreamWithContext : public ::DianaMemoryStream
     {
@@ -157,9 +174,10 @@ namespace orthia
             &stream.parent.parent,
             pFunctionName,
             &result);
-        if (err)
+        if (err || !result)
             return 0;
-        return result;
+        // st_value is a link-time address: the export is where the image is mapped, as with PE
+        return m_imageBase - m_dianaContext->mappedElf.pImpl->linkBase + result;
     }
 
     int CSimpleElfFile::QueryImports(diana::CBasePeLinkImportsObserver* observer)
@@ -259,6 +277,79 @@ namespace orthia
         buildId.assign(buffer, buffer + buildIdSize);
         return DI_SUCCESS;
     }
+    int QueryElfStartupRoutines(Diana_ElfFile* pElfFile,
+        DianaMovableReadStream* pStream,
+        DI_UINT64 moduleAddress,
+        std::vector<ElfStartupRoutine>& routines)
+    {
+        routines.clear();
+        // the routines come as module offsets
+        struct Context
+        {
+            std::vector<ElfStartupRoutine>* routines;
+            DI_UINT64 bias;
+        } context = { &routines, moduleAddress };
+
+        return DianaElfFile_QueryStartupRoutines(pElfFile,
+            pStream,
+            moduleAddress,
+            0,
+            0,
+            [](void* pContext, const DianaElfStartupRoutine* pRoutine) -> int {
+                auto& ctx = *static_cast<Context*>(pContext);
+                ElfStartupRoutine routine;
+                routine.kind = pRoutine->kind;
+                routine.index = pRoutine->index;
+                routine.address = ctx.bias + pRoutine->offset;
+                routine.slotAddress = pRoutine->slotOffset ? ctx.bias + pRoutine->slotOffset : 0;
+                if (pRoutine->pName)
+                    routine.name = pRoutine->pName;
+                ctx.routines->push_back(routine);
+                return DI_SUCCESS;
+            },
+            &context,
+            0);
+    }
+
+    std::string GetElfStartupRoutineName(const ElfStartupRoutine& routine)
+    {
+        auto number = ToAnsiStringAsHex((unsigned short)routine.index);
+        switch (routine.kind)
+        {
+        case DIANA_ELF_STARTUP_IFUNC:
+            return "$ifunc_" + (routine.name.empty() ? number : routine.name);
+        case DIANA_ELF_STARTUP_PREINIT_ARRAY:
+            return "$preinit_array_" + number;
+        case DIANA_ELF_STARTUP_INIT:
+            return "$init";
+        case DIANA_ELF_STARTUP_INIT_ARRAY:
+            return "$init_array_" + number;
+        }
+        return "$startup_" + number;
+    }
+
+    int CSimpleElfFile::QueryStartupRoutines(std::vector<ElfStartupRoutine>& routines) const
+    {
+        routines.clear();
+        if (m_mappedElfFile.empty() || !m_dianaContext)
+            return DI_ERROR;
+
+        // module-mode stream rooted at the image start; the mapping relocated the pointers by m_imageBase
+        SimpleElfFileStreamWithContext stream;
+        Diana_InitMemoryStreamEx2(&stream,
+            const_cast<char*>(m_mappedElfFile.data()),
+            m_mappedElfFile.size(),
+            0,
+            0);
+        stream.translateAbsoluteAddress = TranslateAbsoluteAddress;
+        stream.elf = const_cast<CSimpleElfFile*>(this);
+
+        return QueryElfStartupRoutines(const_cast<Diana_ElfFile*>(&m_dianaContext->mappedElf),
+            &stream.parent.parent,
+            m_imageBase,
+            routines);
+    }
+
     int CSimpleElfFile::QueryExports(diana::CBasePeLinkImportsObserver* observer)
     {
         if (m_mappedElfFile.empty() || !m_dianaContext)

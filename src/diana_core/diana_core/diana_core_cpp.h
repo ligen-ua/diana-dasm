@@ -175,12 +175,19 @@ public:
     }
     void SetSpacesCount(int spacesCount)
     {
+        int options = m_context.parent.options;
         DianaStringOutputContext_Init(&m_context,
             DianaTextOutput_String,
             DianaOpOutput_String,
             spacesCount,
             &m_buffer.front(),
             m_buffer.size());
+        m_context.parent.options = options;
+    }
+    // DIANA_TEXT_OUTPUT_OPTION_*
+    void SetOptions(int options)
+    {
+        m_context.parent.options = options;
     }
     const char * Assign(DianaParserResult * pResult, 
                         OPERAND_SIZE instructionRIP)

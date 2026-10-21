@@ -143,4 +143,55 @@ namespace orthia
         memcpy(pBuffer, realAddress, (size_t)sizeToCopy);
         *pBytesRead = (size_t)sizeToCopy;
     }
+
+    namespace
+    {
+        class COuiFileRangeReader : public IFileRangeReader
+        {
+            std::shared_ptr<oui::IFile> m_file;
+            unsigned long long m_size;
+        public:
+            COuiFileRangeReader(std::shared_ptr<oui::IFile> file, unsigned long long size)
+                : m_file(std::move(file))
+                , m_size(size)
+            {
+            }
+            unsigned long long GetSize() const override
+            {
+                return m_size;
+            }
+            bool Read(unsigned long long offset, std::vector<char>& data) override
+            {
+                const size_t size = data.size();
+                // the posix ReadExact succeeds on a short read at the end of the file
+                return m_file->ReadExact(nullptr, offset, size, data) == 0 && data.size() == size;
+            }
+        };
+    }
+
+    FileOpener_type CreateFileOpener(std::shared_ptr<oui::IFileSystem> fs)
+    {
+        if (!fs)
+            return FileOpener_type();
+        return [fs](const PlatformString_type& name) -> std::unique_ptr<IFileRangeReader>
+        {
+            try
+            {
+                int error = 0;
+                std::shared_ptr<oui::IFile2> file;
+                std::tie(error, file) = fs->SyncOpenFile(oui::FileUnifiedId(name));
+                if (error || !file)
+                    return nullptr;
+                unsigned long long size = 0;
+                std::tie(error, size) = file->GetSizeInBytes();
+                if (error)
+                    return nullptr;
+                return std::make_unique<COuiFileRangeReader>(std::move(file), size);
+            }
+            catch (const std::exception&)
+            {
+                return nullptr;
+            }
+        };
+    }
 }

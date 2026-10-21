@@ -67,7 +67,9 @@ static void test_processor_fpu_cvttsd2si_32()
     DIANA_TEST_ASSERT(xmm0.u64[0] ==  0x3FF51EB851EB851F);
     DIANA_TEST_ASSERT(xmm0.u64[1] ==  0x0000000000000000);
 
-    DIANA_TEST_ASSERT(GET_REG_RAX == 0xAAAAAAAA00000001);
+    // cvttsd2si eax: a 32-bit destination clears the upper half of rax (Intel Core i7-11800H: rcx 0x1 after
+    // cvttsd2si ecx with rcx all ones before)
+    DIANA_TEST_ASSERT(GET_REG_RAX == 0x0000000000000001);
 }
 
 static void test_processor_fpu_divsd1()

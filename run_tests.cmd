@@ -3,7 +3,9 @@ setlocal enabledelayedexpansion
 
 :: Save script dir BEFORE any cd, so paths stay correct
 set "SCRIPT_DIR=%~dp0"
-set "EXE_DIR=%SCRIPT_DIR%bin\Release\amd64"
+set "ORTHIA_ARCH=amd64"
+if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "ORTHIA_ARCH=arm64"
+set "EXE_DIR=%SCRIPT_DIR%bin\Release\%ORTHIA_ARCH%"
 set "LOG_FILE=%SCRIPT_DIR%test_results.log"
 
 cd /d "%EXE_DIR%" || (
@@ -21,7 +23,8 @@ call :log "============================================================"
 
 call :RunTest "diana_core_tests.exe"
 call :RunTest "diana_processor_tests.exe"
-call :RunTest "diana_win_test.exe"
+:: the legacy Win32 tools are not built for ARM64
+if /i "%ORTHIA_ARCH%"=="amd64" call :RunTest "diana_win_test.exe"
 call :RunTest "orthia_test.exe"
 call :RunCliTests
 

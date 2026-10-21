@@ -3,11 +3,19 @@
 #include "orthia_utils.h"
 #include "oui_layouts_calc.h"
 #include "orthia_databases.h"
+#include "orthia_common_format.h"
 #include "orthia_module_names.h"
 #include "orthia_config.h"
+#include "orthia_external_symbols.h"
+#include "formats/orthia_image_format.h"
+#include "orthia_item_process.h"
+#include "orthia_process_adapter.h"
+#include "orthia_image_source.h"
 #ifndef _WIN32
 #include "oui_privileges_posix.h"
 #endif
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <set>
 
@@ -155,6 +163,90 @@ TEST(Databases, ParseProcFolderPid)
     EXPECT_EQ(0ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("notepad.exe")));
     EXPECT_EQ(0ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("[12a] x")));
     EXPECT_EQ(0ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("[]")));
+    EXPECT_EQ(1234ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("[1234] notepad.exe 20261021-153012")));
+}
+
+TEST(Databases, ProcFolderName)
+{
+    EXPECT_EQ(orthia::PlatformString_type(), orthia::FormatProcStartStamp(0));
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("19700101-000001")), orthia::FormatProcStartStamp(1));
+    // 2000-02-29: a leap day of a year divisible by 400
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("20000229-235959")), orthia::FormatProcStartStamp(951868799));
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("20261021-153012")), orthia::FormatProcStartStamp(1792596612));
+
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("[1234] notepad.exe 20261021-153012")),
+        orthia::MakeProcFolderName(ORTHIA_TCSTR("[1234] notepad.exe"), 1792596612));
+    // the start unknown: named as before meta.xml
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("[1234] notepad.exe")),
+        orthia::MakeProcFolderName(ORTHIA_TCSTR("[1234] notepad.exe"), 0));
+}
+
+TEST(Databases, FolderMetaRoundTrip)
+{
+    namespace fs = std::filesystem;
+    const fs::path root = fs::temp_directory_path() / ORTHIA_TCSTR("orthia_test_folder_meta");
+    std::error_code ec;
+    fs::remove_all(root, ec);
+    fs::create_directories(root);
+    oui::ScopedGuard cleanup([&]() { std::error_code ec2; fs::remove_all(root, ec2); });
+    const auto fileName = (root / ORTHIA_TCSTR("meta.xml")).native();
+
+    orthia::FolderMeta meta;
+    EXPECT_FALSE(orthia::ReadFolderMeta(fileName, meta));
+
+    orthia::FolderMeta process;
+    process.kind = orthia::g_folderKindProcess;
+    process.dianaMode = DIANA_MODE64;
+    process.dianaArch = DIANA_ARCH_AARCH64;
+    process.pid = 1234;
+    process.name = ORTHIA_TCSTR("[1234] n\xC3\xA4me \"x\" <y>");
+    process.startUnix = 1792596612;
+    process.startKey = "0f1e2d3c-aaaa-bbbb-cccc-0123456789ab:123456";
+    orthia::WriteFolderMeta(fileName, process);
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, meta));
+    EXPECT_EQ(orthia::g_folderFormatVersion, meta.formatVersion);
+    EXPECT_EQ(orthia::g_folderMinReaderVersion, meta.minReaderVersion);
+    EXPECT_EQ(orthia::g_analysisVersion, meta.analysisVersion);
+    EXPECT_FALSE(meta.orthiaVersion.empty());
+    EXPECT_GT(meta.createdUnix, 0);
+    EXPECT_EQ(std::string(orthia::g_folderKindProcess), meta.kind);
+    EXPECT_EQ(DIANA_MODE64, meta.dianaMode);
+    EXPECT_EQ(DIANA_ARCH_AARCH64, meta.dianaArch);
+    EXPECT_EQ(1234ULL, meta.pid);
+    EXPECT_EQ(process.name, meta.name);
+    EXPECT_EQ(1792596612LL, meta.startUnix);
+    EXPECT_EQ(process.startKey, meta.startKey);
+    EXPECT_TRUE(orthia::IsFolderReadable(meta));
+
+    // rewritten in place, and a newer writer's folder is not readable
+    orthia::FolderMeta file;
+    file.kind = orthia::g_folderKindFile;
+    file.formatVersion = orthia::g_folderFormatVersion + 1;
+    file.minReaderVersion = orthia::g_folderFormatVersion + 1;
+    file.format = "elf";
+    file.imageBase = 0x400000;
+    file.size = 4096;
+    file.sha1 = "aabbcc0011223344556677889900aabbccddeeff";
+    orthia::WriteFolderMeta(fileName, file);
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, meta));
+    EXPECT_EQ(std::string(orthia::g_folderKindFile), meta.kind);
+    EXPECT_EQ(std::string("elf"), meta.format);
+    EXPECT_EQ(0x400000ULL, meta.imageBase);
+    EXPECT_EQ(4096ULL, meta.size);
+    EXPECT_EQ(file.sha1, meta.sha1);
+    EXPECT_TRUE(meta.startKey.empty());
+    EXPECT_FALSE(orthia::IsFolderReadable(meta));
+    EXPECT_FALSE(fs::exists(root / ORTHIA_TCSTR("meta.xml.tmp")));
+
+    // parameters.xml is not a meta.xml
+    {
+        orthia::CCommonFormatBuilder builder;
+        builder.AddMetadata(std::string("format"), std::string("raw"));
+        std::vector<char> data;
+        builder.Produce(&data);
+        std::ofstream(fs::path(fileName), std::ios::binary | std::ios::trunc).write(data.data(), (std::streamsize)data.size());
+    }
+    EXPECT_FALSE(orthia::ReadFolderMeta(fileName, meta));
 }
 
 TEST(Databases, ResolveSelectors)
@@ -471,6 +563,344 @@ TEST(Privileges, ParseIdText)
     EXPECT_FALSE(orthia::ParseIdText("0x10", &id));
 }
 #endif
+
+TEST(ElfDebugFile, HostLookup)
+{
+    namespace fs = std::filesystem;
+    std::error_code error;
+    const fs::path root = fs::temp_directory_path() / ORTHIA_TCSTR("orthia_test_elf_debug_file");
+    fs::remove_all(root, error);
+    const fs::path symbols = root / ORTHIA_TCSTR("symbols");
+    const fs::path moduleDir = root / ORTHIA_TCSTR("lib");
+    fs::create_directories(symbols / ORTHIA_TCSTR(".build-id") / ORTHIA_TCSTR("ab"));
+    fs::create_directories(moduleDir / ORTHIA_TCSTR(".debug"));
+    auto touch = [](const fs::path& path) { std::ofstream file(path); };
+    const fs::path module = moduleDir / ORTHIA_TCSTR("libx.so");
+    touch(module);
+    const fs::path byBuildId = symbols / ORTHIA_TCSTR(".build-id") / ORTHIA_TCSTR("ab") / ORTHIA_TCSTR("cdef.debug");
+    touch(byBuildId);
+    const fs::path byLink = moduleDir / ORTHIA_TCSTR(".debug") / ORTHIA_TCSTR("libx.so.debug");
+    touch(byLink);
+    const std::vector<orthia::PlatformString_type> folders = { symbols.native() };
+
+    // the build-id comes first
+    EXPECT_EQ(byBuildId.native(), orthia::FindElfDebugFile(module.native(), ORTHIA_TCSTR("abcdef"), ORTHIA_TCSTR("libx.so.debug"), folders));
+    // then the debug link; a directory part in it is ignored
+    EXPECT_EQ(byLink.native(), orthia::FindElfDebugFile(module.native(), ORTHIA_TCSTR("ab0000"), ORTHIA_TCSTR("libx.so.debug"), folders));
+    EXPECT_EQ(byLink.native(), orthia::FindElfDebugFile(module.native(), orthia::PlatformString_type(), ORTHIA_TCSTR("../x/libx.so.debug"), folders));
+    // a debug link or a build-id alone, with nothing installed, is not reported
+    EXPECT_TRUE(orthia::FindElfDebugFile(module.native(), ORTHIA_TCSTR("ab0000"), ORTHIA_TCSTR("other.debug"), folders).empty());
+    EXPECT_TRUE(orthia::FindElfDebugFile(module.native(), orthia::PlatformString_type(), orthia::PlatformString_type(), folders).empty());
+    // a debug link naming the module itself
+    EXPECT_TRUE(orthia::FindElfDebugFile(module.native(), orthia::PlatformString_type(), ORTHIA_TCSTR("libx.so"), folders).empty());
+
+    fs::remove_all(root, error);
+}
+
+TEST(ImageFormats, Registry)
+{
+    std::set<std::string> ids;
+    int typeFlags = 0;
+    for (auto* format : orthia::GetImageFormats())
+    {
+        ASSERT_NE(nullptr, format);
+        EXPECT_TRUE(ids.insert(format->GetId()).second) << format->GetId();
+        EXPECT_EQ(format, orthia::FindFormatById(format->GetId()));
+        EXPECT_NE(std::string(), format->GetDisplayName());
+        // one bit per format, apart from the status bits that share the field
+        const int flag = format->GetBuiltInFlag();
+        EXPECT_NE(0, flag);
+        EXPECT_EQ(0, flag & (flag - 1)) << format->GetId();
+        EXPECT_EQ(0, flag & typeFlags) << format->GetId();
+        EXPECT_EQ(0, flag & orthia::ModuleInfo::builtInFlags_unresolved) << format->GetId();
+        EXPECT_EQ(0, flag & orthia::ModuleInfo::builtInFlags_managed) << format->GetId();
+        typeFlags |= flag;
+    }
+    EXPECT_EQ((std::set<std::string>{ "pe", "elf", "raw" }), ids);
+    EXPECT_STREQ("PE", orthia::FindFormatById("pe")->GetDisplayName());
+    EXPECT_STREQ("ELF", orthia::FindFormatById("elf")->GetDisplayName());
+    // the ids are stored, so they stay lowercase and exact
+    EXPECT_EQ(nullptr, orthia::FindFormatById("PE"));
+    EXPECT_EQ(nullptr, orthia::FindFormatById(""));
+    // raw code is chosen by the user, never detected
+    EXPECT_TRUE(orthia::FindFormatById("raw")->NeedsUserParameters());
+    EXPECT_FALSE(orthia::FindFormatById("raw")->Detect("MZ", 2));
+}
+
+TEST(ImageFormats, ModuleStatusText)
+{
+    orthia::ModuleInfo mod;
+    EXPECT_EQ(orthia::PlatformString_type(), orthia::ModuleStatusText(mod));
+    mod.flags = orthia::ModuleInfo::flags_analyzeDone | orthia::ModuleInfo::flags_symbolsLoaded;
+    EXPECT_EQ(ORTHIA_TCSTR("analyzed, symbols"), orthia::ModuleStatusText(mod));
+    // .NET first: the modules window column cuts the end
+    mod.builtInFlags = orthia::ModuleInfo::builtInFlags_moduleTypePe | orthia::ModuleInfo::builtInFlags_managed;
+    mod.imageSourceKind = (int)orthia::ImageSourceKind::LinkedFile;
+    EXPECT_EQ(ORTHIA_TCSTR(".NET, linked, analyzed, symbols"), orthia::ModuleStatusText(mod));
+    mod.builtInFlags |= orthia::ModuleInfo::builtInFlags_unresolved;
+    mod.flags = 0;
+    EXPECT_EQ(ORTHIA_TCSTR(".NET, unresolved"), orthia::ModuleStatusText(mod));
+}
+
+TEST(ImageFormats, Detect)
+{
+    auto detect = [](const std::string& header) {
+        auto* format = orthia::FindFormatByData(header.data(), header.size());
+        return format ? std::string(format->GetId()) : std::string("none");
+    };
+    EXPECT_EQ("pe", detect(std::string("MZ\x90\0", 4)));
+    EXPECT_EQ("elf", detect(std::string("\x7f" "ELF\x02\x01\x01", 7)));
+    EXPECT_EQ("none", detect("just some text"));
+    EXPECT_EQ("none", detect(std::string("\x55\x48\x89\xe5", 4)));
+    // too short to tell
+    EXPECT_EQ("none", detect("M"));
+    EXPECT_EQ("none", detect(std::string("\x7f" "EL", 3)));
+    EXPECT_EQ("none", detect(""));
+}
+
+TEST(ImageFormats, MapErrorMessage)
+{
+    // recognized, but no valid headers behind the magic
+    std::vector<char> data(0x200, 0);
+    data[0] = 'M';
+    data[1] = 'Z';
+    try
+    {
+        orthia::FindFormatById("pe")->MapFile(data, orthia::MapFileParameters());
+        FAIL() << "mapped a PE file without NT headers";
+    }
+    catch (const std::runtime_error& e)
+    {
+        EXPECT_EQ(0u, std::string(e.what()).find("Invalid PE image: ")) << e.what();
+    }
+
+    std::vector<char> elf(0x40, 0);
+    elf[0] = 0x7f;
+    elf[1] = 'E';
+    elf[2] = 'L';
+    elf[3] = 'F';
+    try
+    {
+        orthia::FindFormatById("elf")->MapFile(elf, orthia::MapFileParameters());
+        FAIL() << "mapped an ELF file with an empty header";
+    }
+    catch (const std::runtime_error& e)
+    {
+        EXPECT_EQ(0u, std::string(e.what()).find("Invalid ELF image: ")) << e.what();
+    }
+}
+
+namespace
+{
+    // A process made of images that the formats mapped: what the OS layer of a live process reports,
+    // for machines this host can't run. The modules are opened as both OS layers open them
+    class CFakeProcess : public oui::IProcess
+    {
+    public:
+        struct Image
+        {
+            const orthia::IImageFormat* format = nullptr;
+            orthia::Address_type base = 0;
+            std::vector<char> data;
+        };
+        int dianaMode = DIANA_MODE64;
+        int dianaArch = DIANA_ARCH_X86;
+        std::vector<Image> images;
+
+        std::tuple<int, unsigned long long> GetSizeInBytes() const override
+        {
+            return std::make_tuple(0, dianaMode == DIANA_MODE32 ? 0xFFFFFFFFull : ~0ull);
+        }
+        int ReadExact(std::shared_ptr<oui::BaseOperation>, unsigned long long offset, size_t size, std::vector<char>& data) override
+        {
+            data.resize(size);
+            return ReadExactEx2(offset, data.data(), size);
+        }
+        oui::String GetFullFileName() const override
+        {
+            oui::String name;
+            name.native = OUI_TCSTR("[1] fake");
+            return name;
+        }
+        oui::String GetFullFileNameForUI() const override
+        {
+            return GetFullFileName();
+        }
+        int ReadExactEx2(unsigned long long offset, void* pBuffer, size_t size) override
+        {
+            memset(pBuffer, 0, size);
+            bool found = false;
+            for (const auto& image : images)
+            {
+                const unsigned long long imageEnd = image.base + image.data.size();
+                const unsigned long long start = std::max<unsigned long long>(offset, image.base);
+                const unsigned long long end = std::min<unsigned long long>(offset + size, imageEnd);
+                if (start < end)
+                {
+                    memcpy((char*)pBuffer + (start - offset), image.data.data() + (start - image.base), (size_t)(end - start));
+                    found = true;
+                }
+            }
+            return found ? 0 : 1;
+        }
+        orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) override
+        {
+            std::vector<char> buffer(size);
+            if (ReadExactEx2(offset, buffer.data(), size))
+            {
+                return orthia::WorkAddressData();
+            }
+            auto* pBufferStart = buffer.data();
+            return orthia::WorkAddressData(pBufferStart, size, nullptr, orthia::WorkAddressData::flags_FullValid,
+                [buffer = std::move(buffer)](orthia::WorkAddressData*) mutable {});
+        }
+        int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset,
+            std::function<void(const orthia::ModuleInfo& info, oui::ModuleDisasmContext&)> contextCallback) override
+        {
+            processModuleOffset = 0;
+            modules.clear();
+            orthia::ProcessReaderAdapter reader(this);
+            for (const auto& image : images)
+            {
+                orthia::ModuleInfo info;
+                info.name = OUI_TCSTR("module");
+                info.address = image.base;
+                info.size = image.data.size();
+                info.lastValidAddress = image.base + image.data.size() - 1;
+                if (auto moduleImage = image.format->OpenModuleImage(reader, image.base, image.data.size()))
+                {
+                    const auto range = moduleImage->GetRange();
+                    info.dianaMode = range.dianaMode;
+                    info.dianaArch = range.dianaArch;
+                    info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
+                    info.builtInFlags |= image.format->GetBuiltInFlag() | moduleImage->GetExtraBuiltInFlags();
+                    oui::ModuleDisasmContext context;
+                    context.image = moduleImage.get();
+                    contextCallback(info, context);
+                }
+                modules.push_back(info);
+            }
+            return 0;
+        }
+        std::tuple<int, std::shared_ptr<oui::IThreadEnumerator>> CreateThreadEnumerator() override
+        {
+            return std::make_tuple(1, std::shared_ptr<oui::IThreadEnumerator>());
+        }
+        int GetDianaMode() const override
+        {
+            return dianaMode;
+        }
+        int GetDianaArch() const override
+        {
+            return dianaArch;
+        }
+        oui::ProcessStartInfo GetStartInfo() const override
+        {
+            return oui::ProcessStartInfo();
+        }
+        bool IsRunning() const override
+        {
+            return false;
+        }
+    };
+
+    // data/ of the source tree, above the folder of the binary (bin/Release/amd64, cmake-release/src/...)
+    std::filesystem::path FindTestData(const std::filesystem::path& relative)
+    {
+        namespace fs = std::filesystem;
+        fs::path dir = fs::path(orthia::GetCurrentProcessDir()).parent_path();
+        for (int i = 0; i < 8; ++i)
+        {
+            std::error_code error;
+            const fs::path candidate = dir / ORTHIA_TCSTR("data") / relative;
+            if (fs::exists(candidate, error))
+            {
+                return candidate;
+            }
+            if (dir == dir.parent_path())
+            {
+                break;
+            }
+            dir = dir.parent_path();
+        }
+        return fs::path();
+    }
+}
+
+// An ARM process, as an ARM host reports it: its modules get their architecture from their headers,
+// the rest of the address space (heap, JIT code) is the process's own
+TEST(ProcessArch, ModulesAndProcessRange)
+{
+    struct Case
+    {
+        const char* format;
+        const ORTHIA_TCHAR* file;
+        int processMode;
+        int processArch;
+        int moduleMode;
+        int moduleArch;
+    };
+    const Case cases[] = {
+        { "elf", ORTHIA_TCSTR("elf/libstartup_arm64.so"), DIANA_MODE64, DIANA_ARCH_AARCH64, DIANA_MODE64, DIANA_ARCH_AARCH64 },
+        { "elf", ORTHIA_TCSTR("elf/libstartup_arm32.so"), DIANA_MODE32, DIANA_ARCH_ARM32, DIANA_MODE32, DIANA_ARCH_ARM32 },
+        { "elf", ORTHIA_TCSTR("elf/libstartup_thumb.so"), DIANA_MODE32, DIANA_ARCH_ARM32, DIANA_MODE32, DIANA_ARCH_THUMB },
+        { "elf", ORTHIA_TCSTR("elf/libstartup_x64.so"), DIANA_MODE64, DIANA_ARCH_X86, DIANA_MODE64, DIANA_ARCH_X86 },
+        { "pe", ORTHIA_TCSTR("pe/tls_aarch64.dll"), DIANA_MODE64, DIANA_ARCH_AARCH64, DIANA_MODE64, DIANA_ARCH_AARCH64 },
+        { "pe", ORTHIA_TCSTR("pe/tls_armnt.dll"), DIANA_MODE32, DIANA_ARCH_THUMB, DIANA_MODE32, DIANA_ARCH_THUMB },
+        // an x64 process emulated on ARM64 Windows loads ARM64X system DLLs: each module keeps its own
+        { "pe", ORTHIA_TCSTR("pe/tls_aarch64.dll"), DIANA_MODE64, DIANA_ARCH_X86, DIANA_MODE64, DIANA_ARCH_AARCH64 },
+    };
+    for (const auto& item : cases)
+    {
+        const auto path = FindTestData(item.file);
+        if (path.empty())
+        {
+            GTEST_SKIP() << "data/ not found above " << orthia::PlatformStringToUtf8(orthia::GetCurrentProcessDir());
+        }
+        SCOPED_TRACE(path.string());
+        std::vector<char> data;
+        {
+            std::ifstream file(path, std::ios::binary);
+            data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+        }
+        const auto* format = orthia::FindFormatById(item.format);
+        ASSERT_NE(nullptr, format);
+        orthia::MapFileParameters params;
+        params.imageBase = 0x10000000;
+        const auto mapped = format->MapFile(data, params);
+
+        auto process = std::make_shared<CFakeProcess>();
+        process->dianaMode = item.processMode;
+        process->dianaArch = item.processArch;
+        CFakeProcess::Image image;
+        image.format = format;
+        image.base = mapped->GetImageBase();
+        image.data = mapped->GetMappedFile();
+        process->images.push_back(image);
+
+        orthia::CProcessWorkplaceItem processItem(process, process->GetFullFileNameForUI(),
+            process->GetDianaMode(), process->GetDianaArch(), nullptr);
+        processItem.ReloadModules();
+        EXPECT_EQ(item.processMode, processItem.GetDianaMode());
+        EXPECT_EQ(item.processArch, processItem.GetDianaArch());
+
+        std::vector<orthia::ModuleInfo> modules;
+        processItem.GetModules(modules);
+        ASSERT_EQ(1u, modules.size());
+        EXPECT_EQ(item.moduleMode, modules[0].dianaMode);
+        EXPECT_EQ(item.moduleArch, modules[0].dianaArch);
+
+        const auto inModule = processItem.GetRangeInfo(image.base + 0x10);
+        EXPECT_EQ(image.base, inModule.address);
+        EXPECT_EQ(item.moduleArch, inModule.dianaArch);
+
+        // below every module: the address space of the process
+        const auto outside = processItem.GetRangeInfo(0x1000);
+        EXPECT_EQ(0u, outside.address);
+        EXPECT_EQ(item.processMode, outside.dianaMode);
+        EXPECT_EQ(item.processArch, outside.dianaArch);
+    }
+}
 
 int RunTests()
 {

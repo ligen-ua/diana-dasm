@@ -42,6 +42,7 @@ int Diana_Call_not(struct _dianaContext * pDianaContext,
 
     dest = ~dest;
 
+    DI_CHECK(Di_ClearUpperHalf(pCallContext));
     DI_MEM_SET_DEST(dest);
     DI_PROC_END
 }

@@ -186,6 +186,99 @@ void DianaProcessor_ProcImplInit()
 #define SIZE_reg_XMM14  16
 #define SIZE_reg_XMM15  16
 
+// reg_XMMi is the low half of reg_YMMi
+#define SIZE_reg_YMM0  32
+#define SIZE_reg_YMM1  32
+#define SIZE_reg_YMM2  32
+#define SIZE_reg_YMM3  32
+#define SIZE_reg_YMM4  32
+#define SIZE_reg_YMM5  32
+#define SIZE_reg_YMM6  32
+#define SIZE_reg_YMM7  32
+#define SIZE_reg_YMM8  32
+#define SIZE_reg_YMM9  32
+#define SIZE_reg_YMM10  32
+#define SIZE_reg_YMM11  32
+#define SIZE_reg_YMM12  32
+#define SIZE_reg_YMM13  32
+#define SIZE_reg_YMM14  32
+#define SIZE_reg_YMM15  32
+
+// AVX-512: reg_YMMi is the low half of reg_ZMMi, xmm16..31 and ymm16..31 the low parts of zmm16..31 (EVEX only)
+#define SIZE_reg_ZMM0  64
+#define SIZE_reg_ZMM1  64
+#define SIZE_reg_ZMM2  64
+#define SIZE_reg_ZMM3  64
+#define SIZE_reg_ZMM4  64
+#define SIZE_reg_ZMM5  64
+#define SIZE_reg_ZMM6  64
+#define SIZE_reg_ZMM7  64
+#define SIZE_reg_ZMM8  64
+#define SIZE_reg_ZMM9  64
+#define SIZE_reg_ZMM10  64
+#define SIZE_reg_ZMM11  64
+#define SIZE_reg_ZMM12  64
+#define SIZE_reg_ZMM13  64
+#define SIZE_reg_ZMM14  64
+#define SIZE_reg_ZMM15  64
+#define SIZE_reg_ZMM16  64
+#define SIZE_reg_ZMM17  64
+#define SIZE_reg_ZMM18  64
+#define SIZE_reg_ZMM19  64
+#define SIZE_reg_ZMM20  64
+#define SIZE_reg_ZMM21  64
+#define SIZE_reg_ZMM22  64
+#define SIZE_reg_ZMM23  64
+#define SIZE_reg_ZMM24  64
+#define SIZE_reg_ZMM25  64
+#define SIZE_reg_ZMM26  64
+#define SIZE_reg_ZMM27  64
+#define SIZE_reg_ZMM28  64
+#define SIZE_reg_ZMM29  64
+#define SIZE_reg_ZMM30  64
+#define SIZE_reg_ZMM31  64
+#define SIZE_reg_YMM16  32
+#define SIZE_reg_YMM17  32
+#define SIZE_reg_YMM18  32
+#define SIZE_reg_YMM19  32
+#define SIZE_reg_YMM20  32
+#define SIZE_reg_YMM21  32
+#define SIZE_reg_YMM22  32
+#define SIZE_reg_YMM23  32
+#define SIZE_reg_YMM24  32
+#define SIZE_reg_YMM25  32
+#define SIZE_reg_YMM26  32
+#define SIZE_reg_YMM27  32
+#define SIZE_reg_YMM28  32
+#define SIZE_reg_YMM29  32
+#define SIZE_reg_YMM30  32
+#define SIZE_reg_YMM31  32
+#define SIZE_reg_XMM16  16
+#define SIZE_reg_XMM17  16
+#define SIZE_reg_XMM18  16
+#define SIZE_reg_XMM19  16
+#define SIZE_reg_XMM20  16
+#define SIZE_reg_XMM21  16
+#define SIZE_reg_XMM22  16
+#define SIZE_reg_XMM23  16
+#define SIZE_reg_XMM24  16
+#define SIZE_reg_XMM25  16
+#define SIZE_reg_XMM26  16
+#define SIZE_reg_XMM27  16
+#define SIZE_reg_XMM28  16
+#define SIZE_reg_XMM29  16
+#define SIZE_reg_XMM30  16
+#define SIZE_reg_XMM31  16
+// the opmask registers
+#define SIZE_reg_K0  8
+#define SIZE_reg_K1  8
+#define SIZE_reg_K2  8
+#define SIZE_reg_K3  8
+#define SIZE_reg_K4  8
+#define SIZE_reg_K5  8
+#define SIZE_reg_K6  8
+#define SIZE_reg_K7  8
+
 #define SIZE_reg_fpu_ST0     8
 #define SIZE_reg_fpu_ST1     8
 #define SIZE_reg_fpu_ST2     8
@@ -234,7 +327,8 @@ void DianaProcessor_ProcImplInit()
 #define REGISTER_SUB_REGISTER(Name, ParentName, Offset) \
     Diana_RegisterSubRegister(pThis, Name, SIZE_##Name, ParentName, Offset);
 
-#define DI_REG_INIT_VALUE 1024
+// the registers take about 3.5 KB with zmm0..31
+#define DI_REG_INIT_VALUE 4096
 
 static
 int Diana_RegisterSubRegister(DianaProcessor * pThis,
@@ -273,11 +367,10 @@ int Diana_RegisterRegister(DianaProcessor * pThis,
         char * pOldRegistersVector = 0;
         DI_CHECK_ALLOC(pRegistersVector);
 
-        // set new vector
+        // set new vector (the old one was freed twice)
         pOldRegistersVector = pThis->m_pRegistersVector;
 
         DIANA_MEMCPY(pRegistersVector, pThis->m_pRegistersVector, pThis->m_registersVectorSize);
-        pThis->m_pAllocator->m_free(pThis->m_pAllocator, pThis->m_pRegistersVector);
         pThis->m_pRegistersVector = pRegistersVector;
         pThis->m_registersVectorSize = newSize;
 
@@ -313,6 +406,8 @@ int DianaProcessor_InitProcessorImpl(DianaProcessor * pThis)
     DianaProcessor_SetResetDefaultFlags(pThis);
 
     DianaProcessor_ResetFPU(pThis);
+    pThis->m_mxcsr = DI_MXCSR_DEFAULT;
+    pThis->m_pkru = 0;
     pThis->m_registersVectorSize = DI_REG_INIT_VALUE;
     pThis->m_pRegistersVector = pThis->m_pAllocator->m_alloc(pThis->m_pAllocator, DI_REG_INIT_VALUE);
     DI_CHECK_ALLOC(pThis->m_pRegistersVector);
@@ -338,22 +433,116 @@ int DianaProcessor_InitProcessorImpl(DianaProcessor * pThis)
 
     REGISTER_REGISTER(reg_RIP);
 
-    REGISTER_REGISTER(reg_XMM0);
-    REGISTER_REGISTER(reg_XMM1);
-    REGISTER_REGISTER(reg_XMM2);
-    REGISTER_REGISTER(reg_XMM3);
-    REGISTER_REGISTER(reg_XMM4);
-    REGISTER_REGISTER(reg_XMM5);
-    REGISTER_REGISTER(reg_XMM6);
-    REGISTER_REGISTER(reg_XMM7);
-    REGISTER_REGISTER(reg_XMM8);
-    REGISTER_REGISTER(reg_XMM9);
-    REGISTER_REGISTER(reg_XMM10);
-    REGISTER_REGISTER(reg_XMM11);
-    REGISTER_REGISTER(reg_XMM12);
-    REGISTER_REGISTER(reg_XMM13);
-    REGISTER_REGISTER(reg_XMM14);
-    REGISTER_REGISTER(reg_XMM15);
+    // AVX-512: zmm0..31; a VEX write clears bits 511:128 or 511:256 of zmm0..15, an EVEX write the bits above
+    // its vector length (DianaProcessor_ZMM_ClearUpper)
+    REGISTER_REGISTER(reg_ZMM0);
+    REGISTER_REGISTER(reg_ZMM1);
+    REGISTER_REGISTER(reg_ZMM2);
+    REGISTER_REGISTER(reg_ZMM3);
+    REGISTER_REGISTER(reg_ZMM4);
+    REGISTER_REGISTER(reg_ZMM5);
+    REGISTER_REGISTER(reg_ZMM6);
+    REGISTER_REGISTER(reg_ZMM7);
+    REGISTER_REGISTER(reg_ZMM8);
+    REGISTER_REGISTER(reg_ZMM9);
+    REGISTER_REGISTER(reg_ZMM10);
+    REGISTER_REGISTER(reg_ZMM11);
+    REGISTER_REGISTER(reg_ZMM12);
+    REGISTER_REGISTER(reg_ZMM13);
+    REGISTER_REGISTER(reg_ZMM14);
+    REGISTER_REGISTER(reg_ZMM15);
+    REGISTER_REGISTER(reg_ZMM16);
+    REGISTER_REGISTER(reg_ZMM17);
+    REGISTER_REGISTER(reg_ZMM18);
+    REGISTER_REGISTER(reg_ZMM19);
+    REGISTER_REGISTER(reg_ZMM20);
+    REGISTER_REGISTER(reg_ZMM21);
+    REGISTER_REGISTER(reg_ZMM22);
+    REGISTER_REGISTER(reg_ZMM23);
+    REGISTER_REGISTER(reg_ZMM24);
+    REGISTER_REGISTER(reg_ZMM25);
+    REGISTER_REGISTER(reg_ZMM26);
+    REGISTER_REGISTER(reg_ZMM27);
+    REGISTER_REGISTER(reg_ZMM28);
+    REGISTER_REGISTER(reg_ZMM29);
+    REGISTER_REGISTER(reg_ZMM30);
+    REGISTER_REGISTER(reg_ZMM31);
+    REGISTER_SUB_REGISTER(reg_YMM0, reg_ZMM0, 0);
+    REGISTER_SUB_REGISTER(reg_YMM1, reg_ZMM1, 0);
+    REGISTER_SUB_REGISTER(reg_YMM2, reg_ZMM2, 0);
+    REGISTER_SUB_REGISTER(reg_YMM3, reg_ZMM3, 0);
+    REGISTER_SUB_REGISTER(reg_YMM4, reg_ZMM4, 0);
+    REGISTER_SUB_REGISTER(reg_YMM5, reg_ZMM5, 0);
+    REGISTER_SUB_REGISTER(reg_YMM6, reg_ZMM6, 0);
+    REGISTER_SUB_REGISTER(reg_YMM7, reg_ZMM7, 0);
+    REGISTER_SUB_REGISTER(reg_YMM8, reg_ZMM8, 0);
+    REGISTER_SUB_REGISTER(reg_YMM9, reg_ZMM9, 0);
+    REGISTER_SUB_REGISTER(reg_YMM10, reg_ZMM10, 0);
+    REGISTER_SUB_REGISTER(reg_YMM11, reg_ZMM11, 0);
+    REGISTER_SUB_REGISTER(reg_YMM12, reg_ZMM12, 0);
+    REGISTER_SUB_REGISTER(reg_YMM13, reg_ZMM13, 0);
+    REGISTER_SUB_REGISTER(reg_YMM14, reg_ZMM14, 0);
+    REGISTER_SUB_REGISTER(reg_YMM15, reg_ZMM15, 0);
+    REGISTER_SUB_REGISTER(reg_YMM16, reg_ZMM16, 0);
+    REGISTER_SUB_REGISTER(reg_YMM17, reg_ZMM17, 0);
+    REGISTER_SUB_REGISTER(reg_YMM18, reg_ZMM18, 0);
+    REGISTER_SUB_REGISTER(reg_YMM19, reg_ZMM19, 0);
+    REGISTER_SUB_REGISTER(reg_YMM20, reg_ZMM20, 0);
+    REGISTER_SUB_REGISTER(reg_YMM21, reg_ZMM21, 0);
+    REGISTER_SUB_REGISTER(reg_YMM22, reg_ZMM22, 0);
+    REGISTER_SUB_REGISTER(reg_YMM23, reg_ZMM23, 0);
+    REGISTER_SUB_REGISTER(reg_YMM24, reg_ZMM24, 0);
+    REGISTER_SUB_REGISTER(reg_YMM25, reg_ZMM25, 0);
+    REGISTER_SUB_REGISTER(reg_YMM26, reg_ZMM26, 0);
+    REGISTER_SUB_REGISTER(reg_YMM27, reg_ZMM27, 0);
+    REGISTER_SUB_REGISTER(reg_YMM28, reg_ZMM28, 0);
+    REGISTER_SUB_REGISTER(reg_YMM29, reg_ZMM29, 0);
+    REGISTER_SUB_REGISTER(reg_YMM30, reg_ZMM30, 0);
+    REGISTER_SUB_REGISTER(reg_YMM31, reg_ZMM31, 0);
+
+    // a legacy SSE write keeps the upper half, a VEX.128 write clears it (DianaProcessor_YMM_ClearUpper)
+    REGISTER_SUB_REGISTER(reg_XMM0, reg_YMM0, 0);
+    REGISTER_SUB_REGISTER(reg_XMM1, reg_YMM1, 0);
+    REGISTER_SUB_REGISTER(reg_XMM2, reg_YMM2, 0);
+    REGISTER_SUB_REGISTER(reg_XMM3, reg_YMM3, 0);
+    REGISTER_SUB_REGISTER(reg_XMM4, reg_YMM4, 0);
+    REGISTER_SUB_REGISTER(reg_XMM5, reg_YMM5, 0);
+    REGISTER_SUB_REGISTER(reg_XMM6, reg_YMM6, 0);
+    REGISTER_SUB_REGISTER(reg_XMM7, reg_YMM7, 0);
+    REGISTER_SUB_REGISTER(reg_XMM8, reg_YMM8, 0);
+    REGISTER_SUB_REGISTER(reg_XMM9, reg_YMM9, 0);
+    REGISTER_SUB_REGISTER(reg_XMM10, reg_YMM10, 0);
+    REGISTER_SUB_REGISTER(reg_XMM11, reg_YMM11, 0);
+    REGISTER_SUB_REGISTER(reg_XMM12, reg_YMM12, 0);
+    REGISTER_SUB_REGISTER(reg_XMM13, reg_YMM13, 0);
+    REGISTER_SUB_REGISTER(reg_XMM14, reg_YMM14, 0);
+    REGISTER_SUB_REGISTER(reg_XMM15, reg_YMM15, 0);
+    REGISTER_SUB_REGISTER(reg_XMM16, reg_YMM16, 0);
+    REGISTER_SUB_REGISTER(reg_XMM17, reg_YMM17, 0);
+    REGISTER_SUB_REGISTER(reg_XMM18, reg_YMM18, 0);
+    REGISTER_SUB_REGISTER(reg_XMM19, reg_YMM19, 0);
+    REGISTER_SUB_REGISTER(reg_XMM20, reg_YMM20, 0);
+    REGISTER_SUB_REGISTER(reg_XMM21, reg_YMM21, 0);
+    REGISTER_SUB_REGISTER(reg_XMM22, reg_YMM22, 0);
+    REGISTER_SUB_REGISTER(reg_XMM23, reg_YMM23, 0);
+    REGISTER_SUB_REGISTER(reg_XMM24, reg_YMM24, 0);
+    REGISTER_SUB_REGISTER(reg_XMM25, reg_YMM25, 0);
+    REGISTER_SUB_REGISTER(reg_XMM26, reg_YMM26, 0);
+    REGISTER_SUB_REGISTER(reg_XMM27, reg_YMM27, 0);
+    REGISTER_SUB_REGISTER(reg_XMM28, reg_YMM28, 0);
+    REGISTER_SUB_REGISTER(reg_XMM29, reg_YMM29, 0);
+    REGISTER_SUB_REGISTER(reg_XMM30, reg_YMM30, 0);
+    REGISTER_SUB_REGISTER(reg_XMM31, reg_YMM31, 0);
+
+    // the opmask registers k0..k7
+    REGISTER_REGISTER(reg_K0);
+    REGISTER_REGISTER(reg_K1);
+    REGISTER_REGISTER(reg_K2);
+    REGISTER_REGISTER(reg_K3);
+    REGISTER_REGISTER(reg_K4);
+    REGISTER_REGISTER(reg_K5);
+    REGISTER_REGISTER(reg_K6);
+    REGISTER_REGISTER(reg_K7);
 
     REGISTER_REGISTER(reg_MM_Internal0);
     REGISTER_REGISTER(reg_MM_Internal1);

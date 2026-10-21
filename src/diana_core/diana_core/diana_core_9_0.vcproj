@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="."
-				PreprocessorDefinitions="WIN32;_DEBUG;_LIB"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;_DEBUG;_LIB"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -113,7 +113,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="."
-				PreprocessorDefinitions="WIN32;_DEBUG;_LIB"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;_DEBUG;_LIB"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -180,7 +180,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				AdditionalIncludeDirectories="."
-				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;NDEBUG;_LIB"
 				RuntimeLibrary="0"
 				DisableLanguageExtensions="false"
 				TreatWChar_tAsBuiltInType="true"
@@ -246,7 +246,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				AdditionalIncludeDirectories="."
-				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
+				PreprocessorDefinitions="DIANA_NO_STDINT;WIN32;NDEBUG;_LIB"
 				RuntimeLibrary="0"
 				DisableLanguageExtensions="false"
 				TreatWChar_tAsBuiltInType="true"
@@ -307,6 +307,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\diana_arm32.c"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_arm64.c"
+				>
+			</File>
+			<File
 				RelativePath=".\diana_core.c"
 				>
 			</File>
@@ -327,7 +335,27 @@
 				>
 			</File>
 			<File
+				RelativePath=".\diana_elf.c"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_elf_analyzer.c"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_executable.c"
+				>
+			</File>
+			<File
 				RelativePath=".\diana_gen.c"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_gen_a32.c"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_gen_a64.c"
 				>
 			</File>
 			<File
@@ -351,10 +379,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\diana_elf_analyzer.c"
-				>
-			</File> 
-			<File
 				RelativePath=".\diana_stack.c"
 				>
 			</File>
@@ -376,6 +400,14 @@
 			</File>
 			<File
 				RelativePath=".\diana_tables_common.c"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_text_output_arm.c"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_text_output_arm32.c"
 				>
 			</File>
 			<File
@@ -406,6 +438,18 @@
 					>
 				</File>
 				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_avx.c"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_avx2.c"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_avx512.c"
+					>
+				</File>
+				<File
 					RelativePath=".\diana_processor\diana_processor_cmd_b.c"
 					>
 				</File>
@@ -414,11 +458,27 @@
 					>
 				</File>
 				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_crypto.c"
+					>
+				</File>
+				<File
 					RelativePath=".\diana_processor\diana_processor_cmd_d.c"
 					>
 				</File>
 				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_ext.c"
+					>
+				</File>
+				<File
 					RelativePath=".\diana_processor\diana_processor_cmd_fpu.c"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_fpu2.c"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_fpu2.h"
 					>
 				</File>
 				<File
@@ -427,6 +487,10 @@
 				</File>
 				<File
 					RelativePath=".\diana_processor\diana_processor_cmd_fpu_sse.c"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_fpu_sse.h"
 					>
 				</File>
 				<File
@@ -486,6 +550,18 @@
 					>
 				</File>
 				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_simd.c"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_sse2.c"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_sse2.h"
+					>
+				</File>
+				<File
 					RelativePath=".\diana_processor\diana_processor_commands.c"
 					>
 				</File>
@@ -530,11 +606,11 @@
 					>
 				</File>
 				<File
-					RelativePath=".\diana_processor\softfloat\softfloat_ext.c"
+					RelativePath=".\diana_processor\softfloat\softfloat16.c"
 					>
 				</File>
 				<File
-					RelativePath=".\diana_processor\softfloat\softfloat16.c"
+					RelativePath=".\diana_processor\softfloat\softfloat_ext.c"
 					>
 				</File>
 				<File
@@ -585,6 +661,18 @@
 				>
 			</File>
 			<File
+				RelativePath=".\diana_arm.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_arm32.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_commands.h"
+				>
+			</File>
+			<File
 				RelativePath=".\diana_config.h"
 				>
 			</File>
@@ -621,7 +709,31 @@
 				>
 			</File>
 			<File
+				RelativePath=".\diana_elf.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_elf_analyzer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_elfs_defs.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_executable.h"
+				>
+			</File>
+			<File
 				RelativePath=".\diana_gen.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_gen_a32.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_gen_a64.h"
 				>
 			</File>
 			<File
@@ -634,6 +746,10 @@
 			</File>
 			<File
 				RelativePath=".\diana_patchers.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_pdb.h"
 				>
 			</File>
 			<File
@@ -654,6 +770,14 @@
 			</File>
 			<File
 				RelativePath=".\diana_processor\diana_proc_gen.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_processor.h"
+				>
+			</File>
+			<File
+				RelativePath=".\diana_processor\diana_processor_avx512_tables.inc"
 				>
 			</File>
 			<File
@@ -720,6 +844,18 @@
 					>
 				</File>
 				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_avx.h"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_avx2.h"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_avx512.h"
+					>
+				</File>
+				<File
 					RelativePath=".\diana_processor\diana_processor_cmd_b.h"
 					>
 				</File>
@@ -728,7 +864,15 @@
 					>
 				</File>
 				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_crypto.h"
+					>
+				</File>
+				<File
 					RelativePath=".\diana_processor\diana_processor_cmd_d.h"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_ext.h"
 					>
 				</File>
 				<File
@@ -789,6 +933,10 @@
 				</File>
 				<File
 					RelativePath=".\diana_processor\diana_processor_cmd_s2.h"
+					>
+				</File>
+				<File
+					RelativePath=".\diana_processor\diana_processor_cmd_simd.h"
 					>
 				</File>
 				<File

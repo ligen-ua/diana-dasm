@@ -22,8 +22,8 @@
 //
 //[BX+SI]+disp16       000   80    88    90    98    A0    A8    B0    B8
 //[BX+DI]+disp16       001   81    89    91    99    A1    A9    B1    B9
-//[BX+SI]+disp16       010   82    8A    92    9A    A2    AA    B2    BA
-//[BX+DI]+disp16       011   83    8B    93    9B    A3    AB    B3    BB
+//[BP+SI]+disp16       010   82    8A    92    9A    A2    AA    B2    BA
+//[BP+DI]+disp16       011   83    8B    93    9B    A3    AB    B3    BB
 //[SI]+disp16      10  100   84    8C    94    9C    A4    AC    B4    BC
 //[DI]+disp16          101   85    8D    95    9D    A5    AD    B5    BD
 //[BP]+disp16          110   86    8E    96    9E    A6    AE    B6    BE
@@ -70,8 +70,8 @@ static DianaRM16 g_table1[3][8]=
     {
         {reg_BX, reg_SI, 2},
         {reg_BX, reg_DI, 2},
-        {reg_BX, reg_SI, 2},
-        {reg_BX, reg_DI, 2},
+        {reg_BP, reg_SI, 2},
+        {reg_BP, reg_DI, 2},
         {reg_SI, reg_none, 2},
         {reg_DI, reg_none, 2},
         {reg_BP, reg_none, 2},

@@ -186,7 +186,7 @@ static void test_processor_jecxz4()
 
 static void test_processor_jecxz5()
 {
-    // jcxz 0
+    // jcxz 0: 67 makes the counter CX, CX is 0 (only ECX bit 16 is set): taken
     unsigned char buff[] = { 0x67, 0xe3, 0xfd };
 
     CTestProcessor proc(buff, sizeof(buff), 0, DIANA_MODE32);
@@ -195,7 +195,36 @@ static void test_processor_jecxz5()
     SET_REG_ECX( 0x00010000ULL );
     int res = proc.ExecOnce();
     DIANA_TEST_ASSERT(res == DI_SUCCESS);
-    DIANA_TEST_ASSERT( 0x3ULL == GET_REG_RIP );
+    DIANA_TEST_ASSERT( 0x0ULL == GET_REG_RIP );
+}
+
+// the results of these bytes on an Intel Core i7-11800H (tests/x86 cpu checks, 2026-10-17)
+static void test_processor_jecxz6()
+{
+    // jecxz 0 in 64-bit mode: 67 makes the counter ecx, ecx is 0 (only rcx bit 32 is set): taken
+    unsigned char buff[] = { 0x67, 0xe3, 0xfd };
+
+    CTestProcessor proc(buff, sizeof(buff), 0, DIANA_MODE64);
+    DianaProcessor * pCallContext = proc.GetSelf();
+
+    SET_REG_RCX( 0x100000000ULL );
+    int res = proc.ExecOnce();
+    DIANA_TEST_ASSERT(res == DI_SUCCESS);
+    DIANA_TEST_ASSERT( 0x0ULL == GET_REG_RIP );
+}
+
+static void test_processor_jecxz7()
+{
+    // jecxz 0 in 32-bit mode: the counter is ecx, 0x10000: not taken
+    unsigned char buff[] = { 0xe3, 0xfe };
+
+    CTestProcessor proc(buff, sizeof(buff), 0, DIANA_MODE32);
+    DianaProcessor * pCallContext = proc.GetSelf();
+
+    SET_REG_ECX( 0x00010000ULL );
+    int res = proc.ExecOnce();
+    DIANA_TEST_ASSERT(res == DI_SUCCESS);
+    DIANA_TEST_ASSERT( 0x2ULL == GET_REG_RIP );
 }
 
 void test_processor_j()
@@ -211,4 +240,6 @@ void test_processor_j()
     DIANA_TEST(test_processor_jecxz3());
     DIANA_TEST(test_processor_jecxz4());
     DIANA_TEST(test_processor_jecxz5());
+    DIANA_TEST(test_processor_jecxz6());
+    DIANA_TEST(test_processor_jecxz7());
 }

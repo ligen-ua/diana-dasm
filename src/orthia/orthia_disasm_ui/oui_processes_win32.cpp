@@ -9,8 +9,10 @@
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_log.h"
+#include "formats/orthia_image_format.h"
 #include "orthia_plugins_win32.h"
 #include "orthia_exec.h"
+#include "orthia_diana_arch.h"
 
 extern "C"
 {
@@ -26,6 +28,35 @@ namespace oui
     {
         ULONGLONG baseAddress, regionSize;
     };
+
+    // the creation time: needs PROCESS_QUERY_LIMITED_INFORMATION
+    static ProcessStartInfo QueryProcessStartInfo(HANDLE hProcess)
+    {
+        ProcessStartInfo info;
+        FILETIME creationTime = { 0, };
+        FILETIME exitTime = { 0, };
+        FILETIME kernelTime = { 0, };
+        FILETIME userTime = { 0, };
+        if (!GetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime))
+        {
+            return info;
+        }
+        ULARGE_INTEGER value;
+        value.LowPart = creationTime.dwLowDateTime;
+        value.HighPart = creationTime.dwHighDateTime;
+        if (!value.QuadPart)
+        {
+            return info;
+        }
+        // 100 ns units since 1601
+        const ULONGLONG unixEpoch = 116444736000000000ULL;
+        if (value.QuadPart > unixEpoch)
+        {
+            info.unixSeconds = (long long)((value.QuadPart - unixEpoch) / 10000000ULL);
+        }
+        info.key = std::to_string(value.QuadPart);
+        return info;
+    }
 
     static int QueryValidRegions(HANDLE hProcess, 
         ULONGLONG address,
@@ -227,6 +258,70 @@ namespace oui
         return CheckIsWow64Process(hProcess);
     }
 
+    struct ProcessArch
+    {
+        int dianaMode = DIANA_MODE64;
+        int dianaArch = DIANA_ARCH_X86;
+    };
+
+    // PROCESS_MACHINE_INFORMATION, ProcessMachineTypeInfo = 9 (Windows 11): not in the older SDKs
+    struct ProcessMachineInformation
+    {
+        USHORT processMachine;
+        USHORT reserved;
+        ULONG machineAttributes;
+    };
+    const int g_processMachineTypeInfo = 9;
+
+    // The machine of the process from what this Windows can tell, the rules are in SelectWin32ProcessMachine.
+    // Both functions are looked up: IsWow64Process2 is Windows 10 1709+, GetProcessInformation Windows 8+,
+    // and Windows without them runs x86 and x64 only
+    ProcessArch DetectProcessArch(HANDLE hProcess)
+    {
+        typedef BOOL(WINAPI* IsWow64Process2_type)(HANDLE, USHORT*, USHORT*);
+        typedef BOOL(WINAPI* GetProcessInformation_type)(HANDLE, int, LPVOID, DWORD);
+        static IsWow64Process2_type fnIsWow64Process2 = 0;
+        static GetProcessInformation_type fnGetProcessInformation = 0;
+        static std::once_flag flag;
+        std::call_once(flag, [&]() {
+            HMODULE kernel32 = GetModuleHandle(TEXT("kernel32"));
+            fnIsWow64Process2 = (IsWow64Process2_type)GetProcAddress(kernel32, "IsWow64Process2");
+            fnGetProcessInformation = (GetProcessInformation_type)GetProcAddress(kernel32, "GetProcessInformation");
+        });
+
+        int processMachineInfo = 0;
+        if (fnGetProcessInformation)
+        {
+            ProcessMachineInformation info = { 0, };
+            if (fnGetProcessInformation(hProcess, g_processMachineTypeInfo, &info, sizeof(info)))
+            {
+                processMachineInfo = info.processMachine;
+            }
+        }
+        int wow64Machine = 0;
+        int nativeMachine = 0;
+        if (fnIsWow64Process2)
+        {
+            USHORT processMachine = 0;
+            USHORT hostMachine = 0;
+            if (fnIsWow64Process2(hProcess, &processMachine, &hostMachine))
+            {
+                wow64Machine = processMachine;
+                nativeMachine = hostMachine;
+            }
+        }
+
+        ProcessArch arch;
+        const int machine = orthia::SelectWin32ProcessMachine(processMachineInfo, wow64Machine, nativeMachine);
+        if (machine && orthia::FindDianaArchOfPeMachine(machine, &arch.dianaMode, &arch.dianaArch))
+        {
+            return arch;
+        }
+        arch.dianaMode = CheckIs32BitProcess(hProcess) ? DIANA_MODE32 : DIANA_MODE64;
+        arch.dianaArch = DIANA_ARCH_X86;
+        return arch;
+    }
+
 
     int LoadModulesFromProcess(HANDLE hProc, std::vector<HMODULE>& modules)
     {
@@ -326,10 +421,26 @@ namespace oui
             {
                 return ERROR_INVALID_FUNCTION;
             }
-            Diana_Processor_Registers_Context dianaContext;
-            int mode = DIANA_MODE64;
-            if (CheckIsWindows64() && CheckIsWow64Process(m_handleGuard.Get()))
+            // the stack is walked by the x86 emulator from the thread's registers
+            if (proc->GetDianaArch() != DIANA_ARCH_X86)
             {
+                return ERROR_NOT_SUPPORTED;
+            }
+            Diana_Processor_Registers_Context dianaContext;
+            const int mode = proc->GetDianaMode();
+            if (mode == DIANA_MODE32)
+            {
+#if defined(_M_IX86)
+                // a 32-bit orthia sees x86 threads in their own context, under WOW64 too
+                CONTEXT context;
+                context.ContextFlags = CONTEXT_FULL;
+                if (!GetThreadContext(m_handleGuard.Get(), &context))
+                {
+                    return GetLastError();
+                }
+                DI_CHECK(DianaProcessor_ConvertContextToIndependent_Win32((DIANA_CONTEXT_NTLIKE_32*)&context, &dianaContext));
+#else
+                // x64 and ARM64 Windows run x86 processes in WOW64
                 WOW64_CONTEXT wowContext;
                 wowContext.ContextFlags = CONTEXT_FULL;
                 if (!Wow64GetThreadContext(m_handleGuard.Get(), &wowContext))
@@ -337,10 +448,11 @@ namespace oui
                     return GetLastError();
                 }
                 DI_CHECK(DianaProcessor_ConvertContextToIndependent_Win32((DIANA_CONTEXT_NTLIKE_32*) &wowContext, &dianaContext));
-                mode = DIANA_MODE32;
+#endif
             }
             else
             {
+#if defined(_M_X64)
                 CONTEXT context;
                 context.ContextFlags = CONTEXT_FULL;
                 if (!GetThreadContext(m_handleGuard.Get(), &context))
@@ -348,6 +460,11 @@ namespace oui
                     return GetLastError();
                 }
                 DI_CHECK(DianaProcessor_ConvertContextToIndependent_X64((DIANA_CONTEXT_NTLIKE_64*)&context, &dianaContext));
+#else
+                // a 32-bit orthia can't read 64-bit registers, and ARM64 Windows gives an emulated x64
+                // thread's registers in the ARM64 layout
+                return ERROR_NOT_SUPPORTED;
+#endif
             }
             orthia::ProcessReaderAdapter memReader(proc.get());
             SYSTEM_INFO sysInfo;
@@ -387,19 +504,32 @@ namespace oui
         String m_name;
         HANDLE m_hProc;
         bool m_is32bit;
+        int m_dianaArch;
         LARGE_INTEGER m_distance;
         ULONG m_processID;
         std::weak_ptr<IThreadOpener> m_opener;
+        ProcessStartInfo m_startInfo;
     public:
-        CProcess(const String& name, HANDLE hProc, bool is32bit, ULONG processID, std::shared_ptr<IThreadOpener> opener)
+        CProcess(const String& name, HANDLE hProc, const ProcessArch& arch, ULONG processID, std::shared_ptr<IThreadOpener> opener)
             :
             m_name(name),
             m_hProc(hProc),
-            m_is32bit(is32bit),
-            m_processID(processID), 
-            m_opener(opener)
+            m_is32bit(arch.dianaMode == DIANA_MODE32),
+            m_dianaArch(arch.dianaArch),
+            m_processID(processID),
+            m_opener(opener),
+            m_startInfo(QueryProcessStartInfo(hProc))
         {
             m_distance.QuadPart = 0;
+        }
+        ProcessStartInfo GetStartInfo() const override
+        {
+            return m_startInfo;
+        }
+        bool IsRunning() const override
+        {
+            // the handle keeps the pid from being reused; SYNCHRONIZE is in g_ProcReaderDesiredAccess
+            return m_hProc && m_hProc != INVALID_HANDLE_VALUE && WaitForSingleObject(m_hProc, 0) == WAIT_TIMEOUT;
         }
         ~CProcess()
         {
@@ -467,6 +597,7 @@ namespace oui
             orthia::ProcessReaderAdapter memReader(this);
             orthia::CMemoryStorageOfModifiedData writeCache(&memReader, sysInfo.dwPageSize);
             writeCache.SetCacheReads(true);
+            const orthia::IImageFormat& peFormat = *orthia::FindFormatById("pe");
 
             std::vector<wchar_t> buffer(4096);
             for (auto hmod : modulesVec)
@@ -509,38 +640,20 @@ namespace oui
                 Diana_SafeAdd(&info.lastValidAddress, info.size - 1);
 
 
+                if (auto image = peFormat.OpenModuleImage(writeCache, info.address, info.size))
                 {
-                    // diana PE analyzer uses relative pointers
-                    orthia::CMemoryCache module(&writeCache, info.address);
-                    // adapter to C-code
-                    orthia::DianaMemoryStream stream(0, &module, info.size);
+                    const auto range = image->GetRange();
+                    info.dianaMode = range.dianaMode;
+                    info.dianaArch = range.dianaArch;
+                    // a module without an entry point gets its base, as before
+                    info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
+                    info.builtInFlags |= peFormat.GetBuiltInFlag() | image->GetExtraBuiltInFlags();
 
-                    DianaExecutable exe = {};
-                    exe.type = DIANA_EXECUTABLE_TYPE_PE;
-                    if (!DianaPeFile_Init(&exe.u.peFile,
-                        &stream.parent,
-                        info.size,
-                        DIANA_PE_FILE_FLAGS_MODULE_MODE))
+                    if (contextCallback)
                     {
-                        // yahoo, success
-                        diana::Guard<diana::PeFile> peFileGuard(&exe.u.peFile);
-
-                        exe.dianaMode = exe.u.peFile.pImpl->dianaMode;
-                        info.dianaMode = exe.dianaMode;
-
-                        info.entryPoint = exe.u.peFile.pImpl->addressOfEntryPoint;
-                        Diana_SafeAdd(&info.entryPoint, info.address);
-
-                        info.builtInFlags |= orthia::ModuleInfo::builtInFlags_moduleTypePe;
-
-                        if (contextCallback)
-                        {
-                            ModuleDisasmContext context;
-                            context.executable = &exe;
-                            context.stream = &stream;
-
-                            contextCallback(info, context);
-                        }
+                        ModuleDisasmContext context;
+                        context.image = image.get();
+                        contextCallback(info, context);
                     }
                 }
                 modules.push_back(info);
@@ -575,6 +688,11 @@ namespace oui
             {
                 return DIANA_MODE64;
             }
+        }
+
+        int GetDianaArch() const override
+        {
+            return m_dianaArch;
         }
 
         orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) override
@@ -752,7 +870,7 @@ namespace oui
                     CloseHandle(hProc);
                 });
 
-                bool is32bit = CheckIs32BitProcess(hProc);
+                const ProcessArch arch = DetectProcessArch(hProc);
 
                 std::vector<wchar_t> buf(4096);
                 if (!GetProcessImageFileNameW(hProc, buf.data(), (DWORD)(buf.size() - 1)))
@@ -767,7 +885,7 @@ namespace oui
                     oui::String::StringStream_type res;
                     res << OUI_TCSTR("[") << procId.pid << OUI_TCSTR("] ") << shortName.native;
 
-                    proc = std::make_shared<CProcess>(res.str(), hProc, is32bit, (DWORD)procId.pid, shared_from_this());
+                    proc = std::make_shared<CProcess>(res.str(), hProc, arch, (DWORD)procId.pid, shared_from_this());
                     handlerGuard.Release();
                 }
             }
@@ -808,6 +926,39 @@ namespace oui
             oui::String::StringStream_type res;
             res << OUI_TCSTR("[") << pid << OUI_TCSTR("] ") << shortName.native;
             return std::make_tuple(0, String(res.str()));
+        }
+
+        std::tuple<int, ProcessStartInfo> SyncQueryProcessStartInfo(unsigned long long pid) override
+        {
+            bool canWait = true;
+            HANDLE hProc = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, (DWORD)pid);
+            if (!hProc && GetLastError() == ERROR_ACCESS_DENIED)
+            {
+                canWait = false;
+                hProc = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)pid);
+            }
+            if (!hProc)
+            {
+                int error = GetLastError();
+                if (error != ERROR_ACCESS_DENIED)
+                {
+                    return std::make_tuple(error, ProcessStartInfo());
+                }
+                // the open process plugin may still get through; when it doesn't, the
+                // process exists, its start is just unknown
+                std::shared_ptr<IProcess> proc;
+                std::tie(error, proc) = SyncOpenProcess(oui::ProcessUnifiedId(pid));
+                return std::make_tuple(0, proc ? proc->GetStartInfo() : ProcessStartInfo());
+            }
+            oui::ScopedGuard handlerGuard([&]() {
+                CloseHandle(hProc);
+            });
+            // an exited process stays openable while someone holds a handle to it
+            if (canWait && WaitForSingleObject(hProc, 0) == WAIT_OBJECT_0)
+            {
+                return std::make_tuple((int)ERROR_INVALID_PARAMETER, ProcessStartInfo());
+            }
+            return std::make_tuple(0, QueryProcessStartInfo(hProc));
         }
 
         void AsyncStartQueryProcess(ThreadPtr_type targetThread,
@@ -909,10 +1060,7 @@ namespace oui
                         CloseHandle(hProc);
                     });
 
-                    if (CheckIs32BitProcess(hProc))
-                    {
-                        info.pointerSize = 4;
-                    }
+                    info.pointerSize = DetectProcessArch(hProc).dianaMode;
                 }
 
                 result.push_back(std::move(info));

@@ -22,6 +22,9 @@ extern "C"
 #include "test_x64_integrated.h"
 #include "test_fpu_mmx32.h"
 #include "test_analyze.h"
+#include "test_analyze_arm64.h"
+#include "test_analyze_arm32.h"
+#include "test_flist.h"
 #include "test_stack.h"
 #include "test_new.h"
 #include "test_avx.h"
@@ -30,7 +33,12 @@ extern "C"
 #include "test_bmi.h"
 
 #include "test_masm1.h"
+#include "test_arm64.h"
+#include "test_arm64_cmds.h"
+#include "test_arm32.h"
+#include "test_arm_exe.h"
 #include "test_patchers.h"
+#include "test_x86_oracle.h"
 
 int main()
 {
@@ -41,6 +49,7 @@ int main()
     test_aesni();
     test_sse4();
     test_bmi();
+    test_flist();
     test_stack();
     test_analyze();
     test_integrated2();
@@ -62,6 +71,16 @@ int main()
     test_misc();
     test_integrated();
     test_masm1();
+    test_arm64();
+    test_arm64_cmds();
+    test_arm32();
     test_patchers();
+    test_x86_oracle();
+	
+#ifdef DIANA_HAS_STDINT
+    test_arm_exe();
+    test_analyze_arm64();
+#endif
+    test_analyze_arm32();
     return g_diana_resultCode;
 }

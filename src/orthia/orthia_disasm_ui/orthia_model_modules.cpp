@@ -9,6 +9,7 @@
 #include "orthia_image_source.h"
 #include "orthia_helpers.h"
 #include "orthia_log.h"
+#include "formats/orthia_image_format.h"
 
 namespace orthia
 {
@@ -230,6 +231,10 @@ namespace orthia
         {
             throw std::runtime_error("Can't load file: " + orthia::PlatformStringToUtf8(fullName.native));
         }
+        if (mappedPE->GetDianaArch() != m_dianaArch)
+        {
+            throw std::runtime_error("Architecture mismatch: " + orthia::PlatformStringToUtf8(fullName.native));
+        }
         if (CheckConflicts(mappedPE))
         {
             RelocateModule(mappedPE);
@@ -381,59 +386,27 @@ namespace orthia
         {
             return;
         }
-        struct ExportsCollector :public diana::CBasePeLinkImportsObserver
+        std::vector<orthia::NameInfo> found;
+        if (!QueryMappedFileNames(*FindFormatById("pe"), *mod.peFile, found))
         {
-            ModuleInfo& m_mod;
-
-            ExportsCollector(ModuleInfo& mod)
-                : m_mod(mod)
-            {
-            }
-            void QueryFunctionByOrdinal(const char* pDllName,
-                DI_UINT32 ordinal,
-                OPERAND_SIZE* pAddress)
-            {
-            }
-            void QueryFunctionByName(const char* pDllName,
-                const char* pFunctionName,
-                DI_UINT32 hint,
-                OPERAND_SIZE* pAddress)
-            {
-                if (!*pAddress)
-                {
-                    return;
-                }
-                orthia::Address_type fncAddress = m_mod.peFile->GetImageBase() + *pAddress;
-                orthia::NameInfo nameInfo;
-                nameInfo.flags = orthia::NameInfo::flags_Export;
-                nameInfo.address = fncAddress;
-                nameInfo.name = orthia::Utf8ToPlatformString(pFunctionName);
-                m_mod.names.insert({ fncAddress , nameInfo });
-            }
-        } collector(mod);
-        DI_CHECK_CPP(mod.peFile->QueryExports(&collector));
-
-        OPERAND_SIZE entryPoint = mod.peFile->GetImpl()->mappedPE.pImpl->addressOfEntryPoint;
-        if (entryPoint)
-        {
-            collector.QueryFunctionByName("$", "$entrypoint", 0, &entryPoint);
+            throw std::runtime_error("Can't parse the module headers");
         }
-        // report tls callbacks
-        std::vector<OPERAND_SIZE> tlsCallbacks;
-        mod.peFile->QueryTLSCallbacks(tlsCallbacks);
-        for (int i = 0, size = (int)tlsCallbacks.size(); i < size; ++i)
+        // one name per address: the first, so $entrypoint and $tls_ win over an export there
+        for (auto& info : found)
         {
-            auto name = "$tls_" + orthia::ToAnsiStringAsHex((unsigned short)i);
-            auto callback = tlsCallbacks[i];
-            collector.QueryFunctionByName("$", name.c_str(), 0, &callback);
+            mod.names.insert({ info.address, std::move(info) });
         }
-
     }
     // CPEImportsLoader
     void CPEImportsLoader::LoadModules(const oui::String & fileName, 
-        std::shared_ptr<orthia::CSimplePeFile> peFile,
+        std::shared_ptr<ISimpleFile> file,
         std::shared_ptr<oui::IFileSystem> pFs)
     {
+        auto peFile = std::dynamic_pointer_cast<orthia::CSimplePeFile>(file);
+        if (!peFile)
+        {
+            throw std::runtime_error("Not a PE image");
+        }
         CheckCancel();
         m_pFs = pFs;
         if (!m_pFs)
@@ -441,6 +414,7 @@ namespace orthia
             throw std::runtime_error("Unknown filesystem");
         }
         m_dianaMode = peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+        m_dianaArch = peFile->GetDianaArch();
         m_exeDirectory = DirectoryOfFile(fileName);
 
         oui::String shortFileName;
@@ -552,87 +526,6 @@ namespace orthia
             // 2. fullname
             // 3. import functions address
             classicDatabase->DoneSave();
-        }
-    }
-
-    // CImportsLoader (unified facade)
-    CImportsLoader::CImportsLoader(int executableType, std::shared_ptr<oui::BaseOperation> operation)
-        : m_executableType(executableType)
-    {
-        if (executableType == DIANA_EXECUTABLE_TYPE_ELF)
-        {
-            m_elfLoader = std::make_unique<CElfImportsLoader>(operation);
-        }
-        else
-        {
-            m_peLoader = std::make_unique<CPEImportsLoader>(operation);
-        }
-    }
-
-    void CImportsLoader::LoadModules(const oui::String& fileName,
-        std::shared_ptr<ISimpleFile> file,
-        std::shared_ptr<oui::IFileSystem> pFs)
-    {
-        if (m_elfLoader)
-        {
-            m_elfLoader->LoadModules(fileName, std::static_pointer_cast<CSimpleElfFile>(file), pFs);
-        }
-        else
-        {
-            m_peLoader->LoadModules(fileName, std::static_pointer_cast<CSimplePeFile>(file), pFs);
-        }
-    }
-
-    void CImportsLoader::ReportModules(std::shared_ptr<CModuleManager> moduleManager)
-    {
-        if (m_elfLoader)
-        {
-            m_elfLoader->ReportModules(moduleManager);
-        }
-        else
-        {
-            m_peLoader->ReportModules(moduleManager);
-        }
-    }
-
-    static std::string DescribeMapError(int errorCode)
-    {
-        switch (errorCode)
-        {
-        case DI_END_OF_STREAM:
-            return "file is truncated";
-        case DI_INVALID_INPUT:
-            return "malformed or truncated headers";
-        case DI_UNSUPPORTED:
-        case DI_UNSUPPORTED_COMMAND:
-            return "unsupported format feature";
-        }
-        return diana::QueryErrorCode(errorCode);
-    }
-
-    // MakeSimpleFile factory
-    std::shared_ptr<ISimpleFile> MakeSimpleFile(int executableType,
-        const std::vector<char>& data,
-        const MapFileParameters& params)
-    {
-        const bool isElf = executableType == DIANA_EXECUTABLE_TYPE_ELF;
-        try
-        {
-            if (isElf)
-            {
-                auto elfFile = std::make_shared<CSimpleElfFile>();
-                elfFile->MapFile(data, params);
-                return elfFile;
-            }
-            auto peFile = std::make_shared<CSimplePeFile>();
-            peFile->MapFile(data, params);
-            return peFile;
-        }
-        catch (const diana::CException& e)
-        {
-            // the parser's error code means nothing to the user
-            throw std::runtime_error(std::string("Invalid ") + (isElf ? "ELF" : "PE") +
-                " image: " + DescribeMapError(e.GetErrorCode()));
         }
     }
 }

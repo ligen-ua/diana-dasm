@@ -4,6 +4,7 @@
 #include "orthia_image_source.h"
 #include "orthia_helpers.h"
 #include "orthia_log.h"
+#include "formats/orthia_image_format.h"
 
 namespace orthia
 {
@@ -189,6 +190,10 @@ namespace orthia
         {
             throw std::runtime_error("Bitness mismatch: " + orthia::PlatformStringToUtf8(fullName.native));
         }
+        if (mappedElf->GetDianaArch() != m_dianaArch)
+        {
+            throw std::runtime_error("Architecture mismatch: " + orthia::PlatformStringToUtf8(fullName.native));
+        }
 
         if (CheckConflicts(mappedElf))
             RelocateModule(mappedElf);
@@ -220,75 +225,21 @@ namespace orthia
         if (!mod.elfFile->GetImpl())
             return;
 
-        struct ExportsCollector : public diana::CBasePeLinkImportsObserver
+        std::vector<orthia::NameInfo> found;
+        if (!QueryMappedFileNames(*FindFormatById("elf"), *mod.elfFile, found))
         {
-            ModuleInfo& m_mod;
-            explicit ExportsCollector(ModuleInfo& m) : m_mod(m) {}
-            void QueryFunctionByOrdinal(const char*, DI_UINT32, OPERAND_SIZE*) override {}
-            void QueryFunctionByName(const char*, const char* pFunctionName,
-                DI_UINT32, OPERAND_SIZE* pAddress) override
-            {
-                if (!pFunctionName || !*pFunctionName || !pAddress || !*pAddress)
-                    return;
-                orthia::NameInfo info;
-                info.flags   = orthia::NameInfo::flags_Export;
-                info.address = *pAddress;
-                info.name    = orthia::Utf8ToPlatformString(pFunctionName);
-                m_mod.names.insert({ *pAddress, info });
-            }
-        } collector(mod);
-
-        int err = mod.elfFile->QueryExports(&collector);
-        if (err && err != DI_END)
-        {
-            ORTHIA_LOG(orthia::LogSeverity::Error, "QueryExports failed: ", err);
-        }
-
-        DI_UINT64 ep = mod.elfFile->GetEntryPoint();
-        if (ep)
-        {
-            orthia::NameInfo epInfo;
-            epInfo.flags   = orthia::NameInfo::flags_Export;
-            epInfo.address = ep;
-            epInfo.name    = orthia::Utf8ToPlatformString("$entrypoint");
-            mod.names.insert({ ep, epInfo });
-        }
-    }
-    void CElfImportsLoader::LoadImports(ModuleInfo& mod)
-    {
-        if (!mod.elfFile->GetImpl())
+            ORTHIA_LOG(orthia::LogSeverity::Error, "Can't parse the module headers: ", mod.fullName.native);
             return;
-
-        struct ImportsCollector : public diana::CBasePeLinkImportsObserver
+        }
+        // one name per address: the first, so $ifunc_memcpy wins over memcpy at the same address
+        for (auto& info : found)
         {
-            ModuleInfo& m_mod;
-            explicit ImportsCollector(ModuleInfo& m) : m_mod(m) {}
-            void QueryFunctionByOrdinal(const char*, DI_UINT32, OPERAND_SIZE*) override {}
-            void QueryFunctionByName(const char* pDllName, const char* pFunctionName,
-                DI_UINT32, OPERAND_SIZE* pAddress) override
-            {
-                if (!pFunctionName || !*pFunctionName)
-                    return;
-                std::string nameStr;
-                if (pDllName && *pDllName)
-                    nameStr = std::string(pDllName) + "!" + pFunctionName;
-                else
-                    nameStr = pFunctionName;
-
-                orthia::NameInfo info;
-                info.flags   = orthia::NameInfo::flags_Import;
-                info.address = pAddress ? *pAddress : 0;
-                info.name    = orthia::Utf8ToPlatformString(nameStr);
-                m_mod.names.insert({ GetLastAddress(), info });
-            }
-        } collector(mod);
-
-        int err = mod.elfFile->QueryImports(&collector);
-        if (err && err != DI_END)
-        {
-            ORTHIA_LOG(orthia::LogSeverity::Error, "QueryImports failed: ", err);
+            mod.names.insert({ info.address, std::move(info) });
         }
     }
+    // Links the module's PLT slots to the exports of the loaded chain and records each import
+    // at its slot (the absolute address), with the address the slot now holds; a reopen writes
+    // the recorded values back (ImportsKeyedBySlot)
     void CElfImportsLoader::LinkImports(ModuleInfo& mod)
     {
         if (!mod.elfFile->GetImpl())
@@ -297,38 +248,76 @@ namespace orthia
         struct Resolver : public diana::CBasePeLinkImportsObserver
         {
             CElfImportsLoader& loader;
-            explicit Resolver(CElfImportsLoader& l) : loader(l) {}
+            ModuleInfo& m_mod;
+            Resolver(CElfImportsLoader& l, ModuleInfo& m) : loader(l), m_mod(m) {}
             void QueryFunctionByOrdinal(const char*, DI_UINT32, OPERAND_SIZE*) override {}
-            void QueryFunctionByName(const char*, const char* pFunctionName,
+            void QueryFunctionByName(const char* pDllName, const char* pFunctionName,
                 DI_UINT32, OPERAND_SIZE* pAddress) override
             {
                 if (!pFunctionName || !*pFunctionName || !pAddress)
                     return;
+                OPERAND_SIZE target = 0;
                 for (auto& m : loader.m_mappedModules)
                 {
                     if (!m.second.elfFile->GetImpl())
                         continue;
-                    auto addr = m.second.elfFile->DiGetProcAddress(pFunctionName);
-                    if (addr)
-                    {
-                        *pAddress = addr;
-                        return;
-                    }
+                    target = m.second.elfFile->DiGetProcAddress(pFunctionName);
+                    if (target)
+                        break;
                 }
-            }
-        } resolver(*this);
+                // the slot: a module offset reported just before this call
+                const Address_type slot = m_mod.base + GetLastAddress();
+                if (target)
+                {
+                    *pAddress = target;
+                }
+                else
+                {
+                    // unresolved: the slot keeps what the file has (the PLT stub, relocated)
+                    target = ReadSlot(slot);
+                }
 
-        mod.elfFile->QueryImports(&resolver);
+                orthia::NameInfo info;
+                info.flags   = orthia::NameInfo::flags_Import;
+                info.address = target;
+                info.name    = orthia::Utf8ToPlatformString(pDllName && *pDllName ?
+                    std::string(pDllName) + "!" + pFunctionName : std::string(pFunctionName));
+                m_mod.names.insert({ slot, info });
+            }
+            OPERAND_SIZE ReadSlot(Address_type slot) const
+            {
+                const auto& image = m_mod.elfFile->GetMappedFile();
+                const int size = m_mod.elfFile->GetDianaMode();
+                DI_UINT64 value = 0;
+                if (slot >= m_mod.base && slot - m_mod.base + size <= image.size())
+                {
+                    memcpy(&value, image.data() + (size_t)(slot - m_mod.base), (size_t)size);
+                }
+                return value;
+            }
+        } resolver(*this, mod);
+
+        int err = mod.elfFile->QueryImports(&resolver);
+        if (err && err != DI_END)
+        {
+            ORTHIA_LOG(orthia::LogSeverity::Error, "QueryImports failed: ", err);
+        }
     }
 
     void CElfImportsLoader::LoadModules(
         const oui::String& fileName,
-        std::shared_ptr<orthia::CSimpleElfFile> elfFile,
+        std::shared_ptr<ISimpleFile> file,
         std::shared_ptr<oui::IFileSystem> pFs)
     {
+        auto elfFile = std::dynamic_pointer_cast<orthia::CSimpleElfFile>(file);
+        if (!elfFile)
+        {
+            throw std::runtime_error("Not an ELF image");
+        }
         CheckCancel();
         m_pFs = pFs;
         m_dianaMode = elfFile->GetDianaMode();
+        m_dianaArch = elfFile->GetDianaArch();
         m_freeSpaceStart = elfFile->GetImageEnd();
         m_exeDirectory = DirectoryOfFile(fileName);
 
@@ -382,7 +371,7 @@ namespace orthia
             }
         }
 
-        // Link root's imports against the fully loaded chain (patches GOT slots)
+        // Link root's imports against the fully loaded chain (patches GOT slots, records the names)
         auto rootFinal = m_mappedModules.find(rootKey);
         if (rootFinal != m_mappedModules.end())
         {
@@ -390,12 +379,6 @@ namespace orthia
             catch (std::exception& e)
             {
                 ORTHIA_LOG(orthia::LogSeverity::Error, "Can't link ELF imports: ", e.what());
-            }
-            // Collect import names (with now-resolved addresses)
-            try { LoadImports(rootFinal->second); }
-            catch (std::exception& e)
-            {
-                ORTHIA_LOG(orthia::LogSeverity::Error, "Can't load ELF imports: ", e.what());
             }
         }
     }

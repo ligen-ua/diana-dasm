@@ -1,6 +1,12 @@
 #include "diana_elf.h"
 
 
+static int DianaElf_DecodeShdrNormalized(DIANA_ELF_SECTION_HEADER* out,
+    const unsigned char* raw,
+    int rawSize,
+    int is64bit,
+    int isLE);
+
 static
 int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
     DianaMovableReadStream* pStream,
@@ -11,11 +17,17 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
     int i;
     OPERAND_SIZE shAddress = 0;
     int status = 0;
+    unsigned char raw[64];
+    const int is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
+    const int rawSize = is64bit ? 64 : 40;
 
     if (pImpl->elfHeader.e_shnum == 0)
         return DI_SUCCESS;
 
     if (pImpl->elfHeader.e_shoff >= sizeOfFile)
+        return DI_INVALID_INPUT;
+
+    if (pImpl->elfHeader.e_shentsize < rawSize)
         return DI_INVALID_INPUT;
 
     // Allocate space for section headers
@@ -32,9 +44,13 @@ int ReadSectionHeaders(Diana_ElfFile_impl* pImpl,
         DIANA_ELF_SECTION_HEADER * pHeader = &pSectionHeader[i].header;
         DI_CHECK_GOTO(pStream->pMoveTo(pStream, shAddress));
 
-        DI_CHECK_GOTO(DianaExactRead(&pStream->parent,
-            pHeader,
-            sizeof(DIANA_ELF_SECTION_HEADER)));
+        // Elf32_Shdr/Elf64_Shdr in the file's byte order -> normalized header
+        DI_CHECK_GOTO(DianaExactRead(&pStream->parent, raw, rawSize));
+        DI_CHECK_GOTO(DianaElf_DecodeShdrNormalized(pHeader,
+            raw,
+            rawSize,
+            is64bit,
+            pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE));
 
         DI_CHECK_GOTO(Diana_SafeAdd(&shAddress, pImpl->elfHeader.e_shentsize));
     }
@@ -120,6 +136,16 @@ int InitializeSymbolTables(Diana_ElfFile_impl* pImpl)
                 pImpl->pDynamicStringTableSection = pSection;
         }
     }
+    // a not stripped file has .strtab too: the dynamic one is the table .dynsym links to
+    if (pImpl->pDynamicSymbolTableSection)
+    {
+        DI_UINT32 link = pImpl->pDynamicSymbolTableSection->header.sh_link;
+        if (link && link < (DI_UINT32)pImpl->capturedSectionCount &&
+            pImpl->pCapturedSections[link].header.sh_type == DIANA_SHT_STRTAB)
+        {
+            pImpl->pDynamicStringTableSection = &pImpl->pCapturedSections[link];
+        }
+    }
 
     return DI_SUCCESS;
 }
@@ -199,6 +225,47 @@ static int DianaElf_DecodePhdrNormalized(DIANA_ELF_PROGRAM_HEADER* out,
         out->p_memsz = (DI_UINT64)DianaElf_rd32(raw + 0x14, isLE);
         out->p_flags = DianaElf_rd32(raw + 0x18, isLE);
         out->p_align = (DI_UINT64)DianaElf_rd32(raw + 0x1C, isLE);
+        return DI_SUCCESS;
+    }
+}
+
+static int DianaElf_DecodeShdrNormalized(DIANA_ELF_SECTION_HEADER* out,
+    const unsigned char* raw,
+    int rawSize,
+    int is64bit,
+    int isLE)
+{
+    // Elf32_Shdr is 40 bytes, Elf64_Shdr is 64 bytes
+    if (is64bit)
+    {
+        if (rawSize < 64) return DI_INVALID_INPUT;
+
+        out->sh_name = DianaElf_rd32(raw + 0x00, isLE);
+        out->sh_type = DianaElf_rd32(raw + 0x04, isLE);
+        out->sh_flags = DianaElf_rd64(raw + 0x08, isLE);
+        out->sh_addr = DianaElf_rd64(raw + 0x10, isLE);
+        out->sh_offset = DianaElf_rd64(raw + 0x18, isLE);
+        out->sh_size = DianaElf_rd64(raw + 0x20, isLE);
+        out->sh_link = DianaElf_rd32(raw + 0x28, isLE);
+        out->sh_info = DianaElf_rd32(raw + 0x2C, isLE);
+        out->sh_addralign = DianaElf_rd64(raw + 0x30, isLE);
+        out->sh_entsize = DianaElf_rd64(raw + 0x38, isLE);
+        return DI_SUCCESS;
+    }
+    else
+    {
+        if (rawSize < 40) return DI_INVALID_INPUT;
+
+        out->sh_name = DianaElf_rd32(raw + 0x00, isLE);
+        out->sh_type = DianaElf_rd32(raw + 0x04, isLE);
+        out->sh_flags = (DI_UINT64)DianaElf_rd32(raw + 0x08, isLE);
+        out->sh_addr = (DI_UINT64)DianaElf_rd32(raw + 0x0C, isLE);
+        out->sh_offset = (DI_UINT64)DianaElf_rd32(raw + 0x10, isLE);
+        out->sh_size = (DI_UINT64)DianaElf_rd32(raw + 0x14, isLE);
+        out->sh_link = DianaElf_rd32(raw + 0x18, isLE);
+        out->sh_info = DianaElf_rd32(raw + 0x1C, isLE);
+        out->sh_addralign = (DI_UINT64)DianaElf_rd32(raw + 0x20, isLE);
+        out->sh_entsize = (DI_UINT64)DianaElf_rd32(raw + 0x24, isLE);
         return DI_SUCCESS;
     }
 }
@@ -390,6 +457,8 @@ int Diana_InitElfFileImpl(Diana_ElfFile* pElfFile,
     Diana_ElfFile_impl* pImpl = 0;
     int i;
     OPERAND_SIZE maxSize = 0;
+    OPERAND_SIZE minLoadAddress = 0;
+    int haveLoad = 0;
 
     pElfFile->flags = flags;
 
@@ -428,6 +497,25 @@ int Diana_InitElfFileImpl(Diana_ElfFile* pElfFile,
     }
 
     pElfFile->dianaMode = mode;
+    // other machines stay x86 as before
+    switch (pImpl->elfHeader.e_machine)
+    {
+    case DIANA_EM_AARCH64:
+        // A64 code is little-endian in aarch64_be files too, only data is big-endian
+        pElfFile->arch = DIANA_ARCH_AARCH64;
+        break;
+    case DIANA_EM_ARM:
+        // big-endian without BE8 is BE32: the code is big-endian, the decoders read little-endian words
+        if (!(pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE) &&
+            !(pImpl->elfHeader.e_flags & DIANA_EF_ARM_BE8))
+        {
+            return DI_UNSUPPORTED;
+        }
+        pElfFile->arch = DIANA_ARCH_ARM32;
+        break;
+    default:
+        pElfFile->arch = DIANA_ARCH_X86;
+    }
 
     // Calculate module size based on segments
     for (i = 0; i < pImpl->capturedSegmentCount; ++i)
@@ -440,12 +528,30 @@ int Diana_InitElfFileImpl(Diana_ElfFile* pElfFile,
             pImpl->dynamicAddress = pHeader->p_vaddr;
             pImpl->dynamicSize = pHeader->p_memsz;
         }
+        if (pHeader->p_type == DIANA_PT_LOAD && (!haveLoad || pHeader->p_vaddr < minLoadAddress))
+        {
+            minLoadAddress = pHeader->p_vaddr;
+            haveLoad = 1;
+        }
         if (segmentEnd > maxSize)
             maxSize = segmentEnd;
     }
 
-    pImpl->sizeOfModule = maxSize;
+    // the module starts at the lowest PT_LOAD page, where the loader maps it
+    pImpl->linkBase = minLoadAddress & ~(OPERAND_SIZE)DIANA_ELF_PAGE_MASK;
+    pImpl->sizeOfModule = maxSize > pImpl->linkBase ? maxSize - pImpl->linkBase : 0;
 
+
+    return DI_SUCCESS;
+}
+
+int DianaElfFile_LinkToOffset(const Diana_ElfFile_impl* pImpl,
+    OPERAND_SIZE address,
+    OPERAND_SIZE* pOffset)
+{
+    if (address < pImpl->linkBase || address - pImpl->linkBase >= pImpl->sizeOfModule)
+        return DI_END_OF_STREAM;
+    *pOffset = address - pImpl->linkBase;
     return DI_SUCCESS;
 }
 
@@ -524,7 +630,6 @@ void DianaElfFile_Free(Diana_ElfFile* pElfFile)
 #define DI_ELF_DT_FINI_ARRAYSZ 28
 #define DI_ELF_DT_VERSYM      0x6ffffff0
 
-#define DI_ELF_STT_GNU_IFUNC  10
 #define DI_ELF_VERSYM_HIDDEN  0x8000     // non-default version (name@VER, not name@@VER)
 #define DI_ELF_MAX_DYN_SYMBOLS 0x100000  // sanity limit for malformed hash tables
 
@@ -534,6 +639,41 @@ typedef struct _DI_ELF_DYN64
     DI_INT64 d_tag;
     DI_UINT64 d_val; // union {ptr,val} normalized as 64bit
 } DI_ELF_DYN64;
+
+/* the dynamic arrays are read raw and used as Elf64_Dyn. ELF32 entries (8 bytes) are widened in place: the */
+/* buffer has room for twice the bytes read. Big-endian entries are swapped. *pReadBytes becomes the size of */
+/* the Elf64_Dyn array */
+static void DianaElf_NormalizeDyn(DI_ELF_DYN64* pDyn, OPERAND_SIZE* pReadBytes, int isLE, int is64)
+{
+    DI_ELF_DYN64* pEnd = 0;
+    if (!is64)
+    {
+        const unsigned char* pRaw = (const unsigned char*)pDyn;
+        OPERAND_SIZE count = *pReadBytes / 8;
+        OPERAND_SIZE i = count;
+        /* from the end: entry i moves from 8 * i to 16 * i, over entries already moved */
+        while (i > 0)
+        {
+            DI_UINT32 tag = 0;
+            DI_UINT32 value = 0;
+            --i;
+            tag = DianaElf_rd32(pRaw + i * 8, isLE);
+            value = DianaElf_rd32(pRaw + i * 8 + 4, isLE);
+            pDyn[i].d_tag = (DI_INT64)(DI_INT32)tag;
+            pDyn[i].d_val = (DI_UINT64)value;
+        }
+        *pReadBytes = count * sizeof(DI_ELF_DYN64);
+        return;
+    }
+    pEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + (*pReadBytes / sizeof(DI_ELF_DYN64)) * sizeof(DI_ELF_DYN64));
+    if (isLE)
+        return;
+    for (; pDyn < pEnd; ++pDyn)
+    {
+        pDyn->d_tag = (DI_INT64)DianaElf_rd64((const unsigned char*)&pDyn->d_tag, 0);
+        pDyn->d_val = DianaElf_rd64((const unsigned char*)&pDyn->d_val, 0);
+    }
+}
 
 typedef struct _DI_ELF_SYM64
 {
@@ -628,7 +768,7 @@ static int DianaElf_IsExportedDefinition(const DI_ELF_SYM64* pSym)
     int type = DI_ELF_ST_TYPE(pSym->st_info);
     return pSym->st_shndx != 0 && pSym->st_value != 0 &&
         (bind == DIANA_STB_GLOBAL || bind == DIANA_STB_WEAK) &&
-        (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT || type == DI_ELF_STT_GNU_IFUNC);
+        (type == DIANA_STT_FUNC || type == DIANA_STT_OBJECT || type == DIANA_STT_GNU_IFUNC);
 }
 
 // True for a hidden (non-default) version, name@VER rather than name@@VER: dlsym skips it.
@@ -684,10 +824,10 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
     isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
 
-    // Dynamic array is at baseAddress + p_impl->dynamicAddress
-    dynAddr = pImpl->dynamicAddress;
-
     dynSize = pImpl->dynamicSize;
+    if (dynSize && DianaElfFile_LinkToOffset(pImpl, pImpl->dynamicAddress, &dynAddr))
+        return DI_INVALID_INPUT;
+
     if (dynSize == 0 || dynSize > DIANA_MAX_SAFE_ALLOC_SIZE) // sanity
         return DI_INVALID_INPUT;
 
@@ -696,7 +836,8 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
     {
         DIANA_SIZE_T dynAllocSize;
         DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynSize, &dynAllocSize));
-        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize);
+        /* ELF32 entries are widened */
+        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize * 2);
         DI_CHECK_ALLOC_GOTO(pDyn);
     }
 
@@ -706,10 +847,12 @@ int DianaElfFile_GetSymbolAddress_Memory(Diana_ElfFile* pElfFile,
         (int)dynSize,
         &readBytes,
         0));
-    if (readBytes < sizeof(DI_ELF_DYN64))
+    if (readBytes < ((pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT) ? 16u : 8u))
     {
         DI_CHECK_GOTO(DI_ERROR);
     }
+    DianaElf_NormalizeDyn(pDyn, &readBytes, pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE,
+        pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT);
 
     // Walk dynamic entries
     pEntry = pDyn;
@@ -1226,6 +1369,8 @@ cleanup:
     return status;
 }
 
+
+
 // Reports every defined global/weak function or object in .dynsym. Hidden (non-default)
 // versions are skipped, as dlsym does, so each name is reported once.
 static int DianaElf_QueryDynamicExports(DianaMovableReadStream* pStream,
@@ -1326,18 +1471,20 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
     is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
     isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
 
-    // 1) Read dynamic section
-    dynAddr = baseAddress;
-    DI_CHECK_GOTO(Diana_SafeAdd(&dynAddr, pImpl->dynamicAddress));
-
     dynSize = pImpl->dynamicSize;
     if (dynSize == 0 || dynSize > DIANA_MAX_SAFE_ALLOC_SIZE)
         return DI_INVALID_INPUT;
 
+    // 1) Read dynamic section
+    if (DianaElfFile_LinkToOffset(pImpl, pImpl->dynamicAddress, &dynAddr))
+        return DI_INVALID_INPUT;
+    DI_CHECK_GOTO(Diana_SafeAdd(&dynAddr, baseAddress));
+
     {
         DIANA_SIZE_T dynAllocSize;
         DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynSize, &dynAllocSize));
-        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize);
+        /* ELF32 entries are widened */
+        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize * 2);
         DI_CHECK_ALLOC_GOTO(pDyn);
     }
 
@@ -1347,8 +1494,10 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
         (int)dynSize,
         &readBytes,
         streamFlags));
-    if (readBytes < sizeof(DI_ELF_DYN64))
+    if (readBytes < ((pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT) ? 16u : 8u))
         DI_CHECK_GOTO(DI_ERROR);
+    DianaElf_NormalizeDyn(pDyn, &readBytes, pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE,
+        pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT);
 
     // 2) Parse dynamic entries
     symtabAddr = 0;
@@ -1509,6 +1658,7 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                 const char* dllName = 0;
                 OPERAND_SIZE stValue = 0;
                 OPERAND_SIZE gotSlotAddr = 0;
+                OPERAND_SIZE slotAddr = 0;
                 int bind = DI_ELF_ST_BIND(sym.st_info);
                 int type = DI_ELF_ST_TYPE(sym.st_info);
                 if ((bind != DIANA_STB_GLOBAL && bind != DIANA_STB_WEAK) ||
@@ -1517,10 +1667,18 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                     continue;
                 }
 
+                /* the GOT slot the PLT relocation fills, as a module offset plus baseAddress */
+                slotAddr = 0;
+                if (DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)r_offset, &slotAddr) == DI_SUCCESS)
+                {
+                    DI_CHECK_GOTO(Diana_SafeAdd(&slotAddr, baseAddress));
+                }
+
                 symNameAddr = strtabAddr + sym.st_name;
                 if (pObserver->reportInfo_fnc)
                 {
-                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, symNameAddr));
+                    /* an import is reported at its slot, like a PE import at its IAT slot */
+                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, bImports ? slotAddr : symNameAddr));
                 }
                 DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
                     symNameAddr,
@@ -1535,13 +1693,7 @@ int DianaElfFile_QueryImportsExports(Diana_ElfFile* pElfFile,
                 stValue = sym.st_value;
 
                 /* GOT slot address for write-back (only used when stValue==0, i.e. external import) */
-                gotSlotAddr = 0;
-                if (!stValue && bImports)
-                {
-                    gotSlotAddr = r_offset;
-                    if (pElfFile->pImpl->elfHeader.e_type == DIANA_ET_DYN)
-                        DI_CHECK_GOTO(Diana_SafeAdd(&gotSlotAddr, baseAddress));
-                }
+                gotSlotAddr = !stValue && bImports ? slotAddr : 0;
 
                 DI_CHECK_GOTO(pObserver->queryFunctionByName(
                     pObserver,
@@ -1611,30 +1763,36 @@ int DianaElfFile_GetNeededLibraries(Diana_ElfFile* pElfFile,
     DI_ELF_DYN64* pEntry = 0;
     DI_ELF_DYN64* pDynEnd = 0;
     OPERAND_SIZE strtabAddr = 0;
+    OPERAND_SIZE dynOffset = 0;
 
     if (!pImpl || !callback)
         return DI_INVALID_INPUT;
 
     if (pImpl->dynamicSize == 0 || pImpl->dynamicSize > DIANA_MAX_SAFE_ALLOC_SIZE)
         return DI_SUCCESS;
+    if (DianaElfFile_LinkToOffset(pImpl, pImpl->dynamicAddress, &dynOffset))
+        return DI_INVALID_INPUT;
 
     {
         DIANA_SIZE_T dynAllocSize;
         DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&pImpl->dynamicSize, &dynAllocSize));
-        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize);
+        /* ELF32 entries are widened */
+        pDyn = (DI_ELF_DYN64*)DIANA_MALLOC(dynAllocSize * 2);
         DI_CHECK_ALLOC_GOTO(pDyn);
     }
 
     DI_CHECK_GOTO(pStream->pRandomRead(pStream,
-        pImpl->dynamicAddress,
+        dynOffset,
         pDyn,
         (int)pImpl->dynamicSize,
         &readBytes,
         streamFlags));
-    if (readBytes < sizeof(DI_ELF_DYN64))
+    if (readBytes < ((pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT) ? 16u : 8u))
     {
         DI_CHECK_GOTO(DI_ERROR);
     }
+    DianaElf_NormalizeDyn(pDyn, &readBytes, pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE,
+        pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT);
     pEntry = pDyn;
     pDynEnd = (DI_ELF_DYN64*)((DI_UINT8*)pDyn + readBytes);
 
@@ -1816,6 +1974,7 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
             return DI_SUCCESS;
 
         case DIANA_R_X86_64_RELATIVE:
+        case DIANA_R_X86_64_IRELATIVE: /* the slot gets the resolver, not what it returns */
         {
             /* *patchVA = B + A  (B = loadBias, A = r_addend) */
             DI_UINT64 val = (DI_UINT64)((DI_INT64)loadBias + pEntry->r_addend);
@@ -1873,6 +2032,7 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
             return DI_SUCCESS;
 
         case DIANA_R_386_RELATIVE:
+        case DIANA_R_386_IRELATIVE:
         {
             /* REL style: addend is read from the patch location itself */
             unsigned char cur[4];
@@ -1924,6 +2084,7 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
             return DI_SUCCESS;
 
         case DIANA_R_AARCH64_RELATIVE:
+        case DIANA_R_AARCH64_IRELATIVE:
         {
             DI_UINT64 val = (DI_UINT64)((DI_INT64)loadBias + pEntry->r_addend);
             DI_CHECK(DianaElf_Write64(pOut, patchVA, val, isLE));
@@ -1963,6 +2124,7 @@ static int DianaElf_ApplyReloc(DianaReadWriteRandomStream* pOut,
             return DI_SUCCESS;
 
         case DIANA_R_ARM_RELATIVE:
+        case DIANA_R_ARM_IRELATIVE:
         {
             unsigned char cur[4];
             DI_UINT32 implicit = 0;
@@ -2238,6 +2400,7 @@ int DianaElfFile_Relocate(/* in */    Diana_ElfFile* pElfFile,
                 case DI_ELF_DT_JMPREL:
                 case DI_ELF_DT_INIT_ARRAY:
                 case DI_ELF_DT_FINI_ARRAY:
+                case DIANA_DT_PREINIT_ARRAY:
                     isPtrTag = 1;
                     break;
                 default:
@@ -2346,16 +2509,19 @@ int DianaElfFile_MapEx(/* in */  Diana_ElfFile* pElfFile,
             (OPERAND_SIZE)pImpl->elfHeader.e_ehsize +
             (OPERAND_SIZE)pImpl->elfHeader.e_phnum *
             (OPERAND_SIZE)pImpl->elfHeader.e_phentsize;
+        /* the header is at the start of the module, the lowest PT_LOAD page */
+        OPERAND_SIZE headerAddress = address;
 
         if (headerRegionSize == 0 || headerRegionSize > pImpl->sizeOfModule)
         {
             return DI_ERROR;
         }
 
+        DI_CHECK(Diana_SafeAdd(&headerAddress, pImpl->linkBase));
         DI_CHECK(pStream->pMoveTo(pStream, 0));
         DI_CHECK(DianaStreams_CopyData(&pStream->parent,
             pOutStream,
-            address,          /* dest VA */
+            headerAddress,    /* dest VA */
             headerRegionSize,
             pPage,
             pageSize));
@@ -2488,12 +2654,13 @@ int DianaElfFile_QueryBuildId(/* in */ Diana_ElfFile* pElfFile,
             continue;
         if (segmentFileSize == 0 || segmentFileSize > DIANA_MAX_SAFE_ALLOC_SIZE)
             continue;
+        if (DianaElfFile_LinkToOffset(pImpl, (OPERAND_SIZE)pPhdr->p_vaddr, &segmentVA))
+            continue;
 
         DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&segmentFileSize, &noteAllocSize));
         pCapturedSegment = DIANA_MALLOC(noteAllocSize);
         DI_CHECK_ALLOC_GOTO(pCapturedSegment);
 
-        segmentVA = (OPERAND_SIZE)pPhdr->p_vaddr;
         DI_CHECK_GOTO(Diana_SafeAdd(&segmentVA, address));
 
         DI_CHECK_GOTO(pOutStream->pRandomRead(pOutStream,
@@ -2552,5 +2719,547 @@ int DianaElfFile_QueryBuildId(/* in */ Diana_ElfFile* pElfFile,
 cleanup:
     if (pCapturedSegment)
         DIANA_FREE(pCapturedSegment);
+    return status;
+}
+
+
+
+/* ----------------------------------------------------------------------
+ * Startup routines: the code the dynamic linker runs before main.
+ * IFUNC resolvers (STT_GNU_IFUNC symbols and R_*_IRELATIVE relocations)
+ * and the DT_PREINIT_ARRAY / DT_INIT / DT_INIT_ARRAY initializers.
+ * ---------------------------------------------------------------------- */
+
+#define DI_ELF_STARTUP_MAX_ARRAY_ENTRIES  0x10000
+#define DI_ELF_STARTUP_RELOC_CHUNK        64
+
+typedef struct _DianaElf_StartupQuery
+{
+    Diana_ElfFile_impl* pImpl;
+    DianaMovableReadStream* pStream;
+    int streamFlags;
+    int is64bit;
+    int isLE;
+    OPERAND_SIZE moduleAddress;
+    DianaElfFile_PointerToOffset_Callback pointerToOffset;
+    void* pPointerContext;
+    DianaElfFile_StartupRoutine_Callback callback;
+    void* pContext;
+    OPERAND_SIZE* pNamedIfuncs;     /* offsets of the reported IFUNC symbols */
+    DI_UINT32 namedIfuncCount;
+    int unnamedIfuncCount;
+} DianaElf_StartupQuery;
+
+/* A pointer stored in the image as a module offset. The loader relocates some pointers
+   (most dynamic tags, the init arrays) and leaves others at their link-time addresses. */
+static int DianaElf_StartupPointerToOffset(DianaElf_StartupQuery* pQuery,
+    OPERAND_SIZE pointer,
+    OPERAND_SIZE* pOffset)
+{
+    OPERAND_SIZE moduleAddress = pQuery->moduleAddress;
+    OPERAND_SIZE size = pQuery->pImpl->sizeOfModule;
+
+    if (pQuery->pointerToOffset)
+        return pQuery->pointerToOffset(pQuery->pPointerContext, pointer, pOffset);
+
+    *pOffset = pointer;
+    /* ET_EXEC: the loader does not move it, every pointer is a link-time address */
+    if (pQuery->pImpl->elfHeader.e_type == DIANA_ET_EXEC)
+    {
+        DianaElfFile_LinkToOffset(pQuery->pImpl, pointer, pOffset);
+        return DI_SUCCESS;
+    }
+    if (moduleAddress && pointer >= moduleAddress && pointer - moduleAddress < size)
+        *pOffset = pointer - moduleAddress;
+    else
+        DianaElfFile_LinkToOffset(pQuery->pImpl, pointer, pOffset);
+    return DI_SUCCESS;
+}
+
+int DianaElfFile_QueryArmCodeArch(/* in */ Diana_ElfFile* pElfFile,
+    /* in */ DianaMovableReadStream* pStream,
+    /* in */ OPERAND_SIZE moduleAddress,
+    /* in, optional */ DianaElfFile_PointerToOffset_Callback pointerToOffset,
+    /* in, optional */ void* pPointerContext,
+    /* in */ int streamFlags,
+    /* out */ int* pArch)
+{
+    Diana_ElfFile_impl* pImpl = 0;
+    DianaElf_StartupQuery query;
+    unsigned char raw[8];
+    OPERAND_SIZE readBytes = 0;
+    OPERAND_SIZE dynOffset = 0;
+    OPERAND_SIZE symtab = 0, hash = 0, gnuHash = 0;
+    OPERAND_SIZE pos = 0;
+    DI_UINT32 count = 0, idx = 0, odd = 0, even = 0;
+    int isLE = 0;
+
+    if (!pElfFile || !pElfFile->pImpl || !pStream || !pArch)
+        return DI_INVALID_INPUT;
+    pImpl = pElfFile->pImpl;
+    *pArch = pElfFile->arch;
+    if (pElfFile->arch != DIANA_ARCH_ARM32 && pElfFile->arch != DIANA_ARCH_THUMB)
+        return DI_SUCCESS;
+    *pArch = DIANA_ARCH_ARM32;
+    if (pImpl->elfHeader.e_entry)
+    {
+        if (pImpl->elfHeader.e_entry & 1)
+            *pArch = DIANA_ARCH_THUMB;
+        return DI_SUCCESS;
+    }
+    if (pElfFile->flags & DIANA_ELF_FILE_FLAGS_FILE_MODE)
+        return DI_UNSUPPORTED;
+    if (!pImpl->dynamicSize || DianaElfFile_LinkToOffset(pImpl, pImpl->dynamicAddress, &dynOffset))
+        return DI_SUCCESS;
+
+    DIANA_MEMSET(&query, 0, sizeof(query));
+    query.pImpl = pImpl;
+    query.pStream = pStream;
+    query.streamFlags = streamFlags;
+    query.moduleAddress = moduleAddress;
+    query.pointerToOffset = pointerToOffset;
+    query.pPointerContext = pPointerContext;
+    isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
+
+    /* ELF32: 8-byte entries; the pointers the loader may have relocated */
+    for (pos = 0; pos + 8 <= pImpl->dynamicSize; pos += 8)
+    {
+        DI_INT32 tag = 0;
+        OPERAND_SIZE offset = 0;
+        DI_CHECK(pStream->pRandomRead(pStream, dynOffset + pos, raw, 8, &readBytes, streamFlags));
+        if (readBytes != 8)
+            return DI_SUCCESS;
+        tag = (DI_INT32)DianaElf_rd32(raw, isLE);
+        if (tag == DI_ELF_DT_NULL)
+            break;
+        if (tag != DI_ELF_DT_SYMTAB && tag != DI_ELF_DT_HASH && (DI_UINT32)tag != (DI_UINT32)DI_ELF_DT_GNU_HASH)
+            continue;
+        DI_CHECK(DianaElf_StartupPointerToOffset(&query, DianaElf_rd32(raw + 4, isLE), &offset));
+        if (offset >= pImpl->sizeOfModule)
+            continue;
+        if (tag == DI_ELF_DT_SYMTAB)
+            symtab = offset;
+        else if (tag == DI_ELF_DT_HASH)
+            hash = offset;
+        else
+            gnuHash = offset;
+    }
+    if (!symtab || (!hash && !gnuHash) ||
+        DianaElf_CountDynSymbols(pStream, streamFlags, hash, gnuHash, 0, isLE, &count))
+    {
+        return DI_SUCCESS;
+    }
+    /* the defined functions: their values are link-time addresses, bit 0 is T32 */
+    for (idx = 1; idx < count; ++idx)
+    {
+        DI_ELF_SYM64 sym;
+        int type = 0;
+        if (DianaElf_ReadSymNormalized(pStream, symtab + (OPERAND_SIZE)idx * 16, 0, isLE, &sym, streamFlags))
+            break;
+        type = DI_ELF_ST_TYPE(sym.st_info);
+        if (!sym.st_shndx || !sym.st_value || (type != DIANA_STT_FUNC && type != DIANA_STT_GNU_IFUNC))
+            continue;
+        if (sym.st_value & 1)
+            ++odd;
+        else
+            ++even;
+    }
+    if (odd > even)
+        *pArch = DIANA_ARCH_THUMB;
+    return DI_SUCCESS;
+}
+
+static int DianaElf_StartupReadPointer(DianaElf_StartupQuery* pQuery,
+    OPERAND_SIZE offset,
+    OPERAND_SIZE* pValue)
+{
+    unsigned char buf[8];
+    OPERAND_SIZE readBytes = 0;
+    int size = pQuery->is64bit ? 8 : 4;
+
+    DI_CHECK(pQuery->pStream->pRandomRead(pQuery->pStream, offset, buf, size, &readBytes, pQuery->streamFlags));
+    if (readBytes != (OPERAND_SIZE)size)
+        return DI_END_OF_STREAM;
+    *pValue = pQuery->is64bit ? (OPERAND_SIZE)DianaElf_rd64(buf, pQuery->isLE) :
+                                (OPERAND_SIZE)DianaElf_rd32(buf, pQuery->isLE);
+    return DI_SUCCESS;
+}
+
+static int DianaElf_StartupReport(DianaElf_StartupQuery* pQuery,
+    int kind,
+    int index,
+    OPERAND_SIZE offset,
+    OPERAND_SIZE slotOffset,
+    const char* pName)
+{
+    DianaElfStartupRoutine routine;
+    routine.kind = kind;
+    routine.index = index;
+    routine.offset = offset;
+    routine.slotOffset = slotOffset;
+    routine.pName = pName;
+    return pQuery->callback(pQuery->pContext, &routine);
+}
+
+static int DianaElf_StartupIsNamedIfunc(const DianaElf_StartupQuery* pQuery, OPERAND_SIZE offset)
+{
+    DI_UINT32 i;
+    for (i = 0; i < pQuery->namedIfuncCount; ++i)
+    {
+        if (pQuery->pNamedIfuncs[i] == offset)
+            return 1;
+    }
+    return 0;
+}
+
+/* The STT_GNU_IFUNC symbols of .dynsym; an address is reported once */
+static int DianaElf_StartupQueryIfuncSymbols(DianaElf_StartupQuery* pQuery,
+    OPERAND_SIZE symtabOffset,
+    OPERAND_SIZE strtabOffset,
+    OPERAND_SIZE hashOffset,
+    OPERAND_SIZE gnuHashOffset)
+{
+    DI_UINT32 symCount = 0;
+    DI_UINT32 idx;
+    int status = DI_SUCCESS;
+
+    if (!symtabOffset || !strtabOffset || (!hashOffset && !gnuHashOffset))
+        return DI_SUCCESS;
+
+    if (DianaElf_CountDynSymbols(pQuery->pStream, pQuery->streamFlags,
+        hashOffset, gnuHashOffset, pQuery->is64bit, pQuery->isLE, &symCount) != DI_SUCCESS || symCount < 2)
+    {
+        return DI_SUCCESS;  /* no usable hash table: the IRELATIVE relocations still give the resolvers */
+    }
+
+    pQuery->pNamedIfuncs = (OPERAND_SIZE*)DIANA_MALLOC((DIANA_SIZE_T)symCount * sizeof(OPERAND_SIZE));
+    DI_CHECK_ALLOC(pQuery->pNamedIfuncs);
+
+    /* index 0 is the reserved undefined symbol */
+    for (idx = 1; idx < symCount; ++idx)
+    {
+        DI_ELF_SYM64 sym;
+        char name[256];
+        OPERAND_SIZE readBytes = 0;
+        OPERAND_SIZE offset = 0;
+
+        if (DianaElf_ReadSymNormalized(pQuery->pStream,
+            symtabOffset + (OPERAND_SIZE)idx * (pQuery->is64bit ? 24 : 16),
+            pQuery->is64bit,
+            pQuery->isLE,
+            &sym,
+            pQuery->streamFlags) != DI_SUCCESS)
+        {
+            break;
+        }
+        if (DI_ELF_ST_TYPE(sym.st_info) != DIANA_STT_GNU_IFUNC || sym.st_shndx == 0 || sym.st_value == 0)
+            continue;
+
+        if (DianaElfFile_LinkToOffset(pQuery->pImpl, (OPERAND_SIZE)sym.st_value, &offset) ||
+            DianaElf_StartupIsNamedIfunc(pQuery, offset))
+        {
+            continue;   /* out of the image, or another version of the same symbol */
+        }
+        pQuery->pNamedIfuncs[pQuery->namedIfuncCount++] = offset;
+
+        name[0] = 0;
+        if (pQuery->pStream->pRandomRead(pQuery->pStream,
+            strtabOffset + sym.st_name,
+            name,
+            sizeof(name) - 1,
+            &readBytes,
+            pQuery->streamFlags) != DI_SUCCESS)
+        {
+            readBytes = 0;
+        }
+        name[readBytes < sizeof(name) - 1 ? (DIANA_SIZE_T)readBytes : sizeof(name) - 1] = 0;
+
+        status = DianaElf_StartupReport(pQuery, DIANA_ELF_STARTUP_IFUNC, 0, offset, 0, name[0] ? name : 0);
+        if (status)
+            break;
+    }
+    return status;
+}
+
+static DI_UINT32 DianaElf_GetIRelativeType(DI_UINT16 machine)
+{
+    switch (machine)
+    {
+    case DIANA_EM_X86_64:  return DIANA_R_X86_64_IRELATIVE;
+    case DIANA_EM_386:     return DIANA_R_386_IRELATIVE;
+    case DIANA_EM_AARCH64: return DIANA_R_AARCH64_IRELATIVE;
+    case DIANA_EM_ARM:     return DIANA_R_ARM_IRELATIVE;
+    }
+    return 0;
+}
+
+/* The R_*_IRELATIVE entries of a REL or RELA table: the resolvers of IFUNCs that have no
+   symbol (static ones). RELA keeps the resolver in the addend. REL keeps it in the slot,
+   so in a running process, where the loader has called the resolver, it is the implementation. */
+static int DianaElf_StartupQueryIRelative(DianaElf_StartupQuery* pQuery,
+    OPERAND_SIZE tableOffset,
+    OPERAND_SIZE tableSize,
+    int isRela)
+{
+    unsigned char buf[DI_ELF_STARTUP_RELOC_CHUNK * 24];
+    DI_UINT32 irelativeType = DianaElf_GetIRelativeType(pQuery->pImpl->elfHeader.e_machine);
+    OPERAND_SIZE entSize = isRela ? (pQuery->is64bit ? 24 : 12) : (pQuery->is64bit ? 16 : 8);
+    OPERAND_SIZE count = tableSize / entSize;
+    OPERAND_SIZE i = 0;
+
+    if (!tableOffset || !irelativeType || tableSize > pQuery->pImpl->sizeOfModule)
+        return DI_SUCCESS;
+
+    while (i < count)
+    {
+        OPERAND_SIZE chunk = count - i;
+        OPERAND_SIZE readBytes = 0;
+        OPERAND_SIZE j;
+
+        if (chunk > DI_ELF_STARTUP_RELOC_CHUNK)
+            chunk = DI_ELF_STARTUP_RELOC_CHUNK;
+        DI_CHECK(pQuery->pStream->pRandomRead(pQuery->pStream,
+            tableOffset + i * entSize,
+            buf,
+            (int)(chunk * entSize),
+            &readBytes,
+            pQuery->streamFlags));
+        if (readBytes != chunk * entSize)
+            return DI_END_OF_STREAM;
+
+        for (j = 0; j < chunk; ++j)
+        {
+            const unsigned char* pEntry = buf + j * entSize;
+            OPERAND_SIZE slotOffset = 0;
+            OPERAND_SIZE resolver = 0;
+            DI_UINT32 type = 0;
+
+            if (pQuery->is64bit)
+            {
+                slotOffset = (OPERAND_SIZE)DianaElf_rd64(pEntry, pQuery->isLE);
+                type = (DI_UINT32)(DianaElf_rd64(pEntry + 8, pQuery->isLE) & 0xffffffff);
+            }
+            else
+            {
+                slotOffset = (OPERAND_SIZE)DianaElf_rd32(pEntry, pQuery->isLE);
+                type = DianaElf_rd32(pEntry + 4, pQuery->isLE) & 0xff;
+            }
+            if (type != irelativeType)
+                continue;
+            /* r_offset and the RELA addend are link-time addresses */
+            if (DianaElfFile_LinkToOffset(pQuery->pImpl, slotOffset, &slotOffset))
+                continue;
+
+            if (isRela)
+            {
+                resolver = pQuery->is64bit ? (OPERAND_SIZE)DianaElf_rd64(pEntry + 16, pQuery->isLE) :
+                                             (OPERAND_SIZE)DianaElf_rd32(pEntry + 8, pQuery->isLE);
+                if (DianaElfFile_LinkToOffset(pQuery->pImpl, resolver, &resolver))
+                    continue;
+            }
+            else
+            {
+                OPERAND_SIZE slotValue = 0;
+                if (DianaElf_StartupReadPointer(pQuery, slotOffset, &slotValue) != DI_SUCCESS)
+                    continue;
+                DI_CHECK(DianaElf_StartupPointerToOffset(pQuery, slotValue, &resolver));
+            }
+            if (!resolver || resolver >= pQuery->pImpl->sizeOfModule ||
+                DianaElf_StartupIsNamedIfunc(pQuery, resolver))
+            {
+                continue;
+            }
+            DI_CHECK(DianaElf_StartupReport(pQuery,
+                DIANA_ELF_STARTUP_IFUNC,
+                pQuery->unnamedIfuncCount++,
+                resolver,
+                slotOffset,
+                0));
+        }
+        i += chunk;
+    }
+    return DI_SUCCESS;
+}
+
+/* The entries of DT_INIT_ARRAY or DT_PREINIT_ARRAY; 0 and -1 are no functions */
+static int DianaElf_StartupQueryArray(DianaElf_StartupQuery* pQuery,
+    int kind,
+    OPERAND_SIZE arrayOffset,
+    OPERAND_SIZE arraySize)
+{
+    OPERAND_SIZE pointerSize = pQuery->is64bit ? 8 : 4;
+    OPERAND_SIZE invalid = pQuery->is64bit ? (OPERAND_SIZE)DI_MAX_OPERAND_SIZE : (OPERAND_SIZE)0xffffffffUL;
+    OPERAND_SIZE count = arraySize / pointerSize;
+    OPERAND_SIZE i;
+
+    if (!arrayOffset || count > DI_ELF_STARTUP_MAX_ARRAY_ENTRIES)
+        return DI_SUCCESS;
+
+    for (i = 0; i < count; ++i)
+    {
+        OPERAND_SIZE slotOffset = arrayOffset + i * pointerSize;
+        OPERAND_SIZE value = 0;
+        OPERAND_SIZE offset = 0;
+
+        if (DianaElf_StartupReadPointer(pQuery, slotOffset, &value) != DI_SUCCESS)
+            break;
+        if (value == 0 || value == invalid)
+            continue;
+        DI_CHECK(DianaElf_StartupPointerToOffset(pQuery, value, &offset));
+        if (offset >= pQuery->pImpl->sizeOfModule)
+            continue;
+        DI_CHECK(DianaElf_StartupReport(pQuery, kind, (int)i, offset, slotOffset, 0));
+    }
+    return DI_SUCCESS;
+}
+
+int DianaElfFile_QueryStartupRoutines(/* in */ Diana_ElfFile* pElfFile,
+    /* in */ DianaMovableReadStream* pStream,
+    /* in */ OPERAND_SIZE moduleAddress,
+    /* in, optional */ DianaElfFile_PointerToOffset_Callback pointerToOffset,
+    /* in, optional */ void* pPointerContext,
+    /* in */ DianaElfFile_StartupRoutine_Callback callback,
+    /* in */ void* pContext,
+    /* in */ int streamFlags)
+{
+    Diana_ElfFile_impl* pImpl = 0;
+    DianaElf_StartupQuery query;
+    unsigned char* pDyn = 0;
+    OPERAND_SIZE readBytes = 0;
+    OPERAND_SIZE dynEntSize = 0;
+    OPERAND_SIZE dynOffset = 0;
+    OPERAND_SIZE pos = 0;
+    int status = DI_ERROR;
+
+    /* the dynamic tags, as module offsets */
+    OPERAND_SIZE symtab = 0, strtab = 0, hash = 0, gnuHash = 0;
+    OPERAND_SIZE rela = 0, relaSize = 0, rel = 0, relSize = 0;
+    OPERAND_SIZE jmprel = 0, jmprelSize = 0;
+    OPERAND_SIZE init = 0;
+    OPERAND_SIZE initArray = 0, initArraySize = 0;
+    OPERAND_SIZE preinitArray = 0, preinitArraySize = 0;
+    DI_UINT64 pltRel = DIANA_DT_RELA;
+
+    if (!pElfFile || !pElfFile->pImpl || !pStream || !callback)
+        return DI_INVALID_INPUT;
+    pImpl = pElfFile->pImpl;
+    if (pElfFile->flags & DIANA_ELF_FILE_FLAGS_FILE_MODE)
+        return DI_UNSUPPORTED;
+    if (pImpl->dynamicSize == 0)
+        return DI_SUCCESS;
+    if (pImpl->dynamicSize > DIANA_MAX_SAFE_ALLOC_SIZE)
+        return DI_INVALID_INPUT;
+
+    DIANA_MEMSET(&query, 0, sizeof(query));
+    query.pImpl = pImpl;
+    query.pStream = pStream;
+    query.streamFlags = streamFlags;
+    query.is64bit = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_64BIT;
+    query.isLE = pImpl->internalFlags & DIANA_ELF_INTERNAL_FLAG_LE;
+    query.moduleAddress = moduleAddress;
+    query.pointerToOffset = pointerToOffset;
+    query.pPointerContext = pPointerContext;
+    query.callback = callback;
+    query.pContext = pContext;
+
+    {
+        DIANA_SIZE_T dynAllocSize;
+        OPERAND_SIZE dynSize = pImpl->dynamicSize;
+        DI_CHECK_GOTO(Diana_ConvertOpSizeToSizeT(&dynSize, &dynAllocSize));
+        pDyn = (unsigned char*)DIANA_MALLOC(dynAllocSize);
+        DI_CHECK_ALLOC_GOTO(pDyn);
+    }
+    DI_CHECK_GOTO(DianaElfFile_LinkToOffset(pImpl, pImpl->dynamicAddress, &dynOffset));
+    DI_CHECK_GOTO(pStream->pRandomRead(pStream,
+        dynOffset,
+        pDyn,
+        (int)pImpl->dynamicSize,
+        &readBytes,
+        streamFlags));
+
+    dynEntSize = query.is64bit ? 16 : 8;
+    for (pos = 0; pos + dynEntSize <= readBytes; pos += dynEntSize)
+    {
+        DI_INT64 tag;
+        DI_UINT64 value;
+        OPERAND_SIZE offset = 0;
+
+        if (query.is64bit)
+        {
+            tag = (DI_INT64)DianaElf_rd64(pDyn + pos, query.isLE);
+            value = DianaElf_rd64(pDyn + pos + 8, query.isLE);
+        }
+        else
+        {
+            tag = (DI_INT64)(DI_INT32)DianaElf_rd32(pDyn + pos, query.isLE);
+            value = (DI_UINT64)DianaElf_rd32(pDyn + pos + 4, query.isLE);
+        }
+        if (tag == DIANA_DT_NULL)
+            break;
+
+        /* the pointer tags */
+        switch (tag)
+        {
+        case DIANA_DT_SYMTAB:
+        case DIANA_DT_STRTAB:
+        case DIANA_DT_HASH:
+        case DIANA_DT_RELA:
+        case DIANA_DT_REL:
+        case DIANA_DT_JMPREL:
+        case DIANA_DT_INIT:
+        case DIANA_DT_INIT_ARRAY:
+        case DIANA_DT_PREINIT_ARRAY:
+            DI_CHECK_GOTO(DianaElf_StartupPointerToOffset(&query, (OPERAND_SIZE)value, &offset));
+            break;
+        default:
+            if ((DI_UINT64)tag == DI_ELF_DT_GNU_HASH)
+            {
+                DI_CHECK_GOTO(DianaElf_StartupPointerToOffset(&query, (OPERAND_SIZE)value, &gnuHash));
+            }
+            break;
+        }
+
+        switch (tag)
+        {
+        case DIANA_DT_SYMTAB:           symtab = offset; break;
+        case DIANA_DT_STRTAB:           strtab = offset; break;
+        case DIANA_DT_HASH:             hash = offset; break;
+        case DIANA_DT_RELA:             rela = offset; break;
+        case DIANA_DT_RELASZ:           relaSize = (OPERAND_SIZE)value; break;
+        case DIANA_DT_REL:              rel = offset; break;
+        case DIANA_DT_RELSZ:            relSize = (OPERAND_SIZE)value; break;
+        case DIANA_DT_JMPREL:           jmprel = offset; break;
+        case DIANA_DT_PLTRELSZ:         jmprelSize = (OPERAND_SIZE)value; break;
+        case DIANA_DT_PLTREL:           pltRel = value; break;
+        case DIANA_DT_INIT:             init = offset; break;
+        case DIANA_DT_INIT_ARRAY:       initArray = offset; break;
+        case DIANA_DT_INIT_ARRAYSZ:     initArraySize = (OPERAND_SIZE)value; break;
+        case DIANA_DT_PREINIT_ARRAY:    preinitArray = offset; break;
+        case DIANA_DT_PREINIT_ARRAYSZ:  preinitArraySize = (OPERAND_SIZE)value; break;
+        default: break;
+        }
+    }
+
+    /* IFUNC resolvers: the named ones first, so their IRELATIVE relocations are not reported again */
+    DI_CHECK_GOTO(DianaElf_StartupQueryIfuncSymbols(&query, symtab, strtab, hash, gnuHash));
+    DI_CHECK_GOTO(DianaElf_StartupQueryIRelative(&query, rela, relaSize, 1));
+    DI_CHECK_GOTO(DianaElf_StartupQueryIRelative(&query, rel, relSize, 0));
+    DI_CHECK_GOTO(DianaElf_StartupQueryIRelative(&query, jmprel, jmprelSize, pltRel == DIANA_DT_RELA));
+
+    /* the initializers, in the order the loader calls them */
+    DI_CHECK_GOTO(DianaElf_StartupQueryArray(&query, DIANA_ELF_STARTUP_PREINIT_ARRAY, preinitArray, preinitArraySize));
+    if (init && init < pImpl->sizeOfModule)
+    {
+        DI_CHECK_GOTO(DianaElf_StartupReport(&query, DIANA_ELF_STARTUP_INIT, 0, init, 0, 0));
+    }
+    DI_CHECK_GOTO(DianaElf_StartupQueryArray(&query, DIANA_ELF_STARTUP_INIT_ARRAY, initArray, initArraySize));
+
+    status = DI_SUCCESS;
+
+cleanup:
+    if (query.pNamedIfuncs)
+        DIANA_FREE(query.pNamedIfuncs);
+    if (pDyn)
+        DIANA_FREE(pDyn);
     return status;
 }

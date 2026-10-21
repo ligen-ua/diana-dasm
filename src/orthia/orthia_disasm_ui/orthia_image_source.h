@@ -8,6 +8,11 @@
 
 namespace orthia
 {
+    struct IImageFormat;
+}
+
+namespace orthia
+{
     // Where a module's bytes come from. The layout (which modules exist and at which base)
     // lives in tbl_modules; the source says how to get the image for a range.
     enum class ImageSourceKind : int
@@ -94,8 +99,9 @@ namespace orthia
         Address_type m_base, m_size;
         PlatformString_type m_path;
         ImageIdentity m_identity;
-        int m_executableType;
+        const IImageFormat& m_format;
         int m_dianaMode;
+        int m_dianaArch;
 
         std::atomic<int> m_state;
         mutable std::mutex m_lock;        // guards m_image and m_reason, held for the whole load
@@ -109,8 +115,9 @@ namespace orthia
             Address_type size,
             const PlatformString_type& path,
             const ImageIdentity& identity,
-            int executableType,
-            int dianaMode);
+            const IImageFormat& format,
+            int dianaMode,
+            int dianaArch);
 
         ImageSourceKind GetKind() const override { return ImageSourceKind::LinkedFile; }
         Address_type GetBase() const override { return m_base; }
@@ -121,7 +128,8 @@ namespace orthia
         const PlatformString_type& GetPath() const { return m_path; }
 
         // Cheap check of the file's headers against the recorded identity, without mapping:
-        // marks the source Stale when the file is missing or another build. PE only.
+        // marks the source Stale when the file is missing or another build. Only for formats
+        // whose headers tell the build (PE); the others are checked when mapped
         void PreCheckHeader();
     };
 
@@ -159,7 +167,7 @@ namespace orthia
             DianaUnifiedRegister selectorHint) override;
     };
 
-    // `lm` and the modules window status: unresolved | linked | stale | unlinked, then analysis, symbols
+    // `lm` and the modules window status: .NET, then unresolved | linked | stale | unlinked, then analyzed, symbols
     PlatformString_type ModuleStatusText(const ModuleInfo& mod);
     // the image source line of `modinfo`, e.g. "linked C:\...\hal.dll" or "stale (timestamp mismatch)"
     PlatformString_type ModuleImageSourceText(const ModuleInfo& mod);

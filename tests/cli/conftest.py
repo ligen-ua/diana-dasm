@@ -4,6 +4,7 @@ Every Orthia instance gets its own ORTHIA_HOME (databases) and ORTHIA_SYMBOL_PAT
 so results never depend on %APPDATA%\\Orthia, ~/.local/share/Orthia or C:\\Sym.
 """
 import os
+import platform
 import sqlite3
 import sys
 from pathlib import Path
@@ -17,8 +18,10 @@ from images import ElfInfo, PeInfo  # noqa: E402
 from orthia_runner import Orthia  # noqa: E402
 
 # Where the two build systems put the binary. Override with --orthia or ORTHIA_BIN.
+# The MSBuild folder of this machine comes first: an ARM64 Windows runs the amd64 build too, emulated
+_MSBUILD_ARCHS = ["arm64", "amd64"] if platform.machine().lower() in ("arm64", "aarch64") else ["amd64"]
 BINARY_CANDIDATES = [
-    "bin/Release/amd64/orthia.exe",                                   # MSBuild, orthia_14_0.sln
+    *(f"bin/Release/{arch}/orthia.exe" for arch in _MSBUILD_ARCHS),  # MSBuild, orthia_14_0.sln
     "cmake-release/src/orthia/orthia_disasm_ui/orthia",               # cmake-build.sh
     "cmake-debug/src/orthia/orthia_disasm_ui/orthia",
 ]

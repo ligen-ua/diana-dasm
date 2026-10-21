@@ -10,6 +10,14 @@ typedef int (*DianaOpOutput_type)(struct _DianaTextOutputContext * pContext,
                                   int size);
 typedef int (*DianaTextReset_type)(struct _DianaTextOutputContext * pContext);
 
+// DianaTextOutputContext::flags, set by the printer for the current instruction
+// numbers passed to pOpOutputFnc should be printed as 0x1234 instead of 1234h (ARM)
+#define DIANA_TEXT_OUTPUT_FLAG_C_HEX            0x100
+
+// DianaTextOutputContext::options, set by the user
+// ARM: print raw instructions, no aliases (orr instead of mov, ubfm instead of lsl...)
+#define DIANA_TEXT_OUTPUT_OPTION_ARM_NO_ALIASES 0x1
+
 typedef struct _DianaTextOutputContext
 {
     DianaTextOutput_type pTextOutputFnc;
@@ -19,6 +27,7 @@ typedef struct _DianaTextOutputContext
     OPERAND_SIZE instructionRIP;
     int flags;
     int spacesCount;
+    int options;
 }DianaTextOutputContext;
 
 void DianaTextOutputContext_Init(DianaTextOutputContext * pContext,
@@ -50,10 +59,14 @@ void DianaStringOutputContext_Init(DianaStringOutputContext * pContext,
                                    char * pBuffer,
                                    OPERAND_SIZE maxBufferSize);
 
-//  text out function
+//  text out function, x86 and ARM
 int DianaTextOutputContext_TextOut(DianaTextOutputContext * pContext,
-                                   DianaParserResult * pResult, 
+                                   DianaParserResult * pResult,
                                    OPERAND_SIZE instructionRIP);
+
+// ARM part, called by DianaTextOutputContext_TextOut, see diana_text_output_arm.c
+int DianaA64_TextOut(DianaTextOutputContext * pContext);
+int DianaA32_TextOut(DianaTextOutputContext * pContext);
 
 
 // c-runtime

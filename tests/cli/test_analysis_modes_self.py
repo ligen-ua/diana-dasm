@@ -62,14 +62,14 @@ def db_counts(home: Path, base: int):
 
 def assert_names_intact(orthia, me, export_addr):
     res = orthia.run("lm", f"x orthia!{EXPORT}", **me).assert_ok()
-    res.assert_line(r"\borthia\.exe\s+analysis")
+    res.assert_line(r"\borthia\.exe\s+analyzed")
     assert res.symbols[f"orthia.exe!{EXPORT}"][0] == export_addr
     assert orthia.resolve(EXPORT, **me) == export_addr
 
 
 def test_quick_open(orthia_cold, me, self_pe, export_addr):
     res = orthia_cold.run("lm", f"x orthia!{EXPORT}", f"u {EXPORT} L6", **me).assert_ok()
-    res.assert_line(r"\borthia\.exe$")                  # no "analysis"
+    res.assert_line(r"\borthia\.exe$")                  # no "analyzed"
     assert res.symbols[f"orthia.exe!{EXPORT}"] == [export_addr]
     assert res.instructions(), res
     assert not any(re.search(XREF, line) for line in res.lines), res
@@ -80,7 +80,7 @@ def test_quick_open(orthia_cold, me, self_pe, export_addr):
 def test_analyze_open(orthia_cold, me, self_pe, entry_call):
     call, callee = entry_call
     res = orthia_cold.with_(analyze=True).run("lm", f"u {callee:#x} L6", **me).assert_ok()
-    res.assert_line(r"\borthia\.exe\s+analysis$")
+    res.assert_line(r"\borthia\.exe\s+analyzed$")
     res.assert_line(xref_from(call))
     assert db_counts(orthia_cold.home, self_pe.image_base)[1] > 0
 
@@ -100,7 +100,7 @@ def test_upgrade_in_a_later_session(orthia_cold, me, self_pe, export_addr, entry
 def test_analyze_command_in_the_creating_session(orthia_cold, me, self_pe, export_addr):
     """.analyze right after a quick first open: the connection that created the DB."""
     res = orthia_cold.run(".analyze orthia", "lm", f"x orthia!{EXPORT}", **me).assert_ok()
-    res.assert_line(r"\borthia\.exe\s+analysis$")
+    res.assert_line(r"\borthia\.exe\s+analyzed$")
     assert res.symbols[f"orthia.exe!{EXPORT}"][0] == export_addr
     assert_names_intact(orthia_cold, me, export_addr)
     assert db_counts(orthia_cold.home, self_pe.image_base)[1] > 0

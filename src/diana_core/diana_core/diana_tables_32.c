@@ -62,7 +62,7 @@ static DianaEntry32 g_table1[3][16] =
         {0, {reg_none, reg_R10D, reg_none, 0, 0, 0}},
         {0, {reg_none, reg_R11D, reg_none, 0, 0, 0}},
         {1, {reg_none, reg_R12D, reg_none, 0, 0, 0}}, // SIB
-        {0, {reg_none, reg_R13D, reg_none, 0, 0, 0}},
+        {0, {reg_none, reg_none, reg_none, 0, 4, 0}}, // 101: RIP + disp32 with REX.B too
         {0, {reg_none, reg_R14D, reg_none, 0, 0, 0}},
         {0, {reg_none, reg_R15D, reg_none, 0, 0, 0}}
     },
@@ -76,14 +76,14 @@ static DianaEntry32 g_table1[3][16] =
         {0, {reg_none, reg_ESI, reg_none, 0, 1, 0}},
         {0, {reg_none, reg_EDI, reg_none, 0, 1, 0}},
 
-        {0, {reg_none, reg_R8D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R9D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R10D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R11D, reg_none, 0, 0, 0}},
-        {1, {reg_none, reg_R12D, reg_none, 0, 0, 0}}, // SIB
-        {0, {reg_none, reg_R13D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R14D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R15D, reg_none, 0, 0, 0}}
+        {0, {reg_none, reg_R8D, reg_none, 0, 1, 0}},
+        {0, {reg_none, reg_R9D, reg_none, 0, 1, 0}},
+        {0, {reg_none, reg_R10D, reg_none, 0, 1, 0}},
+        {0, {reg_none, reg_R11D, reg_none, 0, 1, 0}},
+        {1, {reg_none, reg_R12D, reg_none, 0, 1, 0}}, // SIB
+        {0, {reg_none, reg_R13D, reg_none, 0, 1, 0}},
+        {0, {reg_none, reg_R14D, reg_none, 0, 1, 0}},
+        {0, {reg_none, reg_R15D, reg_none, 0, 1, 0}}
     },
     {
         {0, {reg_none, reg_EAX, reg_none, 0, 4, 0}},
@@ -95,14 +95,14 @@ static DianaEntry32 g_table1[3][16] =
         {0, {reg_none, reg_ESI, reg_none, 0, 4, 0}},
         {0, {reg_none, reg_EDI, reg_none, 0, 4, 0}},
 
-        {0, {reg_none, reg_R8D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R9D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R10D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R11D, reg_none, 0, 0, 0}},
-        {1, {reg_none, reg_R12D, reg_none, 0, 0, 0}}, // SIB
-        {0, {reg_none, reg_R13D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R14D, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R15D, reg_none, 0, 0, 0}}
+        {0, {reg_none, reg_R8D, reg_none, 0, 4, 0}},
+        {0, {reg_none, reg_R9D, reg_none, 0, 4, 0}},
+        {0, {reg_none, reg_R10D, reg_none, 0, 4, 0}},
+        {0, {reg_none, reg_R11D, reg_none, 0, 4, 0}},
+        {1, {reg_none, reg_R12D, reg_none, 0, 4, 0}}, // SIB
+        {0, {reg_none, reg_R13D, reg_none, 0, 4, 0}},
+        {0, {reg_none, reg_R14D, reg_none, 0, 4, 0}},
+        {0, {reg_none, reg_R15D, reg_none, 0, 4, 0}}
     }
 };
 
@@ -123,7 +123,7 @@ static DianaEntry32 g_table2[3][16] =
         {0, {reg_none, reg_R10, reg_none, 0, 0, 0}},
         {0, {reg_none, reg_R11, reg_none, 0, 0, 0}},
         {1, {reg_none, reg_R12, reg_none, 0, 0, 0}},
-        {0, {reg_none, reg_R13, reg_none, 0, 0, 0}},
+        {0, {reg_none, reg_none, reg_none, 0, 4, 0}}, // 101: RIP + disp32 with REX.B too
         {0, {reg_none, reg_R14, reg_none, 0, 0, 0}},
         {0, {reg_none, reg_R15, reg_none, 0, 0, 0}}
     },
@@ -203,10 +203,28 @@ int Diana_ReadIndexStructure32(DianaContext * pContext,
     DI_CHAR mod = Diana_GetMod(postByte);
     DI_CHAR rm = Diana_GetRm2(pContext, postByte);
     DI_CHAR old_true_rm = Diana_GetRm(postByte);
+    // VSIB (gathers): a SIB byte with a vector register as the index, m_size2 16 (xmm) or 32 (ymm)
+    const DianaOperandInfo * pOperInfo = pInfo ? pInfo->pInfo : 0;
+    int vsib = pOperInfo && pOperInfo->m_type == diana_orVSIB;
 
+    if (mod == 3 && vsib)
+        return DI_ERROR;
     if (mod == 3)
     {
         *pType = diana_register;
+        if (pOperInfo && pContext->iEvexPrefix)
+        {
+            // EVEX: a vector register in r/m has bit 4 in X, an opmask ignores B and X
+            switch (pOperInfo->m_type)
+            {
+            case diana_orMemoryXMM: case diana_orMemoryYMM: case diana_orMemoryZMM:
+                if (pContext->iEvexPrefix & DI_EVEX_PREFIX_X)
+                    rm |= 0x10;
+                break;
+            }
+        }
+        if (pOperInfo && pOperInfo->m_type == diana_orMemoryK)
+            rm = old_true_rm;
         return Diana_DispatchMod3(pInfo, 
                                   rm, 
                                   old_true_rm, 
@@ -234,6 +252,8 @@ int Diana_ReadIndexStructure32(DianaContext * pContext,
         
         *pIndex = pOp->index;
 
+        if (!pOp->iHasSIB && vsib)
+            return DI_ERROR;
         if (!pOp->iHasSIB)
         {
             if (pContext->iAMD64Mode && mod == 0)
@@ -259,13 +279,15 @@ int Diana_ReadIndexStructure32(DianaContext * pContext,
 
             Diana_DispatchSIB2(pContext, sibByte, &ss, &index, &base);
 
+            if ((base & 7) == 5 && mod == 0)
+            {
+                // no base, disp32: REX.B doesn't change it
+                pIndex->reg = reg_none;
+                pIndex->dispSize = 4;
+            }
+            else
             if (base == 5)
             {
-               if (mod == 0)
-               {
-                   pIndex->dispSize = 4;
-               }
-               else
                {
                    if (pContext->iCurrentCmd_addressSize == 8)
                    {
@@ -290,6 +312,15 @@ int Diana_ReadIndexStructure32(DianaContext * pContext,
             }
 
             // recognize indexes
+            if (vsib)
+            {
+                // every index is a register (4 too); REX.X/VEX.X is in index, EVEX.V' is bit 4
+                if (pContext->iEvexPrefix & DI_EVEX_PREFIX_V1)
+                    index |= 0x10;
+                pIndex->indexed_reg = Diana_VectorRegister(pOperInfo->m_size2, index);
+                pIndex->index = disp_ss[ss];
+            }
+            else
             if (index == 4)
             {
                 pIndex->indexed_reg = reg_none; 

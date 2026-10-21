@@ -8,6 +8,15 @@ extern "C"
 
 namespace orthia
 {
+    // how to map a file: the formats with headers read most of it from there
+    struct MapFileParameters
+    {
+        DI_UINT64 imageBase = (DI_UINT64)(-1);     // -1: the image's preferred base
+        int mapFlags = 0;
+        int dianaMode = 0;                          // raw code only: DIANA_MODE32 / DIANA_MODE64
+        int dianaArch = DIANA_ARCH_X86;             // raw code only: DIANA_ARCH_*
+    };
+
     class ISimpleFile
     {
     public:
@@ -18,6 +27,8 @@ namespace orthia
         virtual void Relocate(OPERAND_SIZE newAddress) = 0;
         virtual DI_UINT64 DiGetProcAddress(const char* pFunctionName, OPERAND_SIZE* pForwardOffset = 0, DI_UINT16 ordinal = DIANA_PE_INVALID_ORDINAL_VALUE)=0;
         virtual int GetDianaMode() const = 0;
+        // DIANA_ARCH_*: how the code decodes, GetDianaMode is the pointer size
+        virtual int GetDianaArch() const = 0;
         virtual DI_UINT64 GetEntryPoint() const = 0;
         virtual int QueryImports(diana::CBasePeLinkImportsObserver* observer) = 0;
         virtual int QueryExports(diana::CBasePeLinkImportsObserver* observer) = 0;

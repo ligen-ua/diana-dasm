@@ -58,15 +58,14 @@ namespace oui
 
     struct OpenFileModelInfo
     {
+        std::string formatId;           // the detected image format, empty when not recognized
         int flags = 0;
         String dbFileName;
-        unsigned long long baseAddress = 0;
-        int dianaMode = 0;
     };
 
     using ThreadPtr_type = std::shared_ptr<CWindowThread>;
     using FileRecipientHandler_type = std::function<void(std::shared_ptr<IFile2>, int error, const String& folderName)>;
-    using FileWithTypeRecipientHandler_type = std::function<void(std::shared_ptr<IFile2>, int error, const String& folderName, int fileType, OpenFileModelInfo modelInfo)>;
+    using FileWithTypeRecipientHandler_type = std::function<void(std::shared_ptr<IFile2>, int error, const String& folderName, OpenFileModelInfo modelInfo)>;
     using AsyncOpenFileWithTypeCallback_type = std::function<void(ThreadPtr_type, const FileUnifiedId&, FileWithTypeRecipientHandler_type)>;
     using QueryFilesHandler_type = std::function<void(std::shared_ptr<BaseOperation> operation, 
         const FileUnifiedId& folderId, 

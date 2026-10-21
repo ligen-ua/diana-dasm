@@ -47,7 +47,8 @@ DIANA_INLINE_C DI_UINT16 shift16RightJamming(DI_UINT16 a, int count)
         z = a;
     }
     else if (count < 16) {
-        z = (a>>count) | ((a<<((-count) & 15)) != 0);
+        // the lost bits in 16 bits (a promotes to int: without the cast every nonzero a set the sticky bit)
+        z = (DI_UINT16)((a>>count) | ((DI_UINT16)(a<<((-count) & 15)) != 0));
     }
     else {
         z = (a != 0);

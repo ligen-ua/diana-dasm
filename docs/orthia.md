@@ -5,10 +5,12 @@ It opens executable files and live processes, analyzes their code, and lets you 
 A `--cmd` mode runs the same commands without the UI, for scripts and tests.
 
 Supported targets:
-- PE files (32 and 64-bit), including drivers and `ntoskrnl.exe`;
-- ELF files (Linux);
-- running processes (Windows and Linux);
-- raw shellcode: files in an unknown format can be opened as raw code.
+- PE files (32 and 64-bit), including drivers and `ntoskrnl.exe`: x86, x64, ARM64 and ARM32 (Thumb-2);
+- ELF files (Linux): x86, x64, AArch64 and ARM32 (A32 and Thumb, mixed);
+- running processes (Windows and Linux), x86 and x64, and ARM processes when Orthia runs on an ARM machine: each module
+  is disassembled as its headers say, other memory as the process's architecture; `threads` shows call stacks of x86
+  and x64 processes on Windows only;
+- raw shellcode: files in an unknown format can be opened as raw code: x86, x64, arm64, arm (A32) or thumb (T32).
 
 Analysis results (modules, cross-references, symbols) and your comments are kept in an SQLite database for each file,
 so a file opens quickly the second time and comments survive restarts. See [databases.md](databases.md) for what is
@@ -89,7 +91,8 @@ Problems setting up the sandbox are reported as warnings only when Orthia runs e
 ## Command line
 
 ```
-orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] [--no-sandbox]
+orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] [--overwrite-db] [--no-sandbox]
+orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <command>...
 ```
 
 | Option | Meaning |
@@ -98,6 +101,10 @@ orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] 
 | `--pid <pid>` | open the process with the given id: decimal, `0x`-prefixed hex, or `self` for Orthia's own process |
 | `--cmd <command>` | run `<command>` without the UI and exit; repeat it for more commands, they run in order |
 | `--analyze` | with `--cmd`: deep code analysis and symbol loading on open |
+| `--format <format>` | with `--cmd`: open the `--file` as `pe`, `elf` or `raw` (code without headers) instead of the format it is detected as |
+| `--base <address>` | with `--format raw`: where the code is placed (ARM code: a multiple of 4, Thumb: of 2) |
+| `--arch <arch>` | with `--format raw`: how the code is disassembled and analyzed: `x86`, `x64`, `arm64`, `arm` or `thumb` |
+| `--overwrite-db` | give every target opened in this run a new, empty database instead of reusing the one of an earlier open (comments included, see [databases](databases.md)) |
 | `--no-sandbox` | don't restrict Orthia: on Linux no privilege drop and no seccomp filter (see [what Orthia keeps of root](#linux-what-orthia-keeps-of-root)), on Windows no privilege removal and no mitigation policies (see [sandbox](#windows-sandbox)) |
 | `--run-tests` | run the built-in tests and exit |
 | `-h`, `--help` | show help and exit; on Windows also `/?` and `-?` |
@@ -118,6 +125,7 @@ orthia --file C:\Windows\System32\notepad.exe
 orthia --pid 1234
 orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
 orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
+orthia --file firmware.bin --format raw --base 0x8000 --arch thumb --analyze --cmd 'u 8000 L20'
 orthia --cmd '.database list'
 ```
 
@@ -152,7 +160,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 |---|---|
 | `x [/a\|/n] [/v] <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched. `/a` sorts by address, `/n` by name (default: by type), `/v` shows the symbol type |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
-| `lm` | List modules with their status: `unresolved`, `linked`, `stale`, `unlinked`, `analysis`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)) |
+| `lm` | List modules with their status: `.NET`, `unresolved`, `linked`, `stale`, `unlinked`, `analyzed`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)). `.NET` marks a managed image: an IL-only one has no native entry point and almost no native code |
 | `db`, `dw`, `dd`, `dq`, `dp`, `dps` | Display memory as bytes, words, dwords, qwords, pointers, or pointers with symbols |
 | `threads` | Display threads (processes only) |
 | `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from |

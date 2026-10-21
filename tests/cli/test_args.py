@@ -19,9 +19,16 @@ def target(data):
 def test_help(orthia, flag):
     res = orthia.raw(flag)
     assert res.code == EXIT_OK, res
-    for option in ("--file", "--pid", "--cmd", "--analyze", "--no-sandbox", "Exit codes", "ORTHIA_HOME",
+    for option in ("--file", "--pid", "--cmd", "--analyze", "--format", "--no-sandbox", "Exit codes", "ORTHIA_HOME",
                    "ORTHIA_SYMBOL_PATH"):
         assert option in res.stdout, res
+
+
+def test_builtin_tests(orthia):
+    """The gtests inside orthia (src/orthia/orthia_disasm_ui/ui_tests.cpp), which no other runner starts."""
+    res = orthia.raw("--run-tests", timeout=300)
+    assert res.code == EXIT_OK, res
+    assert "[  PASSED  ]" in res.stdout, res
 
 
 def test_no_sandbox(orthia):

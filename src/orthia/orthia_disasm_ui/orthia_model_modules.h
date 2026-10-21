@@ -8,11 +8,12 @@
 #include "orthia_model_modules_elf.h"
 #include "orthia_image_identity.h"
 #include "diana_executable.h"
+#include "formats/orthia_image_format.h"
 
 
 namespace orthia
 {
-    class CPEImportsLoader :public diana::CBasePeLinkImportsObserver
+    class CPEImportsLoader :public diana::CBasePeLinkImportsObserver, public IDependencyLoader
     {
         struct ModuleInfo
         {
@@ -32,6 +33,7 @@ namespace orthia
         decltype(m_mappedModules)::iterator m_currentModule;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
+        int m_dianaArch = 0;   // a dependency of another CPU (x64 host DLLs for an ARM64 image) is not linked
         oui::String m_exeDirectory;   // searched before the system paths, like the real loader
 
         using ModuleIterator = decltype(m_mappedModules)::iterator;
@@ -73,27 +75,12 @@ namespace orthia
             DI_UINT32 hint,
             OPERAND_SIZE* pAddress) override;
 
-        void LoadModules(const oui::String& fileName,
-            std::shared_ptr<orthia::CSimplePeFile> peFile,
-            std::shared_ptr<oui::IFileSystem> pFs);
-
-        void ReportModules(std::shared_ptr<CModuleManager> moduleManager);
-    };
-
-    class CImportsLoader
-    {
-        int m_executableType;
-        std::unique_ptr<CPEImportsLoader> m_peLoader;
-        std::unique_ptr<CElfImportsLoader> m_elfLoader;
-    public:
-        CImportsLoader(int executableType, std::shared_ptr<oui::BaseOperation> operation = nullptr);
+        // IDependencyLoader; file is a CSimplePeFile
         void LoadModules(const oui::String& fileName,
             std::shared_ptr<ISimpleFile> file,
-            std::shared_ptr<oui::IFileSystem> pFs);
-        void ReportModules(std::shared_ptr<CModuleManager> moduleManager);
+            std::shared_ptr<oui::IFileSystem> pFs) override;
+        void ReportModules(std::shared_ptr<CModuleManager> moduleManager) override;
+        // the main module's import rows carry the IAT slot address
+        bool ImportsKeyedBySlot() const override { return true; }
     };
-
-    std::shared_ptr<ISimpleFile> MakeSimpleFile(int executableType,
-        const std::vector<char>& data,
-        const MapFileParameters& params);
 }

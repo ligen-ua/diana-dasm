@@ -60,6 +60,11 @@
 # endif
 #endif
 
+// DIANA_NO_ARM (not defined by default): x86 only. The ARM decoders, their tables and text output compile to
+// nothing, the ARM fields leave DianaContext, DianaLinkedOperand, Diana_RouteInfo and the analyzer session.
+// DIANA_ARCH_AARCH64, DIANA_ARCH_ARM32 and DIANA_ARCH_THUMB get DI_UNSUPPORTED. For small environments,
+// such as an i386 kernel driver: define it on the command line or in DIANA_CONFIGURATION_FILE
+
 #ifndef DIANA_CONFIGURATION_FILE
 #define DIANA_CONFIGURATION_FILE "./diana_custom_config.inc"
 #endif

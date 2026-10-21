@@ -17,6 +17,7 @@ add_library(${PROJECT_NAME} SHARED
     orthia_database_impl_vm.cpp
     orthia_database_module.cpp
     orthia_database_saver.cpp
+    orthia_diana_arch.cpp
     orthia_diana_module.cpp
     orthia_diana_print.cpp
     orthia_exec.cpp

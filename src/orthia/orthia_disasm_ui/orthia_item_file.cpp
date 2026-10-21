@@ -2,10 +2,8 @@
 #include "orthia_image_source.h"
 #include "orthia_helpers.h"
 #include <map>
-extern "C"
-{
-#include "diana_executable.h"
-}
+#include <algorithm>
+#include "formats/orthia_image_format.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_common_format.h"
@@ -140,7 +138,8 @@ namespace orthia
                 source->GetLastValidAddress(),
                 source->GetBase(),
                 source->GetSize(),
-                file->GetDianaMode()
+                file->GetDianaMode(),
+                file->GetDianaArch()
             };
         }
         return {
@@ -148,7 +147,8 @@ namespace orthia
             moduleLastValidAddress,
             file->GetEntryPoint(),
             file->GetMappedFile().size(),
-            file->GetDianaMode()
+            file->GetDianaMode(),
+            file->GetDianaArch()
         };
     }
 
@@ -246,6 +246,7 @@ namespace orthia
             info.entryPoint = info.address;
             info.size = dbm.size;
             info.dianaMode = file->GetDianaMode();
+            info.dianaArch = file->GetDianaArch();
             modules.push_back(info);
         }
 
@@ -313,6 +314,10 @@ namespace orthia
     int FileWorkplaceItem::GetDianaMode() const
     {
         return file->GetDianaMode();
+    }
+    int FileWorkplaceItem::GetDianaArch() const
+    {
+        return file->GetDianaArch();
     }
     MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address, IMarkupCache* cache) const
     {
@@ -647,7 +652,7 @@ namespace orthia
             database->InsertMetaInfo(moduleAddress, g_database_type_moduleMetaInfo, newText, moduleAddress, true);
         }
     }
-    void FileWorkplaceItem::InitImageSources(int executableType)
+    void FileWorkplaceItem::InitImageSources(const IImageFormat* mainFormat)
     {
         auto table = std::make_shared<ImageSourceTable>();
         table->SetMain(std::make_shared<CMainImageSource>(file));
@@ -699,21 +704,26 @@ namespace orthia
                 table->Add(std::make_shared<CNullImageSource>(dbm.address, dbm.size, PlatformString_type()));
                 continue;
             }
-            int moduleType = executableType;
-            if (record.builtInFlags & ModuleInfo::builtInFlags_moduleTypeElf)
+            // a dependency recorded before the type bits existed has its importer's format
+            ModuleInfo recorded;
+            recorded.builtInFlags = record.builtInFlags;
+            const IImageFormat* format = FindFormatByModule(recorded);
+            if (!format)
             {
-                moduleType = DIANA_EXECUTABLE_TYPE_ELF;
+                format = mainFormat;
             }
-            else if (record.builtInFlags & ModuleInfo::builtInFlags_moduleTypePe)
+            if (!format)
             {
-                moduleType = DIANA_EXECUTABLE_TYPE_PE;
+                table->Add(std::make_shared<CNullImageSource>(dbm.address, dbm.size, PlatformString_type()));
+                continue;
             }
             auto source = std::make_shared<CLinkedFileImageSource>(dbm.address,
                 dbm.size,
                 record.fullName,
                 record.identity,
-                moduleType,
-                file->GetDianaMode());
+                *format,
+                file->GetDianaMode(),
+                file->GetDianaArch());
             linked.push_back(source);
             table->Add(source);
         }
@@ -773,7 +783,7 @@ namespace orthia
         return applied;
     }
 
-    void FileWorkplaceItem::QuerySections(Address_type moduleBase, ImageSections& sections)
+    void FileWorkplaceItem::QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections)
     {
         if (!moduleBase)
         {
@@ -793,8 +803,24 @@ namespace orthia
                 imageFile = static_cast<CLinkedFileImageSource*>(source)->GetPath();
             }
         }
+        ModuleInfo mod;
+        {
+            std::vector<ModuleInfo> modules;
+            GetModules(modules);
+            auto it = std::find_if(modules.begin(), modules.end(), [&](const ModuleInfo& m) { return m.address == moduleBase; });
+            if (it != modules.end())
+            {
+                mod = *it;
+            }
+            mod.address = moduleBase;
+        }
         auto reader = CreateMemoryReader();
-        QueryImageSections(reader.get(), moduleBase, imageFile, sections);
+        ModuleAccess access;
+        access.reader = reader.get();
+        access.mod = &mod;
+        access.imageFile = imageFile;
+        access.openFile = openFile;
+        QueryModuleSections(access, sections);
     }
 
     void InsertName(orthia::intrusive_ptr<CClassicDatabase> database, Address_type moduleAddress, const orthia::NameInfo & info, Address_type metaInfoAddres)

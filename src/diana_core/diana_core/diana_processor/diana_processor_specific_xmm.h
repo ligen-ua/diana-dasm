@@ -13,6 +13,11 @@ int DianaProcessor_XMM_GetMemValue(DianaProcessor * pThis,
 
     flags;
 
+    if (size > sizeof(*pResult))
+    {
+        Diana_FatalBreak();
+        return DI_ERROR;
+    }
     pResult->u64[ 0 ] = 0;
     pResult->u64[ 1 ] = 0;
     status = pThis->m_pMemoryStream->pReadFnc(pThis->m_pMemoryStream, 
@@ -44,6 +49,11 @@ int DianaProcessor_XMM_SetMemValue(DianaProcessor * pThis,
 
     flags;
 
+    if (size > sizeof(*pResult))
+    {
+        Diana_FatalBreak();
+        return DI_ERROR;
+    }
     status = pThis->m_pMemoryStream->pWriteFnc(pThis->m_pMemoryStream, 
                                                selector,
                                                offset, 
@@ -67,6 +77,12 @@ void DianaProcessor_XMM_SetValueEx(DianaProcessor * pCallContext,
                                    int size)
 {
     char * pStart = (pCallContext->m_pRegistersVector + pReg->m_offset);
+    if (size > (int)sizeof(*value))
+    {
+        // a YMM register: DianaProcessor_YMM_SetValue
+        Diana_FatalBreak();
+        size = sizeof(*value);
+    }
     DIANA_MEMCPY(pStart, value, size);
 
     regId;
@@ -78,6 +94,12 @@ DianaRegisterXMM_type DianaProcessor_XMM_GetValueEx(DianaProcessor * pCallContex
 {
     DianaRegisterXMM_type r = {0};
     char * pStart = (pCallContext->m_pRegistersVector + pReg->m_offset);
+    if (size > (int)sizeof(r))
+    {
+        // a YMM register: DianaProcessor_YMM_GetValue
+        Diana_FatalBreak();
+        size = sizeof(r);
+    }
     DIANA_MEMCPY(r.u8, pStart, size);
     return r;
 }

@@ -143,7 +143,8 @@ float64 int64_to_float64(DI_INT64 a, float_status_t *status)
 float32 uint32_to_float32(DI_UINT32 a, float_status_t *status)
 {
     if (a == 0) return 0;
-    if (a & 0x80000000) return normalizeRoundAndPackFloat32(0, 0x9D, a >> 1, status);
+    // the bit shifted out stays as a sticky bit (a >> 1 alone rounded some values the wrong way)
+    if (a & 0x80000000) return normalizeRoundAndPackFloat32(0, 0x9D, (a >> 1) | (a & 1), status);
     return normalizeRoundAndPackFloat32(0, 0x9C, a, status);
 }
 
@@ -199,6 +200,8 @@ float32 uint64_to_float32(DI_UINT64 a, float_status_t *status)
 float64 uint64_to_float64(DI_UINT64 a, float_status_t *status)
 {
     if (a == 0) return 0;
+    // bit 63 set: one bit right, the shifted-out bit sticky (the normalization shift was -1: garbage)
+    if (a >> 63) return normalizeRoundAndPackFloat64(0, 0x43D, (a >> 1) | (a & 1), status);
     return normalizeRoundAndPackFloat64(0, 0x43C, a, status);
 }
 
@@ -305,7 +308,8 @@ DI_UINT32 float32_to_uint32_round_to_zero(float32 a, float_status_t *status)
 
     aSig = (aSig | 0x800000)<<8;
     z = aSig >> (-shiftCount);
-    if (aSig << (shiftCount & 31)) {
+    // shiftCount 0 (2^31): exact, nothing is shifted out
+    if (shiftCount && (aSig << (shiftCount & 31))) {
         float_raise(status, float_flag_inexact);
     }
     return z;
@@ -379,7 +383,8 @@ DI_INT64 float32_to_int64_round_to_zero(float32 a, float_status_t *status)
     aSig64 = aSig | 0x00800000;
     aSig64 <<= 40;
     z = aSig64>>(-shiftCount);
-    if ((DI_UINT64) (aSig64<<(shiftCount & 63))) {
+    // shiftCount 0 (2^63, the unsigned form): exact, nothing is shifted out
+    if (shiftCount && (DI_UINT64) (aSig64<<(shiftCount & 63))) {
         float_raise(status, float_flag_inexact);
     }
     if (aSign) z = -z;
@@ -421,7 +426,8 @@ DI_UINT64 float32_to_uint64_round_to_zero(float32 a, float_status_t *status)
     aSig64 = aSig | 0x00800000;
     aSig64 <<= 40;
     z = aSig64>>(-shiftCount);
-    if ((DI_UINT64) (aSig64<<(shiftCount & 63))) {
+    // shiftCount 0 (2^63, the unsigned form): exact, nothing is shifted out
+    if (shiftCount && (DI_UINT64) (aSig64<<(shiftCount & 63))) {
         float_raise(status, float_flag_inexact);
     }
     return z;
@@ -709,6 +715,8 @@ float32 float32_getmant(float32 a, float_status_t *status, int sign_ctrl, int in
     if (aExp == 0) {
         float_raise(status, float_flag_denormal);
         normalizeFloat32Subnormal(aSig, &aExp, &aSig);
+        // without the hidden bit: packFloat32 adds the fraction to the exponent field
+        aSig &= 0x007FFFFF;
     }
 
     switch(interv) {
@@ -775,15 +783,19 @@ float32 float32_scalef(float32 a, float32 b, float_status_t *status)
         return a;
     }
 
-    if ((aExp | aSig) == 0) {
-        if (bExp == 0xFF && ! bSign) {
-            float_raise(status, float_flag_invalid);
-            return float32_default_nan;
+    // a zero (DAZ: a denormal) gives a zero of its sign, a denormal raises DE (the CPU, softfloat3e of Bochs)
+    if (aExp == 0) {
+        if (aSig == 0) {
+            if (bExp == 0xFF && ! bSign) {
+                float_raise(status, float_flag_invalid);
+                return float32_default_nan;
+            }
+            return packFloat32(aSign, 0, 0);
         }
-        return a;
+        float_raise(status, float_flag_denormal);
     }
 
-    if ((bExp | bSig) == 0) return a;
+    if ((bExp | bSig) == 0) return packFloat32(aSign, aExp, aSig);
 
     if (bExp == 0xFF) {
         if (bSign) return packFloat32(aSign, 0, 0);
@@ -792,7 +804,9 @@ float32 float32_scalef(float32 a, float32 b, float_status_t *status)
 
     if (bExp >= 0x8E) {
         // handle obvious overflow/underflow result
-        return roundAndPackFloat32(aSign, bSign ? -0x7F : 0xFF, aSig, status);
+        // the significand with its hidden bit, in place for the rounding (the fraction alone: 2^31 rounded up
+        // to 0, not to the smallest denormal)
+        return roundAndPackFloat32(aSign, bSign ? -0x7F : 0xFF, (aSig | (aExp ? 0x00800000 : 0)) << 7, status);
     }
 
     scale = 0;
@@ -1612,13 +1626,15 @@ DI_UINT64 float64_to_uint64_round_to_zero(float64 a, float_status_t *status)
     aExp = extractFloat64Exp(a);
     aSign = extractFloat64Sign(a);
 
-    if (aExp < 0x3FE) {
+    // |a| < 1 truncates to 0 (0x3FE: -0.75 was invalid)
+    if (aExp < 0x3FF) {
         if (get_denormals_are_zeros(status) && aExp == 0) aSig = 0;
         if (aExp | aSig) float_raise(status, float_flag_inexact);
         return 0;
     }
 
-    if (0x43E <= aExp || aSign) {
+    // 2^63 <= a < 2^64 (aExp 0x43E) fits
+    if (0x43E < aExp || aSign) {
         float_raise(status, float_flag_invalid);
         return uint64_indefinite;
     }
@@ -1930,6 +1946,8 @@ float64 float64_getmant(float64 a, float_status_t *status, int sign_ctrl, int in
     if (aExp == 0) {
         float_raise(status, float_flag_denormal);
         normalizeFloat64Subnormal(aSig, &aExp, &aSig);
+        // without the hidden bit: packFloat64 adds the fraction to the exponent field
+        aSig &= DI_CONST64(0x000FFFFFFFFFFFFF);
     }
 
     switch(interv) {
@@ -1996,15 +2014,19 @@ float64 float64_scalef(float64 a, float64 b, float_status_t *status)
         return a;
     }
 
-    if ((aExp | aSig) == 0) {
-        if (bExp == 0x7FF && ! bSign) {
-            float_raise(status, float_flag_invalid);
-            return float64_default_nan;
+    // a zero (DAZ: a denormal) gives a zero of its sign, a denormal raises DE (the CPU, softfloat3e of Bochs)
+    if (aExp == 0) {
+        if (aSig == 0) {
+            if (bExp == 0x7FF && ! bSign) {
+                float_raise(status, float_flag_invalid);
+                return float64_default_nan;
+            }
+            return packFloat64(aSign, 0, 0);
         }
-        return a;
+        float_raise(status, float_flag_denormal);
     }
 
-    if ((bExp | bSig) == 0) return a;
+    if ((bExp | bSig) == 0) return packFloat64(aSign, aExp, aSig);
 
     if (bExp == 0x7FF) {
         if (bSign) return packFloat64(aSign, 0, 0);
@@ -2013,7 +2035,9 @@ float64 float64_scalef(float64 a, float64 b, float_status_t *status)
 
     if (0x40F <= bExp) {
         // handle obvious overflow/underflow result
-        return roundAndPackFloat64(aSign, bSign ? -0x3FF : 0x7FF, aSig, status);
+        // the significand with its hidden bit, in place for the rounding
+        return roundAndPackFloat64(aSign, bSign ? -0x3FF : 0x7FF,
+                                   (aSig | (aExp ? DI_CONST64(0x0010000000000000) : 0)) << 10, status);
     }
 
     scale = 0;

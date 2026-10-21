@@ -9,6 +9,10 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
@@ -16,6 +20,10 @@
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -41,9 +49,19 @@
     <PlatformToolset>v141_xp</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141_xp</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -58,7 +76,13 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -73,6 +97,10 @@
     <OutDir>$(SolutionDir)..\lib\$(Configuration)\amd64\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\amd64\</IntDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <OutDir>$(SolutionDir)..\lib\$(Configuration)\arm64\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\arm64\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)..\lib\$(Configuration)\i386\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\i386\</IntDir>
@@ -80,6 +108,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)..\lib\$(Configuration)\amd64\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\amd64\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <OutDir>$(SolutionDir)..\lib\$(Configuration)\arm64\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(Configuration)\$(ProjectName)\arm64\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -104,6 +136,25 @@
     <Midl>
       <TargetEnvironment>X64</TargetEnvironment>
     </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader />
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)diana_core.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -159,10 +210,29 @@
       <OutputFile>$(OutDir)diana_core.lib</OutputFile>
     </Lib>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <AdditionalIncludeDirectories>.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader />
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)diana_core.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="diana_allocators.c" />
     <ClCompile Include="diana_analyze.c" />
     <ClCompile Include="diana_analyze2.c" />
+    <ClCompile Include="diana_arm64.c" />
+    <ClCompile Include="diana_arm32.c" />
     <ClCompile Include="diana_core.c" />
     <ClCompile Include="diana_core_gen_tags.c" />
     <ClCompile Include="diana_core_parsers.c" />
@@ -172,6 +242,8 @@
     <ClCompile Include="diana_elf_analyzer.c" />
     <ClCompile Include="diana_executable.c" />
     <ClCompile Include="diana_gen.c" />
+    <ClCompile Include="diana_gen_a64.c" />
+    <ClCompile Include="diana_gen_a32.c" />
     <ClCompile Include="diana_list.c" />
     <ClCompile Include="diana_operands.c" />
     <ClCompile Include="diana_patchers.c" />
@@ -201,6 +273,12 @@
     <ClCompile Include="diana_processor\diana_processor_cmd_m.c" />
     <ClCompile Include="diana_processor\diana_processor_cmd_m_xmm.c" />
     <ClCompile Include="diana_processor\diana_processor_cmd_n.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_avx.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_avx2.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_avx512.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_crypto.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_simd.c" />
+    <ClCompile Include="diana_processor\diana_processor_cmd_ext.c" />
     <ClCompile Include="diana_processor\diana_processor_cmd_p.c" />
     <ClCompile Include="diana_processor\diana_processor_cmd_r.c" />
     <ClCompile Include="diana_processor\diana_processor_cmd_s.c" />
@@ -226,6 +304,8 @@
     <ClCompile Include="diana_tables_32.c" />
     <ClCompile Include="diana_tables_common.c" />
     <ClCompile Include="diana_text_output_masm.c" />
+    <ClCompile Include="diana_text_output_arm.c" />
+    <ClCompile Include="diana_text_output_arm32.c" />
     <ClCompile Include="diana_uids.c" />
     <ClCompile Include="diana_win32.c" />
     <ClCompile Include="diana_win32_executable_heap.c" />
@@ -236,6 +316,8 @@
     <ClInclude Include="diana_allocators.h" />
     <ClInclude Include="diana_analyze.h" />
     <ClInclude Include="diana_analyze2.h" />
+    <ClInclude Include="diana_arm.h" />
+    <ClInclude Include="diana_arm32.h" />
     <ClInclude Include="diana_apply_config_rules.h" />
     <ClInclude Include="diana_config.h" />
     <ClInclude Include="diana_core.h" />
@@ -250,6 +332,8 @@
     <ClInclude Include="diana_elfs_defs.h" />
     <ClInclude Include="diana_executable.h" />
     <ClInclude Include="diana_gen.h" />
+    <ClInclude Include="diana_gen_a64.h" />
+    <ClInclude Include="diana_gen_a32.h" />
     <ClInclude Include="diana_list.h" />
     <ClInclude Include="diana_operands.h" />
     <ClInclude Include="diana_patchers.h" />
@@ -279,6 +363,12 @@
     <ClInclude Include="diana_processor\diana_processor_cmd_m.h" />
     <ClInclude Include="diana_processor\diana_processor_cmd_m_xmm.h" />
     <ClInclude Include="diana_processor\diana_processor_cmd_n.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_avx.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_avx2.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_avx512.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_crypto.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_simd.h" />
+    <ClInclude Include="diana_processor\diana_processor_cmd_ext.h" />
     <ClInclude Include="diana_processor\diana_processor_cmd_p.h" />
     <ClInclude Include="diana_processor\diana_processor_cmd_r.h" />
     <ClInclude Include="diana_processor\diana_processor_cmd_s.h" />
@@ -319,6 +409,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="diana_custom_config.inc" />
+    <None Include="diana_text_output_arm_sysregs.inc" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="diana_processor\ReadMe.txt" />

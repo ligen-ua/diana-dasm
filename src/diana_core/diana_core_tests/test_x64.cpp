@@ -129,7 +129,8 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 4);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
+        // the base is EBP/ESP/RSP: SS is the default segment
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_RSP);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.index == 0);
@@ -155,7 +156,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_RCX);
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 8);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RBP);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.index == 0);
@@ -180,7 +181,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 1);
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedAddressSize == 8);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RBP);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.index == 0);
@@ -204,7 +205,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 8);
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedAddressSize == 8);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_RSP);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.index == 0);
@@ -252,7 +253,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 4);
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedAddressSize == 8);
         DIANA_TEST_ASSERT(result.linkedOperands[1].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RBP);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.indexed_reg == reg_RBP);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.index == 2);
@@ -293,7 +294,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.recognizedRegister == reg_CX);
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedSize == 2);
         DIANA_TEST_ASSERT(result.linkedOperands[1].usedAddressSize == 8);
-        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.reg == reg_RSP);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[1].value.rmIndex.index == 0);
@@ -555,7 +556,7 @@ static void test_x64_impl()
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);
-        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_DS);
+        DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.seg_reg == reg_SS);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.reg == reg_RSP);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.indexed_reg == reg_none);
         DIANA_TEST_ASSERT(result.linkedOperands[0].value.rmIndex.index == 0);
@@ -611,14 +612,16 @@ static void test_x64_impl()
 
   
     static unsigned char mov29[] = {0xf3, 0x36, 0x66, 0x44, 0x0f, 0x7f, 
-                                    0x89, 0x90, 0x00, 0x00, 0x00};//     rep  movdqa oword ptr ss:[rcx+0x90],xmm9
+                                    0x89, 0x90, 0x00, 0x00, 0x00};//     movdqu oword ptr ss:[rcx+0x90],xmm9
+    // F3 is the mandatory prefix before 66, whatever the order (objdump: ss data16 movdqu)
     iRes = Diana_ParseCmdOnBuffer_test(DIANA_MODE64, mov29, sizeof(mov29), Diana_GetRootLine(), &result, &read);
     DIANA_TEST_ASSERT_IF(!iRes)
     {
         DIANA_TEST_ASSERT(result.iLinkedOpCount==2);
         DIANA_TEST_ASSERT(result.pInfo->m_operandCount==2);
         DIANA_TEST_ASSERT(pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId));
-        DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "movdqa")==0);
+        DIANA_TEST_ASSERT(strcmp(pGroupInfo->m_pName, "movdqu")==0);
+        DIANA_TEST_ASSERT(result.iPrefix == DI_PREFIX_NONE);
         DIANA_TEST_ASSERT(DI_FLAG_CMD_PRIVILEGED != (result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED));
         DIANA_TEST_ASSERT(result.linkedOperands[0].usedSize == 16);
         DIANA_TEST_ASSERT(result.linkedOperands[0].type == diana_index);

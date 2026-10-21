@@ -1,5 +1,6 @@
 #include "orthia_image_source.h"
 #include "orthia_model_modules.h"
+#include "formats/orthia_image_format.h"
 #include "orthia_files.h"
 #include "orthia_log.h"
 #include <algorithm>
@@ -9,7 +10,6 @@
 extern "C"
 {
 #include "diana_pe.h"
-#include "diana_executable.h"
 }
 
 namespace orthia
@@ -39,15 +39,17 @@ namespace orthia
         Address_type size,
         const PlatformString_type& path,
         const ImageIdentity& identity,
-        int executableType,
-        int dianaMode)
+        const IImageFormat& format,
+        int dianaMode,
+        int dianaArch)
         :
         m_base(base),
         m_size(size),
         m_path(path),
         m_identity(identity),
-        m_executableType(executableType),
+        m_format(format),
         m_dianaMode(dianaMode),
+        m_dianaArch(dianaArch),
         m_state((int)ImageState::NotLoaded)
     {
     }
@@ -102,7 +104,7 @@ namespace orthia
             MapFileParameters params;
             // both formats use 1 for "keep the preferred base": the relocation below moves it
             params.mapFlags = DIANA_PE_MAP_DO_NOT_RELOCATE;
-            image = MakeSimpleFile(m_executableType, raw, params);
+            image = m_format.MapFile(raw, params);
         }
         catch (const std::exception& e)
         {
@@ -119,8 +121,14 @@ namespace orthia
             SetState(ImageState::Stale, "bitness mismatch");
             return nullptr;
         }
+        // databases from before the loaders checked the CPU may have recorded one
+        if (image->GetDianaArch() != m_dianaArch)
+        {
+            SetState(ImageState::Stale, "architecture mismatch");
+            return nullptr;
+        }
         ImageIdentity actual;
-        if (!QueryImageIdentity(*image, actual))
+        if (!m_format.QueryIdentity(*image, actual))
         {
             SetState(ImageState::Failed, "unknown format");
             return nullptr;
@@ -149,7 +157,8 @@ namespace orthia
     }
     void CLinkedFileImageSource::PreCheckHeader()
     {
-        if (m_identity.format != ImageIdentity::format_Pe)
+        const size_t headerSize = m_format.GetHeaderIdentitySize();
+        if (!headerSize)
         {
             return;
         }
@@ -158,7 +167,7 @@ namespace orthia
         {
             return;
         }
-        std::vector<char> header(0x1000);
+        std::vector<char> header(headerSize);
         {
             std::ifstream stream(std::filesystem::path(m_path), std::ios::binary);
             if (!stream)
@@ -170,12 +179,12 @@ namespace orthia
             header.resize((size_t)stream.gcount());
         }
         ImageIdentity actual;
-        if (!QueryPeHeaderIdentity(header.data(), header.size(), actual))
+        if (!m_format.QueryHeaderIdentity(header.data(), header.size(), actual))
         {
-            SetState(ImageState::Stale, "not a PE file");
+            SetState(ImageState::Stale, std::string("not a ") + m_format.GetDisplayName() + " file");
             return;
         }
-        // the header has no GUID, so only the timestamp and size are compared here
+        // the header's identity may be partial (PE: no GUID), SameIdentity compares what it has
         if (!SameIdentity(m_identity, actual))
         {
             SetState(ImageState::Stale, DescribeIdentityMismatch(m_identity, actual));
@@ -275,28 +284,6 @@ namespace orthia
     PlatformString_type ModuleStatusText(const ModuleInfo& mod)
     {
         PlatformString_type text;
-        if (mod.builtInFlags & ModuleInfo::builtInFlags_unresolved)
-        {
-            text = ORTHIA_TCSTR("unresolved");
-        }
-        else
-        {
-            switch ((ImageSourceKind)mod.imageSourceKind)
-            {
-            case ImageSourceKind::LinkedFile:
-                text = ((ImageState)mod.imageState == ImageState::Stale || (ImageState)mod.imageState == ImageState::Failed)
-                    ? ORTHIA_TCSTR("stale") : ORTHIA_TCSTR("linked");
-                break;
-            case ImageSourceKind::None:
-                if (mod.imageState == (int)ImageState::Unavailable && mod.imageSourceKnown)
-                {
-                    text = ORTHIA_TCSTR("unlinked");
-                }
-                break;
-            default:
-                break;
-            }
-        }
         auto append = [&](const PlatformString_type::value_type* part)
         {
             if (!text.empty())
@@ -305,9 +292,36 @@ namespace orthia
             }
             text += part;
         };
+        // first: the column is narrow and cuts the end, and it explains an empty module
+        if (mod.builtInFlags & ModuleInfo::builtInFlags_managed)
+        {
+            append(ORTHIA_TCSTR(".NET"));
+        }
+        if (mod.builtInFlags & ModuleInfo::builtInFlags_unresolved)
+        {
+            append(ORTHIA_TCSTR("unresolved"));
+        }
+        else
+        {
+            switch ((ImageSourceKind)mod.imageSourceKind)
+            {
+            case ImageSourceKind::LinkedFile:
+                append(((ImageState)mod.imageState == ImageState::Stale || (ImageState)mod.imageState == ImageState::Failed)
+                    ? ORTHIA_TCSTR("stale") : ORTHIA_TCSTR("linked"));
+                break;
+            case ImageSourceKind::None:
+                if (mod.imageState == (int)ImageState::Unavailable && mod.imageSourceKnown)
+                {
+                    append(ORTHIA_TCSTR("unlinked"));
+                }
+                break;
+            default:
+                break;
+            }
+        }
         if (mod.flags & ModuleInfo::flags_analyzeDone)
         {
-            append(ORTHIA_TCSTR("analysis"));
+            append(ORTHIA_TCSTR("analyzed"));
         }
         if (mod.flags & ModuleInfo::flags_symbolsLoaded)
         {

@@ -80,6 +80,7 @@ int Diana_Call_psrad(struct _dianaContext * pDianaContext, DianaProcessor * pCal
 /* Shuffle */
 int Diana_Call_pshufhw(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_pshuflw(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_pshufw(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 /* Move quadword */
 int Diana_Call_movq(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
@@ -157,5 +158,17 @@ int Diana_Call_lfence(struct _dianaContext * pDianaContext, DianaProcessor * pCa
 int Diana_Call_sfence(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_clflush(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 int Diana_Call_ud2(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+
+/* the smaller gaps: movhlps, movlhps, CET, TSX, PKU */
+int Diana_Call_movhlps(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_movlhps(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_rdsspd(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_cet_ud(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xbegin(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xabort(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xend(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_xtest(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_rdpkru(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
+int Diana_Call_wrpkru(struct _dianaContext * pDianaContext, DianaProcessor * pCallContext);
 
 #endif

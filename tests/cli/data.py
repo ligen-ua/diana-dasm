@@ -1,7 +1,7 @@
 """Test inputs: committed files under data/, private files, the binary under test, and derived files.
 
 data/private/ (gitignored) holds third-party binaries that can't be published (dmesg, apt-mark, ls.bin,
-ntoskrnl with its PDB). The tests that use them skip when the folder is absent; the *_self tests
+ntoskrnl with its PDB, the ARM64 driver QcTrEE850.sys). The tests that use them skip when the folder is absent; the *_self tests
 cover the same ground with the freshly built Orthia binary.
 """
 import hashlib
@@ -22,6 +22,7 @@ OUT_DIR = Path(__file__).resolve().parent / "_out"
 ELF_DIR = DATA_DIR / "elf"
 PRIVATE_DIR = DATA_DIR / "private"
 NT_ZIP = PRIVATE_DIR / "pe" / "nt.zip"
+ARM64_DRIVER = PRIVATE_DIR / "pe" / "QcTrEE850.sys"
 
 
 def private_file(path: Path) -> Path:
@@ -92,6 +93,11 @@ class DataSet:
     @property
     def nt_symbols(self) -> Path:
         return self.nt_dir / "symbols"
+
+    # data/private/pe/QcTrEE850.sys: a Qualcomm ARM64 KMDF driver, compiled code (unlike the tiny tls_aarch64.dll)
+    @property
+    def arm64_driver(self) -> Path:
+        return private_file(ARM64_DRIVER)
 
     # the binary under test, opened as a file: the file counterpart of --pid self
     @property
@@ -202,6 +208,14 @@ def patch_pe_timestamp(path: Path) -> None:
     image = bytearray(path.read_bytes())
     e_lfanew, _, _ = _pe_headers(image)
     image[e_lfanew + 8] ^= 0x01
+    path.write_bytes(image)
+
+
+def patch_pe_machine(path: Path, machine: int) -> None:
+    """Set the file header Machine in place: the same headers otherwise, code of another CPU as far as Orthia goes."""
+    image = bytearray(path.read_bytes())
+    e_lfanew, _, _ = _pe_headers(image)
+    struct.pack_into("<H", image, e_lfanew + 4, machine)
     path.write_bytes(image)
 
 

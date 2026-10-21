@@ -18,6 +18,7 @@ the work is derivative, and (2) the source code includes prominent notice with
 these four paragraphs for those parts of this code that are retained.
 =============================================================================*/
 
+#define USE_estimateDiv128To64
 #include "softfloat_start.h"
 #include "softfloatx80.h"
 #include "softfloat-round-pack.h"
@@ -372,4 +373,158 @@ int floatx80_compare_quiet(floatx80_t a, floatx80_t b, float_status_t *status)
 
     if (less_than) return float_relation_less;
     return float_relation_greater;
+}
+
+/*----------------------------------------------------------------------------
+| fprem, fprem1 (Bochs do_fprem): the exact remainder of a / b. The quotient is
+| rounded toward zero (fprem) or to nearest even (fprem1); its low bits go to
+| *q. With an exponent difference of 64 or more one step reduces the exponent
+| by 32..63 (the partial remainder, C2): the result is 1 then, 0 when complete,
+| -1 for a NaN or an invalid operand (no quotient bits).
+*----------------------------------------------------------------------------*/
+
+// one reduction: (aSig0 << expDiff) mod bSig in zSig0:zSig1, the quotient returned
+static DI_UINT64 remainder_kernel(DI_UINT64 aSig0, DI_UINT64 bSig, int expDiff, DI_UINT64 *zSig0, DI_UINT64 *zSig1)
+{
+    DI_UINT64 term0, term1;
+    DI_UINT64 aSig1 = 0;
+    DI_UINT64 q;
+
+    shortShift128Left(aSig1, aSig0, expDiff, &aSig1, &aSig0);
+    q = estimateDiv128To64(aSig1, aSig0, bSig);
+    mul64To128(bSig, q, &term0, &term1);
+    sub128(aSig1, aSig0, term0, term1, zSig1, zSig0);
+    while ((DI_INT64)(*zSig1) < 0) {
+        --q;
+        add128(*zSig1, *zSig0, 0, bSig, zSig1, zSig0);
+    }
+    return q;
+}
+
+static int do_fprem(floatx80_t a, floatx80_t b, floatx80_t *r, DI_UINT64 *q, int rounding_mode,
+                    float_status_t *status)
+{
+    DI_INT32 aExp, bExp, zExp, expDiff;
+    DI_UINT64 aSig0, aSig1, bSig;
+    int aSign;
+    int overflow = 0;
+    *q = 0;
+
+    // unsupported extended double-precision encodings
+    if (floatx80_is_unsupported(a) || floatx80_is_unsupported(b))
+    {
+        float_raise(status, float_flag_invalid);
+        *r = floatx80_default_nan;
+        return -1;
+    }
+
+    aSig0 = extractFloatx80Frac(a);
+    aExp = extractFloatx80Exp(a);
+    aSign = extractFloatx80Sign(a);
+    bSig = extractFloatx80Frac(b);
+    bExp = extractFloatx80Exp(b);
+
+    if (aExp == 0x7FFF) {
+        if ((DI_UINT64) (aSig0<<1) || ((bExp == 0x7FFF) && (DI_UINT64) (bSig<<1))) {
+            *r = propagateFloatx80NaN_ex(a, b, status);
+            return -1;
+        }
+        float_raise(status, float_flag_invalid);
+        *r = floatx80_default_nan;
+        return -1;
+    }
+    if (bExp == 0x7FFF) {
+        if ((DI_UINT64) (bSig<<1)) {
+            *r = propagateFloatx80NaN_ex(a, b, status);
+            return -1;
+        }
+        if (aExp == 0 && aSig0) {
+            float_raise(status, float_flag_denormal);
+            normalizeFloatx80Subnormal(aSig0, &aExp, &aSig0);
+            *r = (a.fraction & DI_CONST64(0x8000000000000000)) ? packFloatx80(aSign, aExp, aSig0) : a;
+            return 0;
+        }
+        *r = a;
+        return 0;
+    }
+    if (bExp == 0) {
+        if (bSig == 0) {
+            float_raise(status, float_flag_invalid);
+            *r = floatx80_default_nan;
+            return -1;
+        }
+        float_raise(status, float_flag_denormal);
+        normalizeFloatx80Subnormal(bSig, &bExp, &bSig);
+    }
+    if (aExp == 0) {
+        if (aSig0 == 0) {
+            *r = a;
+            return 0;
+        }
+        float_raise(status, float_flag_denormal);
+        normalizeFloatx80Subnormal(aSig0, &aExp, &aSig0);
+    }
+
+    expDiff = aExp - bExp;
+    aSig1 = 0;
+
+    if (expDiff >= 64) {
+        int n = (expDiff & 0x1f) | 0x20;
+        remainder_kernel(aSig0, bSig, n, &aSig0, &aSig1);
+        zExp = aExp - n;
+        overflow = 1;
+    }
+    else {
+        zExp = bExp;
+
+        if (expDiff < 0) {
+            if (expDiff < -1) {
+                *r = (a.fraction & DI_CONST64(0x8000000000000000)) ? packFloatx80(aSign, aExp, aSig0) : a;
+                return 0;
+            }
+            shift128Right(aSig0, 0, 1, &aSig0, &aSig1);
+            expDiff = 0;
+        }
+
+        if (expDiff > 0) {
+            *q = remainder_kernel(aSig0, bSig, expDiff, &aSig0, &aSig1);
+        }
+        else {
+            if (bSig <= aSig0) {
+               aSig0 -= bSig;
+               *q = 1;
+            }
+        }
+
+        if (rounding_mode == float_round_nearest_even)
+        {
+            DI_UINT64 term0, term1;
+            shift128Right(bSig, 0, 1, &term0, &term1);
+
+            if (! lt128(aSig0, aSig1, term0, term1))
+            {
+               int lt = lt128(term0, term1, aSig0, aSig1);
+               int eq = eq128(aSig0, aSig1, term0, term1);
+
+               if ((eq && (*q & 1)) || lt) {
+                  aSign = !aSign;
+                  ++*q;
+               }
+               if (lt) sub128(bSig, 0, aSig0, aSig1, &aSig0, &aSig1);
+            }
+        }
+    }
+
+    *r = normalizeRoundAndPackFloatx80(80, aSign, zExp, aSig0, aSig1, status);
+    return overflow;
+}
+
+int floatx80_remainder(floatx80_t a, floatx80_t b, floatx80_t *r, DI_UINT64 *q, float_status_t *status)
+{
+    return do_fprem(a, b, r, q, float_round_to_zero, status);
+}
+
+int floatx80_ieee754_remainder(floatx80_t a, floatx80_t b, floatx80_t *r, DI_UINT64 *q, float_status_t *status)
+{
+    return do_fprem(a, b, r, q, float_round_nearest_even, status);
 }

@@ -250,28 +250,18 @@ void test_x32_integrated_impl(const unsigned char * pData,
             break;
 
         if (iRes)
-        {
-            Diana_FatalBreak();
-            break;
-        }
-
-        if( ( result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED ) != pNames[i].iPrivileged )
-        {
-            Diana_FatalBreak();
-            break;
-        }
+            std::cout<<"[ERROR] item "<<i<<" ("<<pNames[i].pCmdName<<"): error "<<iRes<<"\n";
+        DIANA_TEST_ASSERT(!iRes);
 
         DianaGroupInfo * pGroupInfo = Diana_GetGroupInfo(result.pInfo->m_lGroupId);
-        
-        if (strcmp(pNames[i].pCmdName,  pGroupInfo->m_pName))
+        if (strcmp(pNames[i].pCmdName,  pGroupInfo->m_pName) ||
+            pNames[i].iCmdSize != result.iFullCmdSize ||
+            ( result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED ) != pNames[i].iPrivileged)
         {
-            Diana_FatalBreak();
-            break;
-        }
-
-        if (pNames[i].iCmdSize != result.iFullCmdSize)
-        {
-            Diana_FatalBreak();
+            std::cout<<"[ERROR] item "<<i<<": expected "<<pNames[i].pCmdName<<", size "<<pNames[i].iCmdSize
+                     <<", privileged "<<pNames[i].iPrivileged<<"; got "<<pGroupInfo->m_pName<<", size "
+                     <<result.iFullCmdSize<<", privileged "<<( result.pInfo->m_flags & DI_FLAG_CMD_PRIVILEGED )<<"\n";
+            DIANA_TEST_ASSERT(0);
         }
     }
 

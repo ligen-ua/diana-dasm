@@ -17,6 +17,7 @@ int DianaExecutable_Init(DianaExecutable * pExecutable,
         pExecutable->type = DIANA_EXECUTABLE_TYPE_PE;
         pExecutable->dianaMode = pExecutable->u.peFile.pImpl->dianaMode;
         pExecutable->sizeOfModule = pExecutable->u.peFile.pImpl->sizeOfModule;
+        pExecutable->arch = pExecutable->u.peFile.pImpl->arch;
         return DI_SUCCESS;
     }
 
@@ -28,6 +29,7 @@ int DianaExecutable_Init(DianaExecutable * pExecutable,
         pExecutable->type = DIANA_EXECUTABLE_TYPE_ELF;
         pExecutable->dianaMode = pExecutable->u.elfFile.dianaMode;
         pExecutable->sizeOfModule = pExecutable->u.elfFile.pImpl->sizeOfModule;
+        pExecutable->arch = pExecutable->u.elfFile.arch;
         return DI_SUCCESS;
     }
     return DI_UNSUPPORTED;
@@ -103,6 +105,21 @@ int DianaExecutable_QueryTLSCallbacks(DianaExecutable* pExe,
     if (ppTlsCallbacks)   *ppTlsCallbacks = 0;
     if (callbacksCount)   *callbacksCount = 0;
     if (pAddressOfTLSIndex) *pAddressOfTLSIndex = 0;
+    return DI_SUCCESS;
+}
+
+int DianaExecutable_QueryStartupRoutines(DianaExecutable* pExe,
+    DianaMovableReadStream* pStream,
+    OPERAND_SIZE moduleAddress,
+    DianaElfFile_StartupRoutine_Callback callback,
+    void* pContext,
+    int streamFlags)
+{
+    if (pExe->type == DIANA_EXECUTABLE_TYPE_ELF)
+    {
+        return DianaElfFile_QueryStartupRoutines(&pExe->u.elfFile, pStream, moduleAddress,
+            0, 0, callback, pContext, streamFlags);
+    }
     return DI_SUCCESS;
 }
 
