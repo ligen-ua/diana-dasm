@@ -1,4 +1,5 @@
 #include "orthia_diana_image_format.h"
+#include "orthia_diana_arch.h"
 #include "orthia_module_manager.h"
 #include "orthia_log.h"
 #include "diana_core_cpp.h"
@@ -75,6 +76,15 @@ namespace orthia
             return status;
         }
         m_initialized = true;
+        if (m_exe.type == DIANA_EXECUTABLE_TYPE_ELF)
+        {
+            // AArch32: T32 or A32 by default, from the symbols
+            int arch = m_exe.arch;
+            if (DianaElfFile_QueryArmCodeArch(&m_exe.u.elfFile, &m_stream.parent, m_base, 0, 0, 0, &arch) == DI_SUCCESS)
+            {
+                m_exe.arch = m_exe.u.elfFile.arch = arch;
+            }
+        }
         return m_exe.type == m_format.GetExecutableType() ? DI_SUCCESS : DI_UNSUPPORTED;
     }
 
@@ -90,7 +100,7 @@ namespace orthia
         range.size = m_size;
         range.lastValidAddress = m_base;
         Diana_SafeAdd(&range.lastValidAddress, m_size ? m_size - 1 : 0);
-        range.entryPoint = QueryEntryPoint();
+        range.entryPoint = GetDianaInstructionAddress(QueryEntryPoint(), m_exe.arch);
         range.dianaMode = m_exe.dianaMode;
         range.dianaArch = m_exe.arch;
         return range;

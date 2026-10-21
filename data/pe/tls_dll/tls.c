@@ -26,14 +26,20 @@ __declspec(allocate(".tls")) char _tls_start = 0;
 __declspec(allocate(".tls$ZZZ")) char _tls_end = 0;
 unsigned long _tls_index = 0;
 
+/* IMAGE_TLS_DIRECTORY64 or IMAGE_TLS_DIRECTORY32: pointer-sized addresses */
+#ifdef _WIN64
+typedef unsigned long long TlsPointer;
+#else
+typedef unsigned int TlsPointer;
+#endif
 typedef struct
 {
-    unsigned long long startOfRawData, endOfRawData, addressOfIndex, addressOfCallBacks;
+    TlsPointer startOfRawData, endOfRawData, addressOfIndex, addressOfCallBacks;
     unsigned int sizeOfZeroFill, characteristics;
 } TlsDirectory;
 const TlsDirectory _tls_used = {
-    (unsigned long long)&_tls_start, (unsigned long long)&_tls_end,
-    (unsigned long long)&_tls_index, (unsigned long long)(&__xl_a + 1), 0, 0 };
+    (TlsPointer)&_tls_start, (TlsPointer)&_tls_end,
+    (TlsPointer)&_tls_index, (TlsPointer)(&__xl_a + 1), 0, 0 };
 
 int __stdcall DllMain(void* module, unsigned long reason, void* reserved) { return 1; }
 __declspec(dllexport) int tls_reasons(void) { return g_reasons; }

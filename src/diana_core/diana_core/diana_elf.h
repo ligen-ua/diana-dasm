@@ -46,7 +46,7 @@ typedef struct _diana_ElfFile
     Diana_ElfFile_impl* pImpl;
     int flags;
     int dianaMode;  // the pointer size
-    int arch;       // DIANA_ARCH_*, from e_machine
+    int arch;       // DIANA_ARCH_*, from e_machine; EM_ARM: DIANA_ARCH_ARM32, see DianaElfFile_QueryArmCodeArch
 }
 Diana_ElfFile;
 
@@ -151,6 +151,18 @@ int DianaElfFile_QueryStartupRoutines(/* in */ Diana_ElfFile* pElfFile,
     /* in */ DianaElfFile_StartupRoutine_Callback callback,
     /* in */ void* pContext,
     /* in */ int streamFlags);
+
+/* EM_ARM: the mode of the module's code unless a route says otherwise. DIANA_ARCH_THUMB for an odd e_entry
+   or, without an entry (a shared library), when most of the defined functions have bit 0 set (gcc builds T32
+   code for armhf); DIANA_ARCH_ARM32 otherwise. Other machines: pElfFile->arch. A module-mode stream; the
+   pointers of the dynamic section are converted as in DianaElfFile_QueryStartupRoutines */
+int DianaElfFile_QueryArmCodeArch(/* in */ Diana_ElfFile* pElfFile,
+    /* in */ DianaMovableReadStream* pStream,
+    /* in */ OPERAND_SIZE moduleAddress,
+    /* in, optional */ DianaElfFile_PointerToOffset_Callback pointerToOffset,
+    /* in, optional */ void* pPointerContext,
+    /* in */ int streamFlags,
+    /* out */ int* pArch);
 
 // Scans the PT_NOTE segments for an NT_GNU_BUILD_ID note (name "GNU") and
 // returns its descriptor bytes (the raw build-id, typically 20 bytes for a

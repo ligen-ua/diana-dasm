@@ -333,8 +333,8 @@ int Diana_AnalyzeJumps(DianaParserResult* pResult,
 #ifndef DIANA_NO_ARM
     if (DianaA32_GetCmdInfo(pResult))
     {
-        // AArch32: only labels; tbb [pc, r0] has no target of its own. T32 blx counts from the
-        // address rounded down to 4
+        /* AArch32: only labels; tbb [pc, r0] has no target of its own. T32 blx counts from the */
+        /* address rounded down to 4 */
         const DianaLinkedOperand * pOp = pResult->linkedOperands + pLinkedInfo->relArgrumentNumber;
         int iRes = 0;
         if (pLinkedInfo->relArgrumentNumber >= pResult->iLinkedOpCount || pOp->type != diana_rel)
@@ -1007,8 +1007,8 @@ int SaveArm64JumpTable(DianaAnalyzeSession * pSession, Diana_Instruction * pInst
     return DI_SUCCESS;
 }
 
-// after cmp <armCmpReg>, #armCmpImm: the bound of the register where the condition holds (bHolds), or where
-// it doesn't. ls/lo bound it where they hold, hi/hs where they don't (the same numbers in A64 and AArch32)
+/* after cmp <armCmpReg>, #armCmpImm: the bound of the register where the condition holds (bHolds), or where */
+/* it doesn't. ls/lo bound it where they hold, hi/hs where they don't (the same numbers in A64 and AArch32) */
 static
 int GetArmCompareBound(const DianaAnalyzeSession * pSession, int cond, int bHolds, DI_UINT64 * pCount)
 {
@@ -1017,19 +1017,19 @@ int GetArmCompareBound(const DianaAnalyzeSession * pSession, int cond, int bHold
     // signed conditions too: the compiler uses them when the index can't be negative (memset: cmp x2, #32; b.gt)
     switch (cond)
     {
-    case 9:     // ls: below or equal where it holds
+    case 9:     /* ls: below or equal where it holds */
     case 13:    // le
         *pCount = pSession->armCmpImm + 1;
         return bHolds;
-    case 3:     // lo: below where it holds
+    case 3:     /* lo: below where it holds */
     case 11:    // lt
         *pCount = pSession->armCmpImm;
         return bHolds;
-    case 8:     // hi: below or equal where it doesn't
+    case 8:     /* hi: below or equal where it doesn't */
     case 12:    // gt
         *pCount = pSession->armCmpImm + 1;
         return !bHolds;
-    case 2:     // hs: below where it doesn't
+    case 2:     /* hs: below where it doesn't */
     case 10:    // ge
         *pCount = pSession->armCmpImm;
         return !bHolds;
@@ -1037,7 +1037,7 @@ int GetArmCompareBound(const DianaAnalyzeSession * pSession, int cond, int bHold
     return 0;
 }
 
-// a cmp before b.ls/b.lo bounds the index on the branch target; b.hi/b.hs bound it on the next instruction
+/* a cmp before b.ls/b.lo bounds the index on the branch target; b.hi/b.hs bound it on the next instruction */
 static
 int GetArm64BranchBound(const DianaAnalyzeSession * pSession, int bTarget, DI_UINT64 * pCount)
 {
@@ -1412,9 +1412,10 @@ int SaveArm32Route(DianaAnalyzeSession * pSession,
 }
 
 /* the words at [offset, offset + size) are data (a literal, a table): no route starts there, so the scan
-   doesn't take them for code. They are rolled back instructions, as data that a strict route tried */
+   doesn't take them for code. They are rolled back instructions, as data that a strict route tried.
+   elementFlags: DI_INSTRUCTION_DATA_BYTES or _HALFWORDS for the entries of a tbb or tbh table, 0 for words */
 static
-int MarkArm32Data(DianaAnalyzeSession * pSession, OPERAND_SIZE offset, OPERAND_SIZE size)
+int MarkArm32Data(DianaAnalyzeSession * pSession, OPERAND_SIZE offset, OPERAND_SIZE size, int elementFlags)
 {
     OPERAND_SIZE end = 0;
     Diana_Instruction * pInstruction = 0;
@@ -1431,7 +1432,8 @@ int MarkArm32Data(DianaAnalyzeSession * pSession, OPERAND_SIZE offset, OPERAND_S
         DI_CHECK(Diana_InstructionsOwner_QueryOrAllocateInstruction(pSession->pOwner,
                                                                     offset,
                                                                     &pInstruction,
-                                                                    DI_INSTRUCTION_INVALID | DI_INSTRUCTION_DATA));
+                                                                    DI_INSTRUCTION_INVALID | DI_INSTRUCTION_DATA |
+                                                                    elementFlags));
         /* m_actualSize counts the valid instructions */
         --pSession->pOwner->m_actualSize;
     }
@@ -1443,12 +1445,13 @@ static
 int SaveArm32Data(DianaAnalyzeSession * pSession,
                   Diana_Instruction * pInstruction,
                   OPERAND_SIZE offset,
-                  OPERAND_SIZE size)
+                  OPERAND_SIZE size,
+                  int elementFlags)
 {
     int bRelative = 0;
     DI_UINT64 address = GetArm64ModuleAddress(pSession, offset, &bRelative);
     DI_CHECK(SaveDataAccess(pSession, pInstruction, address, !bRelative));
-    return MarkArm32Data(pSession, offset, size);
+    return MarkArm32Data(pSession, offset, size, elementFlags);
 }
 
 /* an address in a register or in memory: bit 0 set is T32 code, clear is A32 code in A32 code; in T32 code
@@ -1641,7 +1644,8 @@ int SaveArm32BranchTable(DianaAnalyzeSession * pSession,
     if (count > DIANA_ARM64_MAX_JUMP_TABLE)
         count = DIANA_ARM64_MAX_JUMP_TABLE;
     base = GetArm32PcOffset(pSession, instructionOffset);
-    DI_CHECK(SaveArm32Data(pSession, pInstruction, base, count * entrySize));
+    DI_CHECK(SaveArm32Data(pSession, pInstruction, base, count * entrySize,
+                           entrySize == 1 ? DI_INSTRUCTION_DATA_BYTES : DI_INSTRUCTION_DATA_HALFWORDS));
     for (i = 0; i < count; ++i)
     {
         DI_UINT64 entry = 0;
@@ -1690,7 +1694,7 @@ int SaveArm32PcTable(DianaAnalyzeSession * pSession,
     if (count > DIANA_ARM64_MAX_JUMP_TABLE)
         count = DIANA_ARM64_MAX_JUMP_TABLE;
     if (bAddresses)
-        DI_CHECK(SaveArm32Data(pSession, pInstruction, base, count * 4));
+        DI_CHECK(SaveArm32Data(pSession, pInstruction, base, count * 4, 0));
     for (i = 0; i < count; ++i)
     {
         if (bAddresses)
@@ -1738,7 +1742,7 @@ int DispatchArm32(DianaAnalyzeSession * pSession,
             /* ldr r0, [pc, #8]: the literal is data; ldrd and vldr d0 read 8 bytes */
             OPERAND_SIZE offset = GetArm32LiteralBase(pSession, instructionOffset) + pOp->value.rmIndex.dispValue;
             pInstruction->m_flags |= DI_INSTRUCTION_USES_RIP;
-            DI_CHECK(SaveArm32Data(pSession, pInstruction, offset, id == diana_a32_cmd_ldrd ? 8 : 4));
+            DI_CHECK(SaveArm32Data(pSession, pInstruction, offset, id == diana_a32_cmd_ldrd ? 8 : 4, 0));
         }
     }
     return DI_SUCCESS;
@@ -2565,7 +2569,7 @@ int Diana_AnalyzeCodeImpl(DianaAnalyzeSession * pSession,
 #endif
         if (offset >= pSession->maxOffset)
         {
-            // ARM: a questionable or strict route that runs to the end without a terminator is no code
+            /* ARM: a questionable or strict route that runs to the end without a terminator is no code */
             if (IsArm(pSession) && !bNeedReset && IsStrictRoute(pSession))
             {
                 DI_CHECK(RollbackCurrentRoute(pSession));

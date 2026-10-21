@@ -245,6 +245,29 @@ void DianaPeFile_Free(Diana_PeFile * pPeFile)
 #define DIANA_IMAGE_REL_BASED_MIPS_JMPADDR16        9
 #define DIANA_IMAGE_REL_BASED_IA64_IMM64            9
 #define DIANA_IMAGE_REL_BASED_DIR64                 10
+#define DIANA_IMAGE_REL_BASED_THUMB_MOV32           7   /* ARMNT: a T32 movw/movt pair holds the address */
+
+/* T32 MOVW/MOVT (T3/T1): imm16 = imm4:i:imm3:imm8 of the halfwords hw1, hw2 */
+static
+DI_UINT32 DianaPe_GetThumbMovImm16(const unsigned char * p)
+{
+    DI_UINT32 hw1 = (DI_UINT32)p[0] | ((DI_UINT32)p[1] << 8);
+    DI_UINT32 hw2 = (DI_UINT32)p[2] | ((DI_UINT32)p[3] << 8);
+    return ((hw1 & 0xF) << 12) | (((hw1 >> 10) & 1) << 11) | (((hw2 >> 12) & 7) << 8) | (hw2 & 0xFF);
+}
+
+static
+void DianaPe_SetThumbMovImm16(unsigned char * p, DI_UINT32 imm16)
+{
+    DI_UINT32 hw1 = (DI_UINT32)p[0] | ((DI_UINT32)p[1] << 8);
+    DI_UINT32 hw2 = (DI_UINT32)p[2] | ((DI_UINT32)p[3] << 8);
+    hw1 = (hw1 & ~0x040Fu) | ((imm16 >> 12) & 0xF) | (((imm16 >> 11) & 1) << 10);
+    hw2 = (hw2 & ~0x70FFu) | (((imm16 >> 8) & 7) << 12) | (imm16 & 0xFF);
+    p[0] = (unsigned char)hw1;
+    p[1] = (unsigned char)(hw1 >> 8);
+    p[2] = (unsigned char)hw2;
+    p[3] = (unsigned char)(hw2 >> 8);
+}
 
 
 static
@@ -322,6 +345,31 @@ int DianaPeFile_ProcessRelocationEntry(DianaReadWriteRandomStream * pOutStream,
                 break;
 
             case DIANA_IMAGE_REL_BASED_ABSOLUTE:
+                break;
+
+            case DIANA_IMAGE_REL_BASED_THUMB_MOV32:
+                {
+                    /* movw rd, #low; movt rd, #high: both halves of the address move */
+                    unsigned char pair[8];
+                    DI_CHECK(pOutStream->parent.pRandomRead(pOutStream,
+                                                           targetAddress,
+                                                           pair,
+                                                           sizeof(pair),
+                                                           &readBytes,
+                                                           0));
+                    DI_CHECK_CONDITION(readBytes == sizeof(pair), DI_ERROR);
+                    tempVal32 = DianaPe_GetThumbMovImm16(pair) | (DianaPe_GetThumbMovImm16(pair + 4) << 16);
+                    tempVal32 += (DI_UINT32)diff;
+                    DianaPe_SetThumbMovImm16(pair, tempVal32 & 0xFFFF);
+                    DianaPe_SetThumbMovImm16(pair + 4, tempVal32 >> 16);
+                    DI_CHECK(pOutStream->pRandomWrite(pOutStream,
+                                                      targetAddress,
+                                                      pair,
+                                                      sizeof(pair),
+                                                      &readBytes,
+                                                      0));
+                    DI_CHECK_CONDITION(readBytes == sizeof(pair), DI_ERROR);
+                }
                 break;
 
             case DIANA_IMAGE_REL_BASED_DIR64:

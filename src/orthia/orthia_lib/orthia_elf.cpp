@@ -1,6 +1,7 @@
 #include "orthia_elf.h"
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
+#include "orthia_diana_arch.h"
 
 #undef max
 
@@ -82,6 +83,12 @@ namespace orthia
             moduleSize,
             DIANA_ELF_FILE_FLAGS_MODULE_MODE));
         dianaContext->mappedElf_Guard.reset(&dianaContext->mappedElf);
+        // AArch32: T32 or A32 by default, from the symbols; the dynamic tags are relocated to imageBase
+        int arch = dianaContext->mappedElf.arch;
+        if (DianaElfFile_QueryArmCodeArch(&dianaContext->mappedElf, &dianaContext->stream.stream, imageBase, 0, 0, 0, &arch) == DI_SUCCESS)
+        {
+            dianaContext->mappedElf.arch = arch;
+        }
 
         // Commit — store original bytes for Relocate
         m_mappedElfFile.swap(ranges.m_data);
@@ -143,8 +150,9 @@ namespace orthia
         const auto* pImpl = m_dianaContext->mappedElf.pImpl;
         if (!pImpl->elfHeader.e_entry)
             return 0;
-        // a link-time address, moved by the load bias
-        return m_imageBase - pImpl->linkBase + pImpl->elfHeader.e_entry;
+        // a link-time address, moved by the load bias; T32 code has bit 0 set
+        return GetDianaInstructionAddress(m_imageBase - pImpl->linkBase + pImpl->elfHeader.e_entry,
+            m_dianaContext->mappedElf.arch);
     }
     struct SimpleElfFileStreamWithContext : public ::DianaMemoryStream
     {

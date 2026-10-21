@@ -1,4 +1,5 @@
 #include "orthia_image_format.h"
+#include "orthia_diana_arch.h"
 #include "orthia_diana_image_format.h"
 #include "../orthia_helpers.h"
 #include "../orthia_external_symbols.h"
@@ -33,6 +34,15 @@ namespace orthia
         // memcpy), and a caller that keeps one name per address keeps the "$" one
         QuerySpecialNames(out);
         QueryExports(out);
+        // AArch32: a name is where its instruction is, without the T32 bit. An exported object at an odd
+        // address moves too: the export table doesn't say which is which, odd objects are rare
+        if (IsDianaArchArm32(range.dianaArch))
+        {
+            for (auto& name : out)
+            {
+                name.address = GetDianaInstructionAddress(name.address, range.dianaArch);
+            }
+        }
     }
 
     const std::vector<const IImageFormat*>& GetImageFormats()

@@ -516,10 +516,10 @@ namespace oui
                 const orthia::Address_type address = virtualOffset.GetIndex();
                 orthia::Address_type nextChange = 0;
                 const orthia::ArmCodeKind kind = m_armCodeMap->Query(address, &nextChange);
-                if (kind == orthia::ArmCodeKind::Data)
+                if (orthia::IsArmCodeKindData(kind))
                 {
-                    // a word, or less up to the next change or at an odd address
-                    int size = 4;
+                    // an entry, or less up to the next change or at an unaligned address
+                    int size = orthia::GetArmCodeKindDataSize(kind);
                     while (size > 1 && ((address & (size - 1)) || nextChange - address < (orthia::Address_type)size))
                     {
                         size /= 2;

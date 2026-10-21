@@ -116,8 +116,10 @@ Foreign keys are enforced on every connection, so deleting a module row removes 
 Import, export and symbol records carry `address` (the target) and `name`.
 
 The AArch32 code map is written by the analysis of ARM (A32) and Thumb (T32) code, which can mix both and keep
-literals and switch tables between the instructions. Its `meta_info` is plain text, not XML: `a32`, `t32` or
-`data`. Before the first record of a module, its own architecture applies. The disassembly reads it to decode
+literals and switch tables between the instructions. Its `meta_info` is plain text, not XML: `a32`, `t32`,
+`data` (words: literals, tables of addresses), `data16` (a `tbh` table) or `data8` (a `tbb` table). Before the
+first record of a module, its own mode applies: T32 for an ARMNT PE, for raw `thumb` code and for an ELF whose
+entry point or most functions have the Thumb bit; A32 otherwise. The disassembly reads it to decode
 each address in the right mode and to show data as `.word`.
 
 The module description carries:

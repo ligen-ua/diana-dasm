@@ -187,6 +187,9 @@ static void test_analyzer_thumb_flow()
     DIANA_TEST_ASSERT(FindXRefFrom(analyzed.At(0x0a), 0x16, 0) != 0);
     DIANA_TEST_ASSERT(FindXRefFrom(analyzed.At(0x0a), 0x1a, 0) != 0);
     DIANA_TEST_ASSERT(IsData(analyzed, 0x0e) && IsData(analyzed, 0x10));
+    // of byte entries; the literal below is a word
+    DIANA_TEST_ASSERT(analyzed.owner.m_ppPresenceVec[0x0e]->m_flags & DI_INSTRUCTION_DATA_BYTES);
+    DIANA_TEST_ASSERT(!(analyzed.owner.m_ppPresenceVec[0x44]->m_flags & (DI_INSTRUCTION_DATA_BYTES | DI_INSTRUCTION_DATA_HALFWORDS)));
 
     // ldr r3, =f2 + 1; blx r3: T32 code at f2, the literal is data
     DIANA_TEST_ASSERT(IsData(analyzed, 0x44) && IsData(analyzed, 0x46));

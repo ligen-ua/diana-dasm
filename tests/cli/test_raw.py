@@ -377,8 +377,10 @@ def test_thumb_tbb_targets(orthia_full, t32_blob, case):
 
 
 def test_thumb_display_follows_analysis(orthia_full, t32_blob):
-    res, lines = _u(orthia_full, t32_blob, "thumb", BASE + 0x0e, 2)
-    assert re.search(r"\.short\s+0x0402$", lines[0]), res
+    # the tbb table: bytes (and the padding after it)
+    res, lines = _u(orthia_full, t32_blob, "thumb", BASE + 0x0e, 4)
+    assert [re.search(r"\.byte\s+(0x[0-9a-f]+)$", line).group(1) for line in lines] == \
+        ["0x02", "0x04", "0x06", "0x00"], res
     # the A32 function blx goes to, then the literal
     res, lines = _u(orthia_full, t32_blob, "thumb", BASE + 0x3c, 3)
     assert re.search(r"\bmov\s+r0, #5$", lines[0]) and res_addr(lines[1]) == BASE + 0x40, res

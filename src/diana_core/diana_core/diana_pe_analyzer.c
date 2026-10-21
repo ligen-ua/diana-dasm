@@ -16,6 +16,48 @@ int DianaAnalyzeObserverOverMemory_ConvertAddressToRelative(void * pThis,
                                                             OPERAND_SIZE * pRelativeOffset,
                                                             int * pbInvalidPointer);
 
+/* a route from an offset of the module. ARMNT: all code is T32, the addresses of functions have bit 0 set */
+static
+int PeAnalyzer_AnalyzeAt(Diana_PeAnalyzerCommonParams_type * pParams, OPERAND_SIZE offset, int flags)
+{
+    if (pParams->analyzeParams.arch == DIANA_ARCH_THUMB)
+        offset &= ~(OPERAND_SIZE)1;
+    return Diana_AnalyzeCodeEx2(pParams->pOwner,
+                                pParams->pObserver,
+                                pParams->pPeFile->pImpl->dianaMode,
+                                offset,
+                                pParams->pPeFile->pImpl->sizeOfModule,
+                                pParams->pStack,
+                                flags,
+                                &pParams->analyzeParams);
+}
+
+/* ARMNT: 4-byte pointers at 4-aligned offsets; only a pointer with bit 0 set is code (a T32 function),
+   an even one points to data */
+static
+int ScanPageThumb(Diana_PeAnalyzerCommonParams_type * pParams,
+                  int pageSize)
+{
+    const unsigned char * p = (const unsigned char *)pParams->pPage + sizeof(DIANA_SIZE_T);
+    const unsigned char * pEnd = (const unsigned char *)pParams->pPage + pageSize - 4 + 1;
+    for (; p < pEnd; p += 4)
+    {
+        DI_UINT32 address = (DI_UINT32)p[0] | ((DI_UINT32)p[1] << 8) | ((DI_UINT32)p[2] << 16) | ((DI_UINT32)p[3] << 24);
+        OPERAND_SIZE relativeAddress = 0;
+        DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+        if (!(address & 1))
+            continue;
+        DI_CHECK(pParams->pObserver->m_pAnalyzeAddress(pParams->pObserver,
+                                                       address & ~(DI_UINT32)1,
+                                                       DIANA_ANALYZE_ABSOLUTE_ADDRESS,
+                                                       &relativeAddress,
+                                                       &result));
+        if (result == diaJumpNormal)
+            DI_CHECK(PeAnalyzer_AnalyzeAt(pParams, relativeAddress, DI_ANALYSE_BREAK_ON_INVALID_CMD));
+    }
+    return DI_SUCCESS;
+}
+
 // AArch64: 8-byte pointers at 8-aligned offsets; pPage starts with the last pointer of the previous page
 static
 int ScanPageArm64(Diana_PeAnalyzerCommonParams_type * pParams,
@@ -61,6 +103,8 @@ int ScanPage(Diana_PeAnalyzerCommonParams_type * pParams,
         return DI_SUCCESS;
     if (pParams->analyzeParams.arch == DIANA_ARCH_AARCH64)
         return ScanPageArm64(pParams, pageSize);
+    if (pParams->analyzeParams.arch == DIANA_ARCH_THUMB)
+        return ScanPageThumb(pParams, pageSize);
 
     for(++p; p < pEnd; ++p)
     {
@@ -148,6 +192,7 @@ int Diana_AnalyzeExports(Diana_PeAnalyzerCommonParams_type * pParams)
     DI_UINT32 numberOfFunctionsPerPage = 0;
     DI_UINT32 numberOfFunctions = 0;
     OPERAND_SIZE exportsRaw  = 0;
+    OPERAND_SIZE functionsRaw = 0;
     DIANA_IMAGE_EXPORT_DIRECTORY * pCapturedExportDirectory = (DIANA_IMAGE_EXPORT_DIRECTORY * )pParams->pPage;
     if (pParams->pageSize < sizeof(DIANA_IMAGE_EXPORT_DIRECTORY))
         return DI_INVALID_CONFIGURATION;
@@ -156,6 +201,7 @@ int Diana_AnalyzeExports(Diana_PeAnalyzerCommonParams_type * pParams)
     DI_CHECK(pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream, exportsRaw));
     DI_CHECK(DianaExactRead(&pParams->pObserver->m_pStream->parent, pCapturedExportDirectory, sizeof(DIANA_IMAGE_EXPORT_DIRECTORY)));
     numberOfFunctions = pCapturedExportDirectory->NumberOfFunctions;
+    functionsRaw = pCapturedExportDirectory->AddressOfFunctions;
     // done work with pCapturedExportDirectory
     pCapturedExportDirectory = 0;
 
@@ -178,7 +224,10 @@ int Diana_AnalyzeExports(Diana_PeAnalyzerCommonParams_type * pParams)
         {
             numberOfFunctionsToRead = numberOfFunctionsPerPage;
         }
-        // read functions
+        /* read functions: the table is at AddressOfFunctions, the analysis moves the stream between pages */
+        DI_CHECK(pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream,
+                                                        functionsRaw +
+                                                        (OPERAND_SIZE)(numberOfFunctions - theRestNumberOfFunctions) * sizeof(DI_UINT32)));
         DI_CHECK(DianaExactRead(&pParams->pObserver->m_pStream->parent, 
                                 pCapturedFunctions, 
                                 numberOfFunctionsToRead * sizeof(DI_UINT32)));
@@ -186,14 +235,7 @@ int Diana_AnalyzeExports(Diana_PeAnalyzerCommonParams_type * pParams)
         {
             if (pCapturedFunctions[i] < pParams->pPeFile->pImpl->sizeOfModule)
             {
-                DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
-                                              pParams->pObserver,
-                                              pParams->pPeFile->pImpl->dianaMode,
-                                              pCapturedFunctions[i],
-                                              pParams->pPeFile->pImpl->sizeOfModule,
-                                              pParams->pStack,
-                                              0,
-                                              &pParams->analyzeParams));
+                DI_CHECK(PeAnalyzer_AnalyzeAt(pParams, pCapturedFunctions[i], 0));
             }
         }
         theRestNumberOfFunctions -= numberOfFunctionsToRead;
@@ -284,31 +326,27 @@ int Diana_AnalyzeTlsCallbacks(Diana_PeAnalyzerCommonParams_type * pParams)
             break;
         if (PeAnalyzer_PointerToOffset(pParams, callback, &callbackOffset) != DI_SUCCESS)
             continue;
-        DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
-                                      pParams->pObserver,
-                                      pImpl->dianaMode,
-                                      callbackOffset,
-                                      pImpl->sizeOfModule,
-                                      pParams->pStack,
-                                      0,
-                                      &pParams->analyzeParams));
+        DI_CHECK(PeAnalyzer_AnalyzeAt(pParams, callbackOffset, 0));
     }
     return DI_SUCCESS;
 }
 
 // .pdata: RUNTIME_FUNCTION entries, the first field is the start of a function with unwind data.
-// x64 entries are {Begin, End, UnwindInfo}, ARM64 entries are {Begin, UnwindData}
+// x64 entries are {Begin, End, UnwindInfo}, ARM64 and ARMNT entries are {Begin, UnwindData}
 static
 int Diana_AnalyzePData(Diana_PeAnalyzerCommonParams_type * pParams)
 {
     const DIANA_IMAGE_DATA_DIRECTORY * pDirectory =
         pParams->pPeFile->pImpl->pImageDataDirectoryArray + DIANA_IMAGE_DIRECTORY_ENTRY_EXCEPTION;
-    DI_UINT32 entrySize = pParams->pPeFile->pImpl->arch == DIANA_ARCH_AARCH64 ? 8 : 12;
+    DI_UINT32 entrySize = pParams->pPeFile->pImpl->arch == DIANA_ARCH_X86 ? 12 : 8;
     DI_UINT32 theRestCount = 0;
     DI_UINT32 entriesPerPage = (DI_UINT32)pParams->pageSize / entrySize;
 
-    if (pParams->pPeFile->pImpl->dianaMode != DIANA_MODE64 || !pDirectory->VirtualAddress)
+    if ((pParams->pPeFile->pImpl->dianaMode != DIANA_MODE64 && pParams->pPeFile->pImpl->arch != DIANA_ARCH_THUMB) ||
+        !pDirectory->VirtualAddress)
+    {
         return DI_SUCCESS;
+    }
     theRestCount = pDirectory->Size / entrySize;
     DI_CHECK(pParams->pObserver->m_pStream->pMoveTo(pParams->pObserver->m_pStream, pDirectory->VirtualAddress));
     while (theRestCount)
@@ -324,14 +362,7 @@ int Diana_AnalyzePData(Diana_PeAnalyzerCommonParams_type * pParams)
             OPERAND_SIZE begin = (OPERAND_SIZE)p[0] | ((OPERAND_SIZE)p[1] << 8) | ((OPERAND_SIZE)p[2] << 16) | ((OPERAND_SIZE)p[3] << 24);
             if (!begin || begin >= pParams->pPeFile->pImpl->sizeOfModule)
                 continue;
-            DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
-                                         pParams->pObserver,
-                                         pParams->pPeFile->pImpl->dianaMode,
-                                         begin,
-                                         pParams->pPeFile->pImpl->sizeOfModule,
-                                         pParams->pStack,
-                                         0,
-                                     &pParams->analyzeParams));
+            DI_CHECK(PeAnalyzer_AnalyzeAt(pParams, begin, 0));
         }
         // the analysis moved the stream
         if (theRestCount)
@@ -350,14 +381,7 @@ int Diana_PE_AnalyzePEImplUsingBuffer(Diana_PeAnalyzerCommonParams_type * pParam
     // scan from entry point
     if (pParams->pPeFile->pImpl->addressOfEntryPoint)
     {
-        DI_CHECK(Diana_AnalyzeCodeEx2(pParams->pOwner,
-                                     pParams->pObserver, 
-                                     pParams->pPeFile->pImpl->dianaMode, 
-                                     pParams->pPeFile->pImpl->addressOfEntryPoint, 
-                                     pParams->pPeFile->pImpl->sizeOfModule,
-                                     pParams->pStack,
-                                     0,
-                                     &pParams->analyzeParams));
+        DI_CHECK(PeAnalyzer_AnalyzeAt(pParams, pParams->pPeFile->pImpl->addressOfEntryPoint, 0));
     }
     DI_CHECK(Diana_AnalyzeTlsCallbacks(pParams));
     // functions with unwind data, roots before the pointer scan below
@@ -379,6 +403,19 @@ int Diana_PE_AnalyzePEImplUsingBuffer(Diana_PeAnalyzerCommonParams_type * pParam
                                       &pParams->analyzeParams));
 
     // scan all
+    if ((DI_ANALYSE_PE_FILE_SCAN_THROUGH & analyserFlags) && pParams->analyzeParams.arch == DIANA_ARCH_THUMB)
+    {
+        /* every 2-aligned offset, never inside an instruction */
+        DI_CHECK(Diana_AnalyzeScanThrough(pParams->pOwner,
+                                          pParams->pObserver,
+                                          pParams->pPeFile->pImpl->dianaMode,
+                                          0,
+                                          pParams->pPeFile->pImpl->sizeOfModule,
+                                          pParams->pPeFile->pImpl->sizeOfModule,
+                                          pParams->pStack,
+                                          &pParams->analyzeParams));
+    }
+    else
     if (DI_ANALYSE_PE_FILE_SCAN_THROUGH & analyserFlags)
     {
         OPERAND_SIZE i = 0;
@@ -411,9 +448,12 @@ int Diana_PE_AnalyzePEImpl(Diana_PeFile * pPeFile,
     Diana_PeAnalyzerCommonParams_type params;
 	void * pPage = 0;
 
-    // x86 and AArch64 (no ARM64EC/CHPE)
-    if (pPeFile->pImpl->arch != DIANA_ARCH_X86 && pPeFile->pImpl->arch != DIANA_ARCH_AARCH64)
+    /* x86, AArch64 and ARMNT (no ARM64EC/CHPE) */
+    if (pPeFile->pImpl->arch != DIANA_ARCH_X86 && pPeFile->pImpl->arch != DIANA_ARCH_AARCH64 &&
+        pPeFile->pImpl->arch != DIANA_ARCH_THUMB)
+    {
         return DI_UNSUPPORTED;
+    }
 
     pPage = DIANA_MALLOC(pageSize + sizeof(OPERAND_SIZE));
     DI_CHECK_ALLOC(pPage);
@@ -428,7 +468,7 @@ int Diana_PE_AnalyzePEImpl(Diana_PeFile * pPeFile,
     params.pObserver = pObserver;
     params.pStack = &stack;
     DianaAnalyzeParams_Init(&params.analyzeParams, pPeFile->pImpl->arch);
-    if (pPeFile->pImpl->arch == DIANA_ARCH_AARCH64)
+    if (pPeFile->pImpl->arch != DIANA_ARCH_X86)
     {
         // the observer knows where the image is, ADRP needs only offset 0 page-aligned
         params.analyzeParams.flags = DIANA_ANALYZE_ADDRESSES_RELATIVE;

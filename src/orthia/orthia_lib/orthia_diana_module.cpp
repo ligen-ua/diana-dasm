@@ -206,6 +206,8 @@ protected:
                                                &m_env,
                                                &m_owner,
                                                analyserFlags));
+            // AArch32: the analysis found the module's own mode
+            m_executable.arch = m_executable.u.elfFile.arch;
         }
         m_instructionsOwnerGuard.reset(&m_owner);
     }
@@ -216,7 +218,7 @@ protected:
         // the same parameters the PE and ELF analyzers use
         DianaAnalyzeParams params;
         DianaAnalyzeParams_Init(&params, m_executable.arch);
-        if (m_executable.arch == DIANA_ARCH_AARCH64)
+        if (m_executable.arch != DIANA_ARCH_X86)
         {
             params.flags = DIANA_ANALYZE_ADDRESSES_RELATIVE;
         }
@@ -347,7 +349,9 @@ void CDianaModule::QueryArmCodeMap(std::vector<ArmCodeChange>& changes) const
         {
             if (instruction.m_flags & DI_INSTRUCTION_DATA)
             {
-                entries.push_back({ instruction.m_offset, ArmCodeKind::Data });
+                const ArmCodeKind kind = (instruction.m_flags & DI_INSTRUCTION_DATA_BYTES) ? ArmCodeKind::Data8 :
+                    (instruction.m_flags & DI_INSTRUCTION_DATA_HALFWORDS) ? ArmCodeKind::Data16 : ArmCodeKind::Data;
+                entries.push_back({ instruction.m_offset, kind });
             }
             continue;
         }
@@ -368,7 +372,7 @@ void CDianaModule::QueryArmCodeMap(std::vector<ArmCodeChange>& changes) const
         }
         // data is marked every 2 bytes: it ends where the marks do
         const DI_UINT64 end = entries[k].offset + 2;
-        if (current == ArmCodeKind::Data && (k + 1 == entries.size() || entries[k + 1].offset > end))
+        if (IsArmCodeKindData(current) && (k + 1 == entries.size() || entries[k + 1].offset > end))
         {
             changes.push_back({ end, moduleKind });
             current = moduleKind;

@@ -65,14 +65,29 @@ namespace orthia
             return "t32";
         case ArmCodeKind::Data:
             return "data";
+        case ArmCodeKind::Data16:
+            return "data16";
+        case ArmCodeKind::Data8:
+            return "data8";
         default:
             return "a32";
         }
     }
 
+    bool IsArmCodeKindData(ArmCodeKind kind)
+    {
+        return kind == ArmCodeKind::Data || kind == ArmCodeKind::Data16 || kind == ArmCodeKind::Data8;
+    }
+
+    int GetArmCodeKindDataSize(ArmCodeKind kind)
+    {
+        return kind == ArmCodeKind::Data8 ? 1 : kind == ArmCodeKind::Data16 ? 2 : 4;
+    }
+
     bool FindArmCodeKind(const std::string& name, ArmCodeKind* pKind)
     {
-        const ArmCodeKind kinds[] = { ArmCodeKind::A32, ArmCodeKind::T32, ArmCodeKind::Data };
+        const ArmCodeKind kinds[] = { ArmCodeKind::A32, ArmCodeKind::T32, ArmCodeKind::Data, ArmCodeKind::Data16,
+            ArmCodeKind::Data8 };
         for (auto kind : kinds)
         {
             if (name == GetArmCodeKindName(kind))
@@ -92,6 +107,11 @@ namespace orthia
     bool IsDianaArchArm32(int dianaArch)
     {
         return dianaArch == DIANA_ARCH_ARM32 || dianaArch == DIANA_ARCH_THUMB;
+    }
+
+    DI_UINT64 GetDianaInstructionAddress(DI_UINT64 address, int dianaArch)
+    {
+        return IsDianaArchArm32(dianaArch) ? address & ~(DI_UINT64)1 : address;
     }
 
     int GetDianaInstructionAlignment(int dianaArch)

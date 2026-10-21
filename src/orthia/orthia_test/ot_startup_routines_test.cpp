@@ -50,43 +50,84 @@ static std::set<orthia::Address_type> AnalyzeImage(DI_UINT64 base, const std::ve
 }
 
 // ------------------------------------------------------------------ PE: TLS callbacks
-// data/pe/tls_{x86_64,aarch64}.dll, built from data/pe/tls_dll: only the TLS directory reaches the callback
-static const DI_UINT64 c_tlsCallback = 0x1000;
-static const DI_UINT64 c_tlsEntryPoint = 0x1020;
+// data/pe/tls_{x86_64,aarch64,armnt}.dll, built from data/pe/tls_dll: only the TLS directory reaches the
+// callback. RVAs as the image stores them: ARMNT code is T32, its addresses have bit 0 set
+struct TlsFixture
+{
+    const orthia::PlatformString_type::value_type* fileName;
+    DI_UINT64 callback;         // the value in the callback array, minus the image base
+    DI_UINT64 entryPoint;       // AddressOfEntryPoint
+    DI_UINT64 exportFunction;   // tls_reasons
+};
+static const TlsFixture g_tlsX64 = { ORTHIA_TCSTR("tls_x86_64.dll"), 0x1000, 0x1020, 0x1030 };
+static const TlsFixture g_tlsArm64 = { ORTHIA_TCSTR("tls_aarch64.dll"), 0x1000, 0x1020, 0x1028 };
+static const TlsFixture g_tlsArmnt = { ORTHIA_TCSTR("tls_armnt.dll"), 0x1001, 0x101b, 0x101f };
+
+// where the instruction is
+static DI_UINT64 Code(const TlsFixture& fixture, DI_UINT64 rva)
+{
+    return fixture.callback & 1 ? rva & ~(DI_UINT64)1 : rva;
+}
 
 // relocated, as in a process or a file mapped at another base
-static void test_pe_tls_callback_analyzed(const orthia::PlatformString_type& fileName)
+static void test_pe_tls_callback_analyzed(const TlsFixture& fixture)
 {
-    const DI_UINT64 base = 0x10000000;
+    const DI_UINT64 base = 0x20000000;
     orthia::CSimplePeFile pe;
     orthia::MapFileParameters params;
     params.imageBase = base;
-    pe.MapFile(LoadPeTestFile(fileName), params);
+    pe.MapFile(LoadPeTestFile(fixture.fileName), params);
     DIANA_TEST_ASSERT(pe.GetImageBase() == base);
+    DIANA_TEST_ASSERT(pe.GetEntryPoint() == base + Code(fixture, fixture.entryPoint));
 
     // the $tls_ names come from here
     std::vector<OPERAND_SIZE> callbacks;
     DIANA_TEST_ASSERT(pe.QueryTLSCallbacks(callbacks) == DI_SUCCESS);
-    DIANA_TEST_ASSERT(callbacks.size() == 1 && callbacks[0] == base + c_tlsCallback);
+    DIANA_TEST_ASSERT(callbacks.size() == 1 && callbacks[0] == base + fixture.callback);
 
     auto instructions = AnalyzeImage(base, pe.GetMappedFile());
-    DIANA_TEST_ASSERT(instructions.count(c_tlsCallback) == 1);
-    DIANA_TEST_ASSERT(instructions.count(c_tlsEntryPoint) == 1);
+    DIANA_TEST_ASSERT(instructions.count(Code(fixture, fixture.callback)) == 1);
+    DIANA_TEST_ASSERT(instructions.count(Code(fixture, fixture.entryPoint)) == 1);
+    DIANA_TEST_ASSERT(instructions.count(Code(fixture, fixture.exportFunction)) == 1);
+}
+
+// ARMNT relocations: the callback builds the address of g_reasons with movw/movt, which a base relocation
+// (IMAGE_REL_BASED_THUMB_MOV32) moves with the image
+static void test_pe_armnt_mov32_relocation()
+{
+    const DI_UINT64 base = 0x20000000;
+    orthia::CSimplePeFile pe;
+    orthia::MapFileParameters params;
+    params.imageBase = base;
+    pe.MapFile(LoadPeTestFile(g_tlsArmnt.fileName), params);
+    DIANA_TEST_ASSERT(pe.GetDianaArch() == DIANA_ARCH_THUMB && pe.GetDianaMode() == DIANA_MODE32);
+
+    // 0x1004: movw r2, #0x3004; movt r2, #0x1000 at the preferred base 0x10000000
+    const unsigned char* p = (const unsigned char*)pe.GetMappedFile().data() + 0x1004;
+    auto imm16 = [](const unsigned char* q) {
+        DI_UINT32 hw1 = q[0] | (q[1] << 8);
+        DI_UINT32 hw2 = q[2] | (q[3] << 8);
+        return ((hw1 & 0xF) << 12) | (((hw1 >> 10) & 1) << 11) | (((hw2 >> 12) & 7) << 8) | (hw2 & 0xFF);
+    };
+    DIANA_TEST_ASSERT(imm16(p) == 0x3004 && imm16(p + 4) == 0x2000);
+    // the instructions stay movw r2 and movt r2
+    DIANA_TEST_ASSERT(p[1] == 0xf2 && (p[0] & 0xf0) == 0x40 && p[3] == 0x02);
+    DIANA_TEST_ASSERT(p[5] == 0xf2 && (p[4] & 0xf0) == 0xc0 && p[7] == 0x02);
 }
 
 // at the preferred base and analyzed in a buffer: the pointer scan can't take the callback array's
 // pointers for module addresses, only the TLS directory leads to the callback
-static void test_pe_tls_callback_is_root_in_memory(const orthia::PlatformString_type& fileName)
+static void test_pe_tls_callback_is_root_in_memory(const TlsFixture& fixture)
 {
     orthia::CSimplePeFile pe;
     orthia::MapFileParameters params;
-    pe.MapFile(LoadPeTestFile(fileName), params);
+    pe.MapFile(LoadPeTestFile(fixture.fileName), params);
     std::vector<char> image = pe.GetMappedFile();
 
     Diana_InstructionsOwner owner;
     DIANA_TEST_ASSERT(Diana_PE_AnalyzePEInMemory(image.data(), image.size(), &owner, 0) == DI_SUCCESS);
     diana::Guard<diana::InstructionsOwner> ownerGuard(&owner);
-    for (DI_UINT64 root : { c_tlsCallback, c_tlsEntryPoint })
+    for (DI_UINT64 root : { Code(fixture, fixture.callback), Code(fixture, fixture.entryPoint) })
     {
         Diana_Instruction* pInstruction = owner.m_ppPresenceVec[root];
         DIANA_TEST_ASSERT(pInstruction && (pInstruction->m_flags & DI_INSTRUCTION_ROOT) &&
@@ -164,10 +205,13 @@ static void test_elf_startup_routines_in_process(const ElfStartupOffsets& fixtur
 
 void test_startup_routines()
 {
-    DIANA_TEST(test_pe_tls_callback_analyzed(ORTHIA_TCSTR("tls_x86_64.dll")));
-    DIANA_TEST(test_pe_tls_callback_analyzed(ORTHIA_TCSTR("tls_aarch64.dll")));
-    DIANA_TEST(test_pe_tls_callback_is_root_in_memory(ORTHIA_TCSTR("tls_x86_64.dll")));
-    DIANA_TEST(test_pe_tls_callback_is_root_in_memory(ORTHIA_TCSTR("tls_aarch64.dll")));
+    DIANA_TEST(test_pe_tls_callback_analyzed(g_tlsX64));
+    DIANA_TEST(test_pe_tls_callback_analyzed(g_tlsArm64));
+    DIANA_TEST(test_pe_tls_callback_analyzed(g_tlsArmnt));
+    DIANA_TEST(test_pe_tls_callback_is_root_in_memory(g_tlsX64));
+    DIANA_TEST(test_pe_tls_callback_is_root_in_memory(g_tlsArm64));
+    DIANA_TEST(test_pe_tls_callback_is_root_in_memory(g_tlsArmnt));
+    DIANA_TEST(test_pe_armnt_mov32_relocation());
     DIANA_TEST(test_elf_startup_routines_in_process(g_elfX64));
     DIANA_TEST(test_elf_startup_routines_in_process(g_elfArm64));
 }

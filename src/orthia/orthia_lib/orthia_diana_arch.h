@@ -38,7 +38,9 @@ namespace orthia
     {
         A32,
         T32,
-        Data
+        Data,           // words: literals, tables of addresses
+        Data16,         // halfwords: a tbh table
+        Data8           // bytes: a tbb table
     };
     const int g_database_type_armCodeMap = 5;
     struct ArmCodeChange
@@ -46,10 +48,17 @@ namespace orthia
         DI_UINT64 offset;           // in the module
         ArmCodeKind kind;
     };
-    // "a32", "t32", "data"
+    // "a32", "t32", "data", "data16", "data8"
     const char* GetArmCodeKindName(ArmCodeKind kind);
+    // Data, Data16 or Data8
+    bool IsArmCodeKindData(ArmCodeKind kind);
+    // the size of the entries of data: 4, 2 or 1
+    int GetArmCodeKindDataSize(ArmCodeKind kind);
     bool FindArmCodeKind(const std::string& name, ArmCodeKind* pKind);
     // the kind of a module of the architecture: T32 for DIANA_ARCH_THUMB, A32 otherwise
     ArmCodeKind GetArmCodeKind(int dianaArch);
     bool IsDianaArchArm32(int dianaArch);
+    // where the instruction of a code address is: AArch32 addresses of T32 code have bit 0 set (an ELF
+    // function symbol, an entry point, a PE export), the instruction starts at the even address
+    DI_UINT64 GetDianaInstructionAddress(DI_UINT64 address, int dianaArch);
 }

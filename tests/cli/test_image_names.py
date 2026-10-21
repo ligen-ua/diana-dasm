@@ -12,10 +12,11 @@ from data import REPO_ROOT
 from images import ElfInfo, PeInfo
 from orthia_runner import Orthia
 
-_LM_START = re.compile(r"^([0-9a-f`]{17})\s+[0-9a-f`]{17}\s+(\S+)", re.M)
+_LM_START = re.compile(r"^([0-9a-f`]{17}|[0-9a-f]{8})\s+(?:[0-9a-f`]{17}|[0-9a-f]{8})\s+(\S+)", re.M)
 
-PE_FILES = ["tls_x86_64.dll", "tls_aarch64.dll"]
-ELF_FILES = ["libstartup_x64.so", "libstartup_arm64.so", "libexports_gnu.so", "libexports_sysv.so", "nopie_x64"]
+PE_FILES = ["tls_x86_64.dll", "tls_aarch64.dll", "tls_armnt.dll"]
+ELF_FILES = ["libstartup_x64.so", "libstartup_arm64.so", "libstartup_thumb.so", "libstartup_arm32.so",
+             "libexports_gnu.so", "libexports_sysv.so", "nopie_x64"]
 
 
 def module_names(orthia, path):
@@ -42,11 +43,12 @@ def test_pe_names(orthia, name):
 
     callbacks = pe.tls_callbacks
     assert callbacks, "the test image has a TLS callback"
+    # a name is where the instruction is: ARMNT addresses have the Thumb bit
     for index, rva in enumerate(callbacks):
-        assert names[f"$tls_{index:04x}"] == [base + rva], names
-    assert names["$entrypoint"] == [base + pe.entry_rva], names
+        assert names[f"$tls_{index:04x}"] == [base + pe.code(rva)], names
+    assert names["$entrypoint"] == [base + pe.code(pe.entry_rva)], names
     for export, rva in pe.exports.items():
-        assert names[export] == [base + rva], names
+        assert names[export] == [base + pe.code(rva)], names
 
 
 @pytest.mark.elf
@@ -60,16 +62,18 @@ def test_elf_exports(orthia, name):
         # one name per address in file mode: an alias (vfunc, vfunc_v2) or, for an IFUNC's
         # resolver, its "$" name may be the one kept
         aliases = {n for n, v in elf.exported_functions.items() if v == value}
-        address = elf.address(value, bias)
+        # a name is where the instruction is: without the Thumb bit
+        address = elf.address(elf.code(value), bias)
         found = names_at(names, address)
         assert aliases & set(found) or any(n.startswith("$") for n in found), (export, hex(address), names)
     if elf.e_entry:
-        assert names["$entrypoint"] == [elf.address(elf.e_entry, bias)], names
+        assert names["$entrypoint"] == [elf.address(elf.code(elf.e_entry), bias)], names
 
 
 @pytest.mark.elf
 @pytest.mark.parametrize("name", [
     "libstartup_x64.so",
+    "libstartup_thumb.so",
     "nopie_x64",
 ])
 def test_elf_export_bytes(orthia, name):
@@ -78,19 +82,20 @@ def test_elf_export_bytes(orthia, name):
     elf = ElfInfo(path)
     bias, _ = module_names(orthia, path)
     export, value = sorted(elf.exported_functions.items())[0]
-    address = elf.address(value, bias)
+    address = elf.address(elf.code(value), bias)
     res = orthia.run(f"db {address:x} L4", file=path).assert_ok()
-    expected = " ".join(f"{b:02x}" for b in elf.bytes_at(value, 4))
-    res.assert_line(rf"^[0-9a-f`]{{17}}  {expected}\s")
+    expected = " ".join(f"{b:02x}" for b in elf.bytes_at(elf.code(value), 4))
+    res.assert_line(rf"^(?:[0-9a-f`]{{17}}|[0-9a-f]{{8}})  {expected}\s")
 
 
 @pytest.mark.elf
-@pytest.mark.parametrize("name", ["libstartup_x64.so", "libstartup_arm64.so"])
+@pytest.mark.parametrize("name", ["libstartup_x64.so", "libstartup_arm64.so", "libstartup_thumb.so",
+                                  "libstartup_arm32.so"])
 def test_elf_ifunc_resolver_is_the_export(orthia, name):
     path = REPO_ROOT / "data/elf" / name
     elf = ElfInfo(path)
     bias, names = module_names(orthia, path)
-    assert names["$ifunc_exp_ifunc"] == [bias + elf.exported_functions["exp_ifunc"]], names
+    assert names["$ifunc_exp_ifunc"] == [bias + elf.code(elf.exported_functions["exp_ifunc"])], names
     assert "$init_array_0000" in names and "$init" in names, names
 
 

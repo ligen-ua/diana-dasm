@@ -5,8 +5,8 @@ It opens executable files and live processes, analyzes their code, and lets you 
 A `--cmd` mode runs the same commands without the UI, for scripts and tests.
 
 Supported targets:
-- PE files (32 and 64-bit), including drivers and `ntoskrnl.exe`;
-- ELF files (Linux);
+- PE files (32 and 64-bit), including drivers and `ntoskrnl.exe`: x86, x64, ARM64 and ARM32 (Thumb-2);
+- ELF files (Linux): x86, x64, AArch64 and ARM32 (A32 and Thumb, mixed);
 - running processes (Windows and Linux);
 - raw shellcode: files in an unknown format can be opened as raw code: x86, x64, arm64, arm (A32) or thumb (T32).
 
