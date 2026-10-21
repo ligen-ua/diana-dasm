@@ -425,6 +425,7 @@ namespace oui
                 {
                     const auto range = image->GetRange();
                     info.dianaMode = range.dianaMode;
+                    info.dianaArch = range.dianaArch;
                     // a module without an entry point gets its base, as before
                     info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
                     info.builtInFlags |= elfFormat.GetBuiltInFlag();

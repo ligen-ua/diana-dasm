@@ -1,11 +1,21 @@
 #include "orthia_image_format.h"
 #include "orthia_shellcode.h"
 #include "orthia_module_manager.h"
+#include "orthia_diana_arch.h"
+extern "C"
+{
+#include "diana_analyze.h"
+}
 
 namespace orthia
 {
     namespace
     {
+        int GetRawAnalyzerFlags(int dianaArch)
+        {
+            return dianaArch == DIANA_ARCH_X86 ? 0 : DI_ANALYSE_PE_FILE_SCAN_THROUGH;
+        }
+
         // bytes without headers: no entry point, no names, no imports
         class CRawModuleImage : public CModuleImageBase
         {
@@ -52,18 +62,22 @@ namespace orthia
             {
                 if (params.imageBase == (DI_UINT64)(-1) || !params.dianaMode)
                 {
-                    throw std::runtime_error("Raw code needs a base address and a mode");
+                    throw std::runtime_error("Raw code needs a base address and an architecture");
                 }
-                return std::make_shared<CSimpleShellcodeFile>(data, params.imageBase, params.dianaMode);
+                return std::make_shared<CSimpleShellcodeFile>(data, params.imageBase, params.dianaMode, params.dianaArch);
             }
-            // no headers to find the code from: the whole range is analyzed, always
+            // no headers to find the code from: the whole range is analyzed, always. ARM also starts
+            // at every word nothing refers to: its fixed-size, mostly-allocated encodings tell code
+            // from data. x86 decodes nearly any byte, there it would turn data into code
             bool RegisterMainModule(CModuleManager& manager,
                 ISimpleFile& file,
                 IMemoryReader& reader,
                 const PlatformString_type&,
                 bool) const override
             {
-                manager.ReloadRange(file.GetImageBase(), file.GetMappedFile().size(), &reader, file.GetDianaMode(), 0);
+                const int flags = GetRawAnalyzerFlags(file.GetDianaArch());
+                manager.ReloadRange(file.GetImageBase(), file.GetMappedFile().size(), &reader,
+                    file.GetDianaMode(), file.GetDianaArch(), flags);
                 return true;
             }
             Address_type GetInitialAddress(ISimpleFile& file) const override

@@ -47,6 +47,7 @@ namespace orthia
         // ISimpleFile overrides
         const std::vector<char>& GetMappedFile() const override;
         int GetDianaMode() const override;
+        int GetDianaArch() const override;
         DI_UINT64 GetEntryPoint() const override;
         bool WriteImage(DI_UINT64 address, const void* pData, size_t size) override;
     };

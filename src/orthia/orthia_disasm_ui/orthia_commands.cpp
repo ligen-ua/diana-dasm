@@ -130,8 +130,11 @@ namespace orthia
             }
         }
         writer(AddTextHandler);
+        // the module of the address says how its code decodes
+        const int dianaArch = args.item->GetRangeInfo(targetAddress).dianaArch;
         oui::MemoryPrinter printer(&writer,
             args.item->GetDianaMode(),
+            dianaArch,
             oui::LineIndex(targetAddress, 0),
             countOfInstructions,
             oui::LimitKind::Instructions,
@@ -144,7 +147,7 @@ namespace orthia
             Diana_InitMemoryStreamEx2(&stream, (void*)data.pDataStart, (DIANA_SIZE_T)validBytes, 0, 0);
 
             oui::MemoryPrinter::DianaPrintContext context;
-            Diana_InitContext(&context.context, args.item->GetDianaMode());
+            orthia::InitDianaContext(&context.context, args.item->GetDianaMode(), dianaArch);
             context.pStream = &stream.parent.parent;
             printer.OnStream(&context, oui::LineIndex(targetAddress, 0), false);
 

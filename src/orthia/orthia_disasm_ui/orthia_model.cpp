@@ -8,6 +8,7 @@
 #include "orthia_log.h"
 #include "orthia_module_symbols.h"
 #include "orthia_shellcode.h"
+#include "orthia_diana_arch.h"
 #include "orthia_common_format.h"
 #include "formats/orthia_image_format.h"
 
@@ -428,20 +429,24 @@ namespace orthia
         std::string formatId;
         unsigned long long base = 0;
         int mode = 0;
+        // saved before ARM: x86
+        int arch = DIANA_ARCH_X86;
         if (!parser.QueryMetadata(std::string("format"), &formatId) || formatId.empty())
         {
             formatId = "raw";
         }
         parser.QueryMetadata("base_address", &base);
         parser.QueryMetadata("diana_mode", &mode);
+        parser.QueryMetadata("diana_arch", &arch);
         const IImageFormat* saved = FindFormatById(formatId);
-        if (!saved || !mode)
+        if (!saved || !mode || !FindDianaArchChoice(mode, arch))
         {
             return false;
         }
         format = saved;
         params.imageBase = base;
         params.dianaMode = mode;
+        params.dianaArch = arch;
         return true;
     }
 
@@ -454,6 +459,7 @@ namespace orthia
             builder.AddMetadata(std::string("format"), std::string(format.GetId()));
             builder.AddMetadata("base_address", (unsigned long long)params.imageBase);
             builder.AddMetadata("diana_mode", params.dianaMode);
+            builder.AddMetadata("diana_arch", params.dianaArch);
             std::vector<char> data;
             builder.Produce(&data);
             paramsFile.WriteToFile(data.data(), data.size());

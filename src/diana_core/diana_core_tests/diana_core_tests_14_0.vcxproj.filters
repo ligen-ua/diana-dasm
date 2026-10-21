@@ -6,6 +6,7 @@
     <ClCompile Include="test_aesni.cpp" />
     <ClCompile Include="test_analyze.cpp" />
     <ClCompile Include="test_analyze_arm64.cpp" />
+    <ClCompile Include="test_analyze_arm32.cpp" />
     <ClCompile Include="test_analyze_common.cpp" />
     <ClCompile Include="test_arm_exe.cpp" />
     <ClCompile Include="test_arm32.cpp" />
@@ -43,6 +44,7 @@
     <ClInclude Include="test_aesni.h" />
     <ClInclude Include="test_analyze.h" />
     <ClInclude Include="test_analyze_arm64.h" />
+    <ClInclude Include="test_analyze_arm32.h" />
     <ClInclude Include="test_analyze_common.h" />
     <ClInclude Include="test_arm_exe.h" />
     <ClInclude Include="test_arm32.h" />

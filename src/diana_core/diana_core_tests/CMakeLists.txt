@@ -10,6 +10,7 @@ test_avx.cpp
 test_add.cpp
 test_analyze.cpp
 test_analyze_arm64.cpp
+test_analyze_arm32.cpp
 test_analyze_common.cpp
 test_call.cpp
 test_cmp.cpp

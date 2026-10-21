@@ -23,6 +23,7 @@ extern "C"
 #include "test_fpu_mmx32.h"
 #include "test_analyze.h"
 #include "test_analyze_arm64.h"
+#include "test_analyze_arm32.h"
 #include "test_flist.h"
 #include "test_stack.h"
 #include "test_new.h"
@@ -80,5 +81,6 @@ int main()
     test_arm_exe();
     test_analyze_arm64();
 #endif
+    test_analyze_arm32();
     return g_diana_resultCode;
 }

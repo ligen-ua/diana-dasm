@@ -648,6 +648,7 @@ ORTHIA_DECLARE_API(a)
                                 size, 
                                 orthia::QueryReader(), 
                                 g_globals->mode,
+                                DIANA_ARCH_X86,
                                 0);
 
     ORTHIA_CMD_END

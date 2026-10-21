@@ -18,6 +18,8 @@
 #define DI_INSTRUCTION_UNSUPPORTED        0x200
 // AArch64: the instruction needs a feature that DianaAnalyzeParams::pArmProfile doesn't have
 #define DI_INSTRUCTION_OUTSIDE_PROFILE    0x400
+// AArch32: a T32 instruction, its route is Thumb code (DIANA_ARCH_ARM32 and DIANA_ARCH_THUMB analyze both)
+#define DI_INSTRUCTION_THUMB              0x800
 
 #define DI_ROUTE_QUESTIONABLE             0x1
 
@@ -108,6 +110,8 @@ typedef struct _diana_RouteInfo
     // the bound of a jump table index; armBoundCount 0 means none
     int armBoundReg;
     OPERAND_SIZE armBoundCount;
+    // AArch32: the route is T32 code (BX, BLX and pointers with bit 0 set switch to it), A32 otherwise
+    int armThumb;
 #endif
 }Diana_RouteInfo;
 
@@ -172,6 +176,19 @@ int Diana_AnalyzeCodeEx2(Diana_InstructionsOwner * pOwner,
 // starts a strict route (DI_ANALYSE_BREAK_ON_INVALID_CMD): a landing pad of an indirect branch or call, like the C++
 // exception landing pads only the unwinder knows. Run it after the other seeds. Other architectures: nothing to do
 int Diana_AnalyzeLandingPads(Diana_InstructionsOwner * pOwner,
+                             DianaAnalyzeObserver * pObserver,
+                             int mode,
+                             OPERAND_SIZE startOffset,
+                             OPERAND_SIZE endOffset,
+                             OPERAND_SIZE maxOffset,
+                             Diana_Stack * pStack,
+                             const DianaAnalyzeParams * pParams);
+
+// every offset of [startOffset, endOffset) where an instruction can start (1 for x86, 4 for AArch64 and
+// ARM32, 2 for THUMB, from pParams->imageBase) that no route has reached starts a strict route
+// (DI_ANALYSE_BREAK_ON_INVALID_CMD): the code nothing refers to. Run it after the other seeds.
+// AArch32: the second halfword of an A32 or a 32-bit T32 instruction is skipped; x86 may start inside one
+int Diana_AnalyzeScanThrough(Diana_InstructionsOwner * pOwner,
                              DianaAnalyzeObserver * pObserver,
                              int mode,
                              OPERAND_SIZE startOffset,

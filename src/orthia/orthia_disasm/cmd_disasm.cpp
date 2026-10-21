@@ -38,7 +38,7 @@ namespace orthia
         if (options.dianaMode.has_value())
         {
             file = std::make_unique<orthia::CSimpleShellcodeFile>(
-                fileData, options.imageBase.value_or(0), *options.dianaMode);
+                fileData, options.imageBase.value_or(0), *options.dianaMode, DIANA_ARCH_X86);
         }
         else
         {

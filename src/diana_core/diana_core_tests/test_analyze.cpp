@@ -297,6 +297,21 @@ static void test_analyzer_pdata_x64()
     Diana_InstructionsOwner_Free(&owner);
 }
 
+// x86: the scan starts at every byte no route reached
+static void test_analyzer_scan_through_x86()
+{
+    unsigned char code[] = {  0xc3          // ret: the root route         :0
+                            , 0x31, 0xc0    // xor eax, eax: nothing calls :1
+                            , 0xc3          // ret                         :3
+                            };
+    AnalyzedCode analyzed(code, sizeof(code), DIANA_MODE64);
+    DIANA_TEST_ASSERT(analyzed.owner.m_actualSize == 1);
+    DianaAnalyzeParams params;
+    DianaAnalyzeParams_Init(&params, DIANA_ARCH_X86);
+    analyzed.AnalyzeScanThrough(DIANA_MODE64, &params);
+    DIANA_TEST_ASSERT(analyzed.At(1) && analyzed.At(3));
+}
+
 void test_analyze()
 {
     DIANA_TEST(test_analyzer1());
@@ -307,4 +322,5 @@ void test_analyze()
     DIANA_TEST(test_analyzer_address_taken_data());
     DIANA_TEST(test_analyzer_address_taken_code());
     DIANA_TEST(test_analyzer_pdata_x64());
+    DIANA_TEST(test_analyzer_scan_through_x86());
 }

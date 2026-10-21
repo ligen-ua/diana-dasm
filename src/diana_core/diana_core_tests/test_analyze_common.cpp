@@ -204,6 +204,16 @@ void AnalyzedCode::AnalyzeLandingPads(int mode, const DianaAnalyzeParams * pPara
     DIANA_TEST_ASSERT(DI_SUCCESS == status);
 }
 
+void AnalyzedCode::AnalyzeScanThrough(int mode, const DianaAnalyzeParams * pParams)
+{
+    Diana_Stack stack;
+    DIANA_TEST_ASSERT(DI_SUCCESS == Diana_Stack_Init(&stack, 4096, sizeof(Diana_RouteInfo)));
+    int status = Diana_AnalyzeScanThrough(&owner, &env.observer, mode, 0, env.stream.m_size, env.stream.m_size,
+                                          &stack, pParams);
+    Diana_Stack_Free(&stack);
+    DIANA_TEST_ASSERT(DI_SUCCESS == status);
+}
+
 AnalyzedCode::~AnalyzedCode()
 {
     Diana_InstructionsOwner_Free(&owner);

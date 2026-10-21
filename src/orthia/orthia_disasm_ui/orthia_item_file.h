@@ -41,6 +41,7 @@ namespace orthia
         Address_type GetMainModuleAddress() const override;
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         int GetDianaMode() const override;
+        int GetDianaArch() const override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;
         int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const override;
         void InvalidateNames(Address_type moduleAddress) override;

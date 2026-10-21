@@ -610,6 +610,41 @@ static void test_analyzer_arm64_landing_pads()
     }
 }
 
+// the code nothing refers to: every word no route reached starts a strict route. A function only the scan
+// reaches is code and so is the function it calls; zeros (udf #0) and an unallocated word are not
+static void test_analyzer_arm64_scan_through()
+{
+    static const DI_UINT32 words[] = {
+        0x94000002,     // bl f                         :0x00
+        0xd65f03c0,     // ret                          :0x04
+        0xd2800000,     // f: mov x0, #0                :0x08
+        0xd65f03c0,     // ret                          :0x0c
+        0x00000000,     // zeros                        :0x10
+        0xffffffff,     // not an instruction           :0x14
+        0x94000002,     // g: bl h, nothing calls g     :0x18
+        0xd65f03c0,     // ret                          :0x1c
+        0xd2800020,     // h: mov x0, #1                :0x20
+        0xd65f03c0,     // ret                          :0x24
+    };
+    std::vector<unsigned char> code;
+    for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); ++i)
+    {
+        for (int b = 0; b < 4; ++b)
+            code.push_back((unsigned char)(words[i] >> (8 * b)));
+    }
+    DianaAnalyzeParams params = Arm64();
+    AnalyzedCode analyzed(&code[0], code.size(), DIANA_MODE64, &params);
+    DIANA_TEST_ASSERT(analyzed.owner.m_actualSize == 4);
+    DIANA_TEST_ASSERT(!analyzed.At(0x18));
+
+    analyzed.AnalyzeScanThrough(DIANA_MODE64, &params);
+    DIANA_TEST_ASSERT(analyzed.At(0x18) && analyzed.At(0x1c) && analyzed.At(0x20) && analyzed.At(0x24));
+    DIANA_TEST_ASSERT(FindXRefFrom(analyzed.At(0x18), 0x20, 0) != 0);
+    DIANA_TEST_ASSERT(!analyzed.At(0x10) && !analyzed.At(0x14));
+    // only words: nothing at 0x01..0x03
+    DIANA_TEST_ASSERT(!analyzed.owner.m_ppPresenceVec[0x19] && !analyzed.owner.m_ppPresenceVec[0x1a]);
+}
+
 void test_analyze_arm64()
 {
     DIANA_TEST(test_analyzer_arm64_flow());
@@ -629,4 +664,5 @@ void test_analyze_arm64()
     DIANA_TEST(test_analyzer_arm64_route_to_the_end());
     DIANA_TEST(test_analyzer_arm64_strict_udf());
     DIANA_TEST(test_analyzer_arm64_landing_pads());
+    DIANA_TEST(test_analyzer_arm64_scan_through());
 }

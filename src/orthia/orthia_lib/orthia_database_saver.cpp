@@ -4,6 +4,18 @@
 namespace orthia
 {
 
+// AArch32: where the code changes between A32, T32 and data, for the disassembly
+static void SaveArmCodeMap(CDianaModule & dianaModule, CClassicDatabase & classicDatabase, Address_type baseAddress)
+{
+    std::vector<ArmCodeChange> changes;
+    dianaModule.QueryArmCodeMap(changes);
+    for (const auto& change : changes)
+    {
+        classicDatabase.InsertMetaInfo(baseAddress, g_database_type_armCodeMap, GetArmCodeKindName(change.kind),
+            baseAddress + change.offset, true);
+    }
+}
+
 CDatabaseSaver::CDatabaseSaver()
 {
 }
@@ -56,6 +68,7 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
             classicDatabase->GetLock().Lock();
         }
     }
+    SaveArmCodeMap(dianaModule, *classicDatabase, baseAddress);
     classicDatabase->DoneSave();
     rollback.Reset();
 }
@@ -149,6 +162,7 @@ void CDatabaseSaver::SaveWithDedup(CDianaModule & dianaModule,
             classicDatabase->GetLock().Lock();
         }
     }
+    SaveArmCodeMap(dianaModule, *classicDatabase, baseAddress);
     classicDatabase->DoneSave();
     rollback.Reset();
 }

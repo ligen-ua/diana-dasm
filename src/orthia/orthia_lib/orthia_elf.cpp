@@ -130,6 +130,12 @@ namespace orthia
             return 0;
         return m_dianaContext->mappedElf.dianaMode;
     }
+    int CSimpleElfFile::GetDianaArch() const
+    {
+        if (!m_dianaContext)
+            return DIANA_ARCH_X86;
+        return m_dianaContext->mappedElf.arch;
+    }
     DI_UINT64 CSimpleElfFile::GetEntryPoint() const
     {
         if (!m_dianaContext)

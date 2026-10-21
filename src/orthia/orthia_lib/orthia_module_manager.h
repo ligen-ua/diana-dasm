@@ -45,10 +45,13 @@ public:
                                const orthia::PlatformString_type & name,
                                int analyserFlags,
                                const std::vector<Address_type> & hints);
+    // code without headers: mode is the pointer size, arch DIANA_ARCH_*,
+    // analyserFlags DI_ANALYSE_PE_FILE_SCAN_THROUGH to look at every place nothing refers to
     void ReloadRange(Address_type offset,
                      Address_type size,
                      IMemoryReader * pMemoryReader,
                      int mode,
+                     int arch,
                      int analyserFlags);
 
     void QueryLoadedModules(std::vector<CommonModuleInfo> * pResult) const;

@@ -92,6 +92,7 @@ namespace orthia
         Diana_SafeAdd(&range.lastValidAddress, m_size ? m_size - 1 : 0);
         range.entryPoint = QueryEntryPoint();
         range.dianaMode = m_exe.dianaMode;
+        range.dianaArch = m_exe.arch;
         return range;
     }
 

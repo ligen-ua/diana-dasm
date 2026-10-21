@@ -138,7 +138,8 @@ namespace orthia
                 source->GetLastValidAddress(),
                 source->GetBase(),
                 source->GetSize(),
-                file->GetDianaMode()
+                file->GetDianaMode(),
+                file->GetDianaArch()
             };
         }
         return {
@@ -146,7 +147,8 @@ namespace orthia
             moduleLastValidAddress,
             file->GetEntryPoint(),
             file->GetMappedFile().size(),
-            file->GetDianaMode()
+            file->GetDianaMode(),
+            file->GetDianaArch()
         };
     }
 
@@ -244,6 +246,7 @@ namespace orthia
             info.entryPoint = info.address;
             info.size = dbm.size;
             info.dianaMode = file->GetDianaMode();
+            info.dianaArch = file->GetDianaArch();
             modules.push_back(info);
         }
 
@@ -311,6 +314,10 @@ namespace orthia
     int FileWorkplaceItem::GetDianaMode() const
     {
         return file->GetDianaMode();
+    }
+    int FileWorkplaceItem::GetDianaArch() const
+    {
+        return file->GetDianaArch();
     }
     MarkupRangeInfo FileWorkplaceItem::QueryMarkupRange(Address_type address, IMarkupCache* cache) const
     {

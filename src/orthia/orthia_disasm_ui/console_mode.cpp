@@ -3,6 +3,7 @@
 #include "oui_editbox.h"
 #include "orthia_commands.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_diana_arch.h"
 #include "diana_core_cpp.h"
 #include <cstdio>
 #include <climits>
@@ -264,6 +265,7 @@ namespace
                         {
                             params.imageBase = fileFormat.base;
                             params.dianaMode = fileFormat.dianaMode;
+                            params.dianaArch = fileFormat.dianaArch;
                         }
                     }
                     model->AddExecutable(file, handler, format, params);
@@ -482,16 +484,16 @@ namespace
 
     bool ParseFileFormatOptions(const PlatformString_type* format,
         const PlatformString_type* base,
-        const PlatformString_type* bits,
+        const PlatformString_type* arch,
         FileFormatOptions& result,
         std::string& error)
     {
         result = FileFormatOptions();
         if (!format)
         {
-            if (base || bits)
+            if (base || arch)
             {
-                error = std::string(base ? "--base" : "--bits") + " needs --format raw";
+                error = std::string(base ? "--base" : "--arch") + " needs --format raw";
                 return false;
             }
             return true;
@@ -511,17 +513,17 @@ namespace
         if (!imageFormat->NeedsUserParameters())
         {
             // the headers say where and how
-            if (base || bits)
+            if (base || arch)
             {
-                error = std::string(base ? "--base" : "--bits") + " doesn't apply to --format " + formatId;
+                error = std::string(base ? "--base" : "--arch") + " doesn't apply to --format " + formatId;
                 return false;
             }
             result.format = *format;
             return true;
         }
-        if (!base || !bits)
+        if (!base || !arch)
         {
-            error = "--format " + formatId + " needs " + (base ? "--bits" : "--base");
+            error = "--format " + formatId + " needs " + (base ? "--arch" : "--base");
             return false;
         }
         if (!ParsePidArgument(*base, &result.base))
@@ -531,19 +533,21 @@ namespace
             return false;
         }
         // the same choice the shellcode dialog offers
-        if (*bits == ORTHIA_TCSTR("32"))
+        const auto* choice = FindDianaArchChoice(PlatformStringToUtf8(*arch));
+        if (!choice)
         {
-            result.dianaMode = DIANA_MODE32;
-        }
-        else if (*bits == ORTHIA_TCSTR("64"))
-        {
-            result.dianaMode = DIANA_MODE64;
-        }
-        else
-        {
-            error = "Invalid value for --bits: " + PlatformStringToUtf8(*bits) + " (expected 32 or 64)";
+            error = "Invalid value for --arch: " + PlatformStringToUtf8(*arch) + " (expected " + GetDianaArchChoiceNames() + ")";
             return false;
         }
+        const int alignment = GetDianaInstructionAlignment(choice->dianaArch);
+        if (result.base % alignment)
+        {
+            error = "Invalid value for --base: " + PlatformStringToUtf8(*base) + " (" + choice->name +
+                " code starts at a multiple of " + std::to_string(alignment) + ")";
+            return false;
+        }
+        result.dianaMode = choice->dianaMode;
+        result.dianaArch = choice->dianaArch;
         result.format = *format;
         return true;
     }

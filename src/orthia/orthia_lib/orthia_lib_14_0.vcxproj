@@ -160,6 +160,7 @@
     <ClCompile Include="orthia_database_module.cpp" />
     <ClCompile Include="orthia_database_saver.cpp" />
     <ClCompile Include="orthia_diana_module.cpp" />
+    <ClCompile Include="orthia_diana_arch.cpp" />
     <ClCompile Include="orthia_diana_print.cpp" />
     <ClCompile Include="orthia_elf.cpp" />
     <ClCompile Include="orthia_exec.cpp" />
@@ -207,6 +208,7 @@
     <ClInclude Include="orthia_database_module.h" />
     <ClInclude Include="orthia_database_saver.h" />
     <ClInclude Include="orthia_diana_module.h" />
+    <ClInclude Include="orthia_diana_arch.h" />
     <ClInclude Include="orthia_diana_print.h" />
     <ClInclude Include="orthia_elf.h" />
     <ClInclude Include="orthia_exec.h" />

@@ -30,7 +30,8 @@ namespace orthia
         Address_type lastValidAddress = 0;
         Address_type entryPoint = 0;
         Address_type size = 0;
-        int dianaMode = 0;
+        int dianaMode = 0;                  // the pointer size
+        int dianaArch = DIANA_ARCH_X86;     // DIANA_ARCH_*: how the code decodes
 
         bool IsInRange(Address_type offset) const
         {
@@ -232,6 +233,8 @@ namespace orthia
         virtual Address_type GetMainModuleAddress() const = 0;
         virtual std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() = 0;
         virtual int GetDianaMode() const = 0;
+        // DIANA_ARCH_* of the main module
+        virtual int GetDianaArch() const = 0;
         virtual void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const = 0;
         virtual int QueryNamesCount(Address_type moduleAddress, const NameSelectionKey& name) const = 0;
         // drops the cached names of the module, the next QueryNames reads them again
@@ -376,6 +379,7 @@ namespace orthia
     const static int g_database_type_fnc_Import = 2;
     const static int g_database_type_fnc_Export = 3;
     const static int g_database_type_fnc_PrivateSymbol = 4;
+    // 5: orthia::g_database_type_armCodeMap (orthia_diana_arch.h), saved with the analysis
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address, const oui::String& moduleName, Address_type moduleAddress);

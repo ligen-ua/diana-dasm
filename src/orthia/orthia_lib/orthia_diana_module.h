@@ -2,6 +2,8 @@
 #define ORTHIA_DIANA_MODULE_H
 
 #include "orthia_interfaces.h"
+#include "orthia_diana_arch.h"
+#include <vector>
 
 namespace orthia
 {
@@ -40,10 +42,15 @@ public:
     void InitRaw(Address_type offset,
                  Address_type size,
                  IMemoryReader * pMemoryReader,
-                 int mode);
+                 int mode,
+                 int arch);
 
     Address_type GetModuleAddress() const;
     Address_type GetModuleSize() const;
+    // DIANA_ARCH_*
+    int GetDianaArch() const;
+    // after Analyze, AArch32: where the code changes between A32, T32 and data, in order; empty otherwise
+    void QueryArmCodeMap(std::vector<ArmCodeChange>& changes) const;
     void Analyze(int analyserFlags);
     void AnalyzeWithHints(int analyserFlags, const std::vector<Address_type>& extraEntryPoints);
     orthia::PlatformString_type GetName() const;

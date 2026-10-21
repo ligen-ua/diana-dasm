@@ -44,7 +44,8 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "  --format <format> with --cmd: open the --file as pe, elf or raw (code without\n";
     out << "                    headers) instead of the format it is detected as\n";
     out << "  --base <address>  with --format raw: where the code is placed\n";
-    out << "  --bits 32|64      with --format raw: how it is disassembled\n";
+    out << "  --arch <arch>     with --format raw: how it is disassembled, x86, x64,\n";
+    out << "                    arm64, arm or thumb\n";
     out << "                    (the UI asks for these when it doesn't recognize a file)\n";
     out << "  --no-sandbox     no privilege drop under sudo and no syscall filter\n";
     out << "  --run-tests       run the built-in tests and exit\n";
@@ -98,8 +99,8 @@ int main(int argc, const char* argv[])
         bool nextIsCmd = false;
         bool nextIsFile = false;
         bool dropPrivileges = true;
-        std::optional<std::string> formatArg, baseArg, bitsArg;
-        std::optional<std::string>* nextValue = nullptr;      // --format, --base, --bits
+        std::optional<std::string> formatArg, baseArg, archArg;
+        std::optional<std::string>* nextValue = nullptr;      // --format, --base, --arch
         for (int i = 1; i < argc; ++i)
         {
             // checked first, so that a value starting with -- is taken as a value
@@ -169,9 +170,9 @@ int main(int argc, const char* argv[])
                 nextValue = &baseArg;
                 continue;
             }
-            if (strcmp(argv[i], "--bits") == 0)
+            if (strcmp(argv[i], "--arch") == 0)
             {
-                nextValue = &bitsArg;
+                nextValue = &archArg;
                 continue;
             }
             if (strcmp(argv[i], "--analyze") == 0)
@@ -220,7 +221,7 @@ int main(int argc, const char* argv[])
             std::string error;
             if (!orthia::ParseFileFormatOptions(formatArg ? &*formatArg : nullptr,
                 baseArg ? &*baseArg : nullptr,
-                bitsArg ? &*bitsArg : nullptr,
+                archArg ? &*archArg : nullptr,
                 fileFormat,
                 error))
             {

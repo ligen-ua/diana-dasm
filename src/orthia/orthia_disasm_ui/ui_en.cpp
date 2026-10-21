@@ -149,7 +149,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"),    ORTHIA_TCSTR("Open as Shellcode"))
         << textManager->RegisterValue(ORTHIA_TCSTR("message"),    ORTHIA_TCSTR("File format not recognized. Open as raw shellcode?"))
         << textManager->RegisterValue(ORTHIA_TCSTR("addr-label"), ORTHIA_TCSTR("Load address:"))
-        << textManager->RegisterValue(ORTHIA_TCSTR("mode-label"), ORTHIA_TCSTR("Architecture (32 or 64):"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("mode-label"), ORTHIA_TCSTR("Architecture (Left/Right to change):"))
         ;
 
     // main

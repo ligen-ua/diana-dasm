@@ -8,7 +8,7 @@ Supported targets:
 - PE files (32 and 64-bit), including drivers and `ntoskrnl.exe`;
 - ELF files (Linux);
 - running processes (Windows and Linux);
-- raw shellcode: files in an unknown format can be opened as raw code.
+- raw shellcode: files in an unknown format can be opened as raw code: x86, x64, arm64, arm (A32) or thumb (T32).
 
 Analysis results (modules, cross-references, symbols) and your comments are kept in an SQLite database for each file,
 so a file opens quickly the second time and comments survive restarts. See [databases.md](databases.md) for what is
@@ -90,6 +90,7 @@ Problems setting up the sandbox are reported as warnings only when Orthia runs e
 
 ```
 orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] [--no-sandbox]
+orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <command>...
 ```
 
 | Option | Meaning |
@@ -98,6 +99,9 @@ orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] 
 | `--pid <pid>` | open the process with the given id: decimal, `0x`-prefixed hex, or `self` for Orthia's own process |
 | `--cmd <command>` | run `<command>` without the UI and exit; repeat it for more commands, they run in order |
 | `--analyze` | with `--cmd`: deep code analysis and symbol loading on open |
+| `--format <format>` | with `--cmd`: open the `--file` as `pe`, `elf` or `raw` (code without headers) instead of the format it is detected as |
+| `--base <address>` | with `--format raw`: where the code is placed (ARM code: a multiple of 4, Thumb: of 2) |
+| `--arch <arch>` | with `--format raw`: how the code is disassembled and analyzed: `x86`, `x64`, `arm64`, `arm` or `thumb` |
 | `--no-sandbox` | don't restrict Orthia: on Linux no privilege drop and no seccomp filter (see [what Orthia keeps of root](#linux-what-orthia-keeps-of-root)), on Windows no privilege removal and no mitigation policies (see [sandbox](#windows-sandbox)) |
 | `--run-tests` | run the built-in tests and exit |
 | `-h`, `--help` | show help and exit; on Windows also `/?` and `-?` |
@@ -118,6 +122,7 @@ orthia --file C:\Windows\System32\notepad.exe
 orthia --pid 1234
 orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
 orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
+orthia --file firmware.bin --format raw --base 0x8000 --arch thumb --analyze --cmd 'u 8000 L20'
 orthia --cmd '.database list'
 ```
 

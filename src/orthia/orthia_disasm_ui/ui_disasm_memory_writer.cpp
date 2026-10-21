@@ -1,8 +1,88 @@
 #include "ui_disasm_memory_writer.h"
 #include "orthia_model_interfaces.h"
+#include "orthia_module_manager.h"
+#include "orthia_database_module.h"
+#include <iomanip>
+extern "C"
+{
+#include "diana_arm32.h"
+}
 
 namespace oui
 {
+    // CArmCodeMap
+    CArmCodeMap::CArmCodeMap(std::shared_ptr<orthia::IWorkPlaceItem> item)
+        : m_item(std::move(item))
+    {
+    }
+
+    void CArmCodeMap::Load(orthia::Address_type address)
+    {
+        const orthia::Address_type windowSize = 0x1000;
+        const auto range = m_item->GetRangeInfo(address);
+        m_moduleAddress = range.address;
+        m_moduleLast = range.lastValidAddress;
+        m_moduleKind = orthia::GetArmCodeKind(range.dianaArch);
+        m_from = address;
+        m_to = address + windowSize;
+        if (m_to < address || m_to > m_moduleLast + 1)
+        {
+            m_to = m_moduleLast + 1;
+        }
+        m_first = m_moduleKind;
+        m_changes.clear();
+
+        auto moduleManager = m_item->GetModuleManager();
+        if (!moduleManager)
+        {
+            return;
+        }
+        auto classicDb = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+        // the change at or before the address: the module's own rows are above the modules below it
+        classicDb->QueryMetaInfoByNearestAddress(orthia::g_database_type_armCodeMap, address,
+            [&](orthia::Address_type moduleAddress, int, const std::string& text, orthia::Address_type)
+            {
+                if (moduleAddress == m_moduleAddress)
+                {
+                    orthia::FindArmCodeKind(text, &m_first);
+                }
+                return false;
+            });
+        if (m_to > address + 1)
+        {
+            classicDb->QueryMetaInfoByAddressRange(orthia::g_database_type_armCodeMap, address + 1, m_to - 1,
+                [&](orthia::Address_type moduleAddress, int, const std::string& text, orthia::Address_type metaAddress)
+                {
+                    orthia::ArmCodeKind kind;
+                    if (moduleAddress == m_moduleAddress && orthia::FindArmCodeKind(text, &kind))
+                    {
+                        m_changes.push_back({ metaAddress, kind });
+                    }
+                    return true;
+                });
+        }
+    }
+
+    orthia::ArmCodeKind CArmCodeMap::Query(orthia::Address_type address, orthia::Address_type* pNextChange)
+    {
+        if (address < m_from || address >= m_to)
+        {
+            Load(address);
+        }
+        orthia::ArmCodeKind kind = m_first;
+        *pNextChange = m_to < m_moduleLast + 1 ? m_to : DI_MAX_OPERAND_SIZE;
+        for (const auto& change : m_changes)
+        {
+            if (change.offset > address)
+            {
+                *pNextChange = change.offset;
+                break;
+            }
+            kind = change.kind;
+        }
+        return kind;
+    }
+
     // DisasmWriter
     void DisasmWriter::PrintLine(const orthia::PlatformString_type& line)
     {
@@ -37,6 +117,7 @@ namespace oui
     // MemoryPrinter
     MemoryPrinter::MemoryPrinter(DisasmWriter* pTextPrinter,
         int dianaMode,
+        int dianaArch,
         const oui::LineIndex& startAddress,
         orthia::Address_type limit,
         LimitKind limitKind,
@@ -53,6 +134,11 @@ namespace oui
         m_startAddress(startAddress),
         m_limitKind(limitKind)
     {
+        SetDianaArch(dianaArch);
+        if (orthia::IsDianaArchArm32(dianaArch) && m_workspaceItem)
+        {
+            m_armCodeMap.reset(new CArmCodeMap(m_workspaceItem));
+        }
         QueryDefaultColorProfile(m_colors);
         m_bytesIdent += 10;
         m_countOfSpacesAfterAddress = 3;
@@ -251,8 +337,9 @@ namespace oui
                     gotoAddress = Diana_ReadValue(data.pDataStart, m_workspaceItem->GetDianaMode());
                 }
             }
-            else
+            else if (m_dianaArch == DIANA_ARCH_X86)
             {
+                // a jump to a jmp rel32 thunk: name the thunk's target
                 // TODO: move it to some utils, too low-level here
                 int opSize = 2;
                 switch (m_workspaceItem->GetDianaMode())
@@ -358,7 +445,7 @@ namespace oui
             reportNoData = true;
         }
         
-        Diana_InitContext(&context, m_dianaMode);
+        orthia::InitDianaContext(&context, m_dianaMode, m_dianaArch);
 
         // cut off tail - extra zeroes from stream
         DIANA_SIZE_T bufferSize = (size_t)vmRange.size;
@@ -423,6 +510,62 @@ namespace oui
                     break;
                 }
             }
+            if (m_armCodeMap && !reportNoData && !this->IsBadByte(virtualOffset.GetIndex()))
+            {
+                // AArch32: A32, T32 or data, as the analysis found
+                const orthia::Address_type address = virtualOffset.GetIndex();
+                orthia::Address_type nextChange = 0;
+                const orthia::ArmCodeKind kind = m_armCodeMap->Query(address, &nextChange);
+                if (kind == orthia::ArmCodeKind::Data)
+                {
+                    // a word, or less up to the next change or at an odd address
+                    int size = 4;
+                    while (size > 1 && ((address & (size - 1)) || nextChange - address < (orthia::Address_type)size))
+                    {
+                        size /= 2;
+                    }
+                    char bytes[4] = { 0 };
+                    int bytesRead = 0;
+                    Diana_ClearCache(&context);
+                    DI_CHECK_CPP(stream.pMoveTo(&stream, offsetInPage));
+                    if (stream.parent.pReadFnc(&stream, bytes, size, &bytesRead) || bytesRead != size)
+                    {
+                        break;
+                    }
+                    result.iFullCmdSize = size;
+                    result.iLinkedOpCount = 0;
+                    result.pInfo = Diana_GetNopInfo();
+                    bool print = true, exit = false;
+                    Preprocess(0, context, result, address, &print, &exit);
+                    if (print)
+                    {
+                        ++m_currentCommand;
+                        DI_UINT64 value = 0;
+                        for (int i = size - 1; i >= 0; --i)
+                        {
+                            value = (value << 8) | (unsigned char)bytes[i];
+                        }
+                        orthia::PlatformStringStream_type text;
+                        text << (size == 4 ? ORTHIA_TCSTR(".word") : size == 2 ? ORTHIA_TCSTR(".short") : ORTHIA_TCSTR(".byte"));
+                        text << orthia::PlatformString_type(m_spacesCount, ORTHIA_TCHAR(' ')) << ORTHIA_TCSTR("0x");
+                        text << std::hex << std::setw(size * 2) << std::setfill(ORTHIA_TCHAR('0')) << value;
+                        PrintCommand(virtualOffset, orthia::ToHexString(bytes, size), text.str());
+                    }
+                    offsetInPage += size;
+                    virtualOffset.IncIndex(size);
+                    if (exit)
+                    {
+                        break;
+                    }
+                    continue;
+                }
+                const int arch = kind == orthia::ArmCodeKind::T32 ? DIANA_ARCH_THUMB : DIANA_ARCH_ARM32;
+                if (context.iArch != arch)
+                {
+                    context.iArch = arch;
+                    DianaA32_ResetItState(&context);
+                }
+            }
             int iRes = 0;
             if (reportNoData || this->IsBadByte(virtualOffset.GetIndex()))
             {
@@ -479,8 +622,10 @@ namespace oui
                         PrintCommand(virtualOffset, temp, dbCommand + temp);
                     }
                 }
-                ++offsetInPage;
-                virtualOffset.IncIndex();
+                // undecodable: the next place an instruction can start (1 byte on x86, a word on ARM)
+                const int step = prevWasBad ? 1 : orthia::GetDianaInstructionAlignment(m_dianaArch);
+                offsetInPage += step;
+                virtualOffset.IncIndex(step);
                 DI_CHECK_CPP(stream.pMoveTo(&stream, offsetInPage));
                 Diana_ClearCache(&context);
 

@@ -64,6 +64,8 @@ struct AnalyzedCode
     Diana_Instruction * At(OPERAND_SIZE offset);
     // then Diana_AnalyzeLandingPads over the whole buffer
     void AnalyzeLandingPads(int mode, const DianaAnalyzeParams * pParams);
+    // then Diana_AnalyzeScanThrough over the whole buffer
+    void AnalyzeScanThrough(int mode, const DianaAnalyzeParams * pParams);
 };
 
 #endif

@@ -54,10 +54,10 @@ void CMainWindow::ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file,
         [node]() { return node->QueryValue(ORTHIA_TCSTR("message")); },
         [node]() { return node->QueryValue(ORTHIA_TCSTR("addr-label")); },
         [node]() { return node->QueryValue(ORTHIA_TCSTR("mode-label")); },
-        [weakMe, file, completeHandler](DI_UINT64 address, int dianaMode)
+        [weakMe, file, completeHandler](DI_UINT64 address, int dianaMode, int dianaArch)
         {
             if (auto p = weakMe.lock())
-                p->AsyncOpenFileAsShellcode(file, address, dianaMode, completeHandler);
+                p->AsyncOpenFileAsShellcode(file, address, dianaMode, dianaArch, completeHandler);
         }
     ));
     if (completeHandler)
@@ -76,7 +76,7 @@ void CMainWindow::ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file,
     dialog->Dock();
 }
 
-bool CMainWindow::AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode,
+bool CMainWindow::AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode, int dianaArch,
     oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> outerHandler)
 {
     auto me = oui::GetPtr_t<CMainWindow>(this);
@@ -94,10 +94,11 @@ bool CMainWindow::AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI
     });
 
     m_model->GetFileSystem()->AsyncExecute(GetThread(),
-        [file, baseAddress, dianaMode, model = m_model, innerHandler = std::move(innerHandler)]() {
+        [file, baseAddress, dianaMode, dianaArch, model = m_model, innerHandler = std::move(innerHandler)]() {
         orthia::MapFileParameters params;
         params.imageBase = baseAddress;
         params.dianaMode = dianaMode;
+        params.dianaArch = dianaArch;
         model->AddExecutable(file, innerHandler, orthia::FindFormatById("raw"), params);
     });
     return true;

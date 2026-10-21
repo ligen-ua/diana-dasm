@@ -2,8 +2,8 @@
 
 namespace orthia
 {
-    CSimpleShellcodeFile::CSimpleShellcodeFile(const std::vector<char>& data, DI_UINT64 base, int dianaMode)
-        : m_data(data), m_imageBase(base), m_dianaMode(dianaMode)
+    CSimpleShellcodeFile::CSimpleShellcodeFile(const std::vector<char>& data, DI_UINT64 base, int dianaMode, int dianaArch)
+        : m_data(data), m_imageBase(base), m_dianaMode(dianaMode), m_dianaArch(dianaArch)
     {
     }
 
@@ -37,6 +37,11 @@ namespace orthia
     int CSimpleShellcodeFile::GetDianaMode() const
     {
         return m_dianaMode;
+    }
+
+    int CSimpleShellcodeFile::GetDianaArch() const
+    {
+        return m_dianaArch;
     }
 
     DI_UINT64 CSimpleShellcodeFile::GetEntryPoint() const

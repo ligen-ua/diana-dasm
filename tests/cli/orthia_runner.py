@@ -189,7 +189,7 @@ class Orthia:
     def run(self, *cmds: str, file: Optional[Path] = None, pid: Optional[str] = None,
             options: Sequence[str] = (), timeout: Optional[float] = None) -> Result:
         """Open one target and run each command as its own --cmd.
-        `options` go before the commands, e.g. ("--format", "raw", "--base", "0x1000", "--bits", "64")."""
+        `options` go before the commands, e.g. ("--format", "raw", "--base", "0x1000", "--arch", "x64")."""
         if (file is None) == (pid is None):
             raise ValueError("pass exactly one of file= or pid=")
         args: List[str] = ["--file", str(file)] if file is not None else ["--pid", str(pid)]

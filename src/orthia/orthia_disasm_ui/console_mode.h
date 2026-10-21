@@ -10,12 +10,13 @@ namespace orthia
     // Platform-only steps (DianaWin32_Init, SetupWin32FSHandlers) stay in main.cpp.
     std::shared_ptr<CConfigOptionsStorage> InitAppCore();
 
-    // --format/--base/--bits: how to open the --file. Empty format = detect it from the file
+    // --format/--base/--arch: how to open the --file. Empty format = detect it from the file
     struct FileFormatOptions
     {
         PlatformString_type format;                     // a format id (pe, elf, raw) or empty
         unsigned long long base = 0;                    // formats opened by hand (raw): where the bytes go
-        int dianaMode = 0;                              // and DIANA_MODE32 / DIANA_MODE64
+        int dianaMode = 0;                              // and the pointer size, DIANA_MODE32 / DIANA_MODE64
+        int dianaArch = DIANA_ARCH_X86;                 // and how the code decodes, DIANA_ARCH_*
     };
 
     struct ConsoleModeOptions
@@ -43,11 +44,11 @@ namespace orthia
     // --pid value: decimal, or hex with a 0x prefix. Rejects signs, junk and overflow.
     bool ParsePidArgument(const PlatformString_type& text, unsigned long long* pid);
 
-    // Checks --format/--base/--bits together (nullptr = not given) and fills `result`.
+    // Checks --format/--base/--arch together (nullptr = not given) and fills `result`.
     // On a bad combination or value returns false with the message for the user in `error`.
     bool ParseFileFormatOptions(const PlatformString_type* format,
         const PlatformString_type* base,
-        const PlatformString_type* bits,
+        const PlatformString_type* arch,
         FileFormatOptions& result,
         std::string& error);
 

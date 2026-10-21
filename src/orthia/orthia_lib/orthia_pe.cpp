@@ -294,6 +294,12 @@ namespace orthia
             return 0;
         return m_dianaContext->mappedPE.pImpl->dianaMode;
     }
+    int CSimplePeFile::GetDianaArch() const
+    {
+        if (!m_dianaContext)
+            return DIANA_ARCH_X86;
+        return m_dianaContext->mappedPE.pImpl->arch;
+    }
     DI_UINT64 CSimplePeFile::GetEntryPoint() const
     {
         if (!m_dianaContext)

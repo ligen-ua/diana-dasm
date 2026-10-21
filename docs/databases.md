@@ -35,7 +35,7 @@ and a rebuilt file gets a new one.
 | `data.db` | the SQLite database described below |
 | `target.bin` | a byte-identical copy of the opened file. It is verified by SHA-1 on every open and rewritten when it differs, so the folder stays self-describing. Opening `target.bin` itself prints the folder's `DIRINFO` |
 | `DIRINFO` | two text lines: the header `Orthia Disasm Database Folder` and `Original Name: "<path as opened>"` |
-| `parameters.xml` | raw shellcode only: `base_address` and `diana_mode` chosen in the shellcode dialog, so the file reopens with the same layout |
+| `parameters.xml` | raw shellcode only: `base_address`, `diana_mode` (the pointer size) and `diana_arch` (0 x86, 1 AArch64, 2 A32, 3 T32; missing means x86) chosen in the shellcode dialog or with `--base`/`--arch`, so the file reopens with the same layout |
 
 Dependency files (imported DLLs and shared objects) are **not** copied. See [Dependencies](#dependencies).
 
@@ -111,8 +111,14 @@ Foreign keys are enforced on every connection, so deleting a module row removes 
 | 2 | import | the import table slot in the module (see [IAT](#import-table)) |
 | 3 | export | the export's address |
 | 4 | private symbol (from a PDB) | the symbol's address |
+| 5 | AArch32 code map: what the bytes are from here on | the address where it changes |
 
 Import, export and symbol records carry `address` (the target) and `name`.
+
+The AArch32 code map is written by the analysis of ARM (A32) and Thumb (T32) code, which can mix both and keep
+literals and switch tables between the instructions. Its `meta_info` is plain text, not XML: `a32`, `t32` or
+`data`. Before the first record of a module, its own architecture applies. The disassembly reads it to decode
+each address in the right mode and to show data as `.word`.
 
 The module description carries:
 

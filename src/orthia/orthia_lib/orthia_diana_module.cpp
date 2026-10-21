@@ -1,6 +1,7 @@
 #include "orthia_diana_module.h"
 #include "orthia_memory_cache.h"
 #include <iomanip>
+#include <algorithm>
 #include "orthia_sha1.h"
 
 extern "C"
@@ -119,10 +120,29 @@ int DianaEnvironment_AnalyzeJumpAddress(void * pThis,
     return DI_SUCCESS;
 }
 
+// the route stack of one analysis
+class CAnalyzeStack
+{
+    Diana_Stack m_stack;
+    CAnalyzeStack(const CAnalyzeStack&);
+    CAnalyzeStack& operator = (const CAnalyzeStack&);
+public:
+    CAnalyzeStack()
+    {
+        DI_CHECK_CPP(Diana_Stack_Init(&m_stack, 4096, sizeof(Diana_RouteInfo)));
+    }
+    ~CAnalyzeStack()
+    {
+        Diana_Stack_Free(&m_stack);
+    }
+    Diana_Stack* Get() { return &m_stack; }
+};
+
 class CDianaModuleImpl
 {
 protected:
     friend class CDianaInstructionIterator;
+    friend class CDianaModule;
     CMemoryCache m_cache;
     DianaEnvironment m_env;
     Diana_InstructionsOwner m_owner;
@@ -158,6 +178,7 @@ public:
     }
     orthia::Address_type GetModuleSize() { return m_env.m_moduleSize; }
     virtual int GetDianaMode() const =0;
+    virtual int GetDianaArch() const =0;
 };
 
 class CDianaModuleImpl_Executable:public CDianaModuleImpl
@@ -192,6 +213,14 @@ protected:
                               const std::vector<Address_type>& extraEntryPoints) override
     {
         AnalyzeImpl(analyserFlags);
+        // the same parameters the PE and ELF analyzers use
+        DianaAnalyzeParams params;
+        DianaAnalyzeParams_Init(&params, m_executable.arch);
+        if (m_executable.arch == DIANA_ARCH_AARCH64)
+        {
+            params.flags = DIANA_ANALYZE_ADDRESSES_RELATIVE;
+        }
+        CAnalyzeStack stack;
         for (auto addr : extraEntryPoints)
         {
             if (addr < m_env.m_moduleStart)
@@ -199,7 +228,8 @@ protected:
             Address_type relOffset = addr - m_env.m_moduleStart;
             if (relOffset >= m_env.m_moduleSize)
                 continue;
-            Diana_AnalyzeCode(&m_owner, &m_env, GetDianaMode(), relOffset, m_env.m_moduleSize);
+            Diana_AnalyzeCodeEx2(&m_owner, &m_env, GetDianaMode(), relOffset, m_env.m_moduleSize,
+                                 stack.Get(), 0, &params);
         }
     }
 public:
@@ -219,22 +249,36 @@ public:
     {
     }
     int GetDianaMode() const { return m_executable.dianaMode; }
+    int GetDianaArch() const { return m_executable.arch; }
 };
 
 class CDianaModuleImpl_Range:public CDianaModuleImpl
 {
     int m_dianaMode;
+    int m_dianaArch;
 protected:
+    // from the start of the range; DI_ANALYSE_PE_FILE_SCAN_THROUGH: also every place nothing refers to
     void AnalyzeImpl(int analyserFlags)
     {
-        &analyserFlags;
         m_cache.Init(m_env.m_moduleStart, 
                      m_env.m_moduleSize); 
         DI_CHECK_CPP(Diana_InstructionsOwner_Init(&m_owner, 
                                               m_env.m_moduleSize, 
                                               0x10000));
         m_instructionsOwnerGuard.reset(&m_owner);
-        DI_CHECK_CPP(Diana_AnalyzeCode(&m_owner, &m_env, m_dianaMode, 0, m_env.m_moduleSize));
+
+        DianaAnalyzeParams params;
+        DianaAnalyzeParams_Init(&params, m_dianaArch);
+        // the range is where the user put it: ADRP pages and instruction alignment count from there
+        params.imageBase = m_env.m_moduleStart;
+        CAnalyzeStack stack;
+        const OPERAND_SIZE size = m_env.m_moduleSize;
+        DI_CHECK_CPP(Diana_AnalyzeCodeEx2(&m_owner, &m_env, m_dianaMode, 0, size, stack.Get(), 0, &params));
+        DI_CHECK_CPP(Diana_AnalyzeLandingPads(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
+        if (analyserFlags & DI_ANALYSE_PE_FILE_SCAN_THROUGH)
+        {
+            DI_CHECK_CPP(Diana_AnalyzeScanThrough(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
+        }
     }
     void AnalyzeWithHintsImpl(int analyserFlags,
                               const std::vector<Address_type>&) override
@@ -245,14 +289,17 @@ public:
     CDianaModuleImpl_Range(Address_type offset,
                            Address_type size,
                            IMemoryReader * pMemoryReader,
-                           int dianaMode)
+                           int dianaMode,
+                           int dianaArch)
            :
             CDianaModuleImpl(offset, pMemoryReader),
-            m_dianaMode(dianaMode)
+            m_dianaMode(dianaMode),
+            m_dianaArch(dianaArch)
     {
         InitEnv(size, dianaMode);
     }
     int GetDianaMode() const { return m_dianaMode; }
+    int GetDianaArch() const { return m_dianaArch; }
 };
 
 CDianaModule::CDianaModule()
@@ -274,14 +321,69 @@ Address_type CDianaModule::GetModuleSize() const
 {
     return m_impl->GetModuleSize();
 }
+int CDianaModule::GetDianaArch() const
+{
+    return m_impl->GetDianaArch();
+}
+void CDianaModule::QueryArmCodeMap(std::vector<ArmCodeChange>& changes) const
+{
+    changes.clear();
+    const int arch = m_impl->GetDianaArch();
+    if (!IsDianaArchArm32(arch))
+    {
+        return;
+    }
+    // the code (T32 or A32 by its flag) and the data the analyzer marked, by offset
+    const Diana_InstructionsOwner& owner = m_impl->m_owner;
+    std::vector<ArmCodeChange> entries;
+    for (OPERAND_SIZE i = 0; i < owner.m_usedSize; ++i)
+    {
+        const Diana_Instruction& instruction = owner.m_pInstructionsVec[i];
+        if (instruction.m_flags & DI_INSTRUCTION_EXTERNAL)
+        {
+            continue;
+        }
+        if (instruction.m_flags & DI_INSTRUCTION_INVALID)
+        {
+            if (instruction.m_flags & DI_INSTRUCTION_DATA)
+            {
+                entries.push_back({ instruction.m_offset, ArmCodeKind::Data });
+            }
+            continue;
+        }
+        entries.push_back({ instruction.m_offset,
+            (instruction.m_flags & DI_INSTRUCTION_THUMB) ? ArmCodeKind::T32 : ArmCodeKind::A32 });
+    }
+    std::sort(entries.begin(), entries.end(), [](const ArmCodeChange& a, const ArmCodeChange& b) {
+        return a.offset < b.offset;
+    });
+    const ArmCodeKind moduleKind = GetArmCodeKind(arch);
+    ArmCodeKind current = moduleKind;
+    for (size_t k = 0; k < entries.size(); ++k)
+    {
+        if (entries[k].kind != current)
+        {
+            changes.push_back(entries[k]);
+            current = entries[k].kind;
+        }
+        // data is marked every 2 bytes: it ends where the marks do
+        const DI_UINT64 end = entries[k].offset + 2;
+        if (current == ArmCodeKind::Data && (k + 1 == entries.size() || entries[k + 1].offset > end))
+        {
+            changes.push_back({ end, moduleKind });
+            current = moduleKind;
+        }
+    }
+}
 void CDianaModule::InitRaw(Address_type offset,
                            Address_type size,
                            IMemoryReader * pMemoryReader,
-                           int mode)
+                           int mode,
+                           int arch)
 {
     m_offset = offset;
     m_pMemoryReader = pMemoryReader;
-    m_impl.reset(new CDianaModuleImpl_Range(offset, size, pMemoryReader, mode));
+    m_impl.reset(new CDianaModuleImpl_Range(offset, size, pMemoryReader, mode, arch));
 }
 void CDianaModule::Init(Address_type offset,
                         IMemoryReader * pMemoryReader)
@@ -332,7 +434,8 @@ void CDianaInstructionIterator::SkipExternals()
         if (IsEmpty())
             break;
         Diana_Instruction * pInstruction = &m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction];
-        if (!(pInstruction->m_flags & DI_INSTRUCTION_EXTERNAL))
+        // a rolled back route stays in the vector: it is no code
+        if (!(pInstruction->m_flags & (DI_INSTRUCTION_EXTERNAL | DI_INSTRUCTION_INVALID)))
             break;
     }
 }
@@ -348,7 +451,8 @@ void CDianaInstructionIterator::MoveToNext()
 }
 bool CDianaInstructionIterator::IsEmpty() const
 {
-    if (m_currentInstruction >= m_pModule->m_impl->m_owner.m_actualSize)
+    // m_actualSize counts the valid instructions only, the vector has m_usedSize
+    if (m_currentInstruction >= m_pModule->m_impl->m_owner.m_usedSize)
         return true;
     return false;
 }
@@ -371,8 +475,12 @@ void CDianaInstructionIterator::QueryRefsToCurrentInstuction(std::vector<CommonR
     while(pSubRef)
     {
         Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 0);
-        pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[0].m_pInstruction->m_offset,
-                                (pCurXRef->m_flags & DI_XREF_EXTERNAL)?true:false));
+        // from a rolled back route
+        if (!(pCurXRef->m_flags & DI_XREF_INVALID))
+        {
+            pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[0].m_pInstruction->m_offset,
+                                    (pCurXRef->m_flags & DI_XREF_EXTERNAL)?true:false));
+        }
         pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
     }
 }
@@ -388,7 +496,7 @@ void CDianaInstructionIterator::QueryRefsFromCurrentInstruction(std::vector<Comm
     while(pSubRef)
     {
         Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 1);     
-        if (pCurXRef->m_flags & DI_XREF_EXTERNAL)
+        if ((pCurXRef->m_flags & DI_XREF_EXTERNAL) && !(pCurXRef->m_flags & DI_XREF_INVALID))
         {
             // save only externals to avoid duplicate with save_refs_to
             pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[1].m_pInstruction->m_offset, true));

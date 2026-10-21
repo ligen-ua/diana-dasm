@@ -60,6 +60,7 @@ namespace orthia
         void Relocate(OPERAND_SIZE newAddress) override;
         DI_UINT64 DiGetProcAddress(const char* pFunctionName, OPERAND_SIZE* pForwardOffset = 0, DI_UINT16 ordinal = DIANA_PE_INVALID_ORDINAL_VALUE) override;
         int GetDianaMode() const override;
+        int GetDianaArch() const override;
         DI_UINT64 GetEntryPoint() const override;
         int QueryImports(diana::CBasePeLinkImportsObserver* observer) override;
         int QueryExports(diana::CBasePeLinkImportsObserver* observer) override;
