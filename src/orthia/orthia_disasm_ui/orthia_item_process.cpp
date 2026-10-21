@@ -122,7 +122,7 @@ namespace orthia
         {
             processModuleAddress = modules[processModuleOffset].entryPoint;
         }
-        std::sort(modules.begin(), modules.begin(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
+        std::sort(modules.begin(), modules.end(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
 
         exports.sort();
         m_moduleNames.Clear();
