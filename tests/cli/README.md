@@ -63,7 +63,8 @@ from `dbghelp.dll` (`dbghelp_symbols`).
 Other data:
 - `data/elf/libexports_*.so` are committed; they are built from `data/elf/exports_lib` (our own source).
 - `data/private/` is **gitignored**: third-party binaries that can't be published (`dmesg`, `apt-mark`, `ls.bin`,
-  and `nt.zip`, ntoskrnl with its PDB). The tests marked `private` use them and skip when the folder is absent.
+  `nt.zip`, ntoskrnl with its PDB, and `QcTrEE850.sys`, an ARM64 kernel driver). The tests marked `private`
+  use them and skip when the folder is absent.
   `nt.zip` is unpacked once into `tests/cli/_out/data/`, with binaries in `bin/` and PDBs in `symbols/`.
   The folders must stay siblings: the PDB loader also searches the module's folder and its subfolders.
 - Derived files are generated per session: fresh-SHA1 copies, truncated files, non-ASCII paths (see `data.py`).

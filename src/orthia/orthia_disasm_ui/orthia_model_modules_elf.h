@@ -28,6 +28,7 @@ namespace orthia
         std::unordered_map<decltype(oui::String::native), ModuleInfo> m_mappedModules;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
+        int m_dianaArch = 0;   // a library of another CPU (the host's x86-64 libc for an AArch64 image) is not linked
         oui::String m_exeDirectory;   // searched first, like the dynamic loader's rpath of the binary
         std::shared_ptr<oui::IFileSystem> m_pFs;
         std::shared_ptr<oui::BaseOperation> m_operation;

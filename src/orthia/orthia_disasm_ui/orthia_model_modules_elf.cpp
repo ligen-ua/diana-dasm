@@ -190,6 +190,10 @@ namespace orthia
         {
             throw std::runtime_error("Bitness mismatch: " + orthia::PlatformStringToUtf8(fullName.native));
         }
+        if (mappedElf->GetDianaArch() != m_dianaArch)
+        {
+            throw std::runtime_error("Architecture mismatch: " + orthia::PlatformStringToUtf8(fullName.native));
+        }
 
         if (CheckConflicts(mappedElf))
             RelocateModule(mappedElf);
@@ -313,6 +317,7 @@ namespace orthia
         CheckCancel();
         m_pFs = pFs;
         m_dianaMode = elfFile->GetDianaMode();
+        m_dianaArch = elfFile->GetDianaArch();
         m_freeSpaceStart = elfFile->GetImageEnd();
         m_exeDirectory = DirectoryOfFile(fileName);
 

@@ -40,7 +40,8 @@ namespace orthia
         const PlatformString_type& path,
         const ImageIdentity& identity,
         const IImageFormat& format,
-        int dianaMode)
+        int dianaMode,
+        int dianaArch)
         :
         m_base(base),
         m_size(size),
@@ -48,6 +49,7 @@ namespace orthia
         m_identity(identity),
         m_format(format),
         m_dianaMode(dianaMode),
+        m_dianaArch(dianaArch),
         m_state((int)ImageState::NotLoaded)
     {
     }
@@ -117,6 +119,12 @@ namespace orthia
         if (image->GetDianaMode() != m_dianaMode)
         {
             SetState(ImageState::Stale, "bitness mismatch");
+            return nullptr;
+        }
+        // databases from before the loaders checked the CPU may have recorded one
+        if (image->GetDianaArch() != m_dianaArch)
+        {
+            SetState(ImageState::Stale, "architecture mismatch");
             return nullptr;
         }
         ImageIdentity actual;

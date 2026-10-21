@@ -33,6 +33,7 @@ namespace orthia
         decltype(m_mappedModules)::iterator m_currentModule;
         OPERAND_SIZE m_freeSpaceStart = 0;
         int m_dianaMode = 0;
+        int m_dianaArch = 0;   // a dependency of another CPU (x64 host DLLs for an ARM64 image) is not linked
         oui::String m_exeDirectory;   // searched before the system paths, like the real loader
 
         using ModuleIterator = decltype(m_mappedModules)::iterator;

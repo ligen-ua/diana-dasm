@@ -101,6 +101,7 @@ namespace orthia
         ImageIdentity m_identity;
         const IImageFormat& m_format;
         int m_dianaMode;
+        int m_dianaArch;
 
         std::atomic<int> m_state;
         mutable std::mutex m_lock;        // guards m_image and m_reason, held for the whole load
@@ -115,7 +116,8 @@ namespace orthia
             const PlatformString_type& path,
             const ImageIdentity& identity,
             const IImageFormat& format,
-            int dianaMode);
+            int dianaMode,
+            int dianaArch);
 
         ImageSourceKind GetKind() const override { return ImageSourceKind::LinkedFile; }
         Address_type GetBase() const override { return m_base; }

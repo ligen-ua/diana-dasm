@@ -722,7 +722,8 @@ namespace orthia
                 record.fullName,
                 record.identity,
                 *format,
-                file->GetDianaMode());
+                file->GetDianaMode(),
+                file->GetDianaArch());
             linked.push_back(source);
             table->Add(source);
         }

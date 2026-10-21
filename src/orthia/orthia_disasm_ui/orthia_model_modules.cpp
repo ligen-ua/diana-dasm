@@ -231,6 +231,10 @@ namespace orthia
         {
             throw std::runtime_error("Can't load file: " + orthia::PlatformStringToUtf8(fullName.native));
         }
+        if (mappedPE->GetDianaArch() != m_dianaArch)
+        {
+            throw std::runtime_error("Architecture mismatch: " + orthia::PlatformStringToUtf8(fullName.native));
+        }
         if (CheckConflicts(mappedPE))
         {
             RelocateModule(mappedPE);
@@ -410,6 +414,7 @@ namespace orthia
             throw std::runtime_error("Unknown filesystem");
         }
         m_dianaMode = peFile->GetImpl()->mappedPE.pImpl->dianaMode;
+        m_dianaArch = peFile->GetDianaArch();
         m_exeDirectory = DirectoryOfFile(fileName);
 
         oui::String shortFileName;

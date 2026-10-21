@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from data import flip_rsds_guid, iat_slot, patch_pe_timestamp
+from data import flip_rsds_guid, iat_slot, patch_pe_machine, patch_pe_timestamp
 from orthia_runner import EXIT_COMMAND_ERROR
 
 pytestmark = [pytest.mark.pe, pytest.mark.private]
@@ -124,6 +124,19 @@ def test_stale_after_guid_change(orthia_cold, target):
     rows = re.findall(rf"\b{DEP}\s+(\w+)$", res.stdout, re.M)
     assert rows == ["linked", "stale"], res
     res.assert_line(r"^00000001`c0010000  \?\? \?\?")
+
+
+@windows_only
+def test_stale_after_architecture_change(orthia_cold, target):
+    exe, dep = target
+    _dependency_is(orthia_cold.run("lm", file=exe).assert_ok(), "linked")
+
+    # x64 -> ARM64, the rest of the headers unchanged: a 64-bit file, so only the CPU check finds it out
+    patch_pe_machine(dep, 0xAA64)
+    res = orthia_cold.run(f"db {DEP} L2", f"modinfo {DEP}", file=exe)
+    assert res.code == EXIT_COMMAND_ERROR, res
+    res.assert_line(r"^00000001`c0010000  \?\? \?\?")
+    res.assert_line(r"^Image: stale \(architecture mismatch\)$")
 
 
 @windows_only
