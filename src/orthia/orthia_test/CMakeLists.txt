@@ -23,6 +23,7 @@ ot_image_identity_test.cpp
 ot_sections_test.cpp
 ot_startup_routines_test.cpp
 ot_shellcode_test.cpp
+ot_process_arch_test.cpp
 )
 
 add_executable(${PROJECT_NAME} 

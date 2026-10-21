@@ -24,6 +24,13 @@ def test_help(orthia, flag):
         assert option in res.stdout, res
 
 
+def test_builtin_tests(orthia):
+    """The gtests inside orthia (src/orthia/orthia_disasm_ui/ui_tests.cpp), which no other runner starts."""
+    res = orthia.raw("--run-tests", timeout=300)
+    assert res.code == EXIT_OK, res
+    assert "[  PASSED  ]" in res.stdout, res
+
+
 def test_no_sandbox(orthia):
     res = orthia.raw("--no-sandbox", "--cmd", ".database list")
     assert res.code == EXIT_OK, res

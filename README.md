@@ -26,9 +26,16 @@ build-release-vs.cmd          # Windows, Visual Studio 2022
 ./cmake-build.sh              # Linux
 ```
 
+### Windows on ARM
+
+`src\orthia_14_0.sln` has `ARM64` configurations (output in `bin\<Configuration>\arm64`). They use the v143 toolset,
+so Visual Studio needs the "MSVC v143 ARM64 build tools" component; the Win32 and x64 builds stay on `v141_xp`.
+The ARM64 build has `orthia.exe` and `orthia_disasm.exe`, not the WinDbg extension.
+On ARM64 Windows, `run_tests.cmd` and `win_install.cmd` take the `arm64` folder.
+
 ### Linux
 
-Needs CMake 3.16+, a C++17 compiler (GCC 9+ or Clang 10+) and make; x86-64. On Ubuntu/Debian:
+Needs CMake 3.16+, a C++17 compiler (GCC 9+ or Clang 10+) and make; x86-64 or aarch64. On Ubuntu/Debian:
 ```
 sudo apt install build-essential cmake
 ./cmake-build.sh

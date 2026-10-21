@@ -11,6 +11,7 @@ namespace orthia
         std::shared_ptr<oui::IProcess> m_proc;
         oui::String m_shortName;
         int m_dianaMode = 0;
+        int m_dianaArch = DIANA_ARCH_X86;
         PlatformString_type m_procFolder;
 
         std::vector<orthia::ModuleInfo> m_modules;
@@ -34,6 +35,7 @@ namespace orthia
         CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
             const oui::String& shortName,
             int dianaMode,
+            int dianaArch,
             std::shared_ptr<IPeristentItemStorage> persistentStorage);
 
         void SetProcFolder(const PlatformString_type& folder);
@@ -49,8 +51,7 @@ namespace orthia
         void GetModules(std::vector<orthia::ModuleInfo>& modules) const override;
         int GetModulesCount() const override;
         int GetDianaMode() const override { return m_dianaMode;}
-        // processes are x86 for now
-        int GetDianaArch() const override { return DIANA_ARCH_X86; }
+        int GetDianaArch() const override { return m_dianaArch; }
         Address_type GetMainModuleAddress() const override;
         std::shared_ptr<IPeristentItemStorage> GetPersistentStorage() override;
         void QueryNames(Address_type moduleAddress, const NameSelectionKey& name, int count, std::vector<NameInfo>& names) const override;

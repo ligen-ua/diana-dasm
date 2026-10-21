@@ -7,7 +7,9 @@ A `--cmd` mode runs the same commands without the UI, for scripts and tests.
 Supported targets:
 - PE files (32 and 64-bit), including drivers and `ntoskrnl.exe`: x86, x64, ARM64 and ARM32 (Thumb-2);
 - ELF files (Linux): x86, x64, AArch64 and ARM32 (A32 and Thumb, mixed);
-- running processes (Windows and Linux);
+- running processes (Windows and Linux), x86 and x64, and ARM processes when Orthia runs on an ARM machine: each module
+  is disassembled as its headers say, other memory as the process's architecture; `threads` shows call stacks of x86
+  and x64 processes on Windows only;
 - raw shellcode: files in an unknown format can be opened as raw code: x86, x64, arm64, arm (A32) or thumb (T32).
 
 Analysis results (modules, cross-references, symbols) and your comments are kept in an SQLite database for each file,

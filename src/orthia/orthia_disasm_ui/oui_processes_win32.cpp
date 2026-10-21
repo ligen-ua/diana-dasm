@@ -12,6 +12,7 @@
 #include "formats/orthia_image_format.h"
 #include "orthia_plugins_win32.h"
 #include "orthia_exec.h"
+#include "orthia_diana_arch.h"
 
 extern "C"
 {
@@ -228,6 +229,70 @@ namespace oui
         return CheckIsWow64Process(hProcess);
     }
 
+    struct ProcessArch
+    {
+        int dianaMode = DIANA_MODE64;
+        int dianaArch = DIANA_ARCH_X86;
+    };
+
+    // PROCESS_MACHINE_INFORMATION, ProcessMachineTypeInfo = 9 (Windows 11): not in the older SDKs
+    struct ProcessMachineInformation
+    {
+        USHORT processMachine;
+        USHORT reserved;
+        ULONG machineAttributes;
+    };
+    const int g_processMachineTypeInfo = 9;
+
+    // The machine of the process from what this Windows can tell, the rules are in SelectWin32ProcessMachine.
+    // Both functions are looked up: IsWow64Process2 is Windows 10 1709+, GetProcessInformation Windows 8+,
+    // and Windows without them runs x86 and x64 only
+    ProcessArch DetectProcessArch(HANDLE hProcess)
+    {
+        typedef BOOL(WINAPI* IsWow64Process2_type)(HANDLE, USHORT*, USHORT*);
+        typedef BOOL(WINAPI* GetProcessInformation_type)(HANDLE, int, LPVOID, DWORD);
+        static IsWow64Process2_type fnIsWow64Process2 = 0;
+        static GetProcessInformation_type fnGetProcessInformation = 0;
+        static std::once_flag flag;
+        std::call_once(flag, [&]() {
+            HMODULE kernel32 = GetModuleHandle(TEXT("kernel32"));
+            fnIsWow64Process2 = (IsWow64Process2_type)GetProcAddress(kernel32, "IsWow64Process2");
+            fnGetProcessInformation = (GetProcessInformation_type)GetProcAddress(kernel32, "GetProcessInformation");
+        });
+
+        int processMachineInfo = 0;
+        if (fnGetProcessInformation)
+        {
+            ProcessMachineInformation info = { 0, };
+            if (fnGetProcessInformation(hProcess, g_processMachineTypeInfo, &info, sizeof(info)))
+            {
+                processMachineInfo = info.processMachine;
+            }
+        }
+        int wow64Machine = 0;
+        int nativeMachine = 0;
+        if (fnIsWow64Process2)
+        {
+            USHORT processMachine = 0;
+            USHORT hostMachine = 0;
+            if (fnIsWow64Process2(hProcess, &processMachine, &hostMachine))
+            {
+                wow64Machine = processMachine;
+                nativeMachine = hostMachine;
+            }
+        }
+
+        ProcessArch arch;
+        const int machine = orthia::SelectWin32ProcessMachine(processMachineInfo, wow64Machine, nativeMachine);
+        if (machine && orthia::FindDianaArchOfPeMachine(machine, &arch.dianaMode, &arch.dianaArch))
+        {
+            return arch;
+        }
+        arch.dianaMode = CheckIs32BitProcess(hProcess) ? DIANA_MODE32 : DIANA_MODE64;
+        arch.dianaArch = DIANA_ARCH_X86;
+        return arch;
+    }
+
 
     int LoadModulesFromProcess(HANDLE hProc, std::vector<HMODULE>& modules)
     {
@@ -327,10 +392,26 @@ namespace oui
             {
                 return ERROR_INVALID_FUNCTION;
             }
-            Diana_Processor_Registers_Context dianaContext;
-            int mode = DIANA_MODE64;
-            if (CheckIsWindows64() && CheckIsWow64Process(m_handleGuard.Get()))
+            // the stack is walked by the x86 emulator from the thread's registers
+            if (proc->GetDianaArch() != DIANA_ARCH_X86)
             {
+                return ERROR_NOT_SUPPORTED;
+            }
+            Diana_Processor_Registers_Context dianaContext;
+            const int mode = proc->GetDianaMode();
+            if (mode == DIANA_MODE32)
+            {
+#if defined(_M_IX86)
+                // a 32-bit orthia sees x86 threads in their own context, under WOW64 too
+                CONTEXT context;
+                context.ContextFlags = CONTEXT_FULL;
+                if (!GetThreadContext(m_handleGuard.Get(), &context))
+                {
+                    return GetLastError();
+                }
+                DI_CHECK(DianaProcessor_ConvertContextToIndependent_Win32((DIANA_CONTEXT_NTLIKE_32*)&context, &dianaContext));
+#else
+                // x64 and ARM64 Windows run x86 processes in WOW64
                 WOW64_CONTEXT wowContext;
                 wowContext.ContextFlags = CONTEXT_FULL;
                 if (!Wow64GetThreadContext(m_handleGuard.Get(), &wowContext))
@@ -338,10 +419,11 @@ namespace oui
                     return GetLastError();
                 }
                 DI_CHECK(DianaProcessor_ConvertContextToIndependent_Win32((DIANA_CONTEXT_NTLIKE_32*) &wowContext, &dianaContext));
-                mode = DIANA_MODE32;
+#endif
             }
             else
             {
+#if defined(_M_X64)
                 CONTEXT context;
                 context.ContextFlags = CONTEXT_FULL;
                 if (!GetThreadContext(m_handleGuard.Get(), &context))
@@ -349,6 +431,11 @@ namespace oui
                     return GetLastError();
                 }
                 DI_CHECK(DianaProcessor_ConvertContextToIndependent_X64((DIANA_CONTEXT_NTLIKE_64*)&context, &dianaContext));
+#else
+                // a 32-bit orthia can't read 64-bit registers, and ARM64 Windows gives an emulated x64
+                // thread's registers in the ARM64 layout
+                return ERROR_NOT_SUPPORTED;
+#endif
             }
             orthia::ProcessReaderAdapter memReader(proc.get());
             SYSTEM_INFO sysInfo;
@@ -388,15 +475,17 @@ namespace oui
         String m_name;
         HANDLE m_hProc;
         bool m_is32bit;
+        int m_dianaArch;
         LARGE_INTEGER m_distance;
         ULONG m_processID;
         std::weak_ptr<IThreadOpener> m_opener;
     public:
-        CProcess(const String& name, HANDLE hProc, bool is32bit, ULONG processID, std::shared_ptr<IThreadOpener> opener)
+        CProcess(const String& name, HANDLE hProc, const ProcessArch& arch, ULONG processID, std::shared_ptr<IThreadOpener> opener)
             :
             m_name(name),
             m_hProc(hProc),
-            m_is32bit(is32bit),
+            m_is32bit(arch.dianaMode == DIANA_MODE32),
+            m_dianaArch(arch.dianaArch),
             m_processID(processID), 
             m_opener(opener)
         {
@@ -559,6 +648,11 @@ namespace oui
             {
                 return DIANA_MODE64;
             }
+        }
+
+        int GetDianaArch() const override
+        {
+            return m_dianaArch;
         }
 
         orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) override
@@ -736,7 +830,7 @@ namespace oui
                     CloseHandle(hProc);
                 });
 
-                bool is32bit = CheckIs32BitProcess(hProc);
+                const ProcessArch arch = DetectProcessArch(hProc);
 
                 std::vector<wchar_t> buf(4096);
                 if (!GetProcessImageFileNameW(hProc, buf.data(), (DWORD)(buf.size() - 1)))
@@ -751,7 +845,7 @@ namespace oui
                     oui::String::StringStream_type res;
                     res << OUI_TCSTR("[") << procId.pid << OUI_TCSTR("] ") << shortName.native;
 
-                    proc = std::make_shared<CProcess>(res.str(), hProc, is32bit, (DWORD)procId.pid, shared_from_this());
+                    proc = std::make_shared<CProcess>(res.str(), hProc, arch, (DWORD)procId.pid, shared_from_this());
                     handlerGuard.Release();
                 }
             }
@@ -893,10 +987,7 @@ namespace oui
                         CloseHandle(hProc);
                     });
 
-                    if (CheckIs32BitProcess(hProc))
-                    {
-                        info.pointerSize = 4;
-                    }
+                    info.pointerSize = DetectProcessArch(hProc).dianaMode;
                 }
 
                 result.push_back(std::move(info));

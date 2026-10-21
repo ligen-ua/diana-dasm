@@ -26,6 +26,21 @@ namespace orthia
     // "x86, x64, arm64, arm, thumb", for messages
     std::string GetDianaArchChoiceNames();
 
+    // The architecture of a live process. The functions take what the OS reports and touch nothing, so the
+    // rules are tested on any host: an ARM64 process is only seen on an ARM machine
+
+    // a PE machine (IMAGE_FILE_MACHINE_*): I386, AMD64, ARM64, ARMNT/THUMB; false for any other
+    bool FindDianaArchOfPeMachine(int machine, int* pDianaMode, int* pDianaArch);
+    // the machine a Windows process runs as, 0 if nothing is known (Windows without IsWow64Process2):
+    //  processMachineInfo  ProcessMachineTypeInfo of GetProcessInformation (Windows 11), 0 if unavailable;
+    //                      the only one that tells an x64 process emulated on ARM64 from a native one
+    //  wow64Machine        processMachine of IsWow64Process2: the machine of a WOW process, 0 for the others
+    //  nativeMachine       nativeMachine of IsWow64Process2, 0 if unavailable
+    int SelectWin32ProcessMachine(int processMachineInfo, int wow64Machine, int nativeMachine);
+    // the ELF header of the process image (/proc/<pid>/exe): the class gives the mode, e_machine the
+    // architecture (EM_386, EM_X86_64, EM_AARCH64, EM_ARM); false if it is not ELF, too short or another machine
+    bool FindDianaArchOfElfHeader(const unsigned char* pHeader, size_t size, int* pDianaMode, int* pDianaArch);
+
     // a decoder context for the architecture, every feature allowed
     void InitDianaContext(DianaContext* pContext, int dianaMode, int dianaArch);
     // where instructions can start: 1 for x86, 4 for AArch64 and ARM, 2 for Thumb

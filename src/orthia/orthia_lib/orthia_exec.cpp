@@ -22,10 +22,28 @@ extern "C"
 #include "diana_processor/diana_processor_cmd_j.h"
 }
 
+#include <chrono>
+
 namespace orthia
 {
 
-static 
+// the guest's RDTSC reads the host's time stamp counter, ARM hosts give their virtual counter
+static unsigned long long ReadHostTimestamp()
+{
+#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
+    return __rdtsc();
+#elif defined(_M_ARM64)
+    return (unsigned long long)_ReadStatusReg(ARM64_CNTVCT);
+#elif defined(__aarch64__)
+    unsigned long long value = 0;
+    __asm__ __volatile__("mrs %0, cntvct_el0" : "=r"(value));
+    return value;
+#else
+    return (unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count();
+#endif
+}
+
+static
 int orthia_lsl(struct _dianaContext * pDianaContext,
                         DianaProcessor * pCallContext)
 {
@@ -42,7 +60,7 @@ int orthia_rdtsc(struct _dianaContext * pDianaContext,
                         DianaProcessor * pCallContext)
 {
     orthia::UnsignedLargeInteger_type res;
-    res.QuadPart = __rdtsc();
+    res.QuadPart = ReadHostTimestamp();
     
     SET_REG_EDX(res.HighPart);
     SET_REG_EAX(res.QuadPart);
@@ -53,7 +71,7 @@ int orthia_rdtscp(struct _dianaContext * pDianaContext,
                         DianaProcessor * pCallContext)
 {
     orthia::UnsignedLargeInteger_type res;
-    res.QuadPart = __rdtsc();
+    res.QuadPart = ReadHostTimestamp();
     
     SET_REG_RDX(res.HighPart);
     SET_REG_RAX(res.QuadPart);

@@ -34,11 +34,13 @@ namespace orthia
     CProcessWorkplaceItem::CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
         const oui::String& shortName,
         int dianaMode,
+        int dianaArch,
         std::shared_ptr<IPeristentItemStorage> persistentStorage)
         :
         m_proc(proc),
         m_shortName(shortName),
         m_dianaMode(dianaMode),
+        m_dianaArch(dianaArch),
         m_persistentStorage(persistentStorage)
     {
     }
@@ -80,6 +82,7 @@ namespace orthia
         info.entryPoint = 0;
         info.size = fileSize;
         info.dianaMode = m_dianaMode;
+        info.dianaArch = m_dianaArch;
         return info;
     }
 

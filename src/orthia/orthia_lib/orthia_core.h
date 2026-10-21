@@ -100,7 +100,9 @@ typedef SYSTEMTIME WinSystemTime_type;
 #else
 // Linux
 
-#include <x86intrin.h> 
+#if defined(__x86_64__) || defined(__i386__)
+#include <x86intrin.h>
+#endif
 #define ORTHIA_TCSTR(X) X
 #define ORTHIA_TSTRNCMP(X1, X2, X3)  strncmp(X1, X2, X3)
 #define ORTHIA_TCHAR char

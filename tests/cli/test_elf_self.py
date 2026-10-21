@@ -5,6 +5,7 @@ Expected values come from images.ElfInfo. Orthia maps a PIE at a load bias of it
 read from `lm`; every address is that bias plus the vaddr in the file.
 """
 import os
+import platform
 import re
 import shutil
 
@@ -196,8 +197,10 @@ def test_libraries_beside_the_binary_are_linked(orthia_cold, self_elf, tmp_path,
 
 
 def test_libc_beside_the_binary_is_linked(orthia_cold, self_elf, tmp_path, data):
-    libc = next((p for p in ["/lib/x86_64-linux-gnu/libc.so.6", "/usr/lib64/libc.so.6", "/lib64/libc.so.6"]
-                 if os.path.isfile(p)), None)
+    # the libc of this machine, as orthia was built for it: Debian keeps it under the multiarch triplet
+    triplet = f"{platform.machine()}-linux-gnu"
+    libc = next((p for p in [f"/lib/{triplet}/libc.so.6", f"/usr/lib/{triplet}/libc.so.6", "/usr/lib64/libc.so.6",
+                             "/lib64/libc.so.6"] if os.path.isfile(p)), None)
     if libc is None or "libc.so.6" not in self_elf.needed:
         pytest.skip("no libc.so.6 in a known place")
     target = tmp_path / "with_libc"

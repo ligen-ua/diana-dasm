@@ -40,6 +40,8 @@ namespace oui
     
         virtual std::tuple<int, std::shared_ptr<IThreadEnumerator>> CreateThreadEnumerator() = 0;
         virtual int GetDianaMode() const = 0;
+        // DIANA_ARCH_* of the process image: the code outside its modules (heap, JIT) is disassembled as this
+        virtual int GetDianaArch() const = 0;
     };
 
     struct ProcessUnifiedId

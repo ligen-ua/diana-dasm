@@ -419,7 +419,8 @@ void test_vm()
     DIANA_TEST(test_vm2())
 }
 
-#ifdef WIN32
+// the shuttle test runs the code of this process in the x86 emulator: x86 and x64 builds only
+#if defined(WIN32) && (defined(_M_IX86) || defined(_M_X64))
 
 class CTestAddressSpace:public orthia::IAddressSpace
 {
@@ -543,6 +544,13 @@ static void test_vm_shuttle1()
 void test_vm_shuttle()
 {
     DIANA_TEST(test_vm_shuttle1());
+}
+
+#elif defined(WIN32)
+
+void test_vm_shuttle()
+{
+    std::cout << "[SKIP: test_vm_shuttle] the host code is not x86\n";
 }
 
 #endif

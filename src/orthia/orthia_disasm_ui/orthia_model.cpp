@@ -305,11 +305,13 @@ namespace orthia
         unsigned long long fileSize = 0;
         std::tie(platformError, fileSize) = proc->GetSizeInBytes();
         int dianaMode = proc->GetDianaMode();
+        int dianaArch = proc->GetDianaArch();
 
         WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
 
         auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
-        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, persistentItemStorage);
+        auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, dianaArch,
+            persistentItemStorage);
         info->ReloadModules();
         persistentItemStorage->Init(info);
 

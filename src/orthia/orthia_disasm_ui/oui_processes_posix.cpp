@@ -7,6 +7,7 @@
 #include "orthia_log.h"
 #include "orthia_utils.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_diana_arch.h"
 
 extern "C"
 {
@@ -76,26 +77,48 @@ namespace oui
         return 0;
     }
 
-    // Detect bitness by reading the ELF header of /proc/<pid>/exe.
-    // Returns pointer size in bytes (4 or 8). Returns 8 on error (safe default).
-    static int DetectPointerSize(pid_t pid)
+    struct ProcessArch
     {
+        int dianaMode = DIANA_MODE64;
+        int dianaArch = DIANA_ARCH_X86;
+    };
+
+    // what orthia itself is built for
+    static ProcessArch GetHostArch()
+    {
+        ProcessArch arch;
+#if defined(__aarch64__)
+        arch.dianaArch = DIANA_ARCH_AARCH64;
+#elif defined(__arm__)
+        arch.dianaMode = DIANA_MODE32;
+        arch.dianaArch = DIANA_ARCH_ARM32;
+#elif defined(__i386__)
+        arch.dianaMode = DIANA_MODE32;
+#endif
+        return arch;
+    }
+
+    // The ELF header of /proc/<pid>/exe: the class gives the pointer size, e_machine the architecture.
+    // A process whose image can't be read (no access, a kernel thread) is taken as one like orthia
+    static ProcessArch DetectProcessArch(pid_t pid)
+    {
+        ProcessArch arch = GetHostArch();
+
         char path[64];
         snprintf(path, sizeof(path), "/proc/%d/exe", (int)pid);
 
         int fd = open(path, O_RDONLY);
-        if (fd < 0) return 8;
+        if (fd < 0) return arch;
 
-        unsigned char ident[5] = {};
-        ssize_t r = read(fd, ident, sizeof(ident));
+        unsigned char header[20] = {};
+        ssize_t r = read(fd, header, sizeof(header));
         close(fd);
 
-        if (r < 5) return 8;
-        // EI_MAG0..3 = 0x7f 'E' 'L' 'F'
-        if (ident[0] != 0x7f || ident[1] != 'E' || ident[2] != 'L' || ident[3] != 'F')
-            return 8;
-        // EI_CLASS: 1=32bit, 2=64bit
-        return (ident[4] == 1) ? 4 : 8;
+        if (r > 0)
+        {
+            orthia::FindDianaArchOfElfHeader(header, (size_t)r, &arch.dianaMode, &arch.dianaArch);
+        }
+        return arch;
     }
 
     // Read the short name of a process from /proc/<pid>/comm
@@ -300,11 +323,12 @@ namespace oui
         pid_t  m_pid;
         String m_name;
         bool   m_is32bit;
+        int    m_dianaArch;
         unsigned long long m_pos = 0;
 
     public:
-        CPosixProcess(pid_t pid, const String& name, bool is32bit)
-            : m_pid(pid), m_name(name), m_is32bit(is32bit)
+        CPosixProcess(pid_t pid, const String& name, const ProcessArch& arch)
+            : m_pid(pid), m_name(name), m_is32bit(arch.dianaMode == DIANA_MODE32), m_dianaArch(arch.dianaArch)
         {}
 
         // IFile
@@ -460,6 +484,11 @@ namespace oui
                 return DIANA_MODE64;
             }
         }
+
+        int GetDianaArch() const override
+        {
+            return m_dianaArch;
+        }
     };
 
     // -------------------------------------------------------------------------
@@ -484,10 +513,7 @@ namespace oui
             if (int error = CheckReadAccess((int)pid))
                 return { error, nullptr };
 
-            int pointerSize = DetectPointerSize(pid);
-            bool is32bit    = (pointerSize == 4);
-
-            auto proc = std::make_shared<CPosixProcess>(pid, FormatProcessName(pid), is32bit);
+            auto proc = std::make_shared<CPosixProcess>(pid, FormatProcessName(pid), DetectProcessArch(pid));
             return { 0, proc };
         }
 
@@ -580,7 +606,7 @@ namespace oui
                     }
                 }
 
-                info.pointerSize = DetectPointerSize(pid);
+                info.pointerSize = DetectProcessArch(pid).dianaMode;
 
                 result.push_back(std::move(info));
             }

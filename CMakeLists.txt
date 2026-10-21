@@ -36,6 +36,15 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     string(APPEND CMAKE_CXX_FLAGS_RELEASE " -g")
 endif()
 
+# The decoder and the emulator take plain char as signed, as on x86 and in MSVC: aarch64 and arm
+# GCC/Clang default to unsigned char
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    string(APPEND CMAKE_C_FLAGS " -fsigned-char")
+endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    string(APPEND CMAKE_CXX_FLAGS " -fsigned-char")
+endif()
+
 if(UNIX AND NOT APPLE)
     set(LINUX TRUE)
 endif()
