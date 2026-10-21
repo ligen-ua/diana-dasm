@@ -57,6 +57,30 @@ def own_process_name():
     return Path("/proc/self/comm").read_text().strip()
 
 
+def own_start_key():
+    """meta.xml start_key of this process: what the process provider reads as its start."""
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        times = [wintypes.FILETIME() for _ in range(4)]
+        kernel32.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+        assert kernel32.GetProcessTimes(kernel32.GetCurrentProcess(), *map(ctypes.byref, times))
+        return str(times[0].dwHighDateTime << 32 | times[0].dwLowDateTime)
+    boot_id = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    fields = Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()
+    # field 22 (starttime); the list starts at field 3
+    return f"{boot_id}:{fields[22 - 3]}"
+
+
+def make_proc_folder(path: Path, start_key: str):
+    make_folder(path)
+    (path / "meta.xml").write_text(f'<root format_version="1" min_reader_version="1" kind="process" start_key="{start_key}"/>',
+                                   encoding="utf-8")
+    return path
+
+
 def test_list_empty(orthia_cold):
     res = orthia_cold.raw("--cmd", ".database list").assert_ok()
     res.assert_line(r"^Data folder: ")
@@ -162,14 +186,19 @@ def test_cleanup(orthia_cold, target):
     make_folder(proc / live)                                    # kept: the process runs
     make_folder(proc / f"[{os.getpid()}] other-program.exe")    # removed: pid now runs another program
     make_folder(proc / "[4000000000] gone.exe")                 # removed: no such process
+    started = f"[{os.getpid()}] {own_process_name()} 20000101-000000"
+    make_proc_folder(proc / started, own_start_key())           # kept: the same start
+    make_proc_folder(proc / f"[{os.getpid()}] {own_process_name()} 20000101-000001",
+                     "1")                                        # removed: another start, the same program
     make_folder(proc / "no-pid")                                # kept: can't tell
     make_folder(db / ("0" * 40), age_hours=2)                   # removed: no data.db
     make_folder(db / ("1" * 40))                                # kept: may be being created
     make_folder(db / ("2" * 40 + ".deleting"))                  # removed: unfinished delete
 
     res = orthia_cold.raw("--cmd", ".database cleanup").assert_ok()
-    res.assert_line(r"^Removed 4 folder\(s\)")
-    assert proc_folders(orthia_cold) == sorted([live, "no-pid"])
+    res.assert_line(r"^Removed 5 folder\(s\)")
+    res.assert_line(r"pid now runs another process")
+    assert proc_folders(orthia_cold) == sorted([live, started, "no-pid"])
     assert db_folders(orthia_cold) == sorted(["1" * 40, sha1])
 
     res = orthia_cold.raw("--cmd", ".database cleanup").assert_ok()

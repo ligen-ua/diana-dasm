@@ -29,6 +29,7 @@ namespace orthia
         std::shared_ptr<const ModuleNames> QueryModuleNames(Address_type moduleAddress) const;
         NameInfo QueryAddressNameNoLock(Address_type address) const;
         NameInfo QueryAddressNameImpl(Address_type address, orthia::ModuleInfo& moduleInfo) const;
+        void SaveModuleFlags(const ModuleInfo& module, int flags);
 
     public:
         ~CProcessWorkplaceItem();
@@ -42,6 +43,9 @@ namespace orthia
         void Init(std::shared_ptr<CModuleManager> moduleManager,
             std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
             std::shared_ptr<ModuleStorage> moduleStorage);
+        // after Init, on a database reused from an earlier open of the same process: the
+        // analysis flags of the modules that are still the same
+        void LoadSavedModuleFlags();
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;

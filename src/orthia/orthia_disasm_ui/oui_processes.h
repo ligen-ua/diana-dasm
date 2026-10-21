@@ -31,6 +31,19 @@ namespace oui
         virtual ~IThreadEnumerator() {}
         virtual std::tuple<int, std::shared_ptr<IThread>> GetNextThread() = 0;
     };
+    // When a process started: tells a process from a later one that got the same pid
+    struct ProcessStartInfo
+    {
+        // UTC seconds since 1970, for names shown to people; 0 when unknown.
+        // Linux computes it from the boot time, which moves when the clock is set
+        long long unixSeconds = 0;
+        // exact and stable while the process runs: the creation FILETIME on Windows,
+        // "<boot_id>:<start ticks>" on Linux; empty when unknown
+        std::string key;
+
+        bool IsKnown() const { return !key.empty(); }
+    };
+
     struct IProcess:IFile
     {
         virtual orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) = 0;
@@ -42,6 +55,10 @@ namespace oui
         virtual int GetDianaMode() const = 0;
         // DIANA_ARCH_* of the process image: the code outside its modules (heap, JIT) is disassembled as this
         virtual int GetDianaArch() const = 0;
+        // read when the process was opened
+        virtual ProcessStartInfo GetStartInfo() const = 0;
+        // false once the process has exited (and its pid may run another one)
+        virtual bool IsRunning() const = 0;
     };
 
     struct ProcessUnifiedId
@@ -98,6 +115,8 @@ namespace oui
         // "[pid] name", the same as IProcess::GetFullFileNameForUI() of an opened process,
         // but needs no memory access: works for processes that can't be opened as reader
         virtual std::tuple<int, String> SyncQueryProcessName(unsigned long long pid) = 0;
+        // also without memory access; an unknown start (no access) is not an error
+        virtual std::tuple<int, ProcessStartInfo> SyncQueryProcessStartInfo(unsigned long long pid) = 0;
     };
 
     // default filesystem
@@ -116,6 +135,7 @@ namespace oui
 
         std::tuple<int, std::shared_ptr<IProcess>> SyncOpenProcess(const oui::ProcessUnifiedId& procId) override;
         std::tuple<int, String> SyncQueryProcessName(unsigned long long pid) override;
+        std::tuple<int, ProcessStartInfo> SyncQueryProcessStartInfo(unsigned long long pid) override;
     };
 
     std::shared_ptr<IProcessSystem> CreateDefaultProcessProvider();

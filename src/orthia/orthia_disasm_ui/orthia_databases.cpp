@@ -5,10 +5,13 @@
 #include "oui_filesystem.h"
 #include "oui_processes.h"
 #include "orthia_sqlite.h"
+#include "orthia_version.h"
 #include "sqlite3.h"
 #include <algorithm>
 #include <cerrno>
+#include <cstdio>
 #include <fstream>
+#include <iterator>
 #include <set>
 
 namespace fs = std::filesystem;
@@ -57,9 +60,161 @@ namespace orthia
         return text;
     }
 
+    const char* const g_folderKindFile = "file";
+    const char* const g_folderKindProcess = "process";
+
+    bool ReadFolderMeta(const PlatformString_type& fileName, FolderMeta& meta)
+    {
+        std::ifstream stream(fs::path(fileName), std::ios::binary);
+        if (!stream)
+        {
+            return false;
+        }
+        std::vector<char> data((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+        if (data.empty() || data.size() > 64 * 1024)
+        {
+            return false;
+        }
+        CCommonFormatParser parser;
+        if (!parser.Parse(data, false))
+        {
+            return false;
+        }
+        FolderMeta result;
+        if (!parser.QueryMetadata("format_version", &result.formatVersion) || result.formatVersion <= 0)
+        {
+            return false;
+        }
+        parser.QueryMetadata("min_reader_version", &result.minReaderVersion);
+        parser.QueryMetadata("analysis_version", &result.analysisVersion);
+        parser.QueryMetadata(std::string("orthia_version"), &result.orthiaVersion);
+        parser.QueryMetadata("created", &result.createdUnix);
+        parser.QueryMetadata(std::string("kind"), &result.kind);
+        parser.QueryMetadata("diana_mode", &result.dianaMode);
+        parser.QueryMetadata("diana_arch", &result.dianaArch);
+        parser.QueryMetadata(std::string("format"), &result.format);
+        parser.QueryMetadata("image_base", &result.imageBase);
+        parser.QueryMetadata("size", &result.size);
+        parser.QueryMetadata(std::string("sha1"), &result.sha1);
+        parser.QueryMetadata("pid", &result.pid);
+        parser.QueryMetadata(ORTHIA_TCSTR("name"), &result.name);
+        parser.QueryMetadata("start", &result.startUnix);
+        parser.QueryMetadata(std::string("start_key"), &result.startKey);
+        meta = std::move(result);
+        return true;
+    }
+
+    void WriteFolderMeta(const PlatformString_type& fileName, FolderMeta meta)
+    {
+        if (!meta.formatVersion)
+        {
+            meta.formatVersion = g_folderFormatVersion;
+            meta.minReaderVersion = g_folderMinReaderVersion;
+        }
+        if (!meta.analysisVersion)
+        {
+            meta.analysisVersion = g_analysisVersion;
+        }
+        if (meta.orthiaVersion.empty())
+        {
+            meta.orthiaVersion = ORTHIA_UI_VERSION;
+        }
+        if (!meta.createdUnix)
+        {
+            meta.createdUnix = (long long)std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+        }
+
+        CCommonFormatBuilder builder;
+        builder.AddMetadata("format_version", meta.formatVersion);
+        builder.AddMetadata("min_reader_version", meta.minReaderVersion);
+        builder.AddMetadata("analysis_version", meta.analysisVersion);
+        builder.AddMetadata(std::string("orthia_version"), meta.orthiaVersion);
+        builder.AddMetadata("created", meta.createdUnix);
+        builder.AddMetadata(std::string("kind"), meta.kind);
+        builder.AddMetadata("diana_mode", meta.dianaMode);
+        builder.AddMetadata("diana_arch", meta.dianaArch);
+        if (meta.kind == g_folderKindProcess)
+        {
+            builder.AddMetadata("pid", meta.pid);
+            builder.AddMetadata(ORTHIA_TCSTR("name"), meta.name);
+            builder.AddMetadata("start", meta.startUnix);
+            builder.AddMetadata(std::string("start_key"), meta.startKey);
+        }
+        else
+        {
+            builder.AddMetadata(std::string("format"), meta.format);
+            builder.AddMetadata("image_base", meta.imageBase);
+            builder.AddMetadata("size", meta.size);
+            builder.AddMetadata(std::string("sha1"), meta.sha1);
+        }
+        std::vector<char> data;
+        builder.Produce(&data);
+
+        // a reader never sees half a file
+        fs::path target(fileName);
+        fs::path temp = target;
+        temp += ".tmp";
+        {
+            std::ofstream stream(temp, std::ios::binary | std::ios::trunc);
+            stream.write(data.data(), (std::streamsize)data.size());
+            if (!stream)
+            {
+                throw std::runtime_error("Can't write " + PlatformStringToUtf8(temp.native()));
+            }
+        }
+        std::error_code ec;
+        fs::rename(temp, target, ec);
+        if (ec)
+        {
+            fs::remove(temp, ec);
+            throw std::runtime_error("Can't write " + PlatformStringToUtf8(fileName));
+        }
+    }
+
+    bool IsFolderReadable(const FolderMeta& meta)
+    {
+        return meta.minReaderVersion <= g_folderFormatVersion;
+    }
+
+    PlatformString_type FormatProcStartStamp(long long unixSeconds)
+    {
+        if (unixSeconds <= 0)
+        {
+            return PlatformString_type();
+        }
+        // days to a civil date, H. Hinnant's algorithm: no gmtime, the same on every platform
+        long long days = unixSeconds / 86400;
+        long long secondsOfDay = unixSeconds % 86400;
+        days += 719468;
+        const long long era = days / 146097;
+        const long long dayOfEra = days - era * 146097;
+        const long long yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096) / 365;
+        const long long dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100);
+        const long long mp = (5 * dayOfYear + 2) / 153;
+        const long long day = dayOfYear - (153 * mp + 2) / 5 + 1;
+        const long long month = mp < 10 ? mp + 3 : mp - 9;
+        const long long year = yearOfEra + era * 400 + (month <= 2 ? 1 : 0);
+
+        char text[128];
+        snprintf(text, sizeof(text), "%04lld%02lld%02lld-%02lld%02lld%02lld",
+            year, month, day, secondsOfDay / 3600, (secondsOfDay / 60) % 60, secondsOfDay % 60);
+        return Utf8ToPlatformString(text);
+    }
+
+    PlatformString_type MakeProcFolderName(const PlatformString_type& processName, long long startUnix)
+    {
+        const auto stamp = FormatProcStartStamp(startUnix);
+        if (stamp.empty())
+        {
+            return processName;
+        }
+        return processName + ORTHIA_TCSTR(" ") + stamp;
+    }
+
     unsigned long long ParseProcFolderPid(const PlatformString_type& folderName)
     {
-        // the name is SyncSanitizeName(IProcess::GetFullFileNameForUI()): "[<pid>] <name>"
+        // the name is SyncSanitizeName(MakeProcFolderName(...)): "[<pid>] <name> <start>"
         if (folderName.size() < 3 || folderName[0] != '[')
         {
             return 0;
@@ -122,6 +277,7 @@ namespace orthia
 
         const PlatformString_type dbFileName = config ? config->GetDBFileName() : ORTHIA_TCSTR("data.db");
         const PlatformString_type readmeFileName = config ? config->GetReadmeFileName() : ORTHIA_TCSTR("DIRINFO");
+        const PlatformString_type metaFileName = config ? config->GetMetaFileName() : ORTHIA_TCSTR("meta.xml");
 
         std::error_code ec;
         for (const auto& fileEntry : fs::recursive_directory_iterator(entry.path(), ec))
@@ -153,6 +309,14 @@ namespace orthia
         std::error_code ec3;
         info.hasDataDb = fs::is_regular_file(entry.path() / dbFileName, ec3);
         info.originalName = ReadOriginalName(entry.path() / readmeFileName);
+        if (kind == DatabaseInfo::Kind::Process)
+        {
+            FolderMeta meta;
+            if (ReadFolderMeta((entry.path() / metaFileName).native(), meta) && meta.kind == g_folderKindProcess)
+            {
+                info.startKey = meta.startKey;
+            }
+        }
         return info;
     }
 
@@ -413,7 +577,7 @@ namespace orthia
                 result.push_back({ info, ORTHIA_TCSTR("process has exited") });
                 break;
             case ProcessState::Reused:
-                result.push_back({ info, ORTHIA_TCSTR("pid now belongs to another program") });
+                result.push_back({ info, ORTHIA_TCSTR("pid now runs another process") });
                 break;
             default:
                 break;
@@ -441,13 +605,29 @@ namespace orthia
             return ProcessState::Unknown;
         }
         int error = 0;
+        if (!info.startKey.empty())
+        {
+            oui::ProcessStartInfo start;
+            std::tie(error, start) = processSystem.SyncQueryProcessStartInfo(info.pid);
+            if (error)
+            {
+                return IsNoSuchProcessError(error) ? ProcessState::Gone : ProcessState::Unknown;
+            }
+            if (!start.IsKnown())
+            {
+                return ProcessState::Unknown;
+            }
+            return start.key == info.startKey ? ProcessState::Alive : ProcessState::Reused;
+        }
+
+        // a folder without a start (no meta.xml, or the start was unknown): it is named
+        // after the program
         oui::String processName;
         std::tie(error, processName) = processSystem.SyncQueryProcessName(info.pid);
         if (error)
         {
             return IsNoSuchProcessError(error) ? ProcessState::Gone : ProcessState::Unknown;
         }
-        // the folder was named the same way when the process was opened
         auto name = fileSystem.SyncSanitizeName(processName);
         return name.native == info.folderName ? ProcessState::Alive : ProcessState::Reused;
     }

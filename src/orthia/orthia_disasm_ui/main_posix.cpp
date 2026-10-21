@@ -47,6 +47,8 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "  --arch <arch>     with --format raw: how it is disassembled, x86, x64,\n";
     out << "                    arm64, arm or thumb\n";
     out << "                    (the UI asks for these when it doesn't recognize a file)\n";
+    out << "  --overwrite-db    new, empty databases for the targets opened in this run\n";
+    out << "                    (default: reuse the database of an earlier open)\n";
     out << "  --no-sandbox     no privilege drop under sudo and no syscall filter\n";
     out << "  --run-tests       run the built-in tests and exit\n";
     out << "  -h, --help        show this help and exit\n";
@@ -92,6 +94,7 @@ int main(int argc, const char* argv[])
     std::vector<std::string> commandsToRun;
     const std::string programName = GetProgramName(argc > 0 ? argv[0] : nullptr);
     bool analyze = false;
+    bool overwriteDatabases = false;
 
     try
     {
@@ -179,6 +182,11 @@ int main(int argc, const char* argv[])
             {
                 // the UI always analyzes, so it only matters with --cmd
                 analyze = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--overwrite-db") == 0)
+            {
+                overwriteDatabases = true;
                 continue;
             }
             // --no-privilege-drop: the old name, kept as an undocumented alias
@@ -282,6 +290,7 @@ int main(int argc, const char* argv[])
             }
         }
 
+        config->SetOverwriteDatabases(overwriteDatabases);
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 
         if (consoleMode)

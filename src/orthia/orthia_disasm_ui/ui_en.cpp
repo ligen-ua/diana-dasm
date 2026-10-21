@@ -174,6 +174,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("readme-header"), ORTHIA_TCSTR("Orthia Disasm Database Folder"))
         << textManager->RegisterValue(ORTHIA_TCSTR("original-name"), ORTHIA_TCSTR("Original Name: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("database-file"), ORTHIA_TCSTR("Database file: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("database-reused"), ORTHIA_TCSTR("Using the database of an earlier open of this process (--overwrite-db for a new one)"))
         ;
 
     // model

@@ -3,6 +3,7 @@
 #include "orthia_utils.h"
 #include "oui_layouts_calc.h"
 #include "orthia_databases.h"
+#include "orthia_common_format.h"
 #include "orthia_module_names.h"
 #include "orthia_config.h"
 #include "orthia_external_symbols.h"
@@ -161,6 +162,90 @@ TEST(Databases, ParseProcFolderPid)
     EXPECT_EQ(0ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("notepad.exe")));
     EXPECT_EQ(0ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("[12a] x")));
     EXPECT_EQ(0ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("[]")));
+    EXPECT_EQ(1234ULL, orthia::ParseProcFolderPid(ORTHIA_TCSTR("[1234] notepad.exe 20261021-153012")));
+}
+
+TEST(Databases, ProcFolderName)
+{
+    EXPECT_EQ(orthia::PlatformString_type(), orthia::FormatProcStartStamp(0));
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("19700101-000001")), orthia::FormatProcStartStamp(1));
+    // 2000-02-29: a leap day of a year divisible by 400
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("20000229-235959")), orthia::FormatProcStartStamp(951868799));
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("20261021-153012")), orthia::FormatProcStartStamp(1792596612));
+
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("[1234] notepad.exe 20261021-153012")),
+        orthia::MakeProcFolderName(ORTHIA_TCSTR("[1234] notepad.exe"), 1792596612));
+    // the start unknown: named as before meta.xml
+    EXPECT_EQ(orthia::PlatformString_type(ORTHIA_TCSTR("[1234] notepad.exe")),
+        orthia::MakeProcFolderName(ORTHIA_TCSTR("[1234] notepad.exe"), 0));
+}
+
+TEST(Databases, FolderMetaRoundTrip)
+{
+    namespace fs = std::filesystem;
+    const fs::path root = fs::temp_directory_path() / ORTHIA_TCSTR("orthia_test_folder_meta");
+    std::error_code ec;
+    fs::remove_all(root, ec);
+    fs::create_directories(root);
+    oui::ScopedGuard cleanup([&]() { std::error_code ec2; fs::remove_all(root, ec2); });
+    const auto fileName = (root / ORTHIA_TCSTR("meta.xml")).native();
+
+    orthia::FolderMeta meta;
+    EXPECT_FALSE(orthia::ReadFolderMeta(fileName, meta));
+
+    orthia::FolderMeta process;
+    process.kind = orthia::g_folderKindProcess;
+    process.dianaMode = DIANA_MODE64;
+    process.dianaArch = DIANA_ARCH_AARCH64;
+    process.pid = 1234;
+    process.name = ORTHIA_TCSTR("[1234] n\xC3\xA4me \"x\" <y>");
+    process.startUnix = 1792596612;
+    process.startKey = "0f1e2d3c-aaaa-bbbb-cccc-0123456789ab:123456";
+    orthia::WriteFolderMeta(fileName, process);
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, meta));
+    EXPECT_EQ(orthia::g_folderFormatVersion, meta.formatVersion);
+    EXPECT_EQ(orthia::g_folderMinReaderVersion, meta.minReaderVersion);
+    EXPECT_EQ(orthia::g_analysisVersion, meta.analysisVersion);
+    EXPECT_FALSE(meta.orthiaVersion.empty());
+    EXPECT_GT(meta.createdUnix, 0);
+    EXPECT_EQ(std::string(orthia::g_folderKindProcess), meta.kind);
+    EXPECT_EQ(DIANA_MODE64, meta.dianaMode);
+    EXPECT_EQ(DIANA_ARCH_AARCH64, meta.dianaArch);
+    EXPECT_EQ(1234ULL, meta.pid);
+    EXPECT_EQ(process.name, meta.name);
+    EXPECT_EQ(1792596612LL, meta.startUnix);
+    EXPECT_EQ(process.startKey, meta.startKey);
+    EXPECT_TRUE(orthia::IsFolderReadable(meta));
+
+    // rewritten in place, and a newer writer's folder is not readable
+    orthia::FolderMeta file;
+    file.kind = orthia::g_folderKindFile;
+    file.formatVersion = orthia::g_folderFormatVersion + 1;
+    file.minReaderVersion = orthia::g_folderFormatVersion + 1;
+    file.format = "elf";
+    file.imageBase = 0x400000;
+    file.size = 4096;
+    file.sha1 = "aabbcc0011223344556677889900aabbccddeeff";
+    orthia::WriteFolderMeta(fileName, file);
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, meta));
+    EXPECT_EQ(std::string(orthia::g_folderKindFile), meta.kind);
+    EXPECT_EQ(std::string("elf"), meta.format);
+    EXPECT_EQ(0x400000ULL, meta.imageBase);
+    EXPECT_EQ(4096ULL, meta.size);
+    EXPECT_EQ(file.sha1, meta.sha1);
+    EXPECT_TRUE(meta.startKey.empty());
+    EXPECT_FALSE(orthia::IsFolderReadable(meta));
+    EXPECT_FALSE(fs::exists(root / ORTHIA_TCSTR("meta.xml.tmp")));
+
+    // parameters.xml is not a meta.xml
+    {
+        orthia::CCommonFormatBuilder builder;
+        builder.AddMetadata(std::string("format"), std::string("raw"));
+        std::vector<char> data;
+        builder.Produce(&data);
+        std::ofstream(fs::path(fileName), std::ios::binary | std::ios::trunc).write(data.data(), (std::streamsize)data.size());
+    }
+    EXPECT_FALSE(orthia::ReadFolderMeta(fileName, meta));
 }
 
 TEST(Databases, ResolveSelectors)
@@ -691,6 +776,14 @@ namespace
         int GetDianaArch() const override
         {
             return dianaArch;
+        }
+        oui::ProcessStartInfo GetStartInfo() const override
+        {
+            return oui::ProcessStartInfo();
+        }
+        bool IsRunning() const override
+        {
+            return false;
         }
     };
 

@@ -29,6 +29,35 @@ namespace oui
         ULONGLONG baseAddress, regionSize;
     };
 
+    // the creation time: needs PROCESS_QUERY_LIMITED_INFORMATION
+    static ProcessStartInfo QueryProcessStartInfo(HANDLE hProcess)
+    {
+        ProcessStartInfo info;
+        FILETIME creationTime = { 0, };
+        FILETIME exitTime = { 0, };
+        FILETIME kernelTime = { 0, };
+        FILETIME userTime = { 0, };
+        if (!GetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime))
+        {
+            return info;
+        }
+        ULARGE_INTEGER value;
+        value.LowPart = creationTime.dwLowDateTime;
+        value.HighPart = creationTime.dwHighDateTime;
+        if (!value.QuadPart)
+        {
+            return info;
+        }
+        // 100 ns units since 1601
+        const ULONGLONG unixEpoch = 116444736000000000ULL;
+        if (value.QuadPart > unixEpoch)
+        {
+            info.unixSeconds = (long long)((value.QuadPart - unixEpoch) / 10000000ULL);
+        }
+        info.key = std::to_string(value.QuadPart);
+        return info;
+    }
+
     static int QueryValidRegions(HANDLE hProcess, 
         ULONGLONG address,
         ULONGLONG size,
@@ -479,6 +508,7 @@ namespace oui
         LARGE_INTEGER m_distance;
         ULONG m_processID;
         std::weak_ptr<IThreadOpener> m_opener;
+        ProcessStartInfo m_startInfo;
     public:
         CProcess(const String& name, HANDLE hProc, const ProcessArch& arch, ULONG processID, std::shared_ptr<IThreadOpener> opener)
             :
@@ -486,10 +516,20 @@ namespace oui
             m_hProc(hProc),
             m_is32bit(arch.dianaMode == DIANA_MODE32),
             m_dianaArch(arch.dianaArch),
-            m_processID(processID), 
-            m_opener(opener)
+            m_processID(processID),
+            m_opener(opener),
+            m_startInfo(QueryProcessStartInfo(hProc))
         {
             m_distance.QuadPart = 0;
+        }
+        ProcessStartInfo GetStartInfo() const override
+        {
+            return m_startInfo;
+        }
+        bool IsRunning() const override
+        {
+            // the handle keeps the pid from being reused; SYNCHRONIZE is in g_ProcReaderDesiredAccess
+            return m_hProc && m_hProc != INVALID_HANDLE_VALUE && WaitForSingleObject(m_hProc, 0) == WAIT_TIMEOUT;
         }
         ~CProcess()
         {
@@ -886,6 +926,39 @@ namespace oui
             oui::String::StringStream_type res;
             res << OUI_TCSTR("[") << pid << OUI_TCSTR("] ") << shortName.native;
             return std::make_tuple(0, String(res.str()));
+        }
+
+        std::tuple<int, ProcessStartInfo> SyncQueryProcessStartInfo(unsigned long long pid) override
+        {
+            bool canWait = true;
+            HANDLE hProc = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, (DWORD)pid);
+            if (!hProc && GetLastError() == ERROR_ACCESS_DENIED)
+            {
+                canWait = false;
+                hProc = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)pid);
+            }
+            if (!hProc)
+            {
+                int error = GetLastError();
+                if (error != ERROR_ACCESS_DENIED)
+                {
+                    return std::make_tuple(error, ProcessStartInfo());
+                }
+                // the open process plugin may still get through; when it doesn't, the
+                // process exists, its start is just unknown
+                std::shared_ptr<IProcess> proc;
+                std::tie(error, proc) = SyncOpenProcess(oui::ProcessUnifiedId(pid));
+                return std::make_tuple(0, proc ? proc->GetStartInfo() : ProcessStartInfo());
+            }
+            oui::ScopedGuard handlerGuard([&]() {
+                CloseHandle(hProc);
+            });
+            // an exited process stays openable while someone holds a handle to it
+            if (canWait && WaitForSingleObject(hProc, 0) == WAIT_OBJECT_0)
+            {
+                return std::make_tuple((int)ERROR_INVALID_PARAMETER, ProcessStartInfo());
+            }
+            return std::make_tuple(0, QueryProcessStartInfo(hProc));
         }
 
         void AsyncStartQueryProcess(ThreadPtr_type targetThread,

@@ -10,6 +10,7 @@
 #include "orthia_shellcode.h"
 #include "orthia_diana_arch.h"
 #include "orthia_common_format.h"
+#include "orthia_databases.h"
 #include "formats/orthia_image_format.h"
 
 namespace orthia
@@ -241,13 +242,29 @@ namespace orthia
     {
         try
         {
-            auto folderName = GetFileSystem()->SyncSanitizeName(proc->GetFullFileNameForUI());
+            // the start in the name: a later process with the same pid gets its own folder
+            const auto startInfo = proc->GetStartInfo();
+            const auto processName = proc->GetFullFileNameForUI();
+            auto folderName = GetFileSystem()->SyncSanitizeName(oui::String(
+                MakeProcFolderName(processName.native, startInfo.IsKnown() ? startInfo.unixSeconds : 0)));
             auto dbFolder = m_config->GetProcDBFolder() + AddSlash2(folderName.native);
             auto dbFileName = dbFolder + m_config->GetDBFileName();
-            auto binFileName = dbFolder + m_config->GetBinFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
+            auto metaFileName = dbFolder + m_config->GetMetaFileName();
             CreateAllDirectoriesForFile(dbFileName);
             info->SetProcFolder(dbFolder);
+
+            // the database of an earlier open is reused only for the same process: the folder
+            // name has the start in seconds, meta.xml has it exactly
+            bool reuse = false;
+            if (!m_config->GetOverwriteDatabases() && startInfo.IsKnown() && IsFileExist(dbFileName))
+            {
+                FolderMeta saved;
+                reuse = ReadFolderMeta(metaFileName, saved) &&
+                    IsFolderReadable(saved) &&
+                    saved.kind == g_folderKindProcess &&
+                    saved.startKey == startInfo.key;
+            }
 
             // save readme file 
             orthia::CFile readmeFile;
@@ -265,11 +282,28 @@ namespace orthia
 
             WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
                 dbFileName));
+            if (reuse)
+            {
+                WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("database-reused")));
+            }
 
             // done readme, create db
             auto persistentItemStorage = std::make_shared<CFilePersistentItemStorage>();
             auto moduleManager = std::make_shared<CModuleManager>();
-            moduleManager->Reinit(dbFileName, true);
+            moduleManager->Reinit(dbFileName, !reuse);
+
+            if (!reuse)
+            {
+                FolderMeta meta;
+                meta.kind = g_folderKindProcess;
+                meta.dianaMode = proc->GetDianaMode();
+                meta.dianaArch = proc->GetDianaArch();
+                meta.pid = ParseProcFolderPid(processName.native);
+                meta.name = processName.native;
+                meta.startUnix = startInfo.unixSeconds;
+                meta.startKey = startInfo.key;
+                WriteFolderMeta(metaFileName, meta);
+            }
 
             persistentItemStorage->Init(moduleManager->QueryDatabaseManager());
 
@@ -277,6 +311,11 @@ namespace orthia
                 moduleManager->QueryDatabaseManager()->GetClassicDatabase());
             info->Init(moduleManager, persistentItemStorage, moduleStorage);
             persistentItemStorage->CPersistentItemStorage::Init(info);
+            if (reuse)
+            {
+                // the analysis saved by the earlier open, for the modules that are still the same
+                info->LoadSavedModuleFlags();
+            }
         }
         catch (std::exception& e)
         {
@@ -623,8 +662,17 @@ namespace orthia
                 orthia::UnparseFileNameFromFullFileName(info->fullName.native, &shortName.native);
                 info->shortName = std::move(shortName);
             }
+            const bool overwrite = m_config->GetOverwriteDatabases();
+            const auto metaFileName = dbFolder + m_config->GetMetaFileName();
+            FolderMeta savedMeta;
+            const bool hasMeta = ReadFolderMeta(metaFileName, savedMeta);
+            if (hasMeta && !overwrite && !IsFolderReadable(savedMeta))
+            {
+                throw std::runtime_error("The database of this file was made by a newer Orthia (" + savedMeta.orthiaVersion +
+                    "), --overwrite-db replaces it with a new one: " + PlatformStringToUtf8(dbFolder));
+            }
             info->moduleManager = std::make_shared<CModuleManager>();
-            info->moduleManager->Reinit(dbFileName, false);
+            info->moduleManager->Reinit(dbFileName, overwrite);
             persistentItemStorage->Init(info->moduleManager->QueryDatabaseManager());
 
             if (info->shortName.native == m_config->GetBinFileName())
@@ -657,6 +705,18 @@ namespace orthia
             const bool deepAnalysis = m_config->GetDeepAnalysis();
             const bool firstOpen = !info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(imageBase);
             const bool needsAnalysis = deepAnalysis && (firstOpen || !IsModuleAnalyzed(info, imageBase));
+            if (firstOpen || !hasMeta)
+            {
+                FolderMeta meta;
+                meta.kind = g_folderKindFile;
+                meta.format = format->GetId();
+                meta.dianaMode = mappedExe->GetDianaMode();
+                meta.dianaArch = mappedExe->GetDianaArch();
+                meta.imageBase = imageBase;
+                meta.size = binPeFile.size();
+                meta.sha1 = PlatformStringToUtf8(fileHashStr);
+                WriteFolderMeta(metaFileName, meta);
+            }
             if (firstOpen || needsAnalysis)
             {
                 // warn user it may take quite a time

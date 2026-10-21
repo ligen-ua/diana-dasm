@@ -7,11 +7,38 @@
 #include "orthia_common_print.h"
 #include "orthia_common_format.h"
 #include "orthia_module_manager.h"
+#include "orthia_database_module.h"
 #include "orthia_sections.h"
+#include "orthia_databases.h"
 #include "formats/orthia_image_format.h"
+#ifndef DIANA_HAS_WIN32
+#include <unistd.h>
+#endif
 
 namespace orthia
 {
+
+    static unsigned long long GetOwnPid()
+    {
+#ifdef DIANA_HAS_WIN32
+        return GetCurrentProcessId();
+#else
+        return (unsigned long long)getpid();
+#endif
+    }
+
+    // A folder is kept for the next open of the same process: only while it runs, and only when
+    // its start is known (the folder name and meta.xml tell this process from a later one).
+    // Orthia itself exits right after closing it
+    static bool KeepProcFolder(const std::shared_ptr<oui::IProcess>& proc, const PlatformString_type& folder)
+    {
+        if (!proc || !proc->GetStartInfo().IsKnown() || !proc->IsRunning())
+        {
+            return false;
+        }
+        const auto name = std::filesystem::path(folder).filename().native();
+        return ParseProcFolderPid(name) != GetOwnPid();
+    }
 
     // CProcessWorkplaceItem
     CProcessWorkplaceItem::~CProcessWorkplaceItem()
@@ -20,7 +47,7 @@ namespace orthia
         m_persistentStorage = nullptr;
         m_moduleStorage = nullptr;
 
-        if (!m_procFolder.empty())
+        if (!m_procFolder.empty() && !KeepProcFolder(m_proc, m_procFolder))
         {
             std::error_code ec;
             std::filesystem::remove_all(std::filesystem::path(m_procFolder), ec);
@@ -335,17 +362,122 @@ namespace orthia
     {
         return std::make_shared<ProcessReaderAdapter>(m_proc.get());
     }
+    // Saved in the module metainfo for the next open of the same process. Not flags_symbolsLoaded:
+    // the symbols of a process are kept in memory only (ModuleStorage, m_exports)
+    static const int g_savedProcessModuleFlags = ModuleInfo::flags_analyzeDone | ModuleInfo::flags_analyzePrivateDone;
+
+    // what tells a module at an address from another one loaded there later
+    static const PlatformString_type& GetSavedModuleName(const ModuleInfo& module)
+    {
+        return module.fullName.empty() ? module.name : module.fullName;
+    }
+
     void CProcessWorkplaceItem::UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove)
     {
-        orthia::CAutoCriticalSection guard(m_lock);
-        auto & flags = m_moduleFlags[moduleAddress];
-        flags |= flagsToSet;
-        flags &= ~flagsToRemove;
-
-        auto it = m_modulesIndex.find(moduleAddress);
-        if (it != m_modulesIndex.end())
+        ModuleInfo module;
+        bool moduleKnown = false;
+        int flagsToSave = 0;
         {
-            m_modules[it->second].flags = flags;
+            orthia::CAutoCriticalSection guard(m_lock);
+            auto & flags = m_moduleFlags[moduleAddress];
+            flags |= flagsToSet;
+            flags &= ~flagsToRemove;
+            flagsToSave = flags & g_savedProcessModuleFlags;
+
+            auto it = m_modulesIndex.find(moduleAddress);
+            if (it != m_modulesIndex.end())
+            {
+                m_modules[it->second].flags = flags;
+                module = m_modules[it->second];
+                moduleKnown = true;
+            }
+        }
+        if (moduleKnown && ((flagsToSet | flagsToRemove) & g_savedProcessModuleFlags))
+        {
+            SaveModuleFlags(module, flagsToSave);
+        }
+    }
+
+    void CProcessWorkplaceItem::SaveModuleFlags(const ModuleInfo& module, int flags)
+    {
+        auto moduleManager = m_moduleManager;
+        if (!moduleManager)
+        {
+            return;
+        }
+        try
+        {
+            auto database = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+            // the metainfo belongs to the tbl_modules row
+            if (!database->IsModuleExists(module.address))
+            {
+                return;
+            }
+            CCommonFormatBuilder builder;
+            builder.AddMetadata(ORTHIA_TCSTR("fullname"), GetSavedModuleName(module));
+            builder.AddMetadata("size", (unsigned long long)module.size);
+            builder.AddMetadata("flags", flags);
+            std::string text;
+            builder.Produce(&text);
+            database->InsertMetaInfo(module.address, g_database_type_moduleMetaInfo, text, module.address, true);
+        }
+        catch (const std::exception& e)
+        {
+            (void)e;
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't save the module flags: ") + e.what());
+        }
+    }
+
+    void CProcessWorkplaceItem::LoadSavedModuleFlags()
+    {
+        auto moduleManager = m_moduleManager;
+        if (!moduleManager)
+        {
+            return;
+        }
+        struct Saved
+        {
+            PlatformString_type name;
+            unsigned long long size = 0;
+            int flags = 0;
+        };
+        std::map<Address_type, Saved> saved;
+        try
+        {
+            moduleManager->QueryDatabaseManager()->GetClassicDatabase()->QueryMetaInfo(g_database_type_moduleMetaInfo,
+                [&](Address_type moduleAddress, int, const std::string& text, Address_type)
+            {
+                CCommonFormatParser parser;
+                if (parser.Parse(text))
+                {
+                    Saved record;
+                    parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &record.name);
+                    parser.QueryMetadata("size", &record.size);
+                    parser.QueryMetadata("flags", &record.flags);
+                    saved[moduleAddress] = std::move(record);
+                }
+                return true;
+            });
+        }
+        catch (const std::exception& e)
+        {
+            (void)e;
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't read the module flags: ") + e.what());
+            return;
+        }
+
+        orthia::CAutoCriticalSection guard(m_lock);
+        for (auto& mod : m_modules)
+        {
+            auto it = saved.find(mod.address);
+            // another module loaded at the same address since: analyzed again
+            if (it == saved.end() || it->second.size != (unsigned long long)mod.size || it->second.name != GetSavedModuleName(mod))
+            {
+                continue;
+            }
+            const int flags = it->second.flags & g_savedProcessModuleFlags;
+            m_moduleFlags[mod.address] |= flags;
+            mod.flags |= flags;
         }
     }
 

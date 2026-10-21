@@ -40,6 +40,8 @@ static void PrintUsage(std::ostream& out)
     out << "  --arch <arch>       with --format raw: how it is disassembled, x86, x64,\n";
     out << "                      arm64, arm or thumb\n";
     out << "                      (the UI asks for these when it doesn't recognize a file)\n";
+    out << "  --overwrite-db      new, empty databases for the targets opened in this run\n";
+    out << "                      (default: reuse the database of an earlier open)\n";
     out << "  --no-sandbox       don't restrict orthia (needed for orthia_proc_win32.dll)\n";
     out << "  --run-tests         run the built-in tests and exit\n";
     out << "  -h, --help, /?      show this help and exit\n";
@@ -165,6 +167,7 @@ int wmain(int argc, const wchar_t* argv[])
     std::vector<unsigned long long> processesToOpen;
     std::vector<std::wstring> commandsToRun;
     bool analyze = false;
+    bool overwriteDatabases = false;
 
     try
     {
@@ -252,6 +255,11 @@ int wmain(int argc, const wchar_t* argv[])
             {
                 // the UI always analyzes, so it only matters with --cmd
                 analyze = true;
+                continue;
+            }
+            if (wcscmp(argv[i], L"--overwrite-db") == 0)
+            {
+                overwriteDatabases = true;
                 continue;
             }
             if (wcscmp(argv[i], L"--no-sandbox") == 0)
@@ -359,6 +367,7 @@ int wmain(int argc, const wchar_t* argv[])
             std::cerr << "Warning: running elevated with no sandbox (--no-sandbox)\n";
         }
 
+        config->SetOverwriteDatabases(overwriteDatabases);
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 
         if (consoleMode)

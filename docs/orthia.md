@@ -91,7 +91,7 @@ Problems setting up the sandbox are reported as warnings only when Orthia runs e
 ## Command line
 
 ```
-orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] [--no-sandbox]
+orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] [--overwrite-db] [--no-sandbox]
 orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <command>...
 ```
 
@@ -104,6 +104,7 @@ orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <comm
 | `--format <format>` | with `--cmd`: open the `--file` as `pe`, `elf` or `raw` (code without headers) instead of the format it is detected as |
 | `--base <address>` | with `--format raw`: where the code is placed (ARM code: a multiple of 4, Thumb: of 2) |
 | `--arch <arch>` | with `--format raw`: how the code is disassembled and analyzed: `x86`, `x64`, `arm64`, `arm` or `thumb` |
+| `--overwrite-db` | give every target opened in this run a new, empty database instead of reusing the one of an earlier open (comments included, see [databases](databases.md)) |
 | `--no-sandbox` | don't restrict Orthia: on Linux no privilege drop and no seccomp filter (see [what Orthia keeps of root](#linux-what-orthia-keeps-of-root)), on Windows no privilege removal and no mitigation policies (see [sandbox](#windows-sandbox)) |
 | `--run-tests` | run the built-in tests and exit |
 | `-h`, `--help` | show help and exit; on Windows also `/?` and `-?` |

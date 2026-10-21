@@ -18,6 +18,9 @@ namespace orthia
         // false: open targets without code analysis and symbol loading (--cmd without --analyze);
         // set once before anything is opened
         bool m_deepAnalysis = true;
+        // true: every target opened in this run gets a new, empty database (--overwrite-db);
+        // false: the database of an earlier open is reused when it fits
+        bool m_overwriteDatabases = false;
 
     public:
         void Init();
@@ -26,6 +29,7 @@ namespace orthia
         PlatformString_type GetDBFolder() const;
         PlatformString_type GetReadmeFileName() const;
         PlatformString_type GetParamsFileName() const;
+        PlatformString_type GetMetaFileName() const;
         PlatformString_type GetDataFolder() const;
         PlatformString_type GetBinFolder() const;
         PlatformString_type GetProcDBFolder() const;
@@ -33,5 +37,7 @@ namespace orthia
         void SetSymbolsFolders(const PlatformString_type& names);
         bool GetDeepAnalysis() const { return m_deepAnalysis; }
         void SetDeepAnalysis(bool value) { m_deepAnalysis = value; }
+        bool GetOverwriteDatabases() const { return m_overwriteDatabases; }
+        void SetOverwriteDatabases(bool value) { m_overwriteDatabases = value; }
     };
 }
