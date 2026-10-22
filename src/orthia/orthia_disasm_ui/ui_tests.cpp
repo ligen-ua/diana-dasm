@@ -238,6 +238,23 @@ TEST(Databases, FolderMetaRoundTrip)
     EXPECT_FALSE(orthia::IsFolderReadable(meta));
     EXPECT_FALSE(fs::exists(root / ORTHIA_TCSTR("meta.xml.tmp")));
 
+    // plain XML text: no '\0', which XML tools reject
+    {
+        std::ifstream stream(fs::path(fileName), std::ios::binary);
+        std::string text((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+        ASSERT_FALSE(text.empty());
+        EXPECT_EQ(std::string::npos, text.find('\0'));
+        EXPECT_EQ('<', text.front());
+    }
+    // files written before that end with '\0' and are still read
+    {
+        std::ofstream stream(fs::path(fileName), std::ios::binary | std::ios::trunc);
+        const char old[] = "<root format_version=\"1\" kind=\"file\" sha1=\"aa\"/>";
+        stream.write(old, sizeof(old)); // with the terminator
+    }
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, meta));
+    EXPECT_EQ(std::string("aa"), meta.sha1);
+
     // parameters.xml is not a meta.xml
     {
         orthia::CCommonFormatBuilder builder;

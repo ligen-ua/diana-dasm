@@ -125,7 +125,7 @@ namespace orthia
                 std::chrono::system_clock::now().time_since_epoch()).count();
         }
 
-        CCommonFormatBuilder builder;
+        CCommonFormatBuilder builder(false);
         builder.AddMetadata("format_version", meta.formatVersion);
         builder.AddMetadata("min_reader_version", meta.minReaderVersion);
         builder.AddMetadata("analysis_version", meta.analysisVersion);
@@ -148,8 +148,11 @@ namespace orthia
             builder.AddMetadata("size", meta.size);
             builder.AddMetadata(std::string("sha1"), meta.sha1);
         }
-        std::vector<char> data;
+        // plain XML text: the blob form, Produce(std::vector<char>*), ends with '\0'
+        // and that makes the file invalid XML for other tools
+        std::string data;
         builder.Produce(&data);
+        data += "\n";
 
         // a reader never sees half a file
         fs::path target(fileName);
