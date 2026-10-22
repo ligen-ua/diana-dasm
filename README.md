@@ -3,7 +3,7 @@
 This repository contains three parts:
 
 - **Orthia Disassembler**: a console disassembler with a text UI for PE and ELF files and live processes;
-- **diana_core**: a small, portable x86/amd64 disassembler and emulator library in C, which Orthia is built on;
+- **diana_core**: a small, portable x86/amd64 and ARM (AArch64, AArch32) disassembler library in C, with an x86 emulator, which Orthia is built on;
 - **Orthia WinDbg Plugin**: a WinDbg extension that adds cross-references and a code emulator.
 
 # Orthia Disassembler
@@ -11,7 +11,8 @@ This repository contains three parts:
 Orthia opens executable files and running processes, analyzes their code, and lets you browse the disassembly with WinDbg-style commands.
 
 - PE (32/64-bit, including drivers and `ntoskrnl.exe`), ELF, running processes, raw shellcode;
-- runs on Windows and Linux;
+- x86, x64, ARM64 and ARM32 (A32 and Thumb) code;
+- runs on Windows and Linux, on x86-64 and ARM64 machines;
 - cross-references, PDB symbols, comments, navigation history;
 - analysis results and comments are kept in a database for each file, so files reopen quickly; `.database list | delete | cleanup` manages them;
 - `--cmd` mode runs commands without the UI, for scripting.
@@ -20,10 +21,25 @@ Path: src/orthia/orthia_disasm_ui
 
 ## Quick start
 
-Build (the binary is `bin\Release\amd64\orthia.exe` on Windows, `cmake-release/src/orthia/orthia_disasm_ui/orthia` on Linux):
+Build (the binary is `bin\Release\<arch>\orthia.exe` on Windows, `cmake-release/src/orthia/orthia_disasm_ui/orthia` on Linux):
 ```
 build-release-vs.cmd          # Windows, Visual Studio 2022
 ./cmake-build.sh              # Linux
+```
+
+### Windows
+
+`build-release-vs.cmd [Win32|x86|x64|ARM64]` builds `Release` for the given platform; without an argument it builds
+for the machine it runs on (read from the registry, so it is right under WOW64 or x64 emulation on ARM64).
+The output goes to `bin\Release\i386`, `amd64` or `arm64`.
+
+`win_install.cmd` copies the built binaries and docs, the Windows counterpart of `cmake --install`:
+```
+win_install.cmd                         Release amd64 -> C:\orthia
+win_install.cmd D:\tools\orthia         another destination (or set ORTHIA_INSTALL_DIR)
+win_install.cmd debug pdb               the Debug build, with .pdb files
+win_install.cmd x86 "C:\orthia x86"     the 32-bit build
+win_install.cmd arm64                   the ARM64 build, no WinDbg extension (the default on ARM64 Windows)
 ```
 
 ### Windows on ARM
@@ -73,11 +89,16 @@ Command-line options, commands, hotkeys and symbol setup: see [docs/orthia.md](d
 
 Diana is a small and fast disassembler library in C, useful for Windows kernel developers.
 
-- highly portable, needs only the C runtime;
-- includes an instruction emulator (diana_processor);
+- highly portable, written in C89, needs only the C runtime;
+- includes an x86/amd64 instruction emulator (diana_processor);
 - stream-oriented design;
-- platforms: i386, amd64;
-- instructions: x586/amd64/FPU/MMX/SSE/SSE2.
+- x86 and amd64: general-purpose, FPU, MMX, SSE to SSE4.2, AVX, AVX2, FMA3/FMA4, F16C and AVX-512;
+- AArch64: base instructions, FP/SIMD, SVE and SME, decoded from tables generated from the Arm specification;
+- AArch32 (ARMv7): A32 and T32 (Thumb-2, including IT blocks), VFP and NEON;
+- code analysis for both: functions, cross-references, and for AArch32 the A32/T32 switches, literal pools and
+  `tbb`/`tbh` or `ldr`/`add pc` switch tables;
+- PE and ELF parsers;
+- define `DIANA_NO_ARM` to build an x86-only library without the ARM decoders and their tables.
 
 Path: src/diana_core
 

@@ -18,6 +18,7 @@ python -m pytest tests/cli --orthia path/to/orthia   # a specific binary (or set
 
 Without `--orthia`, the binary is looked up in `bin/Release/amd64/orthia.exe`, then in `cmake-release/…/orthia`.
 `run_tests.cmd` and `cmake-test.sh` run this suite after the C++ tests when pytest is installed.
+The suite also runs the gtests built into the binary (`orthia --run-tests`, from `ui_tests.cpp`), which no other runner starts.
 
 ## Isolation
 
@@ -61,7 +62,15 @@ The expected values of the self tests are never taken from Orthia's output. `ima
 from `dbghelp.dll` (`dbghelp_symbols`).
 
 Other data:
-- `data/elf/libexports_*.so` are committed; they are built from `data/elf/exports_lib` (our own source).
+- Committed fixtures, built from our own sources by the `build.sh` in the folder next to them:
+
+  | Files | Source | Covers |
+  |---|---|---|
+  | `data/elf/libexports_*.so` | `data/elf/exports_lib` | GNU and SysV hash export tables |
+  | `data/elf/libstartup_{x64,arm64,arm32,thumb}.so` | `data/elf/startup_lib` | IFUNC resolvers, `DT_INIT`, init arrays; ARM32 and Thumb code |
+  | `data/elf/linked_x64` | `data/elf/linked_exec` | an executable linked to a dependency: PLT slots |
+  | `data/elf/nopie_x64` | `data/elf/nopie_exec` | a non-PIE (`ET_EXEC`) image at its link base |
+  | `data/pe/tls_{x86_64,aarch64,armnt}.dll` | `data/pe/tls_dll` | TLS callbacks; ARM64 and ARMNT (Thumb-2) PE |
 - `data/private/` is **gitignored**: third-party binaries that can't be published (`dmesg`, `apt-mark`, `ls.bin`,
   `nt.zip`, ntoskrnl with its PDB, and `QcTrEE850.sys`, an ARM64 kernel driver). The tests marked `private`
   use them and skip when the folder is absent.

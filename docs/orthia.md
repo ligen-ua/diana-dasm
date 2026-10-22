@@ -18,11 +18,13 @@ stored where, and the `.database` commands to list, delete and clean up database
 
 ## Building
 
-Windows (Visual Studio 2022, Release x64):
+Windows (Visual Studio 2022):
 ```
-build-release-vs.cmd
+build-release-vs.cmd [Win32|x86|x64|ARM64]
 ```
-The binary is `bin\Release\amd64\orthia.exe`.
+Without an argument it builds `Release` for the machine it runs on.
+The binary is `bin\Release\amd64\orthia.exe` (`i386` for Win32, `arm64` for ARM64).
+`win_install.cmd [debug] [x86|arm64] [pdb] [<dest>]` copies it and the docs to `C:\orthia`, `%ORTHIA_INSTALL_DIR%` or `<dest>`.
 
 Linux:
 ```
@@ -191,6 +193,7 @@ The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`
 | `ntdll!LdrLoadDll` | symbol: an export or a private (PDB) symbol of the module |
 | `ntdll`, `ntdll+1000` | module base (name without extension), module base plus offset |
 | `ls!$entrypoint` | module entry point |
+| `mylib!$init`, `mylib!$init_array_0000` | code that runs before the entry point, see [Startup routines](#startup-routines) |
 | `+`, `-`, `*`, `/`, `( )` | arithmetic with the usual precedence, unary `+`/`-` included |
 | `poi(<expr>)` | the pointer-sized value stored at `<expr>` |
 | `DS:[7ff769486040h]` | a memory operand as the disassembler prints it; evaluates to the address in the brackets, so you can paste it from the disassembly |
@@ -203,6 +206,20 @@ db ntdll L 40
 ```
 The length is a count of instructions for `u` and a count of elements for the `d*` commands.
 `L?` and negative lengths are not supported.
+
+### Startup routines
+
+Code that runs before the entry point is analyzed like the entry point and gets a name, so `x` and expressions find it:
+
+| Name | Format | What it is |
+|---|---|---|
+| `$tls_NNNN` | PE | a TLS callback, by its index in the callback array |
+| `$preinit_array_NNNN` | ELF | an entry of `DT_PREINIT_ARRAY` |
+| `$init` | ELF | the `DT_INIT` function |
+| `$init_array_NNNN` | ELF | an entry of `DT_INIT_ARRAY` |
+| `$ifunc_<name>` | ELF | the resolver of an IFUNC symbol (`$ifunc_NNNN` when the symbol has no name) |
+
+`NNNN` is a 4-digit hex index. `x mylib!$*` lists them all, together with `$entrypoint`.
 
 ### Sections
 
@@ -263,6 +280,18 @@ the dependencies are still readable.
 
 PDB files are searched in the symbol folders and in the module's own folder and its subfolders.
 A PDB is matched to a module by GUID only, not by age, because public Microsoft symbols often have a different age.
+
+ELF modules get their names from the exported symbols of the dynamic symbol table and from the [startup routines](#startup-routines).
+Separate debug files are not loaded yet. Orthia looks for one (by build id in `<folder>/.build-id/xx/<rest>.debug`,
+and by the `.gnu_debuglink` name next to the module, in its `.debug` subfolder and in the symbol folders; on Linux also
+under `/usr/lib/debug`), and when it finds one it only reports that ELF symbol loading is not supported yet.
+
+## Raw shellcode in the UI
+
+When *File > Open executable* gets a file that is neither PE nor ELF, the UI asks whether to open it as raw shellcode.
+The dialog takes the load address and the architecture (Left/Right switch between x86, x64, arm64, arm and thumb;
+x64 by default), the same choices as `--base` and `--arch` on the command line, with the same alignment rule for ARM code. They are saved in the file's database
+(`parameters.xml`, see [databases.md](databases.md)), so the file reopens with the same layout without asking.
 
 ## Testing
 
