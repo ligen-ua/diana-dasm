@@ -4,6 +4,8 @@
 #include "orthia_external_symbols.h"
 #include "orthia_module_symbols.h"
 #include "orthia_helpers.h"
+#include "orthia_floating_code.h"
+#include <algorithm>
 
 namespace orthia
 {
@@ -63,27 +65,133 @@ namespace orthia
         m_ops.erase(workspaceId);
     }
 
+    int CModuleAnalyzer::RegisterOp(std::shared_ptr<oui::BaseOperation> op, int workspaceId)
+    {
+        int itemId = ++m_nextItemId;
+        std::unique_lock<std::mutex> lock(m_opsLock);
+        m_ops[itemId] = op;
+        m_workspaceOps[workspaceId].push_back(op);
+        if (!m_uiThread)
+            m_uiThread = op->GetThread();
+        return itemId;
+    }
+
+    // the most floating modules one process gets analyzed: a chain of them can't run forever
+    static const size_t c_maxFloatingModules = 256;
+
+    void CModuleAnalyzer::AnalyzeFloatingNow(std::shared_ptr<IWorkPlaceItem> item, const ModuleInfo& module, bool force)
+    {
+        auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        if (module.flags & ModuleInfo::flags_stale)
+        {
+            WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("floating-stale")), module.name));
+            return;
+        }
+        if (force || !(module.flags & ModuleInfo::flags_analyzeDone))
+        {
+            WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-floating")), module.name));
+            if (force)
+            {
+                item->GetModuleManager()->ClearModuleReferences(module.address);
+            }
+            AnalyzeFloatingModule(*item, module);
+        }
+        DiscoverFloatingCode(*item, module);
+    }
+
+    void CModuleAnalyzer::EnqueueAnalyzeFloating(std::shared_ptr<IWorkPlaceItem> item,
+        std::shared_ptr<oui::BaseOperation> op,
+        int workspaceId)
+    {
+        if (item->IsDeletePending())
+            return;
+        {
+            std::unique_lock<std::mutex> lock(m_opsLock);
+            if (!m_floatingQueued.insert(item.get()).second)
+                return;
+        }
+        int itemId = RegisterOp(op, workspaceId);
+        m_pool.AddTask([this,
+            weakItem = std::weak_ptr<IWorkPlaceItem>(item),
+            rawItem = item.get(),
+            op,
+            itemId,
+            workspaceId]() mutable
+        {
+            {
+                // a module found from here queues the next pass
+                std::unique_lock<std::mutex> lock(m_opsLock);
+                m_floatingQueued.erase(rawItem);
+            }
+            auto item = weakItem.lock();
+            if (!item || op->IsCancelled() || !item->GetModuleManager())
+            {
+                Cleanup(itemId);
+                return;
+            }
+            bool more = false;
+            try
+            {
+                std::vector<orthia::ModuleInfo> modules;
+                item->GetModules(modules);
+                const size_t floatingCount = std::count_if(modules.begin(), modules.end(),
+                    [](const ModuleInfo& m) { return m.IsFloating(); });
+                if (floatingCount > c_maxFloatingModules)
+                {
+                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("floating-limit")),
+                        oui::String(Utf8ToPlatformString(std::to_string(c_maxFloatingModules)))));
+                }
+                else
+                {
+                    for (const auto& module : QueryPendingFloatingModules(*item))
+                    {
+                        if (op->IsCancelled())
+                            break;
+                        try
+                        {
+                            AnalyzeFloatingNow(item, module, false);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            WriteLog(oui::String(Utf8ToPlatformString(e.what())));
+                            // tried: not again on every pass
+                            item->UpdateModuleFlags(module.address, ModuleInfo::flags_analyzeDone, 0);
+                        }
+                    }
+                    more = !QueryPendingFloatingModules(*item).empty();
+                }
+            }
+            catch (const std::exception& e)
+            {
+                WriteLog(oui::String(Utf8ToPlatformString(e.what())));
+            }
+            // queued before Cleanup: IsBusy stays true across the hand-off
+            if (more && !op->IsCancelled())
+            {
+                EnqueueAnalyzeFloating(item, op, workspaceId);
+            }
+            Cleanup(itemId);
+        });
+    }
+
     void CModuleAnalyzer::EnqueueAnalyze(std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<oui::BaseOperation> op,
         Address_type mainModuleAddr,
         int workspaceId,
-        std::function<void()> onComplete)
+        std::function<void()> onComplete,
+        bool force)
     {
         if (item->IsDeletePending())
             return;
-        int itemId = ++m_nextItemId;
-        {
-            std::unique_lock<std::mutex> lock(m_opsLock);
-            m_ops[itemId] = op;
-            m_workspaceOps[workspaceId].push_back(op);
-            if (!m_uiThread)
-                m_uiThread = op->GetThread();
-        }
+        int itemId = RegisterOp(op, workspaceId);
 
         m_pool.AddTask([this,
             weakItem = std::weak_ptr<IWorkPlaceItem>(item),
             op,
             itemId,
+            workspaceId,
+            force,
             mainModuleAddr,
             onComplete = std::move(onComplete)]() mutable
         {
@@ -119,35 +227,58 @@ namespace orthia
                 Cleanup(itemId);
                 return;
             }
+            bool floatingPending = false;
             try
             {
-                // not IsModuleExists: a quick open (--cmd without --analyze) registers the module unanalyzed
-                if (!(mainIt->flags & ModuleInfo::flags_analyzeDone))
+                if (mainIt->IsFloating())
                 {
-                    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
-                    WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
-                    if (reader)
+                    AnalyzeFloatingNow(item, *mainIt, force);
+                    floatingPending = !QueryPendingFloatingModules(*item).empty();
+                }
+                else
+                {
+                    if (force && (mainIt->flags & ModuleInfo::flags_analyzeDone))
                     {
-                        if (db->IsModuleExists(mainIt->address))
+                        // the references made from the module go, its exports and symbols stay
+                        moduleManager->ClearModuleReferences(mainIt->address);
+                        item->UpdateModuleFlags(mainIt->address, 0, ModuleInfo::flags_analyzeDone);
+                        mainIt->flags &= ~ModuleInfo::flags_analyzeDone;
+                    }
+                    // not IsModuleExists: a quick open (--cmd without --analyze) registers the module unanalyzed
+                    if (!(mainIt->flags & ModuleInfo::flags_analyzeDone))
+                    {
+                        auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+                        WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
+                        if (reader)
                         {
-                            moduleManager->AnalyzeRegisteredModule(mainIt->address, reader.get(), mainIt->name, 0);
-                        }
-                        else
-                        {
-                            moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
-                        }
-                        item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
-                        // the analysis rewrites the names of the module and of its dependencies
-                        for (const auto& mod : modules)
-                        {
-                            item->InvalidateNames(mod.address);
+                            if (db->IsModuleExists(mainIt->address))
+                            {
+                                moduleManager->AnalyzeRegisteredModule(mainIt->address, reader.get(), mainIt->name, 0);
+                            }
+                            else
+                            {
+                                moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
+                            }
+                            item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
+                            // the analysis rewrites the names of the module and of its dependencies
+                            for (const auto& mod : modules)
+                            {
+                                item->InvalidateNames(mod.address);
+                            }
                         }
                     }
+                    // from the references saved now or by an earlier analysis
+                    floatingPending = DiscoverFloatingCode(*item, *mainIt);
                 }
             }
             catch (const std::exception& e)
             {
                 WriteLog(oui::String(Utf8ToPlatformString(e.what())));
+            }
+            // the last task in the queue, so the modules queued after this one go first
+            if (floatingPending && !op->IsCancelled())
+            {
+                EnqueueAnalyzeFloating(item, op, workspaceId);
             }
 
             Cleanup(itemId);
@@ -320,7 +451,8 @@ namespace orthia
                 if (moduleAddressHint && !mod.IsInRange(moduleAddressHint))
                     continue;
 
-                if (mod.flags & mod.flags_symbolsLoaded)
+                // no file, no symbols
+                if ((mod.flags & mod.flags_symbolsLoaded) || mod.IsFloating())
                 {
                     continue;
                 }

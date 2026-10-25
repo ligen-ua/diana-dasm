@@ -58,7 +58,19 @@ namespace oui
         return info;
     }
 
-    static int QueryValidRegions(HANDLE hProcess, 
+    // every protection ReadProcessMemory can read: RWX and copy-on-write pages too, not guard pages
+    static bool IsReadableProtect(DWORD protect)
+    {
+        if (protect & (PAGE_GUARD | PAGE_NOACCESS))
+        {
+            return false;
+        }
+        const DWORD readable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY |
+            PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+        return (protect & readable) != 0;
+    }
+
+    static int QueryValidRegions(HANDLE hProcess,
         ULONGLONG address,
         ULONGLONG size,
         std::vector<RegionInfo>* pRegions)
@@ -92,8 +104,7 @@ namespace oui
                 memInfo.BaseAddress = (PVOID)address;
             }
 
-            if (memInfo.State == MEM_COMMIT &&
-                (memInfo.Protect & (PAGE_READONLY | PAGE_READWRITE| PAGE_EXECUTE_READ | PAGE_READWRITE)) != 0)
+            if (memInfo.State == MEM_COMMIT && IsReadableProtect(memInfo.Protect))
             {
                 pRegions->push_back({ (ULONGLONG)memInfo.BaseAddress, (ULONGLONG)memInfo.RegionSize});
             }
@@ -104,6 +115,75 @@ namespace oui
             else
             {
                 break;
+            }
+        }
+        return 0;
+    }
+
+    static int ToRegionProtect(DWORD protect)
+    {
+        if (protect & (PAGE_GUARD | PAGE_NOACCESS))
+        {
+            return 0;
+        }
+        switch (protect & 0xFF)
+        {
+        case PAGE_READONLY:          return MemoryRegionInfo::protect_read;
+        case PAGE_READWRITE:
+        case PAGE_WRITECOPY:         return MemoryRegionInfo::protect_read | MemoryRegionInfo::protect_write;
+        case PAGE_EXECUTE:           return MemoryRegionInfo::protect_exec;
+        case PAGE_EXECUTE_READ:      return MemoryRegionInfo::protect_read | MemoryRegionInfo::protect_exec;
+        case PAGE_EXECUTE_READWRITE:
+        case PAGE_EXECUTE_WRITECOPY: return MemoryRegionInfo::protect_read | MemoryRegionInfo::protect_write | MemoryRegionInfo::protect_exec;
+        default:                     return 0;
+        }
+    }
+
+    static int QueryMemoryRegionWin32(HANDLE hProcess, unsigned long long address, MemoryRegionInfo& info)
+    {
+        info = MemoryRegionInfo();
+        MEMORY_BASIC_INFORMATION memInfo;
+        if (!VirtualQueryEx(hProcess, (LPCVOID)(ULONG_PTR)address, &memInfo, sizeof(memInfo)))
+        {
+            return GetLastError();
+        }
+        if (memInfo.State == MEM_FREE || !memInfo.AllocationBase)
+        {
+            return ERROR_INVALID_ADDRESS;
+        }
+        info.regionBase = (ULONG_PTR)memInfo.BaseAddress;
+        info.regionSize = memInfo.RegionSize;
+        info.committed = memInfo.State == MEM_COMMIT;
+        info.protect = info.committed ? ToRegionProtect(memInfo.Protect) : 0;
+        info.type = memInfo.Type == MEM_IMAGE ? MemoryRegionInfo::type_image :
+                    memInfo.Type == MEM_MAPPED ? MemoryRegionInfo::type_mapped :
+                                                 MemoryRegionInfo::type_private;
+        // the allocation: every region from AllocationBase on with the same AllocationBase
+        const ULONG_PTR allocationBase = (ULONG_PTR)memInfo.AllocationBase;
+        ULONG_PTR end = allocationBase;
+        for (;;)
+        {
+            MEMORY_BASIC_INFORMATION part;
+            if (!VirtualQueryEx(hProcess, (LPCVOID)end, &part, sizeof(part)) ||
+                (ULONG_PTR)part.AllocationBase != allocationBase || !part.RegionSize)
+            {
+                break;
+            }
+            const ULONG_PTR next = (ULONG_PTR)part.BaseAddress + part.RegionSize;
+            if (next <= end)
+            {
+                break;
+            }
+            end = next;
+        }
+        info.allocationBase = allocationBase;
+        info.allocationSize = end - allocationBase;
+        if (info.type != MemoryRegionInfo::type_private)
+        {
+            std::vector<wchar_t> buffer(4096);
+            if (GetMappedFileNameW(hProcess, (LPVOID)(ULONG_PTR)address, buffer.data(), (DWORD)buffer.size() - 1))
+            {
+                info.mappedName = orthia::PlatformStringToUtf8(buffer.data());
             }
         }
         return 0;
@@ -530,6 +610,10 @@ namespace oui
         {
             // the handle keeps the pid from being reused; SYNCHRONIZE is in g_ProcReaderDesiredAccess
             return m_hProc && m_hProc != INVALID_HANDLE_VALUE && WaitForSingleObject(m_hProc, 0) == WAIT_TIMEOUT;
+        }
+        int QueryMemoryRegion(unsigned long long address, MemoryRegionInfo& info) override
+        {
+            return QueryMemoryRegionWin32(m_hProc, address, info);
         }
         ~CProcess()
         {

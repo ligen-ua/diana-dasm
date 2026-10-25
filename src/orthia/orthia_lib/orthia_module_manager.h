@@ -54,6 +54,25 @@ public:
                      int arch,
                      int analyserFlags);
 
+    // a range without headers registered without analysis (a floating module); nothing when it exists
+    void RegisterRange(Address_type offset,
+                       Address_type size,
+                       const orthia::PlatformString_type & name);
+    // analyzes a registered range from its entry points (none inside it: from its start) and adds
+    // the references it finds, keeping the module row and its metainfo. Returns the lowest and the
+    // highest instruction start found, both 0 when none
+    std::pair<Address_type, Address_type> AnalyzeRange(Address_type offset,
+                      Address_type size,
+                      IMemoryReader * pMemoryReader,
+                      int mode,
+                      int arch,
+                      int analyserFlags,
+                      const std::vector<Address_type> & entryPoints,
+                      const orthia::PlatformString_type & name);
+    // the references made from inside the module, for a full analysis again; the module row and its
+    // metainfo (exports, symbols, flags) stay
+    void ClearModuleReferences(Address_type offset);
+
     void QueryLoadedModules(std::vector<CommonModuleInfo> * pResult) const;
     // references
     Address_type QueryRouteStart(Address_type offset);

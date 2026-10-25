@@ -293,6 +293,7 @@
     <ClCompile Include="orthia_databases.cpp" />
     <ClCompile Include="orthia_helpers.cpp" />
     <ClCompile Include="orthia_external_symbols.cpp" />
+    <ClCompile Include="orthia_floating_code.cpp" />
     <ClCompile Include="orthia_image_source.cpp" />
     <ClCompile Include="orthia_item_file.cpp" />
     <ClCompile Include="orthia_item_process.cpp" />
@@ -337,6 +338,7 @@
     <ClInclude Include="orthia_databases.h" />
     <ClInclude Include="orthia_helpers.h" />
     <ClInclude Include="orthia_external_symbols.h" />
+    <ClInclude Include="orthia_floating_code.h" />
     <ClInclude Include="orthia_image_source.h" />
     <ClInclude Include="orthia_item_file.h" />
     <ClInclude Include="orthia_item_process.h" />

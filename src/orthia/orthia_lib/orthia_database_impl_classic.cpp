@@ -374,6 +374,16 @@ void CClassicDatabase::QueryAllModuleReferences(Address_type baseAddress, Addres
     }
 }
 
+void CClassicDatabase::ClearModuleReferences(Address_type address, Address_type size)
+{
+    orthia::CAutoCriticalSection guard(m_lock);
+    // the same rows UnloadModule deletes: every reference made from inside the module
+    std::stringstream sql;
+    sql<<"DELETE FROM tbl_references WHERE ref_address_from BETWEEN "<<AddrToDb(address)<<" AND "<<AddrToDb(address+size);
+    std::string sqlString = sql.str();
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(), sqlString.c_str()), "Can't clear the module references");
+}
+
 void CClassicDatabase::UnloadModule(Address_type address, bool bSilent)
 {
     orthia::CAutoCriticalSection guard(m_lock);

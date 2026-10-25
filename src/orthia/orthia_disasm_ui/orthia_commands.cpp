@@ -10,6 +10,7 @@
 #include "orthia_databases.h"
 #include "orthia_helpers.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_floating_code.h"
 #include <ctime>
 #include <set>
 
@@ -316,11 +317,27 @@ namespace orthia
 
     void CCommandProcessor::Handle_analyze(CommandArguments& args)
     {
-        auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
-        if (moduleName.empty())
+        const char* usage = "Usage: .analyze [/f] <module>";
+        // /f: the full analysis again, also of an analyzed module
+        auto words = SplitCommandWords(args.text);
+        bool force = false;
+        size_t first = 1;
+        for (; first < words.size() && !words[first].empty() && words[first][0] == '/'; ++first)
+        {
+            if (words[first] == ORTHIA_TCSTR("/f"))
+                force = true;
+            else
+                throw std::runtime_error(usage);
+        }
+        if (words.size() == first)
         {
             throw std::runtime_error("Module name expected");
         }
+        if (words.size() != first + 1)
+        {
+            throw std::runtime_error(usage);
+        }
+        const auto moduleName = words[first];
         bool moduleFound = false;
         oui::EnumModulesByName(args.item,
             moduleName,
@@ -331,7 +348,7 @@ namespace orthia
 
                 args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
                         args.workspaceId, []() {
-                        });
+                        }, force);
                 args.model->GetAnalyzer().EnqueueAnalyzePrivateSymbols(args.item, args.progressHandler, mod.address,
                     args.workspaceId, []() {
                 });
@@ -375,6 +392,19 @@ namespace orthia
             orthia::PlatformString_type line;
             line = ORTHIA_TCSTR("Module: ") + mod.name;
             args.ReplyLine(line);
+
+            if (mod.IsFloating())
+            {
+                // no file and no headers: the memory and what leads there
+                std::vector<orthia::PlatformString_type> lines;
+                orthia::DescribeFloatingModule(*args.item, mod, lines);
+                for (const auto& text : lines)
+                {
+                    args.ReplyLine(text);
+                }
+                moduleFound = true;
+                return false;
+            }
 
             line = ORTHIA_TCSTR("Full name: ") + orthia::StripLongPathPrefix(mod.fullName);
             args.ReplyLine(line);
@@ -892,7 +922,8 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("dq"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 8);  });
             parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, args.item->GetDianaMode());  });
             parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, args.item->GetDianaMode(), true);  });
-            parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args);  });
+            parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args, false);  });
+            parser.SetHandler(OUI_TCSTR("lmf"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args, true);  });
             parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_reload(args);  });
             parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_analyze(args);  });
             parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });

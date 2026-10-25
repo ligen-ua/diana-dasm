@@ -312,6 +312,9 @@ namespace oui
         unsigned long long endAddr   = 0;
         unsigned long long offset    = 0;
         std::string        path;
+        std::string        pseudoName;   // [heap], [stack], [anon:...], [vdso]: not a file
+        bool               isRead    = false;
+        bool               isWrite   = false;
         bool               isExec    = false;
     };
 
@@ -339,9 +342,13 @@ namespace oui
                 path);
             if (matched >= 4)
             {
+                e.isRead = (perms[0] == 'r');
+                e.isWrite = (perms[1] == 'w');
                 e.isExec = (perms[2] == 'x');
                 if (matched >= 8 && path[0] == '/')
                     e.path = path;
+                else if (matched >= 8)
+                    e.pseudoName = path;
                 entries.push_back(e);
             }
         }
@@ -370,6 +377,26 @@ namespace oui
         {}
 
         ProcessStartInfo GetStartInfo() const override { return m_startInfo; }
+        // a maps line is the allocation: Linux keeps no allocation base
+        int QueryMemoryRegion(unsigned long long address, MemoryRegionInfo& info) override
+        {
+            info = MemoryRegionInfo();
+            for (const auto& e : ParseMaps(m_pid))
+            {
+                if (address < e.startAddr || address >= e.endAddr)
+                    continue;
+                info.allocationBase = info.regionBase = e.startAddr;
+                info.allocationSize = info.regionSize = e.endAddr - e.startAddr;
+                info.committed = true;
+                info.protect = (e.isRead ? MemoryRegionInfo::protect_read : 0) |
+                               (e.isWrite ? MemoryRegionInfo::protect_write : 0) |
+                               (e.isExec ? MemoryRegionInfo::protect_exec : 0);
+                info.type = e.path.empty() ? MemoryRegionInfo::type_private : MemoryRegionInfo::type_mapped;
+                info.mappedName = e.path.empty() ? e.pseudoName : e.path;
+                return 0;
+            }
+            return ENOENT;
+        }
         bool IsRunning() const override
         {
             // the pid may run another process by now: the start tells them apart

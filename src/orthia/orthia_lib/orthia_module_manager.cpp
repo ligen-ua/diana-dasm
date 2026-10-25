@@ -150,6 +150,73 @@ void CModuleManager::ReloadModuleWithHints(Address_type offset,
     fileSaver.SaveWithDedup(module, *dbManager, name);
 }
 
+void CModuleManager::RegisterRange(Address_type offset,
+                                   Address_type size,
+                                   const orthia::PlatformString_type & name)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    auto classicDatabase = QueryDatabaseManager()->GetClassicDatabase();
+    // replacing the row would drop its metainfo (ON DELETE CASCADE)
+    if (classicDatabase->IsModuleExists(offset))
+    {
+        return;
+    }
+    CAutoRollbackClassicDatabase rollback;
+    classicDatabase->StartSaveModule(offset, size, name, &rollback, true);
+    classicDatabase->DoneSave();
+    rollback.Reset();
+}
+
+std::pair<Address_type, Address_type> CModuleManager::AnalyzeRange(Address_type offset,
+                                  Address_type size,
+                                  IMemoryReader * pMemoryReader,
+                                  int mode,
+                                  int arch,
+                                  int analyserFlags,
+                                  const std::vector<Address_type> & entryPoints,
+                                  const orthia::PlatformString_type & name)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    CDianaModule module;
+    module.InitRaw(offset, size, pMemoryReader, mode, arch);
+    module.AnalyzeWithHints(analyserFlags, entryPoints);
+
+    std::pair<Address_type, Address_type> extent(0, 0);
+    {
+        CDianaInstructionIterator iterator;
+        module.QueryInstructionIterator(&iterator);
+        bool first = true;
+        for (; !iterator.IsEmpty(); iterator.MoveToNext())
+        {
+            const Address_type address = iterator.GetInstructionOffset() + offset;
+            if (first || address < extent.first)
+                extent.first = address;
+            if (first || address > extent.second)
+                extent.second = address;
+            first = false;
+        }
+    }
+
+    CDatabaseSaver fileSaver;
+    fileSaver.SaveWithDedup(module, *QueryDatabaseManager(), name);
+    return extent;
+}
+
+void CModuleManager::ClearModuleReferences(Address_type offset)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    auto classicDatabase = QueryDatabaseManager()->GetClassicDatabase();
+    CommonModuleInfo info;
+    if (!classicDatabase->QueryModule(offset, &info))
+    {
+        return;
+    }
+    classicDatabase->ClearModuleReferences(offset, info.size);
+}
+
 // module info
 void CModuleManager::QueryLoadedModules(std::vector<CommonModuleInfo> * pResult) const
 {

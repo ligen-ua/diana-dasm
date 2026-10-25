@@ -163,12 +163,13 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `x [/a\|/n] [/v] <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched. `/a` sorts by address, `/n` by name (default: by type), `/v` shows the symbol type |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
 | `lm` | List modules with their status: `.NET`, `unresolved`, `linked`, `stale`, `unlinked`, `analyzed`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)). `.NET` marks a managed image: an IL-only one has no native entry point and almost no native code |
+| `lmf` | List the floating modules of a process: executable memory no module owns that the analysis led to, with protection, entry points and status (`pending`, `analyzed`, `stale`); see [Floating code](#floating-code) |
 | `db`, `dw`, `dd`, `dq`, `dp`, `dps` | Display memory as bytes, words, dwords, qwords, pointers, or pointers with symbols |
 | `threads` | Display threads (processes only) |
-| `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from |
+| `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from; for a floating module, its allocation, code and entry points with the instructions that lead there |
 | `sections [-v] <module\|address>` | List the sections of a module: name, address, size and `RWX` flags; `-v` adds every header field (see [Sections](#sections)) |
 | `.reload [<module>]` | Reload symbols for a module |
-| `.analyze <module>` | Run the full analysis of a module |
+| `.analyze [/f] <module>` | Run the full analysis of a module, then find the floating code it leads to (processes). `/f` analyzes an analyzed module again |
 | `.symfix [<path>]` | Set the symbols directory |
 | `.database list` | List the databases in the data folder; needs no open target (see [databases.md](databases.md#managing-databases)) |
 | `.database delete <sel>...` | Delete databases, selected by a SHA-1 prefix, a pid or a file name; an open one is refused |
@@ -182,7 +183,7 @@ In the UI, press CTRL+C in the command edit box to stop a running command.
 
 The address of `u` and of the `db`/`dw`/`dd`/`dq`/`dp`/`dps` commands is an expression, not just a number.
 The same expressions work in the UI's *Go to address* dialog (G).
-The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`, `.reload` and `.analyze` take a module name.
+The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`, `.reload` and `.analyze` take a module name (`.analyze` also takes `/f`).
 `sections` takes a module name or an expression, and lists the module that contains the address.
 
 | Syntax | Meaning |
@@ -206,6 +207,26 @@ db ntdll L 40
 ```
 The length is a count of instructions for `u` and a count of elements for the `d*` commands.
 `L?` and negative lengths are not supported.
+
+### Floating code
+
+In a process, `.analyze <module>` also looks at the jumps, calls and taken addresses that leave the module.
+Those that land in committed, executable memory no loaded module owns (a hook stub, injected code, a JIT stub)
+make a *floating module*, one per OS allocation, named `fl_<allocation base>`: `fl_7ff7a5d70000`.
+Each one is then analyzed from its entry points in the background, after the rest of the queue, and the floating
+code it leads to is found the same way.
+
+A floating module works like any other: `u fl_7ff7a5d70000`, `x fl_7ff7a5d70000!*` (its entry points are
+`$entry_0001`, `$entry_0002`, ... by address), `modinfo fl_7ff7a5d70000`, `.analyze fl_7ff7a5d70000`.
+`lm` and the Modules window leave them out; `lmf` lists them.
+
+Floating modules are saved in the process database. When the same process is opened again, each one is
+checked against the memory (the allocation and a hash of its bytes); one that changed or went away is kept
+and shown as `stale`, and is not analyzed again.
+
+Limits: only references the static analysis sees count (not thread start addresses, stacks or pointers in data);
+the database does not tell code references from data ones, so a 32-bit constant that falls into such memory
+can add an entry point. Targets in zero-filled memory are left out. Live processes only.
 
 ### Startup routines
 

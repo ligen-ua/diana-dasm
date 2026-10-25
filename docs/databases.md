@@ -67,7 +67,8 @@ opened itself (`--pid self`). At start Orthia removes any `proc/` folder that ha
 The code analysis and the comments go into that database, and the analysis flags of each module
 (`flags` in its metainfo, with its name and size). A reopen trusts the flags of a module only when
 the module at that address still has the same name and size. The module list, exports and loaded
-private symbols are kept in memory and rebuilt from the live process.
+private symbols are kept in memory and rebuilt from the live process. Floating modules are saved
+(metainfo type 6) and come back on a reopen, `stale` when their memory changed.
 
 ## `meta.xml`
 
@@ -143,6 +144,7 @@ Foreign keys are enforced on every connection, so deleting a module row removes 
 | 3 | export | the export's address |
 | 4 | private symbol (from a PDB) | the symbol's address |
 | 5 | AArch32 code map: what the bytes are from here on | the address where it changes |
+| 6 | floating module: an allocation of a process that the analysis led to (processes only) | the module address |
 
 Import, export and symbol records carry `address` (the target) and `name`.
 
@@ -165,6 +167,17 @@ The module description carries:
 | `id_format`, `id_buildid` | ELF identity: 2 and the GNU build id |
 | `sha1` | SHA-1 of the dependency's file, for the planned shared image store |
 | `iat_slots` | main module only: import records are keyed by their slot, so they can be replayed |
+
+A floating module (`fl_<base>`) has a `tbl_modules` row for its allocation and a record of type 6:
+
+| Attribute | Meaning |
+|---|---|
+| `base`, `size` | the OS allocation (hex) |
+| `protect`, `type` | protection where the entry points are (1 read, 2 write, 4 execute) and the allocation type (0 private, 1 mapped file, 2 image) |
+| `mapped`, `header` | the mapped file or pseudo name, and `MZ`/`ELF` when the allocation starts with such a header |
+| `hash`, `hashed` | FNV-1a hash of the first `hashed` bytes (up to 16 MB), checked on reopen; a mismatch makes the module stale |
+| `code_start`, `code_last` | the lowest and the highest instruction start the analysis found (0 before it) |
+| `entries` | `<entry>:<referrer>,<referrer>;<entry>:...` in hex: each entry point and the instructions that lead there |
 
 ## Dependencies
 

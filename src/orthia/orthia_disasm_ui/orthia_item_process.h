@@ -14,10 +14,16 @@ namespace orthia
         int m_dianaArch = DIANA_ARCH_X86;
         PlatformString_type m_procFolder;
 
+        // the OS modules and the floating ones, by address
         std::vector<orthia::ModuleInfo> m_modules;
         std::map<orthia::Address_type, int> m_modulesIndex;
         std::map<orthia::Address_type, int> m_moduleFlags;
         orthia::flat_map<orthia::Address_type, NameInfo> m_exports;
+        // what the OS reports, and the floating modules found by the analysis
+        std::vector<orthia::ModuleInfo> m_osModules;
+        orthia::flat_map<orthia::Address_type, NameInfo> m_osExports;
+        std::map<orthia::Address_type, orthia::ModuleInfo> m_floatingModules;
+        void RebuildModulesNoLock();
 
         Address_type m_processModuleAddress = 0;
         std::shared_ptr<CModuleManager> m_moduleManager;
@@ -46,6 +52,10 @@ namespace orthia
         // after Init, on a database reused from an earlier open of the same process: the
         // analysis flags of the modules that are still the same
         void LoadSavedModuleFlags();
+        // before LoadSavedModuleFlags, on a reused database: the floating modules found then,
+        // stale when their memory changed
+        void LoadSavedFloatingModules();
+        void SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> info) override;
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;

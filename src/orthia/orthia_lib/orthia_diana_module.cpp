@@ -282,10 +282,51 @@ protected:
             DI_CHECK_CPP(Diana_AnalyzeScanThrough(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
         }
     }
+    // from the entry points (absolute addresses) instead of the start: floating code. No entry
+    // point inside the range: from the start, as AnalyzeImpl. AArch32: bit 0 of an entry selects T32
     void AnalyzeWithHintsImpl(int analyserFlags,
-                              const std::vector<Address_type>&) override
+                              const std::vector<Address_type>& extraEntryPoints) override
     {
-        AnalyzeImpl(analyserFlags);
+        std::vector<Address_type> offsets;
+        for (auto addr : extraEntryPoints)
+        {
+            if (addr >= m_env.m_moduleStart && addr - m_env.m_moduleStart < m_env.m_moduleSize)
+                offsets.push_back(addr - m_env.m_moduleStart);
+        }
+        if (offsets.empty())
+        {
+            AnalyzeImpl(analyserFlags);
+            return;
+        }
+        m_cache.Init(m_env.m_moduleStart,
+                     m_env.m_moduleSize);
+        DI_CHECK_CPP(Diana_InstructionsOwner_Init(&m_owner,
+                                              m_env.m_moduleSize,
+                                              0x10000));
+        m_instructionsOwnerGuard.reset(&m_owner);
+
+        const bool aarch32 = m_dianaArch == DIANA_ARCH_ARM32 || m_dianaArch == DIANA_ARCH_THUMB;
+        DianaAnalyzeParams params;
+        DianaAnalyzeParams_Init(&params, m_dianaArch);
+        params.imageBase = m_env.m_moduleStart;
+        CAnalyzeStack stack;
+        const OPERAND_SIZE size = m_env.m_moduleSize;
+        for (auto offset : offsets)
+        {
+            DianaAnalyzeParams entryParams = params;
+            if (aarch32)
+            {
+                const int thumb = (int)((m_env.m_moduleStart + offset) & 1);
+                entryParams.arch = thumb ? DIANA_ARCH_THUMB : DIANA_ARCH_ARM32;
+                offset &= ~(Address_type)1;
+            }
+            DI_CHECK_CPP(Diana_AnalyzeCodeEx2(&m_owner, &m_env, m_dianaMode, offset, size, stack.Get(), 0, &entryParams));
+        }
+        DI_CHECK_CPP(Diana_AnalyzeLandingPads(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
+        if (analyserFlags & DI_ANALYSE_PE_FILE_SCAN_THROUGH)
+        {
+            DI_CHECK_CPP(Diana_AnalyzeScanThrough(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
+        }
     }
 public:
     CDianaModuleImpl_Range(Address_type offset,

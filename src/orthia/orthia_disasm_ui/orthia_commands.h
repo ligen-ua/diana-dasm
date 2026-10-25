@@ -58,7 +58,8 @@ protected:
     void Handle_u(CommandArguments& args);
     void Handle_x(CommandArguments& args);
     void Handle_d(CommandArguments& args, int itemSize, bool dps = false);
-    void Handle_lm(CommandArguments& args);
+    // floating: lmf, the floating modules; lm: the others
+    void Handle_lm(CommandArguments& args, bool floating);
     void Handle_threads(CommandArguments& args);
     void Handle_reload(CommandArguments& args);
     void Handle_analyze(CommandArguments& args);

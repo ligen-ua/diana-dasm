@@ -123,6 +123,8 @@ public:
 
     // modules api
     void UnloadModule(Address_type address, bool bSilent);
+    // the references from inside [address, address + size]; the module row and its metainfo stay
+    void ClearModuleReferences(Address_type address, Address_type size);
     bool IsModuleExists(Address_type address);
     void QueryModules(std::vector<CommonModuleInfo> * pResult);
     bool QueryModule(Address_type moduleAddress, CommonModuleInfo * pResult);

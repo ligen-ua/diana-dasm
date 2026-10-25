@@ -23,6 +23,7 @@ namespace orthia
     class CSimplePeFile;
     class CModuleManager;
     class ModuleStorage;
+    struct FloatingRegionInfo;
 
     struct WorkAddressRangeInfo
     {
@@ -44,6 +45,8 @@ namespace orthia
         static const int flags_analyzeDone = 1;
         static const int flags_symbolsLoaded = 2;
         static const int flags_analyzePrivateDone = 4;
+        // a floating module whose memory changed or went away since it was found
+        static const int flags_stale = 8;
 
         static const int builtInFlags_moduleTypePe  = 1;
         static const int builtInFlags_moduleTypeElf = 2;
@@ -52,11 +55,18 @@ namespace orthia
         static const int builtInFlags_moduleTypeRaw = 8;
         // a .NET image (a PE with a CLR header): an IL-only one has no native entry point
         static const int builtInFlags_managed       = 16;
+        // floating code: executable memory no loaded module owns, found by the analysis of
+        // another module (orthia_floating_code.h). Raw code too (builtInFlags_moduleTypeRaw)
+        static const int builtInFlags_floating      = 32;
 
         PlatformString_type fullName;
         int flags = 0;
         int builtInFlags = 0;
         PlatformString_type name;
+        // builtInFlags_floating: the region and its entry points
+        std::shared_ptr<const FloatingRegionInfo> floating;
+
+        bool IsFloating() const { return (builtInFlags & builtInFlags_floating) != 0; }
 
         // where the bytes come from (orthia::ImageSourceKind / ImageState as ints; 0 for process items).
         // imageSourceKnown: the item has an image source table, so kind None means "unlinked"
@@ -255,6 +265,8 @@ namespace orthia
         virtual void QuerySections(Address_type moduleBase, const FileOpener_type& openFile, ImageSections& sections) {}
         // the db/<sha1> or proc/ folder of this item, without a trailing slash
         virtual PlatformString_type GetDatabaseFolder() const { return PlatformString_type(); }
+        // adds the floating module of the region or replaces it (process items only)
+        virtual void SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> /*info*/) {}
     };
 
     class BaseWorkPlaceItem : public IWorkPlaceItem
@@ -382,6 +394,7 @@ namespace orthia
     const static int g_database_type_fnc_Export = 3;
     const static int g_database_type_fnc_PrivateSymbol = 4;
     // 5: orthia::g_database_type_armCodeMap (orthia_diana_arch.h), saved with the analysis
+    // 6: orthia::g_database_type_floatingRegion (orthia_floating_code.h), a floating module
 
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address);
     oui::String ComposeName(const oui::String& name, Address_type nameAddress, Address_type address, const oui::String& moduleName, Address_type moduleAddress);

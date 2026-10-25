@@ -11,6 +11,7 @@
 #include "orthia_sections.h"
 #include "orthia_databases.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_floating_code.h"
 #ifndef DIANA_HAS_WIN32
 #include <unistd.h>
 #endif
@@ -155,6 +156,42 @@ namespace orthia
         m_moduleNames.Clear();
 
         orthia::CAutoCriticalSection guard(m_lock);
+        m_osModules = std::move(modules);
+        m_osExports = std::move(exports);
+        RebuildModulesNoLock();
+        if (m_processModuleAddress == 0)
+        {
+            m_processModuleAddress = processModuleAddress;
+        }
+    }
+
+    // m_modules and m_exports from the OS modules and the floating ones. A floating module where
+    // the OS reports a module now (it loaded there since) gives way
+    void CProcessWorkplaceItem::RebuildModulesNoLock()
+    {
+        std::vector<orthia::ModuleInfo> modules = m_osModules;
+        auto exports = m_osExports;
+        for (const auto& [address, floating] : m_floatingModules)
+        {
+            const bool overlaps = std::any_of(m_osModules.begin(), m_osModules.end(), [&](const orthia::ModuleInfo& mod) {
+                return mod.address <= floating.lastValidAddress && floating.address <= mod.lastValidAddress;
+            });
+            if (overlaps)
+            {
+                continue;
+            }
+            modules.push_back(floating);
+            std::vector<NameInfo> names;
+            QueryFloatingNames(*floating.floating, names);
+            for (auto& info : names)
+            {
+                info.name.native = floating.name + OUI_STR("!") + info.name.native;
+                exports.insert(info.address, info);
+            }
+        }
+        std::sort(modules.begin(), modules.end(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
+        exports.sort();
+
         m_modules = std::move(modules);
         m_exports = std::move(exports);
         m_modulesIndex.clear();
@@ -168,10 +205,58 @@ namespace orthia
             if (it != m_moduleFlags.end())
                 mod.flags |= it->second;
         }
-        if (m_processModuleAddress == 0)
+    }
+
+    void CProcessWorkplaceItem::SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> info)
+    {
+        if (!info)
         {
-            m_processModuleAddress = processModuleAddress;
+            return;
         }
+        const Address_type address = info->allocationBase;
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            m_floatingModules[address] = MakeFloatingModule(std::move(info), m_dianaMode, m_dianaArch);
+            RebuildModulesNoLock();
+        }
+        m_moduleNames.Invalidate(address);
+    }
+
+    void CProcessWorkplaceItem::LoadSavedFloatingModules()
+    {
+        auto moduleManager = m_moduleManager;
+        if (!moduleManager)
+        {
+            return;
+        }
+        std::vector<std::shared_ptr<FloatingRegionInfo>> regions;
+        try
+        {
+            regions = LoadFloatingRegions(*moduleManager);
+        }
+        catch (const std::exception& e)
+        {
+            (void)e;
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't read the floating modules: ") + e.what());
+            return;
+        }
+        // read before the lock: hashing reads the process
+        std::vector<bool> unchanged;
+        for (const auto& info : regions)
+        {
+            unchanged.push_back(IsFloatingRegionUnchanged(*m_proc, *info));
+        }
+        orthia::CAutoCriticalSection guard(m_lock);
+        for (size_t i = 0; i < regions.size(); ++i)
+        {
+            const Address_type address = regions[i]->allocationBase;
+            m_floatingModules[address] = MakeFloatingModule(regions[i], m_dianaMode, m_dianaArch);
+            if (!unchanged[i])
+            {
+                m_moduleFlags[address] |= ModuleInfo::flags_stale;
+            }
+        }
+        RebuildModulesNoLock();
     }
     void CProcessWorkplaceItem::OnPrivateSymbolLoaded(Address_type addr, const oui::String& name)
     {
@@ -180,6 +265,12 @@ namespace orthia
         if (it != m_exports.end())
         {
             it->second.privateSymbol = name;
+        }
+        // m_exports is rebuilt from it when a floating module comes
+        auto osIt = m_osExports.find(addr);
+        if (osIt != m_osExports.end())
+        {
+            osIt->second.privateSymbol = name;
         }
     }
     void CProcessWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
@@ -241,6 +332,17 @@ namespace orthia
                 {
                     info.name = import.name.native.empty() ? oui::String(OUI_TCSTR("<unknown>")) : import.name;
                 }
+                names.Add(std::move(info));
+            }
+        }
+
+        // a floating module has no headers: its names are its entry points
+        if (module.floating)
+        {
+            std::vector<NameInfo> found;
+            QueryFloatingNames(*module.floating, found);
+            for (auto& info : found)
+            {
                 names.Add(std::move(info));
             }
         }

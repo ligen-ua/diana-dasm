@@ -313,7 +313,9 @@ namespace orthia
             persistentItemStorage->CPersistentItemStorage::Init(info);
             if (reuse)
             {
-                // the analysis saved by the earlier open, for the modules that are still the same
+                // the analysis saved by the earlier open, for the modules that are still the same;
+                // the floating modules first, their flags are saved the same way
+                info->LoadSavedFloatingModules();
                 info->LoadSavedModuleFlags();
             }
         }
