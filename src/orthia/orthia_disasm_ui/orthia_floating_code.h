@@ -29,7 +29,8 @@ namespace orthia
         int protect = 0;                        // oui::MemoryRegionInfo::protect_* where the entries are
         int type = 0;                           // oui::MemoryRegionInfo::type_*
         std::string mappedName;                 // utf8, may be empty
-        std::string header;                     // "MZ", "ELF" or empty: a module mapped by hand
+        // "MZ", "ELF" or empty: a module mapped by hand. TODO: open it with its format, not as raw code
+        std::string header;
         // what tells the same memory on a later open
         unsigned long long bytesHash = 0;
         Address_type hashedSize = 0;

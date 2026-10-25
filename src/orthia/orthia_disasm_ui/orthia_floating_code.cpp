@@ -14,10 +14,12 @@ namespace orthia
 {
     namespace
     {
-        // the most a pass registers: the references of one module can't flood the process
+        // the most a pass registers: the references of one module can't flood the process.
+        // TODO: an option, or a note in lmf of what was left out (docs/orthia.md, Floating code)
         const size_t c_maxNewRegions = 1024;
         // the bytes hashed of an allocation, and the most of it one analysis looks at: the analyzer
-        // keeps a few pointers per byte, a JIT heap can reserve gigabytes
+        // keeps a few pointers per byte, a JIT heap can reserve gigabytes.
+        // TODO: entry points past the window are not analyzed, bytes past it don't make a module stale
         const Address_type c_maxHashedSize = 16 * 1024 * 1024;
         const Address_type c_maxAnalyzedSize = 16 * 1024 * 1024;
         const size_t c_readChunk = 0x10000;
@@ -367,6 +369,9 @@ namespace orthia
         {
             return result;
         }
+        // TODO: tbl_references has no kind (call, jump, taken address, data): every reference that leaves
+        // the module counts, so a 32-bit imm32 that falls into an allocation adds an entry. Other entry
+        // points (threads, stacks, pointers in data) are not looked at (docs/orthia.md, Floating code)
         std::vector<std::pair<Address_type, Address_type>> refs;
         moduleManager.QueryDatabaseManager()->GetClassicDatabase()->QueryAllModuleReferences(source.address, source.size, refs);
 
@@ -601,7 +606,9 @@ namespace orthia
         {
             entries.push_back(entry.address);
         }
-        // a big allocation: the part from the first entry on
+        // a big allocation: the part from the first entry on.
+        // TODO: ARM32 saves its code map (metainfo type 5) under start, which has no tbl_modules row
+        // when start is not the allocation base; the foreign key refuses it
         Address_type start = info.allocationBase;
         Address_type size = info.allocationSize;
         if (size > c_maxAnalyzedSize && !entries.empty())

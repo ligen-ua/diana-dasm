@@ -377,7 +377,8 @@ namespace oui
         {}
 
         ProcessStartInfo GetStartInfo() const override { return m_startInfo; }
-        // a maps line is the allocation: Linux keeps no allocation base
+        // a maps line is the allocation: Linux keeps no allocation base.
+        // TODO: a mapping that mprotect split is several lines, so several floating modules
         int QueryMemoryRegion(unsigned long long address, MemoryRegionInfo& info) override
         {
             info = MemoryRegionInfo();

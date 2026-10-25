@@ -111,7 +111,7 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
     m_verticalScroll->SetDragHandler([this](const oui::Point& point) { VertScroll_OnStartDrag(point); });
 }
 
-// the floating modules are listed by lmf, not here
+// the floating modules are listed by lmf, not here. TODO: a view of their own
 static void QueryShownModules(const std::shared_ptr<orthia::IWorkPlaceItem>& item, std::vector<orthia::ModuleInfo>& modules)
 {
     item->GetModules(modules);

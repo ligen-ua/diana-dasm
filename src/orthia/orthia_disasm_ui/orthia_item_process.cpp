@@ -166,7 +166,7 @@ namespace orthia
     }
 
     // m_modules and m_exports from the OS modules and the floating ones. A floating module where
-    // the OS reports a module now (it loaded there since) gives way
+    // the OS reports a module now (it loaded there since) gives way. TODO: say so instead of hiding it
     void CProcessWorkplaceItem::RebuildModulesNoLock()
     {
         std::vector<orthia::ModuleInfo> modules = m_osModules;

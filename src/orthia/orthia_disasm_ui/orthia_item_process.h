@@ -53,7 +53,8 @@ namespace orthia
         // analysis flags of the modules that are still the same
         void LoadSavedModuleFlags();
         // before LoadSavedModuleFlags, on a reused database: the floating modules found then,
-        // stale when their memory changed
+        // stale when their memory changed. TODO: the same check on demand in an open process, and a
+        // way to drop a stale module
         void LoadSavedFloatingModules();
         void SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> info) override;
 

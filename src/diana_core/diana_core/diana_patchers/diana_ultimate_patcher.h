@@ -47,6 +47,9 @@ typedef struct _DianaHook_CustomOptions
     OPERAND_SIZE patchContext;
 }DianaHook_CustomOptions;
 
+/* x86 and x64 code only: processorMode is DIANA_MODE32 or DIANA_MODE64.
+   TODO: ARM64 and ARM (A32, T32) hooks, which need an architecture argument; the floating code
+   tests (orthia_floating_helper) skip on ARM until then */
 int DianaHook_PatchStream(DianaHook_TargetMemoryProvider * pTargetMemoryProvider,
                           int processorMode,
                           OPERAND_SIZE addressToHook,

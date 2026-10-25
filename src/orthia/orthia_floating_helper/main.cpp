@@ -172,6 +172,7 @@ namespace
     };
     const int g_mode = DIANA_MODE32;
 #else
+// TODO: ARM64 and ARM, once the diana patcher can hook them (docs/orthia.md, Floating code)
 #define HELPER_UNSUPPORTED
 #endif
 }

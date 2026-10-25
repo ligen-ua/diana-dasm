@@ -224,9 +224,53 @@ Floating modules are saved in the process database. When the same process is ope
 checked against the memory (the allocation and a hash of its bytes); one that changed or went away is kept
 and shown as `stale`, and is not analyzed again.
 
-Limits: only references the static analysis sees count (not thread start addresses, stacks or pointers in data);
-the database does not tell code references from data ones, so a 32-bit constant that falls into such memory
-can add an entry point. Targets in zero-filled memory are left out. Live processes only.
+Targets in zero-filled memory are left out: no code starts with `00 00`.
+
+#### TODO
+
+Entry points and targets:
+- [ ] More entry points than the static references: thread start addresses, return addresses on thread stacks,
+  pointers in data (hooked IAT slots, function pointer tables), exception handlers and other callbacks.
+- [ ] Store the reference kind in `tbl_references` (call, jump, taken address, data access); a schema step. The
+  database has no kind, so discovery takes every reference that leaves a module, and filters by executable
+  memory only. In a 32-bit process an `imm32` constant that falls into such an allocation adds an entry point
+  (`push 6A0004h`); the CLI tests allow more than one entry there for that reason.
+- [ ] Mark how each entry was reached (call, jump, taken address) in `modinfo`, once the kind is stored.
+
+Targets:
+- [ ] Minidumps: there is no minidump support yet.
+- [ ] File mode: nothing to find there yet; with captured and memory dependency images it could be.
+
+Regions:
+- [ ] Linux: an allocation is one `/proc/<pid>/maps` line. A region that `mprotect` split into several lines
+  makes several floating modules; adjacent anonymous mappings are never merged.
+- [ ] An allocation that starts with `MZ` or `\x7fELF` (a module mapped by hand) is raw code, with the header only
+  reported by `modinfo`. Open it with its format instead: sections, exports, entry point.
+- [ ] Big allocations (a JIT heap): the analysis looks at 16 MB from the first entry point, and entry points
+  beyond that are not analyzed. The bytes hash covers the first 16 MB only.
+- [ ] ARM32: when that 16 MB window doesn't start at the allocation base, the code map metainfo (type 5) is saved
+  under the window start, which has no `tbl_modules` row (foreign key). Save it under the module address.
+- [ ] Limits per process: 1024 new regions per discovery pass, 256 floating modules analyzed. Make them options,
+  or say in `lmf` what was left out.
+- [ ] A floating module where the OS reports a module later (one loaded there since) is hidden without a word.
+
+Stale and live memory:
+- [ ] The check against memory runs only when the process is opened again. A command to check the floating
+  modules of the open process again (and to analyze a changed one again) is missing.
+- [ ] A stale module stays until the database is deleted; there is no command to drop it.
+
+Commands and UI:
+- [ ] `save`: write a floating module (bytes, base, architecture, entry points) to a file or to another
+  workspace item, once process information is persistent.
+- [ ] The Modules window leaves floating modules out; give them a view of their own.
+
+Architectures and tests:
+- [ ] ARM patches: the diana patcher (`DianaHook_PatchStream`) hooks x86 and x64 code only, so the test helper
+  `orthia_floating_helper` prints `unsupported` on ARM64 and ARM, and `tests/cli/test_floating.py` is skipped there.
+- [ ] ARM floating code has no test at all: add gtests with an AArch64 and an AArch32 (A32 and T32, bit 0 of the
+  entry) module that branches into a fake region, like the x86 ones in `ui_tests.cpp`.
+- [ ] The test helper is not checked in a Debug build (incremental linking puts a jump thunk where the hooked
+  function's address points).
 
 ### Startup routines
 

@@ -1091,6 +1091,8 @@ namespace
     };
 }
 
+// TODO: the same tests for AArch64 and AArch32 (A32, T32 with bit 0 of the entry) floating code
+
 // x86 call targets outside the module are saved as absolute addresses, also below the module
 TEST(FloatingCode, ExternalTargetsAreAbsolute)
 {

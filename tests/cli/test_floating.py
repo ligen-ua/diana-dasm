@@ -48,6 +48,7 @@ class Helper:
 def helper(orthia_exe):
     machine = platform.machine().lower()
     if machine not in ("amd64", "x86_64", "x86", "i386", "i686"):
+        # TODO: ARM64 and ARM once the diana patcher can hook them
         pytest.skip("the diana patcher hooks x86 and x64 code only")
     exe = orthia_exe.parent / (HELPER_NAME + (".exe" if sys.platform == "win32" else ""))
     if not exe.is_file():
