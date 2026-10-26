@@ -8,6 +8,7 @@ extern "C"
 #include "string.h"
 #include "vector"
 #include "test_processor_impl.h"
+#include "test_patchers.h"
 
 static int DianaHook_Alloc_test(void * pThis, 
                                  OPERAND_SIZE size, 
@@ -277,6 +278,24 @@ static void test_patchers_amd64call()
                         pCustomOptions);
     DIANA_TEST_ASSERT(res == 1);
 }
+// architectures the patcher has no hooks for: nothing is allocated
+static void test_patchers_unsupported_arch()
+{
+    unsigned char data[] = { 0xC3 };
+    CTestMemoryProvider testMemoryProvider(data, sizeof(data));
+    size_t heapSize = testMemoryProvider.m_heap.size();
+
+    DIANA_TEST_ASSERT(DI_UNSUPPORTED == DianaHook_PatchStreamEx(testMemoryProvider.GetTargetMemoryProvider(),
+                                                                DIANA_MODE32, DIANA_ARCH_ARM32, 0, 0, 0));
+    DIANA_TEST_ASSERT(DI_UNSUPPORTED == DianaHook_PatchStreamEx(testMemoryProvider.GetTargetMemoryProvider(),
+                                                                DIANA_MODE32, DIANA_ARCH_THUMB, 0, 0, 0));
+#ifdef DIANA_NO_ARM
+    DIANA_TEST_ASSERT(DI_UNSUPPORTED == DianaHook_PatchStreamEx(testMemoryProvider.GetTargetMemoryProvider(),
+                                                                DIANA_MODE64, DIANA_ARCH_AARCH64, 0, 0, 0));
+#endif
+    DIANA_TEST_ASSERT(testMemoryProvider.m_heap.size() == heapSize);
+}
+
 void test_patchers()
 {
     // i386
@@ -293,5 +312,10 @@ void test_patchers()
 
     // amd64 call
     DIANA_TEST(test_patchers_amd64call());
+
+    DIANA_TEST(test_patchers_unsupported_arch());
+#ifndef DIANA_NO_ARM
+    test_patchers_arm();
+#endif
 }
 

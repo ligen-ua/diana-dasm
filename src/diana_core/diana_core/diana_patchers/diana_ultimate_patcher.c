@@ -4,6 +4,9 @@
 
 int DianaHook_PatchStream32(DianaHook_InternalMessage * pMessage);
 int DianaHook_PatchStream64(DianaHook_InternalMessage * pMessage);
+#ifndef DIANA_NO_ARM
+int DianaHook_PatchStreamA64(DianaHook_InternalMessage * pMessage);
+#endif
 
 
 void DianaHook_Allocator_Init(DianaHook_Allocator * pDianaHookAllocator,
@@ -26,8 +29,35 @@ int DianaHook_PatchStream(DianaHook_TargetMemoryProvider * pTargetMemoryProvider
                           OPERAND_SIZE hookFunction,
                           DianaHook_CustomOptions * pCustomOptions)
 {
+    return DianaHook_PatchStreamEx(pTargetMemoryProvider,
+                                   processorMode,
+                                   DIANA_ARCH_X86,
+                                   addressToHook,
+                                   hookFunction,
+                                   pCustomOptions);
+}
+int DianaHook_PatchStreamEx(DianaHook_TargetMemoryProvider * pTargetMemoryProvider,
+                            int processorMode,
+                            int arch,
+                            OPERAND_SIZE addressToHook,
+                            OPERAND_SIZE hookFunction,
+                            DianaHook_CustomOptions * pCustomOptions)
+{
     int result = 0;
     DianaHook_InternalMessage * pMessage = 0;
+
+    if (arch != DIANA_ARCH_X86)
+    {
+#ifdef DIANA_NO_ARM
+        return DI_UNSUPPORTED;
+#else
+        if (arch != DIANA_ARCH_AARCH64)
+        {
+            /* TODO: A32 and T32 */
+            return DI_UNSUPPORTED;
+        }
+#endif
+    }
 
     pMessage = (DianaHook_InternalMessage *)DIANA_MALLOC(sizeof(DianaHook_InternalMessage));
     DI_CHECK_ALLOC(pMessage);
@@ -36,6 +66,7 @@ int DianaHook_PatchStream(DianaHook_TargetMemoryProvider * pTargetMemoryProvider
     pMessage->pReadWriteStream = pTargetMemoryProvider->pReadWriteStream;
     pMessage->pAllocator = pTargetMemoryProvider->pAllocator;
     pMessage->processorMode = processorMode;
+    pMessage->arch = arch;
     pMessage->pCustomOptions = pCustomOptions;
     pMessage->addressToHook = addressToHook;
     pMessage->hookFunction = hookFunction;
@@ -51,6 +82,13 @@ int DianaHook_PatchStream(DianaHook_TargetMemoryProvider * pTargetMemoryProvider
     {
         pMessage->originalFunctionPointer = (DI_OPERAND_SIZE)-1;
     }
+#ifndef DIANA_NO_ARM
+    if (arch == DIANA_ARCH_AARCH64)
+    {
+        result = DianaHook_PatchStreamA64(pMessage);
+    }
+    else
+#endif
     switch (processorMode)
     {
     case DIANA_MODE32:

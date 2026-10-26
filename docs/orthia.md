@@ -265,8 +265,10 @@ Commands and UI:
 - [ ] The Modules window leaves floating modules out; give them a view of their own.
 
 Architectures and tests:
-- [ ] ARM patches: the diana patcher (`DianaHook_PatchStream`) hooks x86 and x64 code only, so the test helper
-  `orthia_floating_helper` prints `unsupported` on ARM64 and ARM, and `tests/cli/test_floating.py` is skipped there.
+- [x] ARM64 patches: `DianaHook_PatchStreamEx` with `DIANA_ARCH_AARCH64` hooks AArch64 code, so the test helper
+  `orthia_floating_helper` and `tests/cli/test_floating.py` run on ARM64 too.
+- [ ] ARM (A32, T32) patches: the diana patcher has no AArch32 hooks yet (`DI_UNSUPPORTED`), so the test helper
+  prints `unsupported` on ARM and `tests/cli/test_floating.py` is skipped there.
 - [ ] ARM floating code has no test at all: add gtests with an AArch64 and an AArch32 (A32 and T32, bit 0 of the
   entry) module that branches into a fake region, like the x86 ones in `ui_tests.cpp`.
 - [ ] The test helper is not checked in a Debug build (incremental linking puts a jump thunk where the hooked

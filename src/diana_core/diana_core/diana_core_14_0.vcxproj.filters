@@ -144,6 +144,9 @@
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_64.c">
       <Filter>patcher</Filter>
     </ClCompile>
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_a64.c">
+      <Filter>patcher</Filter>
+    </ClCompile>
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_impl.c">
       <Filter>patcher</Filter>
     </ClCompile>

@@ -250,6 +250,7 @@
     <ClCompile Include="diana_patchers\diana_ultimate_patcher.c" />
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_32.c" />
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_64.c" />
+    <ClCompile Include="diana_patchers\diana_ultimate_patcher_a64.c" />
     <ClCompile Include="diana_patchers\diana_ultimate_patcher_impl.c" />
     <ClCompile Include="diana_pdb.c" />
     <ClCompile Include="diana_pe.c" />

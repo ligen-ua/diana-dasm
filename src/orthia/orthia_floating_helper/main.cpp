@@ -6,9 +6,10 @@
 //   stub: ... mov rax, <handler>; call rax; ...      (the stub leads to the handler)
 //         <moved instructions>; jmp <target + n>     (and back into the module)
 //
+// On ARM64 the same with b <stub>, and ldr x16, <handler>; blr x16 in the stub.
 // Prints "ready target=<hex> stub=<hex> handler=<hex> calls=<n> result=<n> bits=<32|64>" and waits until its
-// stdin is closed ("change" on stdin changes the handler allocation). x86 and x64 only: the
-// patcher has no ARM support.
+// stdin is closed ("change" on stdin changes the handler allocation). x86, x64 and ARM64: the
+// patcher has no A32/T32 hooks yet.
 
 #include <cstddef>
 #include <cstdio>
@@ -38,8 +39,8 @@ extern "C"
 #define HELPER_NOINLINE __attribute__((noinline))
 #endif
 
-// The hooked function starts with plain instructions and a call rel32, which the patcher moves
-// into its stub (the call is corrected for the new place)
+// The hooked function starts with plain instructions and a call (call rel32, bl), which the patcher
+// moves into its stub when it is among the first instructions (the call is corrected for the new place)
 extern "C" HELPER_NOINLINE int floating_leaf_function(int value)
 {
     return value + 1;
@@ -51,9 +52,24 @@ extern "C" HELPER_NOINLINE int floating_target_function(int value)
 
 namespace
 {
+#if defined(_M_ARM64) || defined(__aarch64__)
+    // b reaches 128 MB
+    const unsigned long long c_maxDistance = 0x07000000ULL;
+#else
     const unsigned long long c_maxDistance = 0x70000000ULL;
+#endif
 
-    // executable memory near the hint, so that a jmp rel32 reaches it
+    // the CPU runs the code written, not what its instruction cache holds (ARM)
+    void FlushCode(void* address, size_t size)
+    {
+#ifdef _WIN32
+        FlushInstructionCache(GetCurrentProcess(), address, size);
+#else
+        __builtin___clear_cache((char*)address, (char*)address + size);
+#endif
+    }
+
+    // executable memory near the hint, so that a jmp rel32 (b on ARM64) reaches it
     void* AllocateNear(unsigned long long hint, size_t size)
     {
 #ifdef _WIN32
@@ -138,6 +154,7 @@ namespace
     int SelfRandomWrite(void*, OPERAND_SIZE offset, void* pBuffer, int size, OPERAND_SIZE* writeBytes, int)
     {
         std::memcpy((void*)(uintptr_t)offset, pBuffer, (size_t)size);
+        FlushCode((void*)(uintptr_t)offset, (size_t)size);
         *writeBytes = (OPERAND_SIZE)size;
         return DI_SUCCESS;
     }
@@ -157,13 +174,15 @@ namespace
     {
     }
 
-    // called by the stub: x64 with the context in rcx, x86 as stdcall(context, esp, registers)
+    // called by the stub: x64 with the context in rcx, x86 as stdcall(context, esp, registers),
+    // ARM64 with the context in x0
 #if defined(_M_X64) || defined(__x86_64__)
     const unsigned char g_handler[] = {
         0x48, 0xFF, 0x01,                   // inc qword ptr [rcx]
         0xC3                                // ret
     };
     const int g_mode = DIANA_MODE64;
+    const int g_arch = DIANA_ARCH_X86;
 #elif defined(_M_IX86) || defined(__i386__)
     const unsigned char g_handler[] = {
         0x8B, 0x44, 0x24, 0x04,             // mov eax, [esp+4]
@@ -171,8 +190,18 @@ namespace
         0xC2, 0x0C, 0x00                    // ret 0Ch
     };
     const int g_mode = DIANA_MODE32;
+    const int g_arch = DIANA_ARCH_X86;
+#elif defined(_M_ARM64) || defined(__aarch64__)
+    const unsigned char g_handler[] = {
+        0x09, 0x00, 0x40, 0xF9,             // ldr x9, [x0]
+        0x29, 0x05, 0x00, 0x91,             // add x9, x9, #1
+        0x09, 0x00, 0x00, 0xF9,             // str x9, [x0]
+        0xC0, 0x03, 0x5F, 0xD6              // ret
+    };
+    const int g_mode = DIANA_MODE64;
+    const int g_arch = DIANA_ARCH_AARCH64;
 #else
-// TODO: ARM64 and ARM, once the diana patcher can hook them (docs/orthia.md, Floating code)
+// TODO: ARM (A32, T32), once the diana patcher can hook them (docs/orthia.md, Floating code)
 #define HELPER_UNSUPPORTED
 #endif
 }
@@ -180,7 +209,7 @@ namespace
 int main()
 {
 #ifdef HELPER_UNSUPPORTED
-    std::printf("unsupported: the patcher is x86 and x64 only\n");
+    std::printf("unsupported: the patcher hooks x86, x64 and ARM64 code only\n");
     return 2;
 #else
     Diana_Init();
@@ -195,6 +224,7 @@ int main()
         return 1;
     }
     std::memcpy(handler, g_handler, sizeof(g_handler));
+    FlushCode(handler, sizeof(g_handler));
 
     if (!MakeWritable((void*)(uintptr_t)target, 64))
     {
@@ -216,7 +246,7 @@ int main()
     options.flags = DIANA_HOOK_CUSTOM_OPTION_PUT_NEAR_JMP;
     options.patchContext = (OPERAND_SIZE)(uintptr_t)&calls;
 
-    const int status = DianaHook_PatchStream(&provider, g_mode, target, (OPERAND_SIZE)(uintptr_t)handler, &options);
+    const int status = DianaHook_PatchStreamEx(&provider, g_mode, g_arch, target, (OPERAND_SIZE)(uintptr_t)handler, &options);
     if (status)
     {
         std::printf("error: the patch failed: %d\n", status);

@@ -47,9 +47,9 @@ class Helper:
 @pytest.fixture
 def helper(orthia_exe):
     machine = platform.machine().lower()
-    if machine not in ("amd64", "x86_64", "x86", "i386", "i686"):
-        # TODO: ARM64 and ARM once the diana patcher can hook them
-        pytest.skip("the diana patcher hooks x86 and x64 code only")
+    if machine not in ("amd64", "x86_64", "x86", "i386", "i686", "arm64", "aarch64"):
+        # TODO: ARM (A32, T32) once the diana patcher can hook them
+        pytest.skip("the diana patcher hooks x86, x64 and ARM64 code only")
     exe = orthia_exe.parent / (HELPER_NAME + (".exe" if sys.platform == "win32" else ""))
     if not exe.is_file():
         pytest.skip(f"{exe.name} is not built next to {orthia_exe}")
@@ -86,7 +86,7 @@ def assert_found(res, helper, address: int, status: str = "analyzed"):
 
 def test_analyze_finds_the_hook(orthia, helper):
     res = orthia.run(f".analyze {HELPER_NAME}", "lm", "lmf", pid=helper.pid).assert_ok()
-    # the stub, then the handler the stub calls through mov rax/eax, <handler>
+    # the stub, then the handler the stub calls through mov rax/eax, <handler> (ARM64: ldr x16, <literal>)
     assert_found(res, helper, helper.stub)
     assert_found(res, helper, helper.handler)
     # lm lists the OS modules only
@@ -104,10 +104,10 @@ def test_names_and_disassembly(orthia, helper):
     res = orthia.run(f".analyze {HELPER_NAME}", f"x {stub}!*", f"u {stub}!$entry_0001 L2",
                      pid=helper.pid).assert_ok()
     assert res.symbols[f"{stub}!$entry_0001"] == [helper.stub], res
-    # the hooked function leads here, and the stub starts by saving registers
+    # the hooked function leads here, and the stub starts by saving registers (ARM64: the stack for them)
     res.assert_line(rf"<--\s+{re.escape(helper.address_text(helper.target))}")
     stub_text = re.escape(helper.address_text(helper.stub))
-    res.assert_line(rf"(?i)^{stub_text}\s+[0-9a-f]+\s+(push\s+rbp|pushad?)\b")
+    res.assert_line(rf"(?i)^{stub_text}\s+[0-9a-f]+\s+(push\s+rbp|pushad?|sub\s+sp,\s*sp,\s*#0xb0)\b")
 
 
 def test_modinfo(orthia, helper):
