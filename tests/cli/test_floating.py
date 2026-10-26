@@ -47,9 +47,9 @@ class Helper:
 @pytest.fixture
 def helper(orthia_exe):
     machine = platform.machine().lower()
-    if machine not in ("amd64", "x86_64", "x86", "i386", "i686", "arm64", "aarch64"):
-        # TODO: ARM (A32, T32) once the diana patcher can hook them
-        pytest.skip("the diana patcher hooks x86, x64 and ARM64 code only")
+    if machine not in ("amd64", "x86_64", "x86", "i386", "i686", "arm64", "aarch64",
+                       "arm", "armv6l", "armv7l", "armv8l"):
+        pytest.skip("the diana patcher has no hooks for this architecture")
     exe = orthia_exe.parent / (HELPER_NAME + (".exe" if sys.platform == "win32" else ""))
     if not exe.is_file():
         pytest.skip(f"{exe.name} is not built next to {orthia_exe}")

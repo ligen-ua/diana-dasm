@@ -6,10 +6,10 @@
 //   stub: ... mov rax, <handler>; call rax; ...      (the stub leads to the handler)
 //         <moved instructions>; jmp <target + n>     (and back into the module)
 //
-// On ARM64 the same with b <stub>, and ldr x16, <handler>; blr x16 in the stub.
+// On ARM64 the same with b <stub>, and ldr x16, <handler>; blr x16 in the stub; on A32/Thumb with
+// b / ldr pc and ldr r3, <handler>; blx r3.
 // Prints "ready target=<hex> stub=<hex> handler=<hex> calls=<n> result=<n> bits=<32|64>" and waits until its
-// stdin is closed ("change" on stdin changes the handler allocation). x86, x64 and ARM64: the
-// patcher has no A32/T32 hooks yet.
+// stdin is closed ("change" on stdin changes the handler allocation).
 
 #include <cstddef>
 #include <cstdio>
@@ -55,6 +55,9 @@ namespace
 #if defined(_M_ARM64) || defined(__aarch64__)
     // b reaches 128 MB
     const unsigned long long c_maxDistance = 0x07000000ULL;
+#elif defined(_M_ARM) || defined(__arm__)
+    // A32 b reaches 32 MB; stay well under it
+    const unsigned long long c_maxDistance = 0x01000000ULL;
 #else
     const unsigned long long c_maxDistance = 0x70000000ULL;
 #endif
@@ -200,8 +203,20 @@ namespace
     };
     const int g_mode = DIANA_MODE64;
     const int g_arch = DIANA_ARCH_AARCH64;
+#elif defined(_M_ARM) || defined(__arm__)
+    // a Thumb handler (called through blx, so it runs whether the hooked code is A32 or Thumb): (*r0)++
+    const unsigned char g_handler[] = {
+        0x01, 0x68,                         // ldr r1, [r0]
+        0x49, 0x1c,                         // adds r1, r1, #1
+        0x01, 0x60,                         // str r1, [r0]
+        0x70, 0x47                          // bx lr
+    };
+    const int g_mode = DIANA_MODE32;
+    // DIANA_ARCH_ARM32 or DIANA_ARCH_THUMB, chosen in main from the function pointer's Thumb bit
+    const int g_arch = DIANA_ARCH_ARM32;
+#define HELPER_ARM32
 #else
-// TODO: ARM (A32, T32), once the diana patcher can hook them (docs/orthia.md, Floating code)
+// TODO: other architectures, once the diana patcher can hook them (docs/orthia.md, Floating code)
 #define HELPER_UNSUPPORTED
 #endif
 }
@@ -209,7 +224,7 @@ namespace
 int main()
 {
 #ifdef HELPER_UNSUPPORTED
-    std::printf("unsupported: the patcher hooks x86, x64 and ARM64 code only\n");
+    std::printf("unsupported: no patcher hooks for this architecture\n");
     return 2;
 #else
     Diana_Init();
@@ -246,7 +261,15 @@ int main()
     options.flags = DIANA_HOOK_CUSTOM_OPTION_PUT_NEAR_JMP;
     options.patchContext = (OPERAND_SIZE)(uintptr_t)&calls;
 
-    const int status = DianaHook_PatchStreamEx(&provider, g_mode, g_arch, target, (OPERAND_SIZE)(uintptr_t)handler, &options);
+    int arch = g_arch;
+    OPERAND_SIZE hookFunction = (OPERAND_SIZE)(uintptr_t)handler;
+#ifdef HELPER_ARM32
+    // the function pointer's bit 0 tells A32 from Thumb; the Thumb handler is reached through blx
+    arch = (((uintptr_t)&floating_target_function) & 1) ? DIANA_ARCH_THUMB : DIANA_ARCH_ARM32;
+    hookFunction |= 1;
+#endif
+
+    const int status = DianaHook_PatchStreamEx(&provider, g_mode, arch, target, hookFunction, &options);
     if (status)
     {
         std::printf("error: the patch failed: %d\n", status);

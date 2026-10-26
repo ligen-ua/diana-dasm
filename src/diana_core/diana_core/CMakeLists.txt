@@ -47,6 +47,7 @@ diana_patchers/diana_ultimate_patcher.c
 diana_patchers/diana_ultimate_patcher_32.c
 diana_patchers/diana_ultimate_patcher_64.c
 diana_patchers/diana_ultimate_patcher_a64.c
+diana_patchers/diana_ultimate_patcher_a32.c
 diana_patchers/diana_ultimate_patcher_impl.c
 
 diana_processor/diana_processor_cmd_a.c

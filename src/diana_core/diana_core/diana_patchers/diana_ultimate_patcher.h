@@ -64,7 +64,12 @@ int DianaHook_PatchStream(DianaHook_TargetMemoryProvider * pTargetMemoryProvider
      "ldr x16, #8; br x16; .quad <stub>". The stub jumps back with "b" when it can: on Linux pages with BTI,
      the "br x16" back into the function faults, so allocate near the hint. An entry "b" is followed unless
      DIANA_HOOK_CUSTOM_OPTION_DONT_FOLLOW_JUMPS.
-   - DIANA_ARCH_ARM32, DIANA_ARCH_THUMB: not yet (DI_UNSUPPORTED). TODO: A32 and T32 hooks.
+   - DIANA_ARCH_ARM32, DIANA_ARCH_THUMB, DIANA_MODE32: hookFunction(r0 = patchContext, r1 = the sp of the hooked
+     function, r2 = the saved registers: cpsr then r0..r12, lr). The hooked function starts with "b <stub>"
+     (A32, stub within 32 MB) or a pc-relative load of the stub. The stub reaches hookFunction with "blx", so a
+     Thumb handler needs bit 0 of hookFunction set. For THUMB, addressToHook's bit 0 is ignored and the saved
+     original function pointer keeps it set. Among the overwritten instructions b, bl, b<cond> and cbz/cbnz are
+     moved; a pc-relative load, adr or an IT block there is refused (DI_ERROR_NOT_IMPLEMENTED).
    ARM: the caller flushes the instruction cache, in pRandomWrite for example. In a DIANA_NO_ARM build every
    ARM architecture gets DI_UNSUPPORTED */
 int DianaHook_PatchStreamEx(DianaHook_TargetMemoryProvider * pTargetMemoryProvider,

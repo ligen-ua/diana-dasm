@@ -6,6 +6,7 @@ int DianaHook_PatchStream32(DianaHook_InternalMessage * pMessage);
 int DianaHook_PatchStream64(DianaHook_InternalMessage * pMessage);
 #ifndef DIANA_NO_ARM
 int DianaHook_PatchStreamA64(DianaHook_InternalMessage * pMessage);
+int DianaHook_PatchStreamA32(DianaHook_InternalMessage * pMessage);
 #endif
 
 
@@ -51,9 +52,8 @@ int DianaHook_PatchStreamEx(DianaHook_TargetMemoryProvider * pTargetMemoryProvid
 #ifdef DIANA_NO_ARM
         return DI_UNSUPPORTED;
 #else
-        if (arch != DIANA_ARCH_AARCH64)
+        if (arch != DIANA_ARCH_AARCH64 && arch != DIANA_ARCH_ARM32 && arch != DIANA_ARCH_THUMB)
         {
-            /* TODO: A32 and T32 */
             return DI_UNSUPPORTED;
         }
 #endif
@@ -86,6 +86,10 @@ int DianaHook_PatchStreamEx(DianaHook_TargetMemoryProvider * pTargetMemoryProvid
     if (arch == DIANA_ARCH_AARCH64)
     {
         result = DianaHook_PatchStreamA64(pMessage);
+    }
+    else if (arch == DIANA_ARCH_ARM32 || arch == DIANA_ARCH_THUMB)
+    {
+        result = DianaHook_PatchStreamA32(pMessage);
     }
     else
 #endif

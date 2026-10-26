@@ -3,6 +3,7 @@ extern "C"
 #include "diana_patchers/diana_ultimate_patcher.h"
 #include "diana_streams.h"
 #include "diana_arm.h"
+#include "diana_arm32.h"
 #include "diana_text_output_masm.h"
 }
 
@@ -100,6 +101,21 @@ namespace
         {
             return (OPERAND_SIZE)Word(address) | ((OPERAND_SIZE)Word(address + 4) << 32);
         }
+        unsigned int Half(OPERAND_SIZE address)
+        {
+            unsigned char * p = Find(address, 2);
+            DIANA_TEST_ASSERT(p != 0);
+            if (!p)
+                return 0;
+            return (unsigned int)p[0] | ((unsigned int)p[1] << 8);
+        }
+        /* write raw code bytes at c_codeBase (for AArch32 instruction streams) */
+        void SetBytes(const unsigned char * pBytes, size_t count)
+        {
+            size_t i = 0;
+            for (; i < count; ++i)
+                m_windows[0].bytes[i] = pBytes[i];
+        }
         int Patch(int flags = 0)
         {
             DianaHook_CustomOptions options;
@@ -108,6 +124,16 @@ namespace
             options.originalFunctionPointer = c_originalSlot;
             options.patchContext = c_context;
             return DianaHook_PatchStreamEx(&m_provider, DIANA_MODE64, DIANA_ARCH_AARCH64, c_codeBase, c_hook, &options);
+        }
+        /* AArch32: context/hook/original fit 32 bits; address keeps the Thumb bit off */
+        int PatchArch(int arch, int flags = 0)
+        {
+            DianaHook_CustomOptions options;
+            memset(&options, 0, sizeof(options));
+            options.flags = flags | DIANA_HOOK_CUSTOM_OPTION_SAVE_ORIGINAL_FP;
+            options.originalFunctionPointer = c_originalSlot;
+            options.patchContext = 0x11223344u;
+            return DianaHook_PatchStreamEx(&m_provider, DIANA_MODE32, arch, c_codeBase, 0x55667788u, &options);
         }
 
         static CArmTestMemory * FromStream(void * pThis)
@@ -521,6 +547,186 @@ static void test_patchers_a64_invalid()
     }
 }
 
+/* ------------------------------------------------------------------ AArch32 (A32 and T32)
+   These check the installed hook, the stub literals, the original pointer and the moved relocations by
+   decoding what was written. Real execution is covered under qemu (scratchpad driver). */
+namespace
+{
+    const OPERAND_SIZE c_a32Context = 0x11223344u;
+    const OPERAND_SIZE c_a32Hook = 0x55667788u;
+    const int c_a32StubSize = 44;    /* 11 words */
+    const int c_t32StubSize = 36;
+
+    /* the absolute target of the branch at address, decoded fresh */
+    OPERAND_SIZE DecodedTarget(const unsigned char * bytes, OPERAND_SIZE address, int arch)
+    {
+        DianaContext ctx;
+        DianaParserResult res;
+        int i = 0;
+        Diana_InitContextEx(&ctx, DIANA_MODE32, arch);
+        if (arch == DIANA_ARCH_ARM32)
+        {
+            DianaA32_DecodeA32(&ctx, (DI_UINT32)bytes[0] | ((DI_UINT32)bytes[1] << 8) |
+                               ((DI_UINT32)bytes[2] << 16) | ((DI_UINT32)bytes[3] << 24), &res);
+        }
+        else
+        {
+            DI_UINT32 hw1 = (DI_UINT32)bytes[0] | ((DI_UINT32)bytes[1] << 8);
+            DI_UINT32 hw2 = DianaA32_GetT32Size(hw1) == 4 ? ((DI_UINT32)bytes[2] | ((DI_UINT32)bytes[3] << 8)) : 0;
+            DianaA32_DecodeT32(&ctx, hw1, hw2, &res);
+        }
+        for (i = 0; i < res.iLinkedOpCount; ++i)
+        {
+            if (res.linkedOperands[i].type == diana_rel)
+            {
+                OPERAND_SIZE t = address + (OPERAND_SIZE)res.iFullCmdSize + (OPERAND_SIZE)res.linkedOperands[i].value.rel.m_value;
+                return arch == DIANA_ARCH_THUMB ? (t | 1) : t;
+            }
+        }
+        DIANA_TEST_ASSERT(0);
+        return 0;
+    }
+
+    void SetAndPatchA32(CArmTestMemory & memory, const unsigned char * bytes, size_t count, int arch, int flags, int expect)
+    {
+        int status = 0;
+        memory.SetBytes(bytes, count);
+        status = memory.PatchArch(arch, flags);
+        if (status != expect)
+            printf("patcher a32/t32: status %d, expected %d\n", status, expect);
+        DIANA_TEST_ASSERT(status == expect);
+    }
+
+    void ExpectLiteralsAndOriginal(CArmTestMemory & memory, OPERAND_SIZE stub, int stubSize, int isThumb)
+    {
+        DIANA_TEST_ASSERT(memory.Word(stub + 0x200) == c_a32Context);
+        DIANA_TEST_ASSERT(memory.Word(stub + 0x204) == c_a32Hook);
+        DIANA_TEST_ASSERT(memory.Word(c_originalSlot) == ((DI_UINT32)(stub + stubSize) | (isThumb ? 1u : 0u)));
+    }
+}
+
+/* A32: near b hook, far ldr-pc hook, moved b/bl, conditional b, and the refused forms */
+static void test_patchers_a32()
+{
+    const OPERAND_SIZE stub = 0x180000;
+    const OPERAND_SIZE moved = stub + c_a32StubSize;
+
+    /* uncond b, near: the function jumps to the stub, the moved b jumps to the same absolute target */
+    {
+        unsigned char code[] = { 0x0E, 0x00, 0x00, 0xEA, 0,0,0,0 };     /* b codeBase+0x40 */
+        OPERAND_SIZE target;
+        CArmTestMemory memory(0, 0, stub);
+        target = DecodedTarget(code, c_codeBase, DIANA_ARCH_ARM32);
+        /* don't follow it as an entry thunk: move it */
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_ARM32, DIANA_HOOK_CUSTOM_OPTION_DONT_FOLLOW_JUMPS, DI_SUCCESS);
+        DIANA_TEST_ASSERT(memory.Word(c_codeBase) ==
+            (0xEA000000u | (((DI_UINT32)(stub - (c_codeBase + 8)) >> 2) & 0xFFFFFFu)));
+        ExpectLiteralsAndOriginal(memory, stub, c_a32StubSize, 0);
+        DIANA_TEST_ASSERT(memory.Word(moved) == 0xE51FF004);            /* ldr pc, [pc, #-4] */
+        DIANA_TEST_ASSERT(memory.Word(moved + 4) == (DI_UINT32)target);
+    }
+    /* bl, near: lr set to the word after the jump, then jump to the target */
+    {
+        unsigned char code[] = { 0x0E, 0x00, 0x00, 0xEB, 0,0,0,0 };     /* bl codeBase+0x40 */
+        OPERAND_SIZE target;
+        CArmTestMemory memory(0, 0, stub);
+        target = DecodedTarget(code, c_codeBase, DIANA_ARCH_ARM32);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_ARM32, 0, DI_SUCCESS);
+        DIANA_TEST_ASSERT(memory.Word(moved) == 0xE28FE004);            /* add lr, pc, #4 */
+        DIANA_TEST_ASSERT(memory.Word(moved + 4) == 0xE51FF004);
+        DIANA_TEST_ASSERT(memory.Word(moved + 8) == (DI_UINT32)target);
+    }
+    /* b<cond>, far hook (two instructions moved): the opposite condition skips a jump to the target */
+    {
+        unsigned char code[] = { 0x00, 0x00, 0x50, 0xE3,               /* cmp r0, #0 */
+                                 0x0E, 0x00, 0x00, 0x0A };              /* beq codeBase+0x44 */
+        OPERAND_SIZE target;
+        CArmTestMemory memory(0, 0, stub);
+        target = DecodedTarget(code + 4, c_codeBase + 4, DIANA_ARCH_ARM32);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_ARM32, DIANA_HOOK_CUSTOM_OPTION_PUT_FAR_JMP, DI_SUCCESS);
+        DIANA_TEST_ASSERT(memory.Word(c_codeBase) == 0xE51FF004);       /* far hook */
+        DIANA_TEST_ASSERT(memory.Word(c_codeBase + 4) == (DI_UINT32)stub);
+        DIANA_TEST_ASSERT(memory.Word(moved) == 0xE3500000);           /* cmp copied */
+        DIANA_TEST_ASSERT(memory.Word(moved + 4) == 0x1A000001);       /* bne #+12 */
+        DIANA_TEST_ASSERT(memory.Word(moved + 8) == 0xE51FF004);
+        DIANA_TEST_ASSERT(memory.Word(moved + 12) == (DI_UINT32)target);
+    }
+    /* a pc-relative load is refused and the allocation is freed */
+    {
+        unsigned char code[] = { 0x00, 0x00, 0x9F, 0xE5, 0,0,0,0 };    /* ldr r0, [pc, #0] */
+        CArmTestMemory memory(0, 0, stub);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_ARM32, 0, DI_ERROR_NOT_IMPLEMENTED);
+        DIANA_TEST_ASSERT(memory.m_frees == 1);
+    }
+}
+
+/* T32: the hook is always a pc-relative load; moved bl and conditional branches */
+static void test_patchers_t32()
+{
+    const OPERAND_SIZE stub = 0x180000;
+    const OPERAND_SIZE moved = stub + c_t32StubSize;
+
+    /* install + bl relocation */
+    {
+        unsigned char code[] = { 0x00, 0xF0, 0x1E, 0xF8,   /* bl codeBase+0x40 */
+                                 0x63, 0x20,               /* movs r0, #99 */
+                                 0x70, 0x47 };             /* bx lr */
+        OPERAND_SIZE target;
+        CArmTestMemory memory(0, 0, stub);
+        target = DecodedTarget(code, c_codeBase, DIANA_ARCH_THUMB);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_THUMB, 0, DI_SUCCESS);
+        DIANA_TEST_ASSERT(memory.Half(c_codeBase) == 0xF8DF && memory.Half(c_codeBase + 2) == 0xF000);
+        DIANA_TEST_ASSERT(memory.Word(c_codeBase + 4) == ((DI_UINT32)stub | 1));
+        ExpectLiteralsAndOriginal(memory, stub, c_t32StubSize, 1);
+        DIANA_TEST_ASSERT(memory.Half(moved) == 0xF8DF && memory.Half(moved + 2) == 0xE008);    /* ldr.w lr,[pc,#8] */
+        DIANA_TEST_ASSERT(memory.Half(moved + 4) == 0xF8DF && memory.Half(moved + 6) == 0xF000);/* ldr.w pc,[pc,#0] */
+        DIANA_TEST_ASSERT(memory.Word(moved + 8) == (DI_UINT32)target);
+        DIANA_TEST_ASSERT(memory.Word(moved + 12) == ((DI_UINT32)(moved + 16) | 1));            /* return address */
+    }
+    /* beq.w relocation: inverted narrow branch over a jump to the target */
+    {
+        unsigned char code[] = { 0x00, 0x28,               /* cmp r0, #0 */
+                                 0x00, 0xF0, 0x1E, 0x80,   /* beq.w codeBase+0x42 */
+                                 0x63, 0x20 };             /* movs r0, #99 */
+        OPERAND_SIZE target;
+        CArmTestMemory memory(0, 0, stub);
+        target = DecodedTarget(code + 2, c_codeBase + 2, DIANA_ARCH_THUMB);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_THUMB, 0, DI_SUCCESS);
+        DIANA_TEST_ASSERT(memory.Half(moved) == 0x2800);                /* cmp copied */
+        DIANA_TEST_ASSERT(memory.Half(moved + 2) == 0xBF00);           /* align */
+        DIANA_TEST_ASSERT(memory.Half(moved + 4) == 0xD104);           /* bne.n #+8 */
+        DIANA_TEST_ASSERT(memory.Half(moved + 8) == 0xF8DF && memory.Half(moved + 10) == 0xF000);
+        DIANA_TEST_ASSERT(memory.Word(moved + 12) == (DI_UINT32)target);
+    }
+    /* cbz relocation: cbnz over a jump to the target */
+    {
+        unsigned char code[] = { 0x70, 0xB1,               /* cbz r0, codeBase+0x20 */
+                                 0x00, 0xBF,               /* nop */
+                                 0x63, 0x20,               /* movs r0, #99 */
+                                 0x70, 0x47 };             /* bx lr */
+        OPERAND_SIZE target;
+        CArmTestMemory memory(0, 0, stub);
+        target = DecodedTarget(code, c_codeBase, DIANA_ARCH_THUMB);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_THUMB, 0, DI_SUCCESS);
+        DIANA_TEST_ASSERT(memory.Half(moved) == 0xB920);               /* cbnz r0, #+8 */
+        DIANA_TEST_ASSERT(memory.Half(moved + 2) == 0xBF00);
+        DIANA_TEST_ASSERT(memory.Half(moved + 4) == 0xF8DF && memory.Half(moved + 6) == 0xF000);
+        DIANA_TEST_ASSERT(memory.Word(moved + 8) == (DI_UINT32)target);
+    }
+    /* an uncond branch alone is too short for the 8-byte Thumb hook (not followed here) */
+    {
+        unsigned char code[] = { 0x00, 0xE0, 0,0,0,0,0,0 };            /* b.n */
+        CArmTestMemory memory(0, 0, stub);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_THUMB, DIANA_HOOK_CUSTOM_OPTION_DONT_FOLLOW_JUMPS, DI_END);
+    }
+    /* a pc-relative load is refused */
+    {
+        unsigned char code[] = { 0x00, 0x48, 0,0,0,0,0,0 };            /* ldr r0, [pc, #0] */
+        CArmTestMemory memory(0, 0, stub);
+        SetAndPatchA32(memory, code, sizeof(code), DIANA_ARCH_THUMB, 0, DI_ERROR_NOT_IMPLEMENTED);
+    }
+}
+
 void test_patchers_arm()
 {
     DIANA_TEST(test_patchers_a64_near());
@@ -530,6 +736,8 @@ void test_patchers_arm()
     DIANA_TEST(test_patchers_a64_adrp_far());
     DIANA_TEST(test_patchers_a64_follow());
     DIANA_TEST(test_patchers_a64_invalid());
+    DIANA_TEST(test_patchers_a32());
+    DIANA_TEST(test_patchers_t32());
 }
 
 #endif

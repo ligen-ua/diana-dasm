@@ -285,13 +285,15 @@ static void test_patchers_unsupported_arch()
     CTestMemoryProvider testMemoryProvider(data, sizeof(data));
     size_t heapSize = testMemoryProvider.m_heap.size();
 
+    // an architecture value that is not DIANA_ARCH_*
     DIANA_TEST_ASSERT(DI_UNSUPPORTED == DianaHook_PatchStreamEx(testMemoryProvider.GetTargetMemoryProvider(),
-                                                                DIANA_MODE32, DIANA_ARCH_ARM32, 0, 0, 0));
-    DIANA_TEST_ASSERT(DI_UNSUPPORTED == DianaHook_PatchStreamEx(testMemoryProvider.GetTargetMemoryProvider(),
-                                                                DIANA_MODE32, DIANA_ARCH_THUMB, 0, 0, 0));
+                                                                DIANA_MODE32, 777, 0, 0, 0));
 #ifdef DIANA_NO_ARM
+    // an x86-only build has no ARM hooks at all
     DIANA_TEST_ASSERT(DI_UNSUPPORTED == DianaHook_PatchStreamEx(testMemoryProvider.GetTargetMemoryProvider(),
                                                                 DIANA_MODE64, DIANA_ARCH_AARCH64, 0, 0, 0));
+    DIANA_TEST_ASSERT(DI_UNSUPPORTED == DianaHook_PatchStreamEx(testMemoryProvider.GetTargetMemoryProvider(),
+                                                                DIANA_MODE32, DIANA_ARCH_ARM32, 0, 0, 0));
 #endif
     DIANA_TEST_ASSERT(testMemoryProvider.m_heap.size() == heapSize);
 }

@@ -638,6 +638,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\diana_patchers\diana_ultimate_patcher_a32.c"
+					>
+				</File>
+				<File
 					RelativePath=".\diana_patchers\diana_ultimate_patcher_impl.c"
 					>
 				</File>
