@@ -256,8 +256,11 @@ def test_saved_folder_after_exit(orthia_cold, helper):
                           "--cmd", f"modinfo {HELPER_NAME}").assert_ok()
     assert_found(res, helper, helper.stub)
     assert_found(res, helper, helper.handler)
-    # the helper is still the file it ran from
+    # the helper is still the file it ran from, and so are the system modules (libc: its file maps up to
+    # the end of bss, more than the process reports)
     res.assert_line(rf"^\S+\s+\S+\s+{HELPER_NAME}(\.exe)?\s+linked, analyzed$")
+    lm = res.stdout.split("protect")[0]
+    assert "stale" not in lm, res
     res.assert_line(r"^Image: linked, loaded$")
     stub_text = re.escape(helper.address_text(helper.stub))
     res.assert_line(rf"(?i)^{stub_text}\s+[0-9a-f]+\s+(push\s+rbp|pushad?|sub\s+sp,\s*sp,\s*#0xb0)\b")

@@ -13,6 +13,7 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
     textManager->RegisterNode(ORTHIA_TCSTR("ui.menu.file"))
         << textManager->RegisterValue(ORTHIA_TCSTR("open_executable"), ORTHIA_TCSTR("Open &Executable"))
         << textManager->RegisterValue(ORTHIA_TCSTR("open_process"), ORTHIA_TCSTR("Open &Process"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("open_saved"), ORTHIA_TCSTR("Open &Saved Process"))
         << textManager->RegisterValue(ORTHIA_TCSTR("close_item"), ORTHIA_TCSTR("&Close"))
         << textManager->RegisterValue(ORTHIA_TCSTR("exit"), ORTHIA_TCSTR("E&xit"))
         ;
@@ -132,6 +133,15 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
 
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.goto"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Goto Address"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.opensaved"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Open Saved Process"))
+        ;
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.opensaved.columns"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("process"), ORTHIA_TCSTR("Process folder"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("modified"), ORTHIA_TCSTR("Modified"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("size"), ORTHIA_TCSTR("Size"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("notes"), ORTHIA_TCSTR("Notes"))
         ;
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.xrefs"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("References"))

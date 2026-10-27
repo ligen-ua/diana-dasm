@@ -624,49 +624,6 @@ namespace orthia
         return text;
     }
 
-    static PlatformString_type FormatSize(unsigned long long size)
-    {
-        const char* units[] = { "B", "KB", "MB", "GB", "TB" };
-        double value = (double)size;
-        int unit = 0;
-        while (value >= 1024 && unit < 4)
-        {
-            value /= 1024;
-            ++unit;
-        }
-        char buffer[32];
-        if (unit == 0)
-        {
-            snprintf(buffer, sizeof(buffer), "%llu B", size);
-        }
-        else
-        {
-            snprintf(buffer, sizeof(buffer), "%.1f %s", value, units[unit]);
-        }
-        return Utf8ToPlatformString(buffer);
-    }
-
-    static PlatformString_type FormatFileTime(std::filesystem::file_time_type time)
-    {
-        if (time == std::filesystem::file_time_type::min())
-        {
-            return ORTHIA_TCSTR("?");
-        }
-        // C++17 has no clock_cast: go through the distance from now
-        auto systemTime = std::chrono::system_clock::now() +
-            std::chrono::duration_cast<std::chrono::system_clock::duration>(time - std::filesystem::file_time_type::clock::now());
-        std::time_t value = std::chrono::system_clock::to_time_t(systemTime);
-        tm local = { 0 };
-#ifdef DIANA_HAS_WIN32
-        localtime_s(&local, &value);
-#else
-        localtime_r(&value, &local);
-#endif
-        char buffer[32];
-        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &local);
-        return Utf8ToPlatformString(buffer);
-    }
-
     static PlatformString_type DescribeDatabase(const DatabaseInfo& info)
     {
         if (info.originalName.empty() || info.originalName == info.folderName)

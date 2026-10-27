@@ -117,7 +117,7 @@ orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <comm
 The value after `--file`, `--pid`, `--proc-folder` or `--cmd` is taken as it is, even if it starts with `--`.
 
 All arguments are optional: plain `orthia` with no arguments starts the UI with an empty workspace,
-and you open files and processes from the **File** menu (*Open executable*, *Open process*).
+and you open files and processes from the **File** menu (*Open executable*, *Open process*, *Open saved process*).
 Without `--cmd` the UI starts with all given files and processes open.
 With `--cmd`, exactly one `--file`, `--pid` or `--proc-folder` is required, except when every command is a `.database` command:
 those work on the data folder and run without a target.
@@ -339,8 +339,10 @@ orthia --proc-folder "proc/[1234] app.exe 20261027-125304"
 orthia --proc-folder 1234 --cmd lm --cmd 'lmf /v'
 ```
 
-`--proc-folder` takes the folder, its `data.db`, or a pid or folder name as `.database list` shows them. The
-item is named `[1234] app.exe (saved)`. What it has:
+`--proc-folder` takes the folder, its `data.db`, or a pid or folder name as `.database list` shows them. In the
+UI, *File > Open Saved Process* lists the process folders of the data folder, newest first, with their size and
+whether they have a capture or floating code snapshots; Enter opens one, and the edit box takes what
+`--proc-folder` takes. The item is named `[1234] app.exe (saved)`. What it has:
 - the analysis, the comments and the floating modules from `data.db`;
 - the module list from `modules.xml`, which the live view writes when the process is opened and again each
   time the module list is reloaded;
@@ -357,9 +359,6 @@ item is named `[1234] app.exe (saved)`. What it has:
 Anything else reads as missing. A saved folder is never removed when its item closes and is never written
 to except by the analysis. Process folders without floating code are removed 48 hours after their last
 write, or by `.database cleanup` once the process exited, so open them before that.
-
-TODO:
-- [ ] The UI: *File* menu entry for a saved folder.
 
 ### Capture (deep mode)
 

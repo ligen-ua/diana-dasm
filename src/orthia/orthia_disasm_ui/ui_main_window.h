@@ -51,6 +51,8 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
     void ToggleMenu(bool openPopup);
     void OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool) override;
     void OpenExecutable();
+    // File > Open Saved Process: a process folder after the process exited
+    void OpenSavedProcess();
     void OpenProcess();
     void CloseCurrentItem();
     void ShowAbout();

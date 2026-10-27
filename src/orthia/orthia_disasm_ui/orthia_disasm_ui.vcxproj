@@ -297,6 +297,7 @@
     <ClCompile Include="orthia_sha256.cpp" />
     <ClCompile Include="orthia_saved_process.cpp" />
     <ClCompile Include="orthia_capture.cpp" />
+    <ClCompile Include="oui_open_saved_dialog.cpp" />
     <ClCompile Include="orthia_image_source.cpp" />
     <ClCompile Include="orthia_item_file.cpp" />
     <ClCompile Include="orthia_item_process.cpp" />
@@ -347,6 +348,7 @@
     <ClInclude Include="orthia_sha256.h" />
     <ClInclude Include="orthia_saved_process.h" />
     <ClInclude Include="orthia_capture.h" />
+    <ClInclude Include="oui_open_saved_dialog.h" />
     <ClInclude Include="ui_tests_fakes.h" />
     <ClInclude Include="orthia_image_source.h" />
     <ClInclude Include="orthia_item_file.h" />

@@ -397,6 +397,11 @@ namespace orthia
             {
                 continue;
             }
+            // a captured module needs no file
+            if (IsCaptured(source->GetBase()))
+            {
+                continue;
+            }
             if (auto image = source->GetImage())
             {
                 copy(source->GetBase(), image->GetMappedFile());

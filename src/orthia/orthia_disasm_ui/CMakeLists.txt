@@ -19,6 +19,7 @@ set(SOURCES
     orthia_sha256.cpp
     orthia_saved_process.cpp
     orthia_capture.cpp
+    oui_open_saved_dialog.cpp
     orthia_image_source.cpp
     orthia_item_file.cpp
     orthia_module_names.cpp

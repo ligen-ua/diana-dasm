@@ -4,6 +4,7 @@
 #include "oui_goto_dialog.h"
 #include "formats/orthia_image_format.h"
 #include "orthia_saved_process.h"
+#include "oui_open_saved_dialog.h"
 
 void CMainWindow::ToggleMenu(bool openPopup)
 {
@@ -286,6 +287,40 @@ void CMainWindow::OpenExecutable()
         oui::FileInfo::flag_any_executable));
     dialog->Dock();
 }
+void CMainWindow::OpenSavedProcess()
+{
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    std::weak_ptr<CMainWindow> weakMe = me;
+    if (!me)
+    {
+        return;
+    }
+    oui::CommonDialogStrings dialogStrings;
+    GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.opensaved"), dialogStrings);
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenSavedProcessDialog>(dialogStrings,
+        [model = m_model]() {
+            return orthia::EnumerateProcDatabases(model->GetConfig()->GetProcDBFolder());
+        },
+        [=](const orthia::PlatformString_type& argument) {
+            auto p = weakMe.lock();
+            if (!p)
+            {
+                return oui::fsui::OpenResult(OUI_TCSTR("Error"));
+            }
+            try
+            {
+                // what --proc-folder takes; the folder is read here, the module files on the FS thread
+                auto process = p->m_model->OpenSavedProcessFolder(argument);
+                p->AsyncOpenProcess(process);
+            }
+            catch (const std::exception& e)
+            {
+                return oui::fsui::OpenResult(oui::String(orthia::Utf8ToPlatformString(e.what())));
+            }
+            return oui::fsui::OpenResult();
+        }));
+    dialog->Dock();
+}
 void CMainWindow::ToggleWorkspaceView()
 {
     m_workspaceWindow->SetVisible(!m_workspaceWindow->IsVisible());
@@ -363,6 +398,11 @@ void CMainWindow::ConstuctMenu()
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_process")),
                 [this]() {  OpenProcess();  },
                 oui::Hotkey(oui::VirtualKey::kP)
+            },
+            {
+                uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_saved")),
+                [this]() {  OpenSavedProcess();  },
+                oui::Hotkey(oui::VirtualKey::kS)
             },
             {
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("close_item")),

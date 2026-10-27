@@ -118,6 +118,10 @@ namespace orthia
 
     std::vector<DatabaseInfo> EnumerateDatabases(const CConfigOptionsStorage& config);
     std::vector<DatabaseInfo> EnumerateProcDatabases(const PlatformString_type& procFolderWithSlash);
+    // "512 B", "12.2 MB"
+    PlatformString_type FormatSize(unsigned long long size);
+    // "2026-10-27 16:56" in local time; "?" for file_time_type::min()
+    PlatformString_type FormatFileTime(std::filesystem::file_time_type time);
     // the proc/ folder of an earlier open of the same process, by its pid and exact start key (meta.xml);
     // empty when there is none. The name has the start in seconds, which can move between two opens
     // (Linux computes it from the boot time, and the clock may be set in between)

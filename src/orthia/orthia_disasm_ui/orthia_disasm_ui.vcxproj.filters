@@ -152,6 +152,9 @@
     <ClCompile Include="orthia_capture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="oui_open_saved_dialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ui_tests_saved_process.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -287,6 +290,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_capture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="oui_open_saved_dialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_tests_fakes.h">
