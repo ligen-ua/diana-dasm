@@ -3,6 +3,7 @@
 #include "ui_help.h"
 #include "oui_goto_dialog.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_saved_process.h"
 
 void CMainWindow::ToggleMenu(bool openPopup)
 {
@@ -144,6 +145,11 @@ bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process)
     });
 
     m_model->GetFileSystem()->AsyncExecute(GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler)] {
+        if (auto saved = std::dynamic_pointer_cast<orthia::CSavedProcess>(process))
+        {
+            model->AddSavedProcess(saved, completeHandler);
+            return;
+        }
         model->AddProcess(process, completeHandler);
     });
     return true;

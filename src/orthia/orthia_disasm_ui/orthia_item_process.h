@@ -2,6 +2,7 @@
 #include "oui_processes.h"
 #include "orthia_module_symbols.h"
 #include "orthia_module_names.h"
+#include "orthia_saved_process.h"
 
 namespace orthia
 {
@@ -13,6 +14,12 @@ namespace orthia
         int m_dianaMode = 0;
         int m_dianaArch = DIANA_ARCH_X86;
         PlatformString_type m_procFolder;
+        // opened from a saved folder (CSavedProcess): the folder is never removed, modules.xml never written
+        bool m_savedView = false;
+        // what modules.xml says, from the last ReloadModules; written by the live view
+        SavedModuleList m_savedModules;
+        std::mutex m_saveLock;
+        void SaveModuleList();
 
         // the OS modules and the floating ones, by address
         std::vector<orthia::ModuleInfo> m_modules;
@@ -45,7 +52,11 @@ namespace orthia
             int dianaArch,
             std::shared_ptr<IPeristentItemStorage> persistentStorage);
 
+        // live view: writes modules.xml there now and after each ReloadModules
         void SetProcFolder(const PlatformString_type& folder);
+        // before SetProcFolder: the item shows a saved folder, not a running process
+        void SetSavedView() { m_savedView = true; }
+        bool IsSavedView() const { return m_savedView; }
         void Init(std::shared_ptr<CModuleManager> moduleManager,
             std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
             std::shared_ptr<ModuleStorage> moduleStorage);

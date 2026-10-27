@@ -138,7 +138,9 @@ namespace orthia
             SetState(ImageState::Stale, DescribeIdentityMismatch(m_identity, actual));
             return nullptr;
         }
-        if (image->GetMappedFile().size() != m_size)
+        // in whole pages: a process reports SizeOfImage, the mapping may end with the last section
+        auto pages = [](Address_type size) { return (size + 0xFFF) & ~(Address_type)0xFFF; };
+        if (pages(image->GetMappedFile().size()) != pages(m_size))
         {
             SetState(ImageState::Stale, "mapped size mismatch");
             return nullptr;

@@ -146,6 +146,12 @@
     <ClCompile Include="orthia_sha256.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_saved_process.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_tests_saved_process.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="orthia_module_symbols.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -269,6 +275,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_sha256.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_saved_process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ui_tests_fakes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_shellcode_dialog.h">

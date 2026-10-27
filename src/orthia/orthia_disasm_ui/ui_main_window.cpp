@@ -1,4 +1,5 @@
 #include "ui_main_window.h"
+#include "orthia_saved_process.h"
 #include <cerrno>
 
 CMainWindow::CMainWindow(std::shared_ptr<orthia::CProgramModel> model)
@@ -119,7 +120,8 @@ void CMainWindow::AddInitialArgument(const InitialOpenFileInfo& info)
 }
 // Never throws: a target that fails to open is reported in the output window by OnAfterInit
 void CMainWindow::AddInitialTargets(const std::vector<orthia::PlatformString_type>& files,
-    const std::vector<unsigned long long>& pids)
+    const std::vector<unsigned long long>& pids,
+    const std::vector<orthia::PlatformString_type>& procFolders)
 {
 #ifdef WIN32
     const int notFoundError = ERROR_FILE_NOT_FOUND;
@@ -153,6 +155,19 @@ void CMainWindow::AddInitialTargets(const std::vector<orthia::PlatformString_typ
             continue;
         }
         AddInitialArgument({ platformError, process->GetFullFileNameForUI(), nullptr, process });
+    }
+    for (const auto& folder : procFolders)
+    {
+        try
+        {
+            auto process = m_model->OpenSavedProcessFolder(folder);
+            AddInitialArgument({ 0, process->GetFullFileNameForUI(), nullptr, process });
+        }
+        catch (const std::exception& e)
+        {
+            AddInitialTextOutputInfo(oui::String(ORTHIA_TCSTR("Can't open the saved process folder: ") +
+                orthia::Utf8ToPlatformString(e.what())));
+        }
     }
 }
 void CMainWindow::AddInitialTextOutputInfo(const oui::String& text)

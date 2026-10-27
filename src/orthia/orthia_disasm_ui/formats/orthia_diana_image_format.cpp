@@ -255,6 +255,36 @@ namespace orthia
         }
     }
 
+    bool CDianaModuleImage::QueryIdentity(ImageIdentity& identity)
+    {
+        identity = ImageIdentity();
+        if (m_exe.type == DIANA_EXECUTABLE_TYPE_PE)
+        {
+            // the headers are mapped as they are in the file
+            std::vector<char> header((size_t)std::min<Address_type>(m_size, 0x1000));
+            OPERAND_SIZE readBytes = 0;
+            if (header.empty() || m_stream.parent.pRandomRead(&m_stream, 0, header.data(), (int)header.size(), &readBytes, 0) ||
+                readBytes != (OPERAND_SIZE)header.size())
+            {
+                return false;
+            }
+            return QueryPeHeaderIdentity(header.data(), header.size(), identity);
+        }
+        if (m_exe.type == DIANA_EXECUTABLE_TYPE_ELF)
+        {
+            DI_UINT8 buffer[256] = { 0, };
+            DI_UINT32 size = 0;
+            if (DianaElfFile_QueryBuildId(&m_exe.u.elfFile, &m_stream.parent, 0, buffer, sizeof(buffer), &size) || !size)
+            {
+                return false;
+            }
+            identity.format = ImageIdentity::format_Elf;
+            identity.buildIdHex = BytesToHex(buffer, size);
+            return true;
+        }
+        return false;
+    }
+
     // CDianaImageFormat
     static std::string DescribeMapError(int errorCode)
     {

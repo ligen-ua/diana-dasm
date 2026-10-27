@@ -30,6 +30,9 @@ static void PrintUsage(std::ostream& out)
     out << "Options:\n";
     out << "  --file <filename>   open the given executable file\n";
     out << "  --pid <pid>         open the process with the given id (\"self\" for this process)\n";
+    out << "  --proc-folder <folder|pid>\n";
+    out << "                      open a saved process folder (proc/...) after the process\n";
+    out << "                      exited: a path, its data.db, or a pid or name of .database list\n";
     out << "  --cmd <command>     run <command> without UI and exit\n";
     out << "                      (repeatable, one command per --cmd, executed in order)\n";
     out << "  --analyze           with --cmd: deep code analysis and symbol loading on open\n";
@@ -165,6 +168,7 @@ int wmain(int argc, const wchar_t* argv[])
     // MessageBox(0, 0, 0, 0);
     std::vector<std::wstring> filenamesToOpen;
     std::vector<unsigned long long> processesToOpen;
+    std::vector<std::wstring> procFoldersToOpen;
     std::vector<std::wstring> commandsToRun;
     bool analyze = false;
     bool overwriteDatabases = false;
@@ -174,6 +178,7 @@ int wmain(int argc, const wchar_t* argv[])
         bool nextIsPid = false;
         bool nextIsCmd = false;
         bool nextIsFile = false;
+        bool nextIsProcFolder = false;
         bool sandbox = true;
         std::optional<std::wstring> formatArg, baseArg, archArg;
         std::optional<std::wstring>* nextValue = nullptr;     // --format, --base, --arch
@@ -196,6 +201,12 @@ int wmain(int argc, const wchar_t* argv[])
             {
                 filenamesToOpen.push_back(argv[i]);
                 nextIsFile = false;
+                continue;
+            }
+            if (nextIsProcFolder)
+            {
+                procFoldersToOpen.push_back(argv[i]);
+                nextIsProcFolder = false;
                 continue;
             }
             if (nextIsPid)
@@ -234,6 +245,11 @@ int wmain(int argc, const wchar_t* argv[])
             if (wcscmp(argv[i], L"--file") == 0)
             {
                 nextIsFile = true;
+                continue;
+            }
+            if (wcscmp(argv[i], L"--proc-folder") == 0)
+            {
+                nextIsProcFolder = true;
                 continue;
             }
             if (wcscmp(argv[i], L"--format") == 0)
@@ -288,7 +304,7 @@ int wmain(int argc, const wchar_t* argv[])
             PrintUsage(std::cerr);
             return orthia::consoleExit_Usage;
         }
-        if (nextIsPid || nextIsCmd || nextIsFile || nextValue)
+        if (nextIsPid || nextIsCmd || nextIsFile || nextIsProcFolder || nextValue)
         {
             std::cerr << "Missing value for " << orthia::ToAnsiString_Silent(argv[argc - 1]) << "\n\n";
             PrintUsage(std::cerr);
@@ -373,7 +389,7 @@ int wmain(int argc, const wchar_t* argv[])
         if (consoleMode)
         {
             const int result = orthia::RunConsoleMode(programModel,
-                { commandsToRun, filenamesToOpen, processesToOpen, analyze, fileFormat });
+                { commandsToRun, filenamesToOpen, processesToOpen, procFoldersToOpen, analyze, fileFormat });
             programModel.reset();
             return result;
         }
@@ -400,7 +416,7 @@ int wmain(int argc, const wchar_t* argv[])
 #endif
 
         // pass arguments
-        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen);
+        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen, procFoldersToOpen);
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

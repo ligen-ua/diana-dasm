@@ -24,6 +24,7 @@ namespace orthia
         std::vector<PlatformString_type> commands;      // --cmd, in order
         std::vector<PlatformString_type> files;         // --file
         std::vector<unsigned long long> pids;           // --pid
+        std::vector<PlatformString_type> procFolders;   // --proc-folder
         bool analyze = false;                           // --analyze
         FileFormatOptions fileFormat;
     };

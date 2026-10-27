@@ -93,7 +93,7 @@ Problems setting up the sandbox are reported as warnings only when Orthia runs e
 ## Command line
 
 ```
-orthia [--file <filename>]... [--pid <pid>]... [--cmd <command>]... [--analyze] [--overwrite-db] [--no-sandbox]
+orthia [--file <filename>]... [--pid <pid>]... [--proc-folder <folder|pid>]... [--cmd <command>]... [--analyze] [--overwrite-db] [--no-sandbox]
 orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <command>...
 ```
 
@@ -101,6 +101,7 @@ orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <comm
 |---|---|
 | `--file <filename>` | open the given executable file |
 | `--pid <pid>` | open the process with the given id: decimal, `0x`-prefixed hex, or `self` for Orthia's own process |
+| `--proc-folder <folder\|pid>` | open a saved process folder after the process exited: a `proc/` folder, its `data.db`, or a pid or folder name as `.database list` shows them (see [Saved process folders](#saved-process-folders)) |
 | `--cmd <command>` | run `<command>` without the UI and exit; repeat it for more commands, they run in order |
 | `--analyze` | with `--cmd`: deep code analysis and symbol loading on open |
 | `--format <format>` | with `--cmd`: open the `--file` as `pe`, `elf` or `raw` (code without headers) instead of the format it is detected as |
@@ -112,12 +113,12 @@ orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <comm
 | `-h`, `--help` | show help and exit; on Windows also `/?` and `-?` |
 | `--version` | show the version (`orthia 1.x.x.xx`) and exit |
 
-The value after `--file`, `--pid` or `--cmd` is taken as it is, even if it starts with `--`.
+The value after `--file`, `--pid`, `--proc-folder` or `--cmd` is taken as it is, even if it starts with `--`.
 
 All arguments are optional: plain `orthia` with no arguments starts the UI with an empty workspace,
 and you open files and processes from the **File** menu (*Open executable*, *Open process*).
 Without `--cmd` the UI starts with all given files and processes open.
-With `--cmd`, exactly one `--file` or `--pid` is required, except when every command is a `.database` command:
+With `--cmd`, exactly one `--file`, `--pid` or `--proc-folder` is required, except when every command is a `.database` command:
 those work on the data folder and run without a target.
 
 Examples:
@@ -125,6 +126,7 @@ Examples:
 orthia
 orthia --file C:\Windows\System32\notepad.exe
 orthia --pid 1234
+orthia --proc-folder 1234 --cmd lmf
 orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
 orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
 orthia --file firmware.bin --format raw --base 0x8000 --arch thumb --analyze --cmd 'u 8000 L20'
@@ -252,8 +254,8 @@ only: data written next to the code doesn't make a module stale, a change of pro
 The bytes of each floating module are saved when it is found: `floating/<base>_<sha256 prefix>.bin` in the
 process database folder (up to 16 MB of the allocation, unreadable pages zero filled). `modinfo` prints the
 file and its SHA-256. The folder is then kept after the process exits, and only `.database delete` removes
-it (see [databases.md](databases.md#processes-procpid-name-start)). Opening such a folder after the process exited is
-not possible yet.
+it (see [databases.md](databases.md#processes-procpid-name-start)). `--proc-folder` opens such a folder after the
+process exited (see [Saved process folders](#saved-process-folders)).
 
 `.analyze /f fl_<base>` on a stale module looks at the memory as it is now: when the allocation is still
 there with some of its entry points executable, the module is fingerprinted and analyzed again; when it is
@@ -306,8 +308,8 @@ Stale and live memory:
 
 Commands and UI:
 - [x] The bytes are saved when a floating module is found, with their SHA-256, and the folder stays.
-- [ ] Open a saved process folder after the process exited: modules and floating modules from the database,
-  bytes from the snapshots.
+- [x] Open a saved process folder after the process exited (`--proc-folder`): the module files and the snapshots.
+- [ ] `.capture` and `--capture`: the memory of the modules, and everything else the process has, into the folder.
 - [ ] Snapshots: 16 MB per allocation and no budget per process; a JIT heap can make many.
 - [ ] The Modules window leaves floating modules out; give them a view of their own.
 
@@ -321,6 +323,36 @@ Architectures and tests:
   entry) module that branches into a fake region, like the x86 ones in `ui_tests.cpp`.
 - [ ] The test helper is not checked in a Debug build (incremental linking puts a jump thunk where the hooked
   function's address points).
+
+### Saved process folders
+
+A process folder (`proc/[pid] name <start>/`) can be opened after the process exited:
+
+```
+orthia --proc-folder "proc/[1234] app.exe 20261027-125304"
+orthia --proc-folder 1234 --cmd lm --cmd 'lmf /v'
+```
+
+`--proc-folder` takes the folder, its `data.db`, or a pid or folder name as `.database list` shows them. The
+item is named `[1234] app.exe (saved)`. What it has:
+- the analysis, the comments and the floating modules from `data.db`;
+- the module list from `modules.xml`, which the live view writes when the process is opened and again each
+  time the module list is reloaded;
+- the bytes of each module from its file, while that file is still the build the process ran (the PE
+  timestamp and size, or the ELF build-id, read from the headers in memory). `lm` shows `linked`, or `stale`
+  when the file is gone or another build; `modinfo` says why. A file has no in-memory changes: an inline hook
+  shows the original instructions there;
+- the bytes of the floating modules from their snapshots, so `u`, `lmf /v` and `modinfo` work as they did.
+
+Anything else reads as missing. A saved folder is never removed when its item closes and is never written
+to except by the analysis. Process folders without floating code are removed 48 hours after their last
+write, or by `.database cleanup` once the process exited, so open them before that.
+
+TODO:
+- [ ] `.capture` (everything, on demand) and `--capture` (each analyzed module's memory): the bytes as the
+  process had them, for the deep case, where the files on disk are not enough.
+- [ ] The UI: *File* menu entry for a saved folder.
+- [ ] Threads: there are none in a saved folder until `.capture` saves them.
 
 ### Startup routines
 

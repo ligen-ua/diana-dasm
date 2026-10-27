@@ -180,6 +180,9 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("readme-header"), ORTHIA_TCSTR("Orthia Disasm Database Folder"))
         << textManager->RegisterValue(ORTHIA_TCSTR("original-name"), ORTHIA_TCSTR("Original Name: \"%1\""))
         << textManager->RegisterValue(ORTHIA_TCSTR("database-file"), ORTHIA_TCSTR("Database file: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("opening-saved"), ORTHIA_TCSTR("Opening the saved process folder: \"%1\""))
+        << textManager->RegisterValue(ORTHIA_TCSTR("saved-no-modules"), ORTHIA_TCSTR("The folder has no module list (modules.xml): only the floating code has bytes"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("saved-name"), ORTHIA_TCSTR("%1 (saved)"))
         << textManager->RegisterValue(ORTHIA_TCSTR("database-reused"), ORTHIA_TCSTR("Using the database of an earlier open of this process (--overwrite-db for a new one)"))
         ;
 

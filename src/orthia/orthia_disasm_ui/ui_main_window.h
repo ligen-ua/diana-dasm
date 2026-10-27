@@ -86,8 +86,10 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
 public:
     CMainWindow(std::shared_ptr<orthia::CProgramModel> model);
     void AddInitialArgument(const InitialOpenFileInfo& info);
+    // procFolders: --proc-folder, saved process folders
     void AddInitialTargets(const std::vector<orthia::PlatformString_type>& files,
-        const std::vector<unsigned long long>& pids);
+        const std::vector<unsigned long long>& pids,
+        const std::vector<orthia::PlatformString_type>& procFolders = std::vector<orthia::PlatformString_type>());
     void AddInitialTextOutputInfo(const oui::String& text);
     void ConstructChilds() override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;

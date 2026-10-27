@@ -49,7 +49,7 @@ nothing is thrown away.
 
 ## Processes: `proc/[pid] name <start>/`
 
-A live process gets `data.db`, `DIRINFO` and `meta.xml` in a folder named after its pid, its short name
+A live process gets `data.db`, `DIRINFO`, `meta.xml` and `modules.xml` in a folder named after its pid, its short name
 and when it started, in UTC: `proc/[1234] notepad.exe 20261021-153012/`. A later process that gets the same
 pid gets its own folder. When the start can't be read the folder is named `[pid] name`, as before
 `meta.xml` existed.
@@ -70,14 +70,32 @@ Only `.database delete` removes it. `--pid self` still removes its folder.
 
 The code analysis and the comments go into that database, and the analysis flags of each module
 (`flags` in its metainfo, with its name and size). A reopen trusts the flags of a module only when
-the module at that address still has the same name and size. The module list, exports and loaded
-private symbols are kept in memory and rebuilt from the live process. Floating modules are saved
+the module at that address still has the same name and size. Exports and loaded private symbols are kept
+in memory and rebuilt from the live process. The module list is also written to `modules.xml`, see below. Floating modules are saved
 (metainfo type 6) and come back on a reopen, `stale` when their memory changed.
 
 When a floating module is found, and when `.analyze /f` checks a stale one again, the bytes of its
 allocation (up to 16 MB, from its base) are written to `floating/<base>_<sha256 prefix>.bin`; pages that
 can't be read are zero filled. Another snapshot of the same region with other bytes is a new file, and the
 old one stays. `modinfo` prints the path and the SHA-256.
+
+### `modules.xml`
+
+What the OS reported as the modules of the process, written by the live view when the process is opened
+and again whenever the module list is reloaded (only when it changed). `--proc-folder` reads it to open the
+folder after the process exited ([orthia.md](orthia.md#saved-process-folders)).
+
+```xml
+<modules format_version="1" main="7ff65ed70000">
+    <module base="7ff65ed70000" size="2b6000" name="app.exe" path="C:\dirpp.exe" mode="8" arch="0"
+        entry="7ff65ed82844" builtin="1" id_format="1" id_timestamp="6716f0aa" id_sizeofimage="2b6000"/>
+</modules>
+```
+
+`main` is the base of the process image, `mode`/`arch` are `DIANA_MODE*`/`DIANA_ARCH_*`, `builtin` the
+`builtInFlags` (format bits). The `id_*` attributes tell the build of the module's file, as in module metainfo:
+PE timestamp and `SizeOfImage` from the headers in memory, or the ELF build-id (`id_buildid`); a module without
+them has no bytes when the folder is opened later.
 
 ## `meta.xml`
 

@@ -4,6 +4,7 @@
 #include "orthia_commands.h"
 #include "formats/orthia_image_format.h"
 #include "orthia_diana_arch.h"
+#include "orthia_saved_process.h"
 #include "diana_core_cpp.h"
 #include <cstdio>
 #include <climits>
@@ -300,6 +301,28 @@ namespace
             });
     }
 
+    bool OpenSavedProcessFolder(CHeadlessPump& pump,
+        const std::shared_ptr<CProgramModel>& model,
+        const PlatformString_type& argument)
+    {
+        std::shared_ptr<CSavedProcess> process;
+        try
+        {
+            process = model->OpenSavedProcessFolder(argument);
+        }
+        catch (const std::exception& e)
+        {
+            WriteLine(stderr, ORTHIA_TCSTR("Can't open the saved process folder: ") + Utf8ToPlatformString(e.what()));
+            return false;
+        }
+        return OpenTargetAndWait<oui::fsui::ProcessCompleteHandler_type>(pump, model,
+            [&](std::shared_ptr<oui::Operation<oui::fsui::ProcessCompleteHandler_type>> handler) {
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler]() {
+                    model->AddSavedProcess(process, handler);
+                });
+            });
+    }
+
     // Returns false when the command reported an error.
     bool RunOneCommand(CHeadlessPump& pump,
         const std::shared_ptr<CProgramModel>& model,
@@ -379,7 +402,7 @@ namespace
             WriteLine(stderr, ORTHIA_TCSTR("--format applies to --file only"));
             return consoleExit_Usage;
         }
-        if (options.files.empty() && options.pids.empty())
+        if (options.files.empty() && options.pids.empty() && options.procFolders.empty())
         {
             // the data folder commands (.database) need no target
             bool allTargetless = true;
@@ -389,7 +412,7 @@ namespace
             }
             if (!allTargetless)
             {
-                WriteLine(stderr, ORTHIA_TCSTR("No target: --file or --pid is required"));
+                WriteLine(stderr, ORTHIA_TCSTR("No target: --file, --pid or --proc-folder is required"));
                 return consoleExit_OpenFail;
             }
             int result = consoleExit_Ok;
@@ -413,6 +436,13 @@ namespace
         for (auto& pid : options.pids)
         {
             if (!OpenProcess(pump, model, pid))
+            {
+                return consoleExit_OpenFail;
+            }
+        }
+        for (auto& folder : options.procFolders)
+        {
+            if (!OpenSavedProcessFolder(pump, model, folder))
             {
                 return consoleExit_OpenFail;
             }

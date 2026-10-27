@@ -33,6 +33,7 @@ namespace orthia
         virtual void OnWorkspaceItemRemoved(int itemId) {}
     };
     class CProcessWorkplaceItem;
+    class CSavedProcess;
     class CProgramModel
     {
         std::shared_ptr<oui::CFileSystem> m_fileSystem;
@@ -57,6 +58,11 @@ namespace orthia
             std::shared_ptr<CProcessWorkplaceItem> info);
 
         int RegisterItem(std::shared_ptr<IWorkPlaceItem> item, bool makeActive);
+        // the end of an open of a process item, live or saved: registered, logged, analysis queued
+        void FinishProcessOpen(std::shared_ptr<CProcessWorkplaceItem> info,
+            oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+            intrusive_ptr<CTextNode> mainNode,
+            oui::fsui::OpenResult& result);
     public:
         CProgramModel(std::shared_ptr<orthia::CConfigOptionsStorage> config);
         void Stop();
@@ -83,6 +89,13 @@ namespace orthia
         // other thread
         void AddProcess(std::shared_ptr<oui::IProcess> proc,
             oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
+        // a process folder after the process exited (OpenSavedProcess): its database as it is,
+        // the bytes from the module files and the floating code snapshots
+        void AddSavedProcess(std::shared_ptr<CSavedProcess> proc,
+            oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler);
+        // a --proc-folder argument: a folder, its data.db, a pid or a folder name of the data
+        // folder. Throws with a message for the user
+        std::shared_ptr<CSavedProcess> OpenSavedProcessFolder(const PlatformString_type& argument);
 
         // forcedFormat: open as this format instead of the detected one; params: what a
         // format opened by hand needs (raw code: base and mode)

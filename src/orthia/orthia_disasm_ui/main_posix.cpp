@@ -37,6 +37,9 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "Options:\n";
     out << "  --file <filename> open the given executable file\n";
     out << "  --pid <pid>       open the process with the given id (\"self\" for this process)\n";
+    out << "  --proc-folder <folder|pid>\n";
+    out << "                    open a saved process folder (proc/...) after the process\n";
+    out << "                    exited: a path, its data.db, or a pid or name of .database list\n";
     out << "  --cmd <command>   run <command> without UI and exit\n";
     out << "                    (repeatable, one command per --cmd, executed in order)\n";
     out << "  --analyze         with --cmd: deep code analysis and symbol loading on open\n";
@@ -91,6 +94,7 @@ int main(int argc, const char* argv[])
 
     std::vector<unsigned long long> processesToOpen;
     std::vector<std::string> filenamesToOpen;
+    std::vector<std::string> procFoldersToOpen;
     std::vector<std::string> commandsToRun;
     const std::string programName = GetProgramName(argc > 0 ? argv[0] : nullptr);
     bool analyze = false;
@@ -101,6 +105,7 @@ int main(int argc, const char* argv[])
         bool nextIsPid = false;
         bool nextIsCmd = false;
         bool nextIsFile = false;
+        bool nextIsProcFolder = false;
         bool dropPrivileges = true;
         std::optional<std::string> formatArg, baseArg, archArg;
         std::optional<std::string>* nextValue = nullptr;      // --format, --base, --arch
@@ -123,6 +128,12 @@ int main(int argc, const char* argv[])
             {
                 filenamesToOpen.push_back(argv[i]);
                 nextIsFile = false;
+                continue;
+            }
+            if (nextIsProcFolder)
+            {
+                procFoldersToOpen.push_back(argv[i]);
+                nextIsProcFolder = false;
                 continue;
             }
             if (nextIsPid)
@@ -156,6 +167,11 @@ int main(int argc, const char* argv[])
             if (strcmp(argv[i], "--cmd") == 0)
             {
                 nextIsCmd = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--proc-folder") == 0)
+            {
+                nextIsProcFolder = true;
                 continue;
             }
             if (strcmp(argv[i], "--file") == 0)
@@ -217,7 +233,7 @@ int main(int argc, const char* argv[])
             PrintUsage(std::cerr, programName);
             return orthia::consoleExit_Usage;
         }
-        if (nextIsPid || nextIsCmd || nextIsFile || nextValue)
+        if (nextIsPid || nextIsCmd || nextIsFile || nextIsProcFolder || nextValue)
         {
             std::cerr << "Missing value for " << argv[argc - 1] << "\n\n";
             PrintUsage(std::cerr, programName);
@@ -296,7 +312,7 @@ int main(int argc, const char* argv[])
         if (consoleMode)
         {
             const int result = orthia::RunConsoleMode(programModel,
-                { commandsToRun, filenamesToOpen, processesToOpen, analyze, fileFormat });
+                { commandsToRun, filenamesToOpen, processesToOpen, procFoldersToOpen, analyze, fileFormat });
             programModel.reset();
             return result;
         }
@@ -311,7 +327,7 @@ int main(int argc, const char* argv[])
             programModel->Stop();
         });
 
-        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen);
+        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen, procFoldersToOpen);
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

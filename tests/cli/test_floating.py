@@ -241,3 +241,37 @@ def test_snapshot_is_evidence(orthia_cold, helper):
     # .database delete does
     orthia_cold.raw("--cmd", f".database delete {helper.pid}").assert_ok()
     assert not path.exists()
+
+
+def test_saved_folder_after_exit(orthia_cold, helper):
+    """The process exits; its folder opens with --proc-folder: the modules from their files,
+    the floating code from its snapshots, the analysis from the database"""
+    stub = floating_name(helper.stub)
+    orthia_cold.run(f".analyze {HELPER_NAME}", pid=helper.pid).assert_ok()
+    helper.proc.stdin.close()
+    helper.proc.wait(timeout=30)
+
+    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lm", "--cmd", "lmf",
+                          "--cmd", f"u {stub}!$entry_0001 L1",
+                          "--cmd", f"modinfo {HELPER_NAME}").assert_ok()
+    assert_found(res, helper, helper.stub)
+    assert_found(res, helper, helper.handler)
+    # the helper is still the file it ran from
+    res.assert_line(rf"^\S+\s+\S+\s+{HELPER_NAME}(\.exe)?\s+linked, analyzed$")
+    res.assert_line(r"^Image: linked, loaded$")
+    stub_text = re.escape(helper.address_text(helper.stub))
+    res.assert_line(rf"(?i)^{stub_text}\s+[0-9a-f]+\s+(push\s+rbp|pushad?|sub\s+sp,\s*sp,\s*#0xb0)\b")
+
+    # by its path too, or its data.db; the folder stays
+    folders = list((orthia_cold.home / "proc").iterdir())
+    assert len(folders) == 1, folders
+    res = orthia_cold.raw("--proc-folder", str(folders[0] / "data.db"), "--cmd", "lmf").assert_ok()
+    assert_found(res, helper, helper.stub)
+    assert (folders[0] / "data.db").is_file()
+    assert (folders[0] / "modules.xml").is_file()
+
+
+def test_saved_folder_not_found(orthia_cold):
+    res = orthia_cold.raw("--proc-folder", "no_such_folder_or_pid", "--cmd", "lmf")
+    assert res.code == 3, res
+    assert "Can't open the saved process folder" in res.stderr, res

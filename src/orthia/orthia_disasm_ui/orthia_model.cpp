@@ -12,6 +12,8 @@
 #include "orthia_common_format.h"
 #include "orthia_databases.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_saved_process.h"
+#include "orthia_floating_code.h"
 
 namespace orthia
 {
@@ -384,7 +386,89 @@ namespace orthia
         persistentItemStorage->Init(info);
 
         CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
+        FinishProcessOpen(info, completeHandler, mainNode, result);
+    }
 
+    void CProgramModel::AddSavedProcess(std::shared_ptr<CSavedProcess> proc,
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler)
+    {
+        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+        oui::fsui::OpenResult result;
+        result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
+        oui::ScopedGuard handlerGuard([&]() {
+            completeHandler->Reply(completeHandler, proc, result);
+        });
+
+        const auto folder = proc->GetFolder();
+        WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opening-saved")),
+            oui::String(folder)));
+        if (!proc->HasModuleList())
+        {
+            WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("saved-no-modules")));
+        }
+
+        auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
+        auto info = std::make_shared<CProcessWorkplaceItem>(proc,
+            oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("saved-name")), proc->GetFullFileNameForUI()),
+            proc->GetDianaMode(), proc->GetDianaArch(), persistentItemStorage);
+        info->SetSavedView();
+        // the module files are read here: exports, and which of them are still the same build
+        info->ReloadModules();
+        persistentItemStorage->Init(info);
+
+        try
+        {
+            const auto dbFileName = AddSlash2(folder) + m_config->GetDBFileName();
+            info->SetProcFolder(folder);
+            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
+                dbFileName));
+
+            auto filePersistentStorage = std::make_shared<CFilePersistentItemStorage>();
+            auto moduleManager = std::make_shared<CModuleManager>();
+            moduleManager->Reinit(dbFileName, false);
+            filePersistentStorage->Init(moduleManager->QueryDatabaseManager());
+            auto moduleStorage = std::make_shared<ModuleStorage>(
+                moduleManager->QueryDatabaseManager()->GetClassicDatabase());
+            info->Init(moduleManager, filePersistentStorage, moduleStorage);
+            filePersistentStorage->CPersistentItemStorage::Init(info);
+
+            // the floating code reads from its snapshots
+            for (const auto& region : LoadFloatingRegions(*moduleManager))
+            {
+                proc->AddSnapshot(*region);
+            }
+            info->LoadSavedFloatingModules();
+            info->LoadSavedModuleFlags();
+        }
+        catch (const std::exception& e)
+        {
+            result.error = oui::String(Utf8ToPlatformString(e.what()));
+            return;
+        }
+        FinishProcessOpen(info, completeHandler, mainNode, result);
+    }
+
+    std::shared_ptr<CSavedProcess> CProgramModel::OpenSavedProcessFolder(const PlatformString_type& argument)
+    {
+        const auto folder = ResolveSavedProcessFolder(EnumerateDatabases(*m_config), argument);
+        // the folder a live item has open would get two writers
+        const auto open = QueryOpenDatabaseFolders();
+        auto it = open.find(folder);
+        if (it != open.end())
+        {
+            throw std::runtime_error("The folder is open as " + PlatformStringToUtf8(it->second));
+        }
+        return OpenSavedProcess(folder);
+    }
+
+    void CProgramModel::FinishProcessOpen(std::shared_ptr<CProcessWorkplaceItem> info,
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+        intrusive_ptr<CTextNode> mainNode,
+        oui::fsui::OpenResult& result)
+    {
+        const int dianaMode = info->GetDianaMode();
+        const int dianaArch = info->GetDianaArch();
         WorkAddressRangeInfo mainModule;
         int mainModuleFlags = 0;
         if (auto address = info->GetMainModuleAddress())
