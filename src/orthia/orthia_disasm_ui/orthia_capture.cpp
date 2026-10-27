@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <atomic>
 
 namespace orthia
 {
@@ -45,6 +46,14 @@ namespace orthia
             return value ? value : "";
         }
 
+        // .capture and --capture may write the same region at once (the UI runs commands and the
+        // analysis on threads of their own): each write has a temporary file of its own
+        std::string UniqueTempSuffix()
+        {
+            static std::atomic<unsigned long long> counter{ 0 };
+            return "." + std::to_string(++counter) + ".tmp";
+        }
+
         fs::path CaptureFolder(const PlatformString_type& folder)
         {
             return fs::path(folder) / g_captureFolder;
@@ -53,7 +62,7 @@ namespace orthia
         void WriteFileAtomic(const fs::path& target, const char* data, size_t size)
         {
             fs::path temp = target;
-            temp += ".tmp";
+            temp += UniqueTempSuffix();
             {
                 std::ofstream stream(temp, std::ios::binary | std::ios::trunc);
                 stream.write(data, (std::streamsize)size);
@@ -101,7 +110,7 @@ namespace orthia
             const std::string fileName = ToHex(region.base) + "_" + ToHex(region.size) + ".bin";
             const fs::path target = CaptureFolder(folder) / Utf8ToPlatformString(fileName);
             fs::path temp = target;
-            temp += ".tmp";
+            temp += UniqueTempSuffix();
             Address_type missing = 0;
             {
                 std::ofstream stream(temp, std::ios::binary | std::ios::trunc);

@@ -7,7 +7,9 @@
 #include "orthia_item_process.h"
 #include "orthia_image_source.h"
 #include "orthia_databases.h"
+#include <atomic>
 #include <fstream>
+#include <thread>
 
 using orthia_tests::CFakeProcess;
 
@@ -295,4 +297,50 @@ TEST(Capture, FolderIsKept)
     const auto all = orthia::EnumerateProcDatabases(orthia::AddSlash2(folder.path.native()));
     ASSERT_EQ(1u, all.size());
     EXPECT_TRUE(all[0].hasCapture);
+}
+
+// .capture while the analysis runs with --capture: the UI runs commands and the analysis on threads
+// of their own, so both can write the same region at once
+TEST(Capture, ConcurrentCaptures)
+{
+    TempFolder folder(ORTHIA_TCSTR("orthia_test_capture_concurrent"));
+    auto process = std::make_shared<CFakeProcess>();
+    process->images.push_back(RawImage(0x10000000, 0x40000, ORTHIA_TCSTR("app")));
+    for (int i = 0; i < 8; ++i)
+    {
+        process->regions.push_back(DataRegion(0x20000000 + i * 0x10000, (char)i, c_rw));
+    }
+    std::atomic<int> errors{ 0 };
+    auto full = std::thread([&]() {
+        for (int i = 0; i < 30; ++i)
+        {
+            try { orthia::CaptureProcess(*process, folder.path.native(), nullptr); }
+            catch (const std::exception&) { ++errors; }
+        }
+    });
+    auto module = std::thread([&]() {
+        for (int i = 0; i < 100; ++i)
+        {
+            try { orthia::CaptureRange(*process, folder.path.native(), 0x10000000, 0x40000); }
+            catch (const std::exception&) { ++errors; }
+        }
+    });
+    full.join();
+    module.join();
+    EXPECT_EQ(0, errors.load());
+
+    // one index, each file it names whole, no temporary files left
+    orthia::CaptureIndex index;
+    ASSERT_TRUE(orthia::ReadCaptureIndex(folder.path.native(), index));
+    EXPECT_EQ(9u, index.regions.size());
+    for (const auto& region : index.regions)
+    {
+        ASSERT_FALSE(region.file.empty());
+        const auto path = folder.path / orthia::g_captureFolder / orthia::Utf8ToPlatformString(region.file);
+        EXPECT_EQ(region.size, fs::file_size(path)) << region.file;
+    }
+    for (const auto& entry : fs::directory_iterator(folder.path / orthia::g_captureFolder))
+    {
+        EXPECT_NE(ORTHIA_TCSTR(".tmp"), entry.path().extension().native()) << entry.path().string();
+    }
 }

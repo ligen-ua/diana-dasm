@@ -372,7 +372,11 @@ orthia --pid 1234 --capture --cmd '.analyze app*'
 orthia --proc-folder 1234 --cmd 'u app!main L10' --cmd threads
 ```
 
-Both only read: the process is not stopped, so a thread may change bytes while they are read. A newer
+Both only read: the process is not stopped, so a thread may change bytes while they are read. In the UI,
+`.capture` can run while the analysis on open (or a `.analyze`) still runs: they read the process each on a
+thread of its own and don't wait for each other. The capture has the memory as it is, whatever the analysis
+has found by then; floating code the analysis finds later has its own snapshots, and `.capture` again
+takes in what changed. A newer
 capture of a range replaces what was captured over it, and keeps the rest: a module captured before it
 unloaded stays. The capture is `capture/` in the process folder ([databases.md](databases.md#capture));
 a folder with one is evidence, kept as one with floating code snapshots is. It can be big: a whole
