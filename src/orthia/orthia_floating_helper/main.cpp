@@ -8,8 +8,14 @@
 //
 // On ARM64 the same with b <stub>, and ldr x16, <handler>; blr x16 in the stub; on A32/Thumb with
 // b / ldr pc and ldr r3, <handler>; blx r3.
-// Prints "ready target=<hex> stub=<hex> handler=<hex> calls=<n> result=<n> bits=<32|64>" and waits until its
-// stdin is closed ("change" on stdin changes the handler allocation).
+//
+// It also hooks an import: the slot of GetCurrentProcessId in its IAT (getpid in its GOT on Linux)
+// leads to a thunk in an allocation of its own, which jumps on to the function. On Windows the
+// export table entry of floating_exported_function leads to another thunk.
+//
+// Prints "ready target=<hex> stub=<hex> handler=<hex> calls=<n> result=<n> bits=<32|64>
+// slot=<hex> thunk=<hex> import=<name> export_slot=<hex> export_thunk=<hex>" (a slot is 0 when it
+// isn't hooked) and waits until its stdin is closed ("change" on stdin changes the handler allocation).
 
 #include <cstddef>
 #include <cstdio>
@@ -29,6 +35,8 @@ extern "C"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
+#include <elf.h>
+#include <link.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
@@ -49,6 +57,13 @@ extern "C" HELPER_NOINLINE int floating_target_function(int value)
 {
     return floating_leaf_function(value) * 2;
 }
+#ifdef _WIN32
+// gives the executable an export table, whose entry gets hooked
+extern "C" __declspec(dllexport) HELPER_NOINLINE int floating_exported_function(int value)
+{
+    return value + 3;
+}
+#endif
 
 namespace
 {
@@ -161,6 +176,209 @@ namespace
         *writeBytes = (OPERAND_SIZE)size;
         return DI_SUCCESS;
     }
+
+    // the slot this module calls an imported function through
+#ifdef _WIN32
+    const char* const g_importName = "GetCurrentProcessId";
+    void** FindImportSlot(const char* name)
+    {
+        auto* base = (unsigned char*)GetModuleHandleW(nullptr);
+        auto* dos = (IMAGE_DOS_HEADER*)base;
+        auto* nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
+        const auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+        if (!dir.VirtualAddress)
+            return nullptr;
+        for (auto* desc = (IMAGE_IMPORT_DESCRIPTOR*)(base + dir.VirtualAddress); desc->Name; ++desc)
+        {
+            auto* names = (IMAGE_THUNK_DATA*)(base + (desc->OriginalFirstThunk ? desc->OriginalFirstThunk : desc->FirstThunk));
+            auto* slots = (IMAGE_THUNK_DATA*)(base + desc->FirstThunk);
+            for (; names->u1.AddressOfData; ++names, ++slots)
+            {
+                if (IMAGE_SNAP_BY_ORDINAL(names->u1.Ordinal))
+                    continue;
+                auto* byName = (IMAGE_IMPORT_BY_NAME*)(base + names->u1.AddressOfData);
+                if (!std::strcmp((const char*)byName->Name, name))
+                    return (void**)&slots->u1.Function;
+            }
+        }
+        return nullptr;
+    }
+    unsigned long long CallImport()
+    {
+        return GetCurrentProcessId();
+    }
+#else
+    const char* const g_importName = "getpid";
+    struct ImportSearch
+    {
+        const char* name;
+        void** slot;
+    };
+    // the PLT relocations of the program (the first object dl_iterate_phdr reports)
+    int SearchProgram(struct dl_phdr_info* info, size_t, void* context)
+    {
+        auto* search = (ImportSearch*)context;
+        const ElfW(Dyn)* dynamic = nullptr;
+        for (int i = 0; i < info->dlpi_phnum; ++i)
+        {
+            if (info->dlpi_phdr[i].p_type == PT_DYNAMIC)
+                dynamic = (const ElfW(Dyn)*)(info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
+        }
+        if (!dynamic)
+            return 1;
+        // glibc has made the pointers absolute already; another loader may not
+        auto absolute = [info](ElfW(Addr) value) { return value < info->dlpi_addr ? value + info->dlpi_addr : value; };
+        ElfW(Addr) jmprel = 0, symtab = 0, strtab = 0;
+        size_t size = 0;
+        ElfW(Sxword) relType = DT_REL;
+        for (const ElfW(Dyn)* d = dynamic; d->d_tag != DT_NULL; ++d)
+        {
+            switch (d->d_tag)
+            {
+            case DT_JMPREL: jmprel = absolute(d->d_un.d_ptr); break;
+            case DT_PLTRELSZ: size = d->d_un.d_val; break;
+            case DT_SYMTAB: symtab = absolute(d->d_un.d_ptr); break;
+            case DT_STRTAB: strtab = absolute(d->d_un.d_ptr); break;
+            case DT_PLTREL: relType = (ElfW(Sxword))d->d_un.d_val; break;
+            }
+        }
+        if (!jmprel || !symtab || !strtab)
+            return 1;
+        const size_t entrySize = relType == DT_RELA ? sizeof(ElfW(Rela)) : sizeof(ElfW(Rel));
+        for (size_t offset = 0; offset + entrySize <= size; offset += entrySize)
+        {
+            const auto* rel = (const ElfW(Rel)*)(jmprel + offset);
+#if defined(__LP64__)
+            const size_t symbol = ELF64_R_SYM(rel->r_info);
+#else
+            const size_t symbol = ELF32_R_SYM(rel->r_info);
+#endif
+            const auto* sym = (const ElfW(Sym)*)symtab + symbol;
+            if (!std::strcmp((const char*)(strtab + sym->st_name), search->name))
+            {
+                search->slot = (void**)(info->dlpi_addr + rel->r_offset);
+                break;
+            }
+        }
+        return 1;
+    }
+    void** FindImportSlot(const char* name)
+    {
+        ImportSearch search = { name, nullptr };
+        dl_iterate_phdr(SearchProgram, &search);
+        return search.slot;
+    }
+    unsigned long long CallImport()
+    {
+        return (unsigned long long)getpid();
+    }
+#endif
+
+    // jmp <function>, position independent
+    size_t MakeThunk(unsigned char* code, unsigned long long function)
+    {
+#if defined(_M_X64) || defined(__x86_64__)
+        const unsigned char jump[] = { 0xFF, 0x25, 0x00, 0x00, 0x00, 0x00 };   // jmp [rip]
+        std::memcpy(code, jump, sizeof(jump));
+        std::memcpy(code + sizeof(jump), &function, 8);
+        return sizeof(jump) + 8;
+#elif defined(_M_IX86) || defined(__i386__)
+        const unsigned int value = (unsigned int)function;
+        code[0] = 0x68;                                                         // push <function>
+        std::memcpy(code + 1, &value, 4);
+        code[5] = 0xC3;                                                         // ret
+        return 6;
+#elif defined(_M_ARM64) || defined(__aarch64__)
+        const unsigned char jump[] = { 0x50, 0x00, 0x00, 0x58,                  // ldr x16, #8
+                                       0x00, 0x02, 0x1F, 0xD6 };                // br x16
+        std::memcpy(code, jump, sizeof(jump));
+        std::memcpy(code + sizeof(jump), &function, 8);
+        return sizeof(jump) + 8;
+#elif defined(_M_ARM)
+        // Windows runs Thumb only
+        const unsigned char jump[] = { 0xDF, 0xF8, 0x00, 0xF0 };                // ldr.w pc, [pc]
+        const unsigned int value = (unsigned int)function;
+        std::memcpy(code, jump, sizeof(jump));
+        std::memcpy(code + sizeof(jump), &value, 4);
+        return sizeof(jump) + 4;
+#elif defined(__arm__)
+        const unsigned char jump[] = { 0x04, 0xF0, 0x1F, 0xE5 };                // ldr pc, [pc, #-4]
+        const unsigned int value = (unsigned int)function;
+        std::memcpy(code, jump, sizeof(jump));
+        std::memcpy(code + sizeof(jump), &value, 4);
+        return sizeof(jump) + 4;
+#else
+        (void)code;
+        (void)function;
+        return 0;
+#endif
+    }
+
+    // the import slot leads to a thunk of its own; false when the slot isn't found
+    bool HookImport(unsigned long long target, unsigned long long& slotAddress, unsigned long long& thunkAddress)
+    {
+        void** slot = FindImportSlot(g_importName);
+        if (!slot)
+            return false;
+        auto* thunk = (unsigned char*)AllocateNear(target, 0x1000);
+        if (!thunk)
+            return false;
+        const size_t size = MakeThunk(thunk, (unsigned long long)(uintptr_t)*slot);
+        FlushCode(thunk, size);
+        if (!size || !MakeWritable(slot, sizeof(void*)))
+            return false;
+        unsigned long long entry = (unsigned long long)(uintptr_t)thunk;
+#if defined(_M_ARM)
+        entry |= 1;
+#endif
+        *slot = (void*)(uintptr_t)entry;
+        slotAddress = (unsigned long long)(uintptr_t)slot;
+        thunkAddress = (unsigned long long)(uintptr_t)thunk;
+        return true;
+    }
+
+#ifdef _WIN32
+    // the export table entry of the function leads to a thunk: an RVA, so the thunk must be above
+    // the module and within 4 GB of it
+    bool HookExport(const char* name, unsigned long long& slotAddress, unsigned long long& thunkAddress)
+    {
+        auto* base = (unsigned char*)GetModuleHandleW(nullptr);
+        auto* dos = (IMAGE_DOS_HEADER*)base;
+        auto* nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
+        const auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+        if (!dir.VirtualAddress)
+            return false;
+        auto* exports = (IMAGE_EXPORT_DIRECTORY*)(base + dir.VirtualAddress);
+        auto* names = (DWORD*)(base + exports->AddressOfNames);
+        auto* ordinals = (WORD*)(base + exports->AddressOfNameOrdinals);
+        auto* functions = (DWORD*)(base + exports->AddressOfFunctions);
+        for (DWORD i = 0; i < exports->NumberOfNames; ++i)
+        {
+            if (std::strcmp((const char*)(base + names[i]), name))
+                continue;
+            DWORD* slot = &functions[ordinals[i]];
+            const unsigned long long moduleBase = (unsigned long long)(uintptr_t)base;
+            auto* thunk = (unsigned char*)AllocateNear(moduleBase + nt->OptionalHeader.SizeOfImage, 0x1000);
+            const unsigned long long thunkValue = (unsigned long long)(uintptr_t)thunk;
+            if (!thunk || thunkValue < moduleBase || thunkValue - moduleBase > 0xFFFFFFFFULL)
+                return false;
+            const size_t size = MakeThunk(thunk, moduleBase + *slot);
+            FlushCode(thunk, size);
+            if (!size || !MakeWritable(slot, sizeof(*slot)))
+                return false;
+#if defined(_M_ARM)
+            // a Thumb thunk
+            *slot = (DWORD)(thunkValue - moduleBase) | 1;
+#else
+            *slot = (DWORD)(thunkValue - moduleBase);
+#endif
+            slotAddress = (unsigned long long)(uintptr_t)slot;
+            thunkAddress = thunkValue;
+            return true;
+        }
+        return false;
+    }
+#endif
 
     unsigned long long g_lastStub = 0;
 
@@ -280,9 +498,35 @@ int main()
     int (*volatile function)(int) = &floating_target_function;
     const int result = function(1);
 
-    std::printf("ready target=%llx stub=%llx handler=%llx calls=%llu result=%d bits=%d\n",
+    // the import through the thunk gives what it gave before
+    const unsigned long long importBefore = CallImport();
+    unsigned long long importSlot = 0;
+    unsigned long long importThunk = 0;
+    if (HookImport(target, importSlot, importThunk) && CallImport() != importBefore)
+    {
+        std::printf("error: the hooked import gives another value\n");
+        return 1;
+    }
+
+    unsigned long long exportSlot = 0;
+    unsigned long long exportThunk = 0;
+#ifdef _WIN32
+    if (HookExport("floating_exported_function", exportSlot, exportThunk))
+    {
+        // GetProcAddress reads the hooked entry: the call goes through the thunk
+        auto exported = (int (*)(int))GetProcAddress(GetModuleHandleW(nullptr), "floating_exported_function");
+        if (!exported || ((unsigned long long)(uintptr_t)exported & ~1ULL) != exportThunk || exported(1) != 4)
+        {
+            std::printf("error: the hooked export doesn't lead to its thunk\n");
+            return 1;
+        }
+    }
+#endif
+
+    std::printf("ready target=%llx stub=%llx handler=%llx calls=%llu result=%d bits=%d slot=%llx thunk=%llx import=%s "
+        "export_slot=%llx export_thunk=%llx\n",
         target, g_lastStub, (unsigned long long)(uintptr_t)handler, (unsigned long long)calls, result,
-        (int)sizeof(void*) * 8);
+        (int)sizeof(void*) * 8, importSlot, importThunk, g_importName, exportSlot, exportThunk);
     std::fflush(stdout);
 
     // until the test closes stdin. "change": a byte of the handler allocation changes (past the

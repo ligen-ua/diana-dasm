@@ -3,7 +3,8 @@
 orthia_floating_helper (built next to the orthia binary) hooks a function of its own with the
 diana patcher: the function jumps to the patcher's stub, the stub calls a handler in an allocation
 of its own. `.analyze` on the helper finds the stub as a floating module, and the stub leads to
-the handler."""
+the handler. It also points an import slot of its own (IAT, GOT on Linux) at a thunk in another
+allocation: an import hook."""
 import hashlib
 import platform
 import re
@@ -32,6 +33,12 @@ class Helper:
         self.stub = int(values["stub"], 16)
         self.handler = int(values["handler"], 16)
         self.bits = int(values["bits"])
+        # 0 when the helper found no import slot to hook
+        self.slot = int(values.get("slot", "0"), 16)
+        self.thunk = int(values.get("thunk", "0"), 16)
+        self.import_name = values.get("import", "")
+        self.export_slot = int(values.get("export_slot", "0"), 16)
+        self.export_thunk = int(values.get("export_thunk", "0"), 16)
 
     def address_text(self, address: int) -> str:
         """The way orthia prints an address of this process: 00007ff7`a5d91ec0 or 00401000."""
@@ -130,6 +137,31 @@ def test_lmf_verbose_lists_referrers(orthia, helper):
     # the hooked function of the helper leads to the stub, the stub to the handler
     res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\S*\s+-> {stub}!\$entry_0001\s+RWX private")
     res.assert_line(rf"^  {stub}!\S+\s+-> {handler}!\$entry_0001\s+RWX private")
+
+
+def test_import_slot_hook(orthia, helper):
+    if not helper.slot:
+        pytest.skip("the helper found no import slot to hook")
+    thunk = floating_name(helper.thunk)
+    res = orthia.run(f".analyze {HELPER_NAME}", "lmf", "lmf /v", f"modinfo {thunk}",
+                     pid=helper.pid).assert_ok()
+    assert_found(res, helper, helper.thunk)
+    # the slot of the helper leads to the thunk, named by the import
+    name = re.escape(helper.import_name)
+    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\+[0-9a-f]+h\s+-> {thunk}!\$entry_0001\s+RWX private "
+                    rf"\[import slot: (\S+!)?{name}\]$")
+    res.assert_line(rf"\$entry_0001\s+from .*{HELPER_NAME}(\.exe)?\+[0-9a-f]+h \(import slot: (\S+!)?{name}\)")
+
+
+def test_export_slot_hook(orthia, helper):
+    # Windows: the export table entry of the helper's own export
+    if not helper.export_slot:
+        pytest.skip("the helper hooks no export here")
+    thunk = floating_name(helper.export_thunk)
+    res = orthia.run(f".analyze {HELPER_NAME}", "lmf", "lmf /v", pid=helper.pid).assert_ok()
+    assert_found(res, helper, helper.export_thunk)
+    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\+[0-9a-f]+h\s+-> {thunk}!\$entry_0001\s+RWX private "
+                    rf"\[export: floating_exported_function\]$")
 
 
 def test_lm_has_no_verbose_option(orthia, helper):

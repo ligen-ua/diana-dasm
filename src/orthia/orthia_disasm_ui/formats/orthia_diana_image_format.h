@@ -40,6 +40,7 @@ namespace orthia
         const IImageFormat& GetFormat() const override;
         WorkAddressRangeInfo GetRange() const override;
         void QueryImports(std::vector<NameInfo>& out) override;
+        void QueryPointerSlots(std::vector<PointerSlotInfo>& out) override;
     };
 
     // What the formats Diana parses (PE, ELF) share: detection by DianaExecutable_DetectType,

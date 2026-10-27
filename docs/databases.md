@@ -187,6 +187,7 @@ A floating module (`fl_<base>`) has a `tbl_modules` row for its allocation and a
 | `hash`, `hashed` | FNV-1a hash of the executable pages of the allocation with their offsets, `hashed` bytes of them (up to 16 MB); checked on reopen, a mismatch makes the module stale |
 | `code_start`, `code_last` | the lowest and the highest instruction start the analysis found (0 before it) |
 | `entries` | `<entry>:<referrer>,<referrer>;<entry>:...` in hex: each entry point and the instructions that lead there |
+| `slots` | `<entry>:<i\|e><slot>=<name>,...;<entry>:...`: the import slots (`i`) and export entries (`e`) that lead to an entry, the slot in hex, the import or export name with `%`, `,`, `;`, `:`, `=` as `%XX`; missing when there are none |
 | `snapshot`, `snapshot_size`, `snapshot_missing` | the file in `floating/` with the bytes as they were found, how many (hex), and how many of them couldn't be read (zero filled); missing when no snapshot was saved |
 | `sha256` | SHA-256 of the snapshot file |
 

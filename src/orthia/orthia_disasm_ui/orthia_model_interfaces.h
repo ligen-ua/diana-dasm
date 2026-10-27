@@ -117,6 +117,18 @@ namespace orthia
         }
     };
 
+    // a pointer in a module's own tables that the loader fills: an import slot (IAT, ELF GOT),
+    // an export table entry (PE). A hook can rewrite one instead of the code
+    struct PointerSlotInfo
+    {
+        static constexpr int kind_import = 1;
+        static constexpr int kind_export = 2;
+        Address_type slot = 0;      // the slot's address
+        Address_type value = 0;     // where it leads now, absolute
+        int kind = 0;
+        std::string name;           // utf8: "KERNEL32.dll!CreateFileW", "getpid", "NtClose", "$ordinal_0005"
+    };
+
     struct NameInfo
     {
         static const int flags_Function = 1;

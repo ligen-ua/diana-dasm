@@ -20,6 +20,8 @@ namespace orthia
     {
         Address_type address = 0;
         std::vector<Address_type> referrers;    // the instructions that lead here, sorted
+        // the import slots and export entries that lead here, by slot; value unused
+        std::vector<PointerSlotInfo> slots;
     };
 
     struct FloatingRegionInfo
@@ -48,6 +50,8 @@ namespace orthia
         bool HasEntry(Address_type address) const;
         // adds the entry and the referrer; true when either is new, *pNewEntry when the entry is
         bool AddReference(Address_type entry, Address_type referrer, bool* pNewEntry = nullptr);
+        // the same for a slot that holds entry; true also when the slot's name changed
+        bool AddSlot(Address_type entry, const PointerSlotInfo& slot, bool* pNewEntry = nullptr);
     };
 
     // "fl_1f0000"
@@ -108,12 +112,16 @@ namespace orthia
         // of them, the ones whose analysis is not up to date any more
         std::vector<Address_type> toAnalyze;
     };
-    // the floating code the references from source lead to. modules: every module of the
-    // process, floating ones too
+    // the floating code the references from source and its pointer slots lead to. modules: every
+    // module of the process, floating ones too
     FloatingDiscovery CollectFloatingRegions(CModuleManager& moduleManager,
         oui::IProcess& process,
         const std::vector<ModuleInfo>& modules,
-        const ModuleInfo& source);
+        const ModuleInfo& source,
+        const std::vector<PointerSlotInfo>& slots = std::vector<PointerSlotInfo>());
+    // the import slots and export entries of a module in the memory of the process; none for a
+    // floating module or one of no known format
+    std::vector<PointerSlotInfo> QueryModulePointerSlots(oui::IProcess& process, const ModuleInfo& module);
 
     // the module row and the metainfo
     void SaveFloatingRegion(CModuleManager& moduleManager, const FloatingRegionInfo& info);
@@ -124,7 +132,8 @@ namespace orthia
     void DescribeFloatingModule(const IWorkPlaceItem& item, const ModuleInfo& module, std::vector<PlatformString_type>& lines);
     // `lmf /v`: what leads to the floating code of the item, one line per referrer and entry, by the
     // referrer's address: "<referrer> -> fl_..!$entry_0001  RWX private [function start]". "function
-    // start": the referrer is at a name (an export, a symbol), as an inline hook over a prologue is
+    // start": the referrer is at a name (an export, a symbol), as an inline hook over a prologue is.
+    // A slot: "<slot> -> ...  RWX private [import slot: KERNEL32.dll!CreateFileW]", or [export: ...]
     void DescribeFloatingReferrers(const IWorkPlaceItem& item, std::vector<PlatformString_type>& lines);
 
     // Discovery from source: saves what it found and gives it to the item. True when a floating

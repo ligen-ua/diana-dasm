@@ -228,6 +228,17 @@ Referrers:
   ntdll!NtProtectVirtualMemory      -> fl_7ff74e840000!$entry_0001  RWX private [function start]
 ```
 
+The import slots (IAT, the GOT on Linux) and the export table entries (PE) of the module are looked at too,
+as they are in memory now: a slot that leads into such memory makes an entry point as well, with the slot as
+what leads to it. That is how an import or export hook looks:
+
+```
+  orthia_floating_helper.exe+2f020h -> fl_7ff604970000!$entry_0001  RWX private [import slot: KERNEL32.dll!GetCurrentProcessId]
+```
+
+`[export: <name>]` marks an export table entry. `modinfo` lists the slots after the instructions:
+`from app.exe+2f020h (import slot: KERNEL32.dll!GetCurrentProcessId)`.
+
 After the arrow: the protection where the entry is, the allocation type (`private`, `mapped`, `image`), an
 `MZ-header` or `ELF-header` when the allocation starts with one, the mapped file, and `stale`.
 `[function start]` marks an instruction at a name (an export or a symbol): code at the start of a function
@@ -257,7 +268,12 @@ Targets in zero-filled memory are left out: no code starts with `00 00`.
 
 Entry points and targets:
 - [ ] More entry points than the static references: thread start addresses, return addresses on thread stacks,
-  pointers in data (hooked IAT slots, function pointer tables), exception handlers and other callbacks.
+  pointers in data (function pointer tables, vtables, `KernelCallbackTable`), exception handlers and other callbacks.
+- [x] Import slots (PE IAT, ELF PLT GOT slots) and PE export table entries that lead into floating code.
+- [ ] ELF: GOT slots of `R_*_GLOB_DAT` relocations (`-fno-plt`, a taken function address) are not looked at, only
+  the PLT ones; an ELF export whose symbol value was rewritten neither.
+- [ ] A slot that leads into memory that is not executable, or into another module than the one it imports from
+  (a hook through a DLL loaded for it), is not reported.
 - [ ] Store the reference kind in `tbl_references` (call, jump, taken address, data access); a schema step. The
   database has no kind, so discovery takes every reference that leaves a module, and filters by executable
   memory only. In a 32-bit process an `imm32` constant that falls into such an allocation adds an entry point

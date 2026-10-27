@@ -5,6 +5,8 @@
 #include "orthia_common_print.h"
 #include "orthia_log.h"
 #include "orthia_sha256.h"
+#include "orthia_process_adapter.h"
+#include "formats/orthia_image_format.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -67,6 +69,45 @@ namespace orthia
                 start = pos + 1;
             }
             return parts;
+        }
+
+        // a slot name in the slots text: the separators and % as %XX
+        std::string EscapeName(const std::string& name)
+        {
+            std::string text;
+            for (unsigned char c : name)
+            {
+                if (c < 0x20 || c == '%' || c == ',' || c == ';' || c == ':' || c == '=')
+                {
+                    char buffer[4];
+                    snprintf(buffer, sizeof(buffer), "%%%02X", c);
+                    text += buffer;
+                }
+                else
+                {
+                    text += (char)c;
+                }
+            }
+            return text;
+        }
+
+        std::string UnescapeName(const std::string& text)
+        {
+            std::string name;
+            for (size_t i = 0; i < text.size(); ++i)
+            {
+                unsigned long long value = 0;
+                if (text[i] == '%' && i + 2 < text.size() && ParseHex(text.substr(i + 1, 2), value))
+                {
+                    name += (char)value;
+                    i += 2;
+                }
+                else
+                {
+                    name += text[i];
+                }
+            }
+            return name;
         }
 
         // FNV-1a
@@ -149,6 +190,43 @@ namespace orthia
         return true;
     }
 
+    bool FloatingRegionInfo::AddSlot(Address_type entry, const PointerSlotInfo& slot, bool* pNewEntry)
+    {
+        if (pNewEntry)
+        {
+            *pNewEntry = false;
+        }
+        auto it = std::lower_bound(entries.begin(), entries.end(), entry,
+            [](const FloatingEntryInfo& e, Address_type a) { return e.address < a; });
+        if (it == entries.end() || it->address != entry)
+        {
+            FloatingEntryInfo info;
+            info.address = entry;
+            it = entries.insert(it, info);
+            if (pNewEntry)
+            {
+                *pNewEntry = true;
+            }
+        }
+        auto& slots = it->slots;
+        auto slotIt = std::lower_bound(slots.begin(), slots.end(), slot.slot,
+            [](const PointerSlotInfo& s, Address_type a) { return s.slot < a; });
+        if (slotIt != slots.end() && slotIt->slot == slot.slot)
+        {
+            if (slotIt->kind == slot.kind && slotIt->name == slot.name)
+            {
+                return false;
+            }
+            slotIt->kind = slot.kind;
+            slotIt->name = slot.name;
+            return true;
+        }
+        PointerSlotInfo stored = slot;
+        stored.value = entry;
+        slots.insert(slotIt, stored);
+        return true;
+    }
+
     PlatformString_type MakeFloatingModuleName(Address_type allocationBase)
     {
         return Utf8ToPlatformString("fl_" + ToHex(allocationBase));
@@ -209,6 +287,33 @@ namespace orthia
                 entries += ToHex(entry.referrers[i]);
             }
         }
+        // slots: "<entry>:<i|e><slot>=<name>,...;<entry>:...", the entries that have any
+        std::string slots;
+        for (const auto& entry : info.entries)
+        {
+            if (entry.slots.empty())
+            {
+                continue;
+            }
+            if (!slots.empty())
+            {
+                slots += ';';
+            }
+            slots += ToHex(entry.address);
+            slots += ':';
+            for (size_t i = 0; i < entry.slots.size(); ++i)
+            {
+                const auto& slot = entry.slots[i];
+                if (i)
+                {
+                    slots += ',';
+                }
+                slots += slot.kind == PointerSlotInfo::kind_export ? 'e' : 'i';
+                slots += ToHex(slot.slot);
+                slots += '=';
+                slots += EscapeName(slot.name);
+            }
+        }
         CCommonFormatBuilder builder;
         builder.AddMetadata("base", ToHex(info.allocationBase));
         builder.AddMetadata("size", ToHex(info.allocationSize));
@@ -221,6 +326,10 @@ namespace orthia
         builder.AddMetadata("code_start", ToHex(info.codeStart));
         builder.AddMetadata("code_last", ToHex(info.codeLast));
         builder.AddMetadata("entries", entries);
+        if (!slots.empty())
+        {
+            builder.AddMetadata("slots", slots);
+        }
         if (!info.snapshotFile.empty())
         {
             builder.AddMetadata("snapshot", info.snapshotFile);
@@ -303,6 +412,33 @@ namespace orthia
         }
         std::sort(info.entries.begin(), info.entries.end(),
             [](const FloatingEntryInfo& a, const FloatingEntryInfo& b) { return a.address < b.address; });
+
+        std::string slots;
+        parser.QueryMetadata(std::string("slots"), &slots);
+        for (const auto& item : Split(slots, ';'))
+        {
+            auto colon = item.find(':');
+            unsigned long long address = 0;
+            if (colon == std::string::npos || !ParseHex(item.substr(0, colon), address))
+            {
+                return false;
+            }
+            for (const auto& text : Split(item.substr(colon + 1), ','))
+            {
+                auto equals = text.find('=');
+                unsigned long long slotAddress = 0;
+                if (text.size() < 2 || (text[0] != 'i' && text[0] != 'e') || equals == std::string::npos ||
+                    !ParseHex(text.substr(1, equals - 1), slotAddress))
+                {
+                    return false;
+                }
+                PointerSlotInfo slot;
+                slot.slot = (Address_type)slotAddress;
+                slot.kind = text[0] == 'e' ? PointerSlotInfo::kind_export : PointerSlotInfo::kind_import;
+                slot.name = UnescapeName(text.substr(equals + 1));
+                info.AddSlot((Address_type)address, slot);
+            }
+        }
         return true;
     }
 
@@ -587,7 +723,8 @@ namespace orthia
     FloatingDiscovery CollectFloatingRegions(CModuleManager& moduleManager,
         oui::IProcess& process,
         const std::vector<ModuleInfo>& modules,
-        const ModuleInfo& source)
+        const ModuleInfo& source,
+        const std::vector<PointerSlotInfo>& slots)
     {
         FloatingDiscovery result;
         if (!source.size)
@@ -622,9 +759,11 @@ namespace orthia
             const auto& info = it->second;
             return address - info->allocationBase < info->allocationSize ? info : nullptr;
         };
-        auto addReference = [&](const std::shared_ptr<FloatingRegionInfo>& info, Address_type to, Address_type from) {
+        // from: an instruction of source, or a slot of it (slot != nullptr)
+        auto addReference = [&](const std::shared_ptr<FloatingRegionInfo>& info, Address_type to, Address_type from,
+            const PointerSlotInfo* slot) {
             bool newEntry = false;
-            if (info->AddReference(to, from, &newEntry))
+            if (slot ? info->AddSlot(to, *slot, &newEntry) : info->AddReference(to, from, &newEntry))
             {
                 changed.insert(info->allocationBase);
             }
@@ -634,23 +773,20 @@ namespace orthia
             }
         };
 
-        for (const auto& ref : refs)
-        {
-            const Address_type from = ref.first;
-            const Address_type to = ref.second;
+        auto consider = [&](Address_type from, Address_type to, const PointerSlotInfo* slot) {
             // the range query includes the first byte after the module
             if (!to || !source.IsInRange(from) || source.IsInRange(to))
             {
-                continue;
+                return;
             }
             const ModuleInfo* owner = FindModule(sorted, to);
             if (owner && !(owner->IsFloating() && owner->floating))
             {
-                continue;
+                return;
             }
             if (IsZeroFilled(process, to))
             {
-                continue;
+                return;
             }
             if (owner)
             {
@@ -659,30 +795,30 @@ namespace orthia
                 {
                     info = std::make_shared<FloatingRegionInfo>(*owner->floating);
                 }
-                addReference(info, to, from);
-                continue;
+                addReference(info, to, from, slot);
+                return;
             }
             if (auto info = findNew(to))
             {
-                addReference(info, to, from);
-                continue;
+                addReference(info, to, from, slot);
+                return;
             }
             if (std::any_of(rejected.begin(), rejected.end(),
                 [to](const std::pair<Address_type, Address_type>& r) { return to - r.first < r.second; }))
             {
-                continue;
+                return;
             }
             oui::MemoryRegionInfo region;
             if (process.QueryMemoryRegion(to, region) || !region.allocationSize)
             {
                 rejected.push_back({ to & ~(Address_type)0xFFF, 0x1000 });
-                continue;
+                return;
             }
             if (!region.committed || !(region.protect & oui::MemoryRegionInfo::protect_exec) ||
                 OverlapsModule(sorted, region.allocationBase, region.allocationSize))
             {
                 rejected.push_back({ region.regionBase, region.regionSize });
-                continue;
+                return;
             }
             if (created.size() >= c_maxNewRegions)
             {
@@ -691,7 +827,7 @@ namespace orthia
                     capReported = true;
                     ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Too many floating regions, the rest is skipped"));
                 }
-                continue;
+                return;
             }
             auto info = std::make_shared<FloatingRegionInfo>();
             info->allocationBase = region.allocationBase;
@@ -701,7 +837,17 @@ namespace orthia
             info->mappedName = region.mappedName;
             regions[info->allocationBase] = info;
             created.insert(info->allocationBase);
-            addReference(info, to, from);
+            addReference(info, to, from, slot);
+        };
+
+        for (const auto& ref : refs)
+        {
+            consider(ref.first, ref.second, nullptr);
+        }
+        // a slot that leads out of the module into memory no module owns: an import or export hook
+        for (const auto& slot : slots)
+        {
+            consider(slot.slot, slot.value, &slot);
         }
 
         for (auto base : created)
@@ -714,6 +860,30 @@ namespace orthia
         }
         result.toAnalyze.assign(toAnalyze.begin(), toAnalyze.end());
         return result;
+    }
+
+    std::vector<PointerSlotInfo> QueryModulePointerSlots(oui::IProcess& process, const ModuleInfo& module)
+    {
+        std::vector<PointerSlotInfo> slots;
+        if (module.IsFloating() || !module.size)
+        {
+            return slots;
+        }
+        try
+        {
+            const auto* format = FindFormatByModule(module);
+            ProcessReaderAdapter reader(&process);
+            if (auto image = format ? format->OpenModuleImage(reader, module.address, module.size) : nullptr)
+            {
+                image->QueryPointerSlots(slots);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, std::string("QueryModulePointerSlots: ") + e.what());
+            (void)e;
+        }
+        return slots;
     }
 
     void SaveFloatingRegion(CModuleManager& moduleManager, const FloatingRegionInfo& info)
@@ -738,6 +908,26 @@ namespace orthia
             return true;
         });
         return result;
+    }
+
+    // "import slot: KERNEL32.dll!CreateFileW", "export: NtClose"
+    static PlatformString_type DescribeSlot(const PointerSlotInfo& slot)
+    {
+        return (slot.kind == PointerSlotInfo::kind_export ? PlatformString_type(ORTHIA_TCSTR("export: ")) :
+            PlatformString_type(ORTHIA_TCSTR("import slot: "))) + Utf8ToPlatformString(slot.name);
+    }
+
+    // a slot is data: "module+2f020h", not the nearest symbol
+    static PlatformString_type NameSlot(const std::vector<ModuleInfo>& modules, Address_type slot, int mode)
+    {
+        for (const auto& mod : modules)
+        {
+            if (!mod.IsFloating() && mod.IsInRange(slot))
+            {
+                return ComposeName(oui::String(mod.name), mod.address, slot).native;
+            }
+        }
+        return AddressToString(slot, mode);
     }
 
     void DescribeFloatingModule(const IWorkPlaceItem& item, const ModuleInfo& module, std::vector<PlatformString_type>& lines)
@@ -798,16 +988,26 @@ namespace orthia
             lines.push_back(ORTHIA_TCSTR("State: stale, the memory changed since it was found"));
         }
         lines.push_back(ORTHIA_TCSTR("Entries: ") + Utf8ToPlatformString(std::to_string(info.entries.size())));
+        std::vector<ModuleInfo> modules;
+        item.GetModules(modules);
         std::vector<NameInfo> names;
         QueryFloatingNames(info, names);
         for (size_t i = 0; i < info.entries.size(); ++i)
         {
             const auto& entry = info.entries[i];
             line = ORTHIA_TCSTR("  ") + AddressToString(entry.address, mode) + ORTHIA_TCSTR("  ") + names[i].name.native;
-            for (size_t r = 0; r < entry.referrers.size(); ++r)
+            bool first = true;
+            for (auto referrer : entry.referrers)
             {
-                line += r ? ORTHIA_TCSTR(", ") : ORTHIA_TCSTR("  from ");
-                line += QueryAddressNameDef(&item, entry.referrers[r], mode).native;
+                line += first ? ORTHIA_TCSTR("  from ") : ORTHIA_TCSTR(", ");
+                first = false;
+                line += QueryAddressNameDef(&item, referrer, mode).native;
+            }
+            for (const auto& slot : entry.slots)
+            {
+                line += first ? ORTHIA_TCSTR("  from ") : ORTHIA_TCSTR(", ");
+                first = false;
+                line += NameSlot(modules, slot.slot, mode) + ORTHIA_TCSTR(" (") + DescribeSlot(slot) + ORTHIA_TCSTR(")");
             }
             lines.push_back(line);
         }
@@ -865,6 +1065,15 @@ namespace orthia
                     }
                     rows.push_back(std::move(row));
                 }
+                for (const auto& slot : info.entries[i].slots)
+                {
+                    Row row;
+                    row.referrer = slot.slot;
+                    row.from = NameSlot(modules, slot.slot, mode);
+                    row.to = module.name + ORTHIA_TCSTR("!") + names[i].name.native;
+                    row.notes = regionNotes + ORTHIA_TCSTR(" [") + DescribeSlot(slot) + ORTHIA_TCSTR("]");
+                    rows.push_back(std::move(row));
+                }
             }
         }
         std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.referrer < b.referrer; });
@@ -895,7 +1104,8 @@ namespace orthia
         }
         std::vector<ModuleInfo> modules;
         item.GetModules(modules);
-        auto found = CollectFloatingRegions(*moduleManager, *process, modules, source);
+        auto found = CollectFloatingRegions(*moduleManager, *process, modules, source,
+            QueryModulePointerSlots(*process, source));
         const auto databaseFolder = item.GetDatabaseFolder();
         for (const auto& info : found.changed)
         {

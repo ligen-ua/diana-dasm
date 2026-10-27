@@ -1179,6 +1179,18 @@ TEST(FloatingCode, RegionTextRoundTrip)
     info.AddReference(0x7ff600010040ULL, 0x401000);
     info.AddReference(0x7ff600010010ULL, 0x401020);
     info.AddReference(0x7ff600010010ULL, 0x401010);
+    // an import slot, an export entry; the name keeps the separators of the text
+    orthia::PointerSlotInfo import;
+    import.slot = 0x403008;
+    import.kind = orthia::PointerSlotInfo::kind_import;
+    import.name = "KERNEL32.dll!Create,File;W:x=%";
+    info.AddSlot(0x7ff600010040ULL, import);
+    orthia::PointerSlotInfo exported;
+    exported.slot = 0x402000;
+    exported.kind = orthia::PointerSlotInfo::kind_export;
+    exported.name = "NtClose";
+    info.AddSlot(0x7ff600010040ULL, exported);
+    EXPECT_FALSE(info.AddSlot(0x7ff600010040ULL, exported));
 
     orthia::FloatingRegionInfo parsed;
     ASSERT_TRUE(orthia::ParseFloatingRegion(orthia::FormatFloatingRegion(info), parsed));
@@ -1196,6 +1208,14 @@ TEST(FloatingCode, RegionTextRoundTrip)
     EXPECT_EQ(0x7ff600010010ULL, parsed.entries[0].address);
     EXPECT_EQ((std::vector<orthia::Address_type>{ 0x401010, 0x401020 }), parsed.entries[0].referrers);
     EXPECT_EQ(0x7ff600010040ULL, parsed.entries[1].address);
+    EXPECT_TRUE(parsed.entries[0].slots.empty());
+    ASSERT_EQ(2u, parsed.entries[1].slots.size());
+    EXPECT_EQ(0x402000u, parsed.entries[1].slots[0].slot);
+    EXPECT_EQ(orthia::PointerSlotInfo::kind_export, parsed.entries[1].slots[0].kind);
+    EXPECT_EQ("NtClose", parsed.entries[1].slots[0].name);
+    EXPECT_EQ(0x403008u, parsed.entries[1].slots[1].slot);
+    EXPECT_EQ(orthia::PointerSlotInfo::kind_import, parsed.entries[1].slots[1].kind);
+    EXPECT_EQ(import.name, parsed.entries[1].slots[1].name);
 
     EXPECT_FALSE(orthia::ParseFloatingRegion("<x/>", parsed));
     EXPECT_EQ(ORTHIA_TCSTR("fl_7ff600010000"), orthia::MakeFloatingModuleName(info.allocationBase));
@@ -1282,6 +1302,81 @@ TEST(FloatingCode, DiscoveryAndAnalysis)
     EXPECT_EQ(std::string::npos, row(2).find("[function start]")) << row(2);
     EXPECT_EQ(0u, row(3).find("  fl_10100000!$entry_0001")) << row(3);
     EXPECT_NE(std::string::npos, row(3).find("-> fl_10400000!$entry_0001")) << row(3);
+}
+
+// an import slot of the module that leads into memory no module owns: an entry with the slot,
+// listed by lmf /v; slots that stay in the module or lead to another one don't count
+TEST(FloatingCode, PointerSlots)
+{
+    FloatingFixture fixture;
+    auto item = fixture.OpenItem();
+    fixture.AnalyzeModule(*item);
+    const auto source = FloatingFixture::FindModule(*item, FloatingFixture::moduleBase);
+
+    auto makeSlot = [](orthia::Address_type slot, orthia::Address_type value, const char* name) {
+        orthia::PointerSlotInfo info;
+        info.slot = slot;
+        info.value = value;
+        info.kind = orthia::PointerSlotInfo::kind_import;
+        info.name = name;
+        return info;
+    };
+    std::vector<orthia::PointerSlotInfo> slots = {
+        makeSlot(FloatingFixture::moduleBase + 0x800, FloatingFixture::regionD + 0x10, "KERNEL32.dll!CreateFileW"),
+        makeSlot(FloatingFixture::moduleBase + 0x808, FloatingFixture::otherModule, "other!f"),
+        makeSlot(FloatingFixture::moduleBase + 0x810, FloatingFixture::moduleBase + 0x20, "own"),
+        makeSlot(FloatingFixture::moduleBase + 0x818, FloatingFixture::regionData, "data"),
+    };
+    std::vector<orthia::ModuleInfo> modules;
+    item->GetModules(modules);
+    auto found = orthia::CollectFloatingRegions(*fixture.moduleManager, *fixture.process, modules, source, slots);
+
+    std::shared_ptr<orthia::FloatingRegionInfo> d;
+    for (const auto& info : found.changed)
+    {
+        if (info->allocationBase == FloatingFixture::regionD)
+            d = info;
+    }
+    ASSERT_TRUE(d);
+    ASSERT_EQ(1u, d->entries.size());
+    EXPECT_EQ(FloatingFixture::regionD + 0x10, d->entries[0].address);
+    EXPECT_TRUE(d->entries[0].referrers.empty());
+    ASSERT_EQ(1u, d->entries[0].slots.size());
+    EXPECT_EQ(FloatingFixture::moduleBase + 0x800, d->entries[0].slots[0].slot);
+    EXPECT_EQ("KERNEL32.dll!CreateFileW", d->entries[0].slots[0].name);
+    EXPECT_NE(found.toAnalyze.end(), std::find(found.toAnalyze.begin(), found.toAnalyze.end(), FloatingFixture::regionD));
+    // the other slots: nothing
+    for (const auto& info : found.changed)
+    {
+        for (const auto& entry : info->entries)
+        {
+            if (info != d)
+                EXPECT_TRUE(entry.slots.empty());
+        }
+    }
+
+    // saved and named
+    orthia::SaveFloatingRegion(*fixture.moduleManager, *d);
+    item->SetFloatingModule(d);
+    std::vector<orthia::PlatformString_type> lines;
+    orthia::DescribeFloatingReferrers(*item, lines);
+    std::string text;
+    for (const auto& line : lines)
+    {
+        text += orthia::PlatformStringToUtf8(line) + "\n";
+    }
+    EXPECT_NE(std::string::npos, text.find("module+0800h")) << text;
+    EXPECT_NE(std::string::npos, text.find("-> fl_10400000!$entry_0001")) << text;
+    EXPECT_NE(std::string::npos, text.find("RWX private [import slot: KERNEL32.dll!CreateFileW]")) << text;
+
+    lines.clear();
+    orthia::DescribeFloatingModule(*item, FloatingFixture::FindModule(*item, FloatingFixture::regionD), lines);
+    text.clear();
+    for (const auto& line : lines)
+    {
+        text += orthia::PlatformStringToUtf8(line) + "\n";
+    }
+    EXPECT_NE(std::string::npos, text.find("from module+0800h (import slot: KERNEL32.dll!CreateFileW)")) << text;
 }
 
 TEST(FloatingCode, SavedAndStale)
