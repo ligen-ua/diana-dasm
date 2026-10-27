@@ -20,6 +20,8 @@ namespace orthia
         SavedModuleList m_savedModules;
         std::mutex m_saveLock;
         void SaveModuleList();
+        // the identity modules.xml has for the module; invalid when none
+        ImageIdentity QuerySavedIdentity(Address_type moduleAddress) const;
 
         // the OS modules and the floating ones, by address
         std::vector<orthia::ModuleInfo> m_modules;
@@ -61,8 +63,15 @@ namespace orthia
             std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
             std::shared_ptr<ModuleStorage> moduleStorage);
         // after Init, on a database reused from an earlier open of the same process: the
-        // analysis flags of the modules that are still the same
+        // analysis flags of the modules that are still the same (SyncDatabaseModules)
         void LoadSavedModuleFlags();
+        // The database against the module list, after Init and after each ReloadModules:
+        // - a module that unloaded keeps its rows (evidence; the same build loading again reuses them)
+        // - a module that is there again, the same file and build at the same place, gets its saved flags back
+        // - a row that another module now covers (another name, size, place or build) is dropped with its
+        //   references and metainfo; a saved view drops nothing
+        // Comments stay: they belong to addresses, not modules
+        void SyncDatabaseModules();
         // before LoadSavedModuleFlags, on a reused database: the floating modules found then,
         // stale when their memory changed. TODO: the same check on demand in an open process, and a
         // way to drop a stale module

@@ -69,8 +69,13 @@ neither the start nor `.database cleanup` removes it, and `.database list` marks
 Only `.database delete` removes it. `--pid self` still removes its folder.
 
 The code analysis and the comments go into that database, and the analysis flags of each module
-(`flags` in its metainfo, with its name and size). A reopen trusts the flags of a module only when
-the module at that address still has the same name and size. Exports and loaded private symbols are kept
+(`flags` in its metainfo, with its name, size and the `id_*` identity of its build). The database follows
+the module list, on open and each time it is reloaded:
+- a module that unloaded keeps its analysis: it is evidence, and the same build loading again at the same
+  place gets it back (its flags too);
+- a module at that place that is another one (another name, size, start or build) gets none of it: the old
+  rows are dropped, with the references made from them and their metainfo;
+- comments stay, they belong to addresses. Exports and loaded private symbols are kept
 in memory and rebuilt from the live process. The module list is also written to `modules.xml`, see below. Floating modules are saved
 (metainfo type 6) and come back on a reopen, `stale` when their memory changed.
 

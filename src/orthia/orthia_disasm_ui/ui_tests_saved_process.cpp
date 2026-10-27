@@ -7,6 +7,8 @@
 #include "orthia_image_source.h"
 #include "orthia_floating_code.h"
 #include "orthia_databases.h"
+#include "orthia_module_manager.h"
+#include "orthia_database_module.h"
 #include <fstream>
 
 using orthia_tests::CFakeProcess;
@@ -189,6 +191,160 @@ TEST(SavedProcess, ModuleListFollowsReload)
     WriteFile(folder.path / ORTHIA_TCSTR("marker"), { 'x' });
     item.ReloadModules();
     EXPECT_EQ(before, fs::last_write_time(folder.path / orthia::g_savedModulesFileName));
+}
+
+// The database follows the module list of a live process: exe -> a.so loads -> it unloads -> it
+// loads again -> b.so takes its place. An unloaded module keeps its analysis (evidence, and reused
+// when it comes back); a module over its place gets none of it
+TEST(SavedProcess, DatabaseFollowsModuleChanges)
+{
+    TempFolder folder(ORTHIA_TCSTR("orthia_test_saved_sync"));
+    auto moduleManager = std::make_shared<orthia::CModuleManager>();
+    moduleManager->Reinit((folder.path / ORTHIA_TCSTR("data.db")).native(), true);
+    auto database = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
+
+    const orthia::Address_type exeBase = 0x10000000;
+    const orthia::Address_type dllBase = 0x20000000;
+    // call <exe+100h>; ret: a reference out of the module, which the analysis saves
+    auto codeImage = [&](orthia::Address_type base, const ORTHIA_TCHAR* name) {
+        auto image = RawImage(base, 0x1000, name);
+        image.data[0] = (char)0xE8;
+        const int rel = (int)(long long)(exeBase + 0x100 - (base + 5));
+        memcpy(&image.data[1], &rel, sizeof(rel));
+        image.data[5] = (char)0xC3;
+        return image;
+    };
+    auto process = std::make_shared<CFakeProcess>();
+    process->images.push_back(codeImage(exeBase, ORTHIA_TCSTR("app")));
+
+    orthia::CProcessWorkplaceItem item(process, process->GetFullFileNameForUI(),
+        process->GetDianaMode(), process->GetDianaArch(), nullptr);
+    item.ReloadModules();
+    item.Init(moduleManager, nullptr, nullptr);
+    item.SetProcFolder(folder.path.native());
+
+    // size: what the analysis maps, which may be less than the OS reports (a PE ends with its last section)
+    auto analyze = [&](orthia::Address_type base, orthia::Address_type size = 0x1000) {
+        orthia::ProcessReaderAdapter reader(process.get());
+        moduleManager->ReloadRange(base, size, &reader, DIANA_MODE64, DIANA_ARCH_X86, 0);
+        item.UpdateModuleFlags(base, orthia::ModuleInfo::flags_analyzeDone, 0);
+    };
+    auto rows = [&]() {
+        std::vector<orthia::CommonModuleInfo> modules;
+        moduleManager->QueryLoadedModules(&modules);
+        std::set<orthia::Address_type> addresses;
+        for (const auto& mod : modules)
+            addresses.insert(mod.address);
+        return addresses;
+    };
+    auto references = [&](orthia::Address_type base) {
+        std::vector<std::pair<orthia::Address_type, orthia::Address_type>> refs;
+        database->QueryAllModuleReferences(base, 0x1000, refs);
+        return std::count_if(refs.begin(), refs.end(),
+            [&](const std::pair<orthia::Address_type, orthia::Address_type>& ref) { return ref.first - base < 0x1000; });
+    };
+    // -1: no such module in the list
+    auto analyzed = [&](orthia::Address_type base) {
+        std::vector<orthia::ModuleInfo> modules;
+        item.GetModules(modules);
+        for (const auto& mod : modules)
+        {
+            if (mod.address == base)
+                return (mod.flags & orthia::ModuleInfo::flags_analyzeDone) ? 1 : 0;
+        }
+        return -1;
+    };
+    const std::set<orthia::Address_type> both = { exeBase, dllBase };
+    const std::set<orthia::Address_type> exeOnly = { exeBase };
+
+    // just the exe
+    analyze(exeBase);
+    EXPECT_EQ(exeOnly, rows());
+    EXPECT_EQ(1, analyzed(exeBase));
+    EXPECT_GT(references(exeBase), 0);
+
+    // a.so loads: not analyzed until it is
+    process->images.push_back(codeImage(dllBase, ORTHIA_TCSTR("a.so")));
+    item.ReloadModules();
+    EXPECT_EQ(0, analyzed(dllBase));
+    analyze(dllBase);
+    EXPECT_EQ(both, rows());
+    EXPECT_EQ(1, analyzed(dllBase));
+    EXPECT_GT(references(dllBase), 0);
+
+    // a.so unloads: its analysis stays in the database
+    process->images.pop_back();
+    item.ReloadModules();
+    EXPECT_EQ(-1, analyzed(dllBase));
+    EXPECT_EQ(both, rows());
+    EXPECT_GT(references(dllBase), 0);
+    EXPECT_EQ(1, analyzed(exeBase));
+
+    // the same a.so comes back where it was: analyzed, from the database
+    process->images.push_back(codeImage(dllBase, ORTHIA_TCSTR("a.so")));
+    item.ReloadModules();
+    EXPECT_EQ(1, analyzed(dllBase));
+    EXPECT_EQ(both, rows());
+
+    // b.so takes its place in one reload: none of a.so's analysis is b.so's
+    process->images.back() = codeImage(dllBase, ORTHIA_TCSTR("b.so"));
+    item.ReloadModules();
+    EXPECT_EQ(0, analyzed(dllBase));
+    EXPECT_EQ(exeOnly, rows());
+    EXPECT_EQ(0, references(dllBase));
+    // and b.so is analyzed as a new module
+    analyze(dllBase);
+    EXPECT_EQ(both, rows());
+    EXPECT_EQ(1, analyzed(dllBase));
+
+    // b.so unloads, a bigger c.so covers its place from below: dropped too
+    process->images.pop_back();
+    item.ReloadModules();
+    EXPECT_EQ(both, rows());
+    auto big = RawImage(dllBase - 0x1000, 0x3000, ORTHIA_TCSTR("c.so"));
+    process->images.push_back(big);
+    item.ReloadModules();
+    EXPECT_EQ(exeOnly, rows());
+    EXPECT_EQ(0, analyzed(dllBase - 0x1000));
+
+    // a module whose analysis mapped less or more than the OS reports is still the same module
+    const orthia::Address_type shortBase = 0x30000000;
+    process->images.push_back(RawImage(shortBase, 0x2000, ORTHIA_TCSTR("d.so")));
+    item.ReloadModules();
+    analyze(shortBase, 0x1800);
+    item.ReloadModules();
+    EXPECT_EQ(1, analyzed(shortBase));
+    EXPECT_TRUE(rows().count(shortBase));
+    process->images.pop_back();
+    item.ReloadModules();
+    // and more (ELF: up to the end of bss), next to another module
+    const orthia::Address_type longBase = 0x40000000;
+    process->images.push_back(RawImage(longBase, 0x1000, ORTHIA_TCSTR("e.so")));
+    process->images.push_back(RawImage(longBase + 0x1000, 0x1000, ORTHIA_TCSTR("f.so")));
+    item.ReloadModules();
+    analyze(longBase, 0x1800);
+    item.ReloadModules();
+    EXPECT_EQ(1, analyzed(longBase));
+    EXPECT_TRUE(rows().count(longBase));
+    process->images.pop_back();
+    process->images.pop_back();
+    item.ReloadModules();
+
+    // the exe was never touched
+    EXPECT_EQ(1, analyzed(exeBase));
+    EXPECT_GT(references(exeBase), 0);
+
+    // a reopen of the same database: the saved flags come back for what is still the same
+    orthia::CProcessWorkplaceItem reopened(process, process->GetFullFileNameForUI(),
+        process->GetDianaMode(), process->GetDianaArch(), nullptr);
+    reopened.ReloadModules();
+    reopened.Init(moduleManager, nullptr, nullptr);
+    reopened.LoadSavedModuleFlags();
+    std::vector<orthia::ModuleInfo> modules;
+    reopened.GetModules(modules);
+    ASSERT_EQ(2u, modules.size());
+    EXPECT_TRUE(modules[0].flags & orthia::ModuleInfo::flags_analyzeDone);
+    EXPECT_FALSE(modules[1].flags & orthia::ModuleInfo::flags_analyzeDone);
 }
 
 // what tells the build of a module's file comes from its headers in memory
