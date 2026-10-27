@@ -22,6 +22,7 @@ extern "C"
 #ifndef _WIN32
 #include "oui_privileges_posix.h"
 #endif
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -994,6 +995,174 @@ TEST(ProcessArch, ModulesAndProcessRange)
         EXPECT_EQ(item.processArch, outside.dianaArch);
     }
 }
+
+namespace
+{
+    // a test file mapped at 0x10000000 as the only module of a fake process
+    struct MappedTestModule
+    {
+        std::shared_ptr<CFakeProcess> process = std::make_shared<CFakeProcess>();
+        orthia::ModuleInfo module;
+        std::vector<char> image;
+        orthia::Address_type base = 0;
+
+        // false when data/ isn't there
+        bool Open(const ORTHIA_TCHAR* file, const char* formatId)
+        {
+            const auto path = FindTestData(file);
+            if (path.empty())
+                return false;
+            std::vector<char> data;
+            {
+                std::ifstream stream(path, std::ios::binary);
+                data.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+            }
+            const auto* format = orthia::FindFormatById(formatId);
+            EXPECT_NE(nullptr, format);
+            orthia::MapFileParameters params;
+            params.imageBase = 0x10000000;
+            const auto mapped = format->MapFile(data, params);
+            base = mapped->GetImageBase();
+            image = mapped->GetMappedFile();
+            return AddImage(format, base, image);
+        }
+        bool AddImage(const orthia::IImageFormat* format, orthia::Address_type imageBase, const std::vector<char>& bytes)
+        {
+            CFakeProcess::Image item;
+            item.format = format;
+            item.base = imageBase;
+            item.data = bytes;
+            process->images.push_back(item);
+            orthia::CProcessWorkplaceItem processItem(process, process->GetFullFileNameForUI(),
+                process->GetDianaMode(), process->GetDianaArch(), nullptr);
+            processItem.ReloadModules();
+            std::vector<orthia::ModuleInfo> modules;
+            processItem.GetModules(modules);
+            EXPECT_EQ(1u, modules.size());
+            if (modules.empty())
+                return false;
+            module = modules[0];
+            return true;
+        }
+        unsigned long long Read(orthia::Address_type address, size_t size) const
+        {
+            unsigned long long value = 0;
+            EXPECT_LE(address - base + size, image.size());
+            if (address - base + size <= image.size())
+                memcpy(&value, image.data() + (size_t)(address - base), size);
+            return value;
+        }
+    };
+
+    std::vector<orthia::PointerSlotInfo> SlotsOfKind(const std::vector<orthia::PointerSlotInfo>& slots, int kind)
+    {
+        std::vector<orthia::PointerSlotInfo> result;
+        for (const auto& slot : slots)
+        {
+            if (slot.kind == kind)
+                result.push_back(slot);
+        }
+        return result;
+    }
+}
+
+// diana_core reports each function to CBasePeLinkImportsObserver::ReportInfo (GetLastAddress) before
+// the call: a PE export at its AddressOfFunctions entry, which holds the export's RVA. Floating code
+// takes that entry for the slot an export hook rewrites
+TEST(PointerSlots, PeExportReportedAtItsEntry)
+{
+    MappedTestModule test;
+    if (!test.Open(ORTHIA_TCSTR("pe/tls_x86_64.dll"), "pe"))
+        GTEST_SKIP() << "data/ not found above " << orthia::PlatformStringToUtf8(orthia::GetCurrentProcessDir());
+    const auto exports = SlotsOfKind(orthia::QueryModulePointerSlots(*test.process, test.module),
+        orthia::PointerSlotInfo::kind_export);
+    ASSERT_FALSE(exports.empty());
+    // AddressOfFunctions from the export directory (lld leaves it unaligned here: 0x207b)
+    const auto nt = test.base + test.Read(test.base + 0x3c, 4);
+    const auto exportDirectory = test.base + test.Read(nt + 24 + 112, 4);
+    const auto functions = test.base + test.Read(exportDirectory + 0x1c, 4);
+    const auto functionCount = test.Read(exportDirectory + 0x14, 4);
+    bool found = false;
+    for (const auto& slot : exports)
+    {
+        SCOPED_TRACE(slot.name);
+        // an entry of AddressOfFunctions, which holds the RVA of the export
+        EXPECT_GE(slot.slot, functions);
+        EXPECT_LT(slot.slot, functions + 4 * functionCount);
+        EXPECT_EQ(0u, (slot.slot - functions) % 4);
+        EXPECT_EQ(slot.value - test.base, test.Read(slot.slot, 4));
+        found = found || slot.name == "tls_reasons";
+    }
+    EXPECT_TRUE(found);
+}
+
+// an ELF import at its GOT slot: data/elf/linked_x64 imports exp_func_07 and exp_func_21 through the
+// slots at 0x4008 and 0x4000 (see ot_elf_test.cpp)
+TEST(PointerSlots, ElfImportReportedAtItsSlot)
+{
+    MappedTestModule test;
+    if (!test.Open(ORTHIA_TCSTR("elf/linked_x64"), "elf"))
+        GTEST_SKIP() << "data/ not found above " << orthia::PlatformStringToUtf8(orthia::GetCurrentProcessDir());
+    const auto imports = SlotsOfKind(orthia::QueryModulePointerSlots(*test.process, test.module),
+        orthia::PointerSlotInfo::kind_import);
+    std::map<std::string, orthia::Address_type> byName;
+    for (const auto& slot : imports)
+    {
+        for (const char* name : { "exp_func_07", "exp_func_21" })
+        {
+            if (slot.name.find(name) != std::string::npos)
+                byName[name] = slot.slot;
+        }
+        // what the slot holds now
+        EXPECT_EQ(test.Read(slot.slot, 8), slot.value) << slot.name;
+    }
+    EXPECT_EQ(test.base + 0x4008, byName["exp_func_07"]);
+    EXPECT_EQ(test.base + 0x4000, byName["exp_func_21"]);
+}
+
+#ifdef _MSC_VER
+extern "C" char __ImageBase;
+
+// a PE import at its IAT slot: the imports of this test binary, as it is loaded
+TEST(PointerSlots, PeImportReportedAtItsIatSlot)
+{
+    const char* base = &__ImageBase;
+    auto read32 = [](const char* p) { unsigned int v = 0; memcpy(&v, p, 4); return v; };
+    const char* nt = base + read32(base + 0x3c);
+    const char* optional = nt + 24;
+    const bool pe64 = *(const unsigned short*)optional == 0x20b;
+    const unsigned int sizeOfImage = read32(optional + 56);
+    // IMAGE_DIRECTORY_ENTRY_IAT
+    const char* iatEntry = optional + (pe64 ? 112 : 96) + 12 * 8;
+    const unsigned int iatRva = read32(iatEntry);
+    const unsigned int iatSize = read32(iatEntry + 4);
+    ASSERT_TRUE(iatRva && iatSize);
+
+    MappedTestModule test;
+    test.process->dianaMode = pe64 ? DIANA_MODE64 : DIANA_MODE32;
+    test.base = (orthia::Address_type)(uintptr_t)base;
+    test.image.assign(base, base + sizeOfImage);
+    ASSERT_TRUE(test.AddImage(orthia::FindFormatById("pe"), test.base, test.image));
+    const auto imports = SlotsOfKind(orthia::QueryModulePointerSlots(*test.process, test.module),
+        orthia::PointerSlotInfo::kind_import);
+    ASSERT_FALSE(imports.empty());
+    const size_t pointerSize = pe64 ? 8 : 4;
+    bool kernel32 = false;
+    for (const auto& slot : imports)
+    {
+        SCOPED_TRACE(slot.name);
+        const auto offset = slot.slot - test.base;
+        EXPECT_GE(offset, iatRva);
+        EXPECT_LT(offset, iatRva + iatSize);
+        EXPECT_EQ(0u, offset % pointerSize);
+        EXPECT_EQ(test.Read(slot.slot, pointerSize), slot.value);
+        std::string lower = slot.name;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return (char)tolower(c); });
+        kernel32 = kernel32 || lower.find("kernel32.dll!") == 0;
+    }
+    EXPECT_TRUE(kernel32);
+}
+#endif
 
 namespace
 {
