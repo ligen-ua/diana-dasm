@@ -615,6 +615,51 @@ namespace oui
         {
             return QueryMemoryRegionWin32(m_hProc, address, info);
         }
+        int EnumMemoryRegions(std::function<bool(const MemoryRegionInfo& info)> callback) override
+        {
+            ULONG_PTR address = 0;
+            for (;;)
+            {
+                MEMORY_BASIC_INFORMATION memInfo;
+                if (!VirtualQueryEx(m_hProc, (LPCVOID)address, &memInfo, sizeof(memInfo)))
+                {
+                    // past the last region
+                    const DWORD error = GetLastError();
+                    return error == ERROR_INVALID_PARAMETER ? 0 : (int)error;
+                }
+                if (memInfo.State != MEM_FREE && memInfo.AllocationBase)
+                {
+                    MemoryRegionInfo info;
+                    info.allocationBase = (ULONG_PTR)memInfo.AllocationBase;
+                    info.regionBase = (ULONG_PTR)memInfo.BaseAddress;
+                    info.regionSize = memInfo.RegionSize;
+                    info.committed = memInfo.State == MEM_COMMIT;
+                    // PAGE_GUARD and PAGE_NOACCESS give 0: never read
+                    info.protect = info.committed ? ToRegionProtect(memInfo.Protect) : 0;
+                    info.type = memInfo.Type == MEM_IMAGE ? MemoryRegionInfo::type_image :
+                                memInfo.Type == MEM_MAPPED ? MemoryRegionInfo::type_mapped :
+                                                             MemoryRegionInfo::type_private;
+                    if (info.type != MemoryRegionInfo::type_private)
+                    {
+                        std::vector<wchar_t> buffer(4096);
+                        if (GetMappedFileNameW(m_hProc, memInfo.BaseAddress, buffer.data(), (DWORD)buffer.size() - 1))
+                        {
+                            info.mappedName = orthia::PlatformStringToUtf8(buffer.data());
+                        }
+                    }
+                    if (!callback(info))
+                    {
+                        return 0;
+                    }
+                }
+                const ULONG_PTR next = (ULONG_PTR)memInfo.BaseAddress + memInfo.RegionSize;
+                if (next <= address)
+                {
+                    return 0;
+                }
+                address = next;
+            }
+        }
         ~CProcess()
         {
             Reset(String(), 0);

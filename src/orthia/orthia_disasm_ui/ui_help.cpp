@@ -23,6 +23,7 @@ namespace orthia
         { "exit", "Exit program" },
         { ".reload [<module>]", "Reload symbols for module" },
         { ".analyze [/f] <module|mask>", "Analyze modules (k*, *) and the floating code they lead to (/f: analyze again)" },
+        { ".capture", "Save the memory of the process (all regions, threads) into its folder" },
         { ".symfix [<path>]", "Set symbols directory" },
         { "modinfo <module>", "Show PE/debug info for module" },
         { "sections [-v] <module|address>", "List sections of module (-v: all header fields)" },

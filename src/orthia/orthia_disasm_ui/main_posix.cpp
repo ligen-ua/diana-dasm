@@ -50,6 +50,8 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "  --arch <arch>     with --format raw: how it is disassembled, x86, x64,\n";
     out << "                    arm64, arm or thumb\n";
     out << "                    (the UI asks for these when it doesn't recognize a file)\n";
+    out << "  --capture         save the memory of each analyzed module of a process into\n";
+    out << "                    its folder (deep mode: see .capture)\n";
     out << "  --overwrite-db    new, empty databases for the targets opened in this run\n";
     out << "                    (default: reuse the database of an earlier open)\n";
     out << "  --no-sandbox     no privilege drop under sudo and no syscall filter\n";
@@ -99,6 +101,7 @@ int main(int argc, const char* argv[])
     const std::string programName = GetProgramName(argc > 0 ? argv[0] : nullptr);
     bool analyze = false;
     bool overwriteDatabases = false;
+    bool captureModules = false;
 
     try
     {
@@ -198,6 +201,11 @@ int main(int argc, const char* argv[])
             {
                 // the UI always analyzes, so it only matters with --cmd
                 analyze = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--capture") == 0)
+            {
+                captureModules = true;
                 continue;
             }
             if (strcmp(argv[i], "--overwrite-db") == 0)
@@ -307,6 +315,7 @@ int main(int argc, const char* argv[])
         }
 
         config->SetOverwriteDatabases(overwriteDatabases);
+        config->SetCaptureModules(captureModules);
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 
         if (consoleMode)

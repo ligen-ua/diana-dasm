@@ -89,6 +89,39 @@ namespace orthia_tests
             return 1;
         }
 
+        int EnumMemoryRegions(std::function<bool(const oui::MemoryRegionInfo& info)> callback) override
+        {
+            std::vector<oui::MemoryRegionInfo> all;
+            for (const auto& region : regions)
+            {
+                oui::MemoryRegionInfo info;
+                info.allocationBase = region.allocationBase ? region.allocationBase : region.base;
+                info.regionBase = region.base;
+                info.regionSize = region.data.size();
+                info.protect = region.protect;
+                info.committed = true;
+                info.type = oui::MemoryRegionInfo::type_private;
+                all.push_back(info);
+            }
+            for (const auto& image : images)
+            {
+                oui::MemoryRegionInfo info;
+                info.allocationBase = info.regionBase = image.base;
+                info.regionSize = image.data.size();
+                info.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_exec;
+                info.committed = true;
+                info.type = oui::MemoryRegionInfo::type_image;
+                all.push_back(info);
+            }
+            std::sort(all.begin(), all.end(), [](const oui::MemoryRegionInfo& a, const oui::MemoryRegionInfo& b) { return a.regionBase < b.regionBase; });
+            for (const auto& info : all)
+            {
+                if (!callback(info))
+                    break;
+            }
+            return 0;
+        }
+
         std::tuple<int, unsigned long long> GetSizeInBytes() const override
         {
             return std::make_tuple(0, dianaMode == DIANA_MODE32 ? 0xFFFFFFFFull : ~0ull);

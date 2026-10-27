@@ -107,6 +107,7 @@ orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <comm
 | `--format <format>` | with `--cmd`: open the `--file` as `pe`, `elf` or `raw` (code without headers) instead of the format it is detected as |
 | `--base <address>` | with `--format raw`: where the code is placed (ARM code: a multiple of 4, Thumb: of 2) |
 | `--arch <arch>` | with `--format raw`: how the code is disassembled and analyzed: `x86`, `x64`, `arm64`, `arm` or `thumb` |
+| `--capture` | deep mode for processes: save the memory of each module into the process folder when its analysis is done (see [Capture](#capture-deep-mode)) |
 | `--overwrite-db` | give every target opened in this run a new, empty database instead of reusing the one of an earlier open (comments included, see [databases](databases.md)) |
 | `--no-sandbox` | don't restrict Orthia: on Linux no privilege drop and no seccomp filter (see [what Orthia keeps of root](#linux-what-orthia-keeps-of-root)), on Windows no privilege removal and no mitigation policies (see [sandbox](#windows-sandbox)) |
 | `--run-tests` | run the built-in tests and exit |
@@ -171,6 +172,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from; for a floating module, its allocation, code and entry points with the instructions that lead there |
 | `sections [-v] <module\|address>` | List the sections of a module: name, address, size and `RWX` flags; `-v` adds every header field (see [Sections](#sections)) |
 | `.reload [<module>]` | Reload symbols for a module |
+| `.capture` | Save the memory of the process into its folder: the memory map, every committed readable region, the threads with their stacks (see [Capture](#capture-deep-mode)) |
 | `.analyze [/f] <module\|mask>` | Run the full analysis of a module, then find the floating code it leads to (processes). A mask (`k*`, `*`) queues every module `lm` lists that matches. `/f` analyzes an analyzed module again, and checks a stale floating module against the memory again |
 | `.symfix [<path>]` | Set the symbols directory |
 | `.database list` | List the databases in the data folder; needs no open target (see [databases.md](databases.md#managing-databases)) |
@@ -309,7 +311,7 @@ Stale and live memory:
 Commands and UI:
 - [x] The bytes are saved when a floating module is found, with their SHA-256, and the folder stays.
 - [x] Open a saved process folder after the process exited (`--proc-folder`): the module files and the snapshots.
-- [ ] `.capture` and `--capture`: the memory of the modules, and everything else the process has, into the folder.
+- [x] `.capture` and `--capture`: the memory of the modules, and everything else the process has, into the folder.
 - [ ] Snapshots: 16 MB per allocation and no budget per process; a JIT heap can make many.
 - [ ] The Modules window leaves floating modules out; give them a view of their own.
 
@@ -342,17 +344,44 @@ item is named `[1234] app.exe (saved)`. What it has:
   timestamp and size, or the ELF build-id, read from the headers in memory). `lm` shows `linked`, or `stale`
   when the file is gone or another build; `modinfo` says why. A file has no in-memory changes: an inline hook
   shows the original instructions there;
-- the bytes of the floating modules from their snapshots, so `u`, `lmf /v` and `modinfo` work as they did.
+- the bytes of the floating modules from their snapshots, so `u`, `lmf /v` and `modinfo` work as they did;
+- with a [capture](#capture-deep-mode), the memory as it was, over all of the above: `lm` shows `captured`,
+  the memory map and `threads` are the capture's.
 
 Anything else reads as missing. A saved folder is never removed when its item closes and is never written
 to except by the analysis. Process folders without floating code are removed 48 hours after their last
 write, or by `.database cleanup` once the process exited, so open them before that.
 
 TODO:
-- [ ] `.capture` (everything, on demand) and `--capture` (each analyzed module's memory): the bytes as the
-  process had them, for the deep case, where the files on disk are not enough.
 - [ ] The UI: *File* menu entry for a saved folder.
-- [ ] Threads: there are none in a saved folder until `.capture` saves them.
+
+### Capture (deep mode)
+
+For something critical and fragile, where the files on disk are not enough (in-memory patches, a module
+that unloads or deletes its file, data, stacks), the memory itself goes into the process folder:
+
+- `.capture` saves everything now: the memory map, the bytes of every committed region that can be read
+  (unreadable pages zero filled and counted), and the threads with their start addresses and stacks.
+  It prints its progress and stops on CTRL+C; what is saved by then stays, marked incomplete.
+- `--capture` saves the memory of each module of the process when its analysis is done (`.analyze`, the
+  analysis on open). Small, for the modules that matter.
+
+```
+orthia --pid 1234 --cmd '.analyze *' --cmd .capture
+orthia --pid 1234 --capture --cmd '.analyze app*'
+orthia --proc-folder 1234 --cmd 'u app!main L10' --cmd threads
+```
+
+Both only read: the process is not stopped, so a thread may change bytes while they are read. A newer
+capture of a range replaces what was captured over it, and keeps the rest: a module captured before it
+unloaded stays. The capture is `capture/` in the process folder ([databases.md](databases.md#capture));
+a folder with one is evidence, kept as one with floating code snapshots is. It can be big: a whole
+process is often hundreds of MB.
+
+TODO:
+- [ ] A switch to stop the threads while `.capture` reads (consistent bytes, but intrusive).
+- [ ] Thread registers: only start addresses and stack return addresses are saved.
+- [ ] `--capture` for floating modules too (they have their snapshots), and a size limit.
 
 ### Startup routines
 

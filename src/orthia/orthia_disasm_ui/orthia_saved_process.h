@@ -7,6 +7,7 @@
 #include "oui_processes.h"
 #include "orthia_image_identity.h"
 #include "orthia_databases.h"
+#include "orthia_capture.h"
 #include <memory>
 #include <mutex>
 
@@ -39,9 +40,10 @@ namespace orthia
     // false when the folder has no modules.xml or it doesn't parse
     bool ReadSavedModules(const PlatformString_type& folder, SavedModuleList& list);
 
-    // The process as the folder keeps it. Module bytes come from the module files that are still
-    // the build the process ran (file on disk: no in-memory patches), floating code from its
-    // snapshots; anything else reads as missing
+    // The process as the folder keeps it. Bytes come from its capture (.capture, --capture) first,
+    // then from the module files that are still the build the process ran (file on disk: no
+    // in-memory patches), then from the floating code snapshots; anything else reads as missing.
+    // The memory map and the threads are the capture's, when there is one
     class CSavedProcess : public oui::IProcess
     {
         struct Snapshot
@@ -60,14 +62,23 @@ namespace orthia
         std::vector<std::shared_ptr<IImageSource>> m_sources;
         mutable std::mutex m_lock;      // m_snapshots
         std::vector<Snapshot> m_snapshots;
+        CaptureIndex m_capture;
+        // allocation base -> its end, from the captured map
+        std::map<Address_type, Address_type> m_allocationEnds;
 
         IImageSource* FindSource(Address_type address) const;
+        const CapturedRegion* FindCaptured(Address_type address) const;
+        void CopyCaptured(unsigned long long offset, void* pBuffer, size_t size, bool& found) const;
     public:
         CSavedProcess(const PlatformString_type& folder, const FolderMeta& meta, const SavedModuleList& list);
 
         const PlatformString_type& GetFolder() const { return m_folder; }
         const FolderMeta& GetMeta() const { return m_meta; }
         bool HasModuleList() const { return !m_list.modules.empty(); }
+        bool HasCapture() const { return !m_capture.regions.empty(); }
+        const CaptureIndex& GetCapture() const { return m_capture; }
+        // whether the capture has the bytes at address
+        bool IsCaptured(Address_type address) const;
         // the bytes of a floating module, from its snapshot file in the floating/ folder; false
         // when it has none or the file can't be read
         bool AddSnapshot(const FloatingRegionInfo& info);

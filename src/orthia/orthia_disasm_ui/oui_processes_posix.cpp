@@ -398,6 +398,30 @@ namespace oui
             }
             return ENOENT;
         }
+        int EnumMemoryRegions(std::function<bool(const MemoryRegionInfo& info)> callback) override
+        {
+            const auto entries = ParseMaps(m_pid);
+            if (entries.empty())
+                return ENOENT;
+            for (const auto& e : entries)
+            {
+                MemoryRegionInfo info;
+                info.allocationBase = info.regionBase = e.startAddr;
+                info.regionSize = e.endAddr - e.startAddr;
+                info.committed = true;
+                info.protect = (e.isRead ? MemoryRegionInfo::protect_read : 0) |
+                               (e.isWrite ? MemoryRegionInfo::protect_write : 0) |
+                               (e.isExec ? MemoryRegionInfo::protect_exec : 0);
+                info.type = e.path.empty() ? MemoryRegionInfo::type_private : MemoryRegionInfo::type_mapped;
+                info.mappedName = e.path.empty() ? e.pseudoName : e.path;
+                // [vvar] can't be read by another process
+                if (e.pseudoName == "[vvar]" || e.pseudoName == "[vvar_vclock]")
+                    info.protect = 0;
+                if (!callback(info))
+                    return 0;
+            }
+            return 0;
+        }
         bool IsRunning() const override
         {
             // the pid may run another process by now: the start tells them apart

@@ -102,6 +102,19 @@ folder after the process exited ([orthia.md](orthia.md#saved-process-folders)).
 PE timestamp and `SizeOfImage` from the headers in memory, or the ELF build-id (`id_buildid`); a module without
 them has no bytes when the folder is opened later.
 
+### Capture
+
+`.capture` and `--capture` ([orthia.md](orthia.md#capture-deep-mode)) write `capture/` in the process folder:
+
+| File | What it holds |
+|---|---|
+| `capture.xml` | the memory map: `<region base size allocation protect committed type name file missing/>` per region, `file` when its bytes were saved; `<threads>` with `<thread tid start created stack/>` (`stack`: return addresses, hex, space separated); `complete="0"` when `.capture` was stopped |
+| `<base>_<size>.bin` | the bytes of a region, unreadable chunks zero filled (`missing` bytes of them) |
+
+A newer capture of a range replaces the regions saved over it (their files are removed) and keeps the
+rest. A folder with `capture/capture.xml` is evidence: `.database list` marks it `(captured)`, only
+`.database delete` removes it.
+
 ## `meta.xml`
 
 Every `db/` and `proc/` folder made since `meta.xml` was added has one, in the same XML format as

@@ -296,6 +296,7 @@
     <ClCompile Include="orthia_floating_code.cpp" />
     <ClCompile Include="orthia_sha256.cpp" />
     <ClCompile Include="orthia_saved_process.cpp" />
+    <ClCompile Include="orthia_capture.cpp" />
     <ClCompile Include="orthia_image_source.cpp" />
     <ClCompile Include="orthia_item_file.cpp" />
     <ClCompile Include="orthia_item_process.cpp" />
@@ -332,6 +333,7 @@
     <ClCompile Include="ui_output_window.cpp" />
     <ClCompile Include="ui_tests.cpp" />
     <ClCompile Include="ui_tests_saved_process.cpp" />
+    <ClCompile Include="ui_tests_capture.cpp" />
     <ClCompile Include="ui_workspace_window.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -344,6 +346,7 @@
     <ClInclude Include="orthia_floating_code.h" />
     <ClInclude Include="orthia_sha256.h" />
     <ClInclude Include="orthia_saved_process.h" />
+    <ClInclude Include="orthia_capture.h" />
     <ClInclude Include="ui_tests_fakes.h" />
     <ClInclude Include="orthia_image_source.h" />
     <ClInclude Include="orthia_item_file.h" />

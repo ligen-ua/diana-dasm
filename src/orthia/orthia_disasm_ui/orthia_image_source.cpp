@@ -317,6 +317,9 @@ namespace orthia
                     append(ORTHIA_TCSTR("unlinked"));
                 }
                 break;
+            case ImageSourceKind::MemoryImage:
+                append(ORTHIA_TCSTR("captured"));
+                break;
             default:
                 break;
             }
@@ -337,6 +340,8 @@ namespace orthia
         {
         case ImageSourceKind::Main:
             return ORTHIA_TCSTR("main");
+        case ImageSourceKind::MemoryImage:
+            return ORTHIA_TCSTR("captured (the process memory)");
         case ImageSourceKind::LinkedFile:
         {
             auto state = (ImageState)mod.imageState;

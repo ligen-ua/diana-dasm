@@ -18,6 +18,7 @@ set(SOURCES
     orthia_floating_code.cpp
     orthia_sha256.cpp
     orthia_saved_process.cpp
+    orthia_capture.cpp
     orthia_image_source.cpp
     orthia_item_file.cpp
     orthia_module_names.cpp
@@ -52,6 +53,7 @@ set(SOURCES
     ui_output_window.cpp
     ui_tests.cpp
     ui_tests_saved_process.cpp
+    ui_tests_capture.cpp
     ui_workspace_window.cpp
 )
 

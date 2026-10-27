@@ -81,6 +81,8 @@ namespace orthia
         bool pendingDelete = false;         // left by a delete that failed half way
         // processes only: snapshots of floating code, evidence. No cleanup removes it, .database delete does
         bool hasFloatingSnapshots = false;
+        // processes only: a .capture or --capture, evidence as the snapshots are
+        bool hasCapture = false;
     };
 
     // What data.db says; read with a read-only connection, so unknown fields stay unset.

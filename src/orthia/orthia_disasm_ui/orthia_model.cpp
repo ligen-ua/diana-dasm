@@ -382,6 +382,7 @@ namespace orthia
         auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, dianaArch,
             persistentItemStorage);
+        info->SetCaptureModules(m_config->GetCaptureModules());
         info->ReloadModules();
         persistentItemStorage->Init(info);
 

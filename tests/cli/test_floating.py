@@ -275,3 +275,50 @@ def test_saved_folder_not_found(orthia_cold):
     res = orthia_cold.raw("--proc-folder", "no_such_folder_or_pid", "--cmd", "lmf")
     assert res.code == 3, res
     assert "Can't open the saved process folder" in res.stderr, res
+
+
+def test_capture_after_exit(orthia_cold, helper):
+    """.capture, the process exits, its folder opens: the memory as it was, the hook in the
+    hooked function (a file on disk has the original bytes), the threads"""
+    stub = floating_name(helper.stub)
+    res = orthia_cold.run(f".analyze {HELPER_NAME}", ".capture", pid=helper.pid).assert_ok()
+    res.assert_line(r"^Captured: \d+ of \d+ regions, [\d.]+ MB \([\d.]+ MB unreadable\), [1-9]\d* threads$")
+    helper.proc.stdin.close()
+    helper.proc.wait(timeout=30)
+
+    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lm", "--cmd", "lmf",
+                          "--cmd", f"u {helper.target:x} L1", "--cmd", "threads",
+                          "--cmd", f"modinfo {HELPER_NAME}").assert_ok()
+    res.assert_line(rf"^\S+\s+\S+\s+{HELPER_NAME}(\.exe)?\s+captured, analyzed$")
+    res.assert_line(r"^Image: captured \(the process memory\)$")
+    assert_found(res, helper, helper.stub)
+    # the hooked function jumps to the stub (x86 jmp, ARM b / ldr pc)
+    target = re.escape(helper.address_text(helper.target))
+    res.assert_line(rf"(?i)^{target}\s+[0-9a-f]+\s+(jmp|b|ldr)\b.*{stub}")
+    res.assert_line(r"^THREAD ")
+
+    res = orthia_cold.raw("--cmd", ".database list").assert_ok()
+    res.assert_line(rf"^pid {helper.pid}\s.*\(captured\)$")
+    orthia_cold.raw("--cmd", ".database cleanup").assert_ok()
+    assert (next((orthia_cold.home / "proc").iterdir()) / "capture" / "capture.xml").is_file()
+
+
+def test_capture_option_saves_analyzed_modules(orthia_cold, helper):
+    """--capture: the module analyzed is captured, the others come from their files"""
+    orthia_cold.run(f".analyze {HELPER_NAME}", pid=helper.pid, options=("--capture",)).assert_ok()
+    helper.proc.stdin.close()
+    helper.proc.wait(timeout=30)
+    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lm", "--cmd", f"u {helper.target:x} L1").assert_ok()
+    res.assert_line(rf"^\S+\s+\S+\s+{HELPER_NAME}(\.exe)?\s+captured, analyzed$")
+    assert re.search(r"\s+linked$", res.stdout, re.M), res
+    target = re.escape(helper.address_text(helper.target))
+    res.assert_line(rf"(?i)^{target}\s+[0-9a-f]+\s+(jmp|b|ldr)\b")
+
+
+def test_capture_needs_a_running_process(orthia_cold, helper):
+    orthia_cold.run(f".analyze {HELPER_NAME}", pid=helper.pid).assert_ok()
+    helper.proc.stdin.close()
+    helper.proc.wait(timeout=30)
+    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", ".capture")
+    assert res.code == 1, res
+    assert "Nothing to capture: not a running process" in res.stdout + res.stderr, res

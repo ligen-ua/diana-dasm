@@ -1,4 +1,6 @@
 #include "orthia_commands.h"
+#include "orthia_capture.h"
+#include <filesystem>
 #include "orthia_expressions.h"
 #include "ui_common.h"
 #include "ui_disasm_memory_writer.h"
@@ -313,6 +315,64 @@ namespace orthia
         {
             throw std::runtime_error("Module not found: " + orthia::PlatformStringToUtf8(moduleName));
         }
+    }
+
+    void CCommandProcessor::Handle_capture(CommandArguments& args)
+    {
+        if (SplitCommandWords(args.text).size() > 1)
+        {
+            throw std::runtime_error("Usage: .capture");
+        }
+        auto process = args.item->GetAssociatedProcess();
+        if (!process || !process->IsRunning())
+        {
+            throw std::runtime_error("Nothing to capture: not a running process");
+        }
+        const auto folder = args.item->GetDatabaseFolder();
+        if (folder.empty())
+        {
+            throw std::runtime_error("The process has no database folder");
+        }
+        auto megabytes = [](unsigned long long bytes) {
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "%.1f MB", (double)bytes / (1024.0 * 1024.0));
+            return Utf8ToPlatformString(buffer);
+        };
+        const auto target = (std::filesystem::path(folder) / g_captureFolder).native();
+        args.ReplyLine(ORTHIA_TCSTR("Capturing the memory of the process: ") + target);
+        unsigned long long reported = 0;
+        size_t regionsSinceSync = 0;
+        bool cancelled = false;
+        const auto stats = CaptureProcess(*process, folder, [&](const CaptureStats& progress) {
+            try
+            {
+                if (progress.bytes - reported >= 256ull * 1024 * 1024)
+                {
+                    reported = progress.bytes;
+                    args.ReplyLine(ORTHIA_TCSTR("  ") + megabytes(progress.bytes));
+                }
+                else if (++regionsSinceSync >= 32)
+                {
+                    regionsSinceSync = 0;
+                    args.Sync();
+                }
+            }
+            catch (const RequestCanceledException&)
+            {
+                cancelled = true;
+                return false;
+            }
+            return true;
+        });
+        if (cancelled)
+        {
+            // the bytes saved so far stay, the capture says it is incomplete
+            throw RequestCanceledException();
+        }
+        args.ReplyLine(ORTHIA_TCSTR("Captured: ") + Utf8ToPlatformString(std::to_string(stats.savedRegions)) +
+            ORTHIA_TCSTR(" of ") + Utf8ToPlatformString(std::to_string(stats.regions)) + ORTHIA_TCSTR(" regions, ") +
+            megabytes(stats.bytes) + ORTHIA_TCSTR(" (") + megabytes(stats.missing) + ORTHIA_TCSTR(" unreadable), ") +
+            Utf8ToPlatformString(std::to_string(stats.threads)) + ORTHIA_TCSTR(" threads"));
     }
 
     void CCommandProcessor::Handle_analyze(CommandArguments& args)
@@ -691,6 +751,10 @@ namespace orthia
             {
                 line += ORTHIA_TCSTR("  (floating code saved)");
             }
+            if (info.hasCapture)
+            {
+                line += ORTHIA_TCSTR("  (captured)");
+            }
             args.ReplyLine(line);
         }
     }
@@ -981,6 +1045,7 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("lmf"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args, true);  });
             parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_reload(args);  });
             parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_analyze(args);  });
+            parser.SetHandler(OUI_TCSTR(".capture"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_capture(args);  });
             parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });
             parser.SetHandler(OUI_TCSTR("modinfo"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_mod_info(args);  });
             parser.SetHandler(OUI_TCSTR("sections"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_sections(args);  });

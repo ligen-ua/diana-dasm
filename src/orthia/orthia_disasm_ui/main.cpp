@@ -43,6 +43,8 @@ static void PrintUsage(std::ostream& out)
     out << "  --arch <arch>       with --format raw: how it is disassembled, x86, x64,\n";
     out << "                      arm64, arm or thumb\n";
     out << "                      (the UI asks for these when it doesn't recognize a file)\n";
+    out << "  --capture           save the memory of each analyzed module of a process into\n";
+    out << "                      its folder (deep mode: see .capture)\n";
     out << "  --overwrite-db      new, empty databases for the targets opened in this run\n";
     out << "                      (default: reuse the database of an earlier open)\n";
     out << "  --no-sandbox       don't restrict orthia (needed for orthia_proc_win32.dll)\n";
@@ -172,6 +174,7 @@ int wmain(int argc, const wchar_t* argv[])
     std::vector<std::wstring> commandsToRun;
     bool analyze = false;
     bool overwriteDatabases = false;
+    bool captureModules = false;
 
     try
     {
@@ -271,6 +274,11 @@ int wmain(int argc, const wchar_t* argv[])
             {
                 // the UI always analyzes, so it only matters with --cmd
                 analyze = true;
+                continue;
+            }
+            if (wcscmp(argv[i], L"--capture") == 0)
+            {
+                captureModules = true;
                 continue;
             }
             if (wcscmp(argv[i], L"--overwrite-db") == 0)
@@ -384,6 +392,7 @@ int wmain(int argc, const wchar_t* argv[])
         }
 
         config->SetOverwriteDatabases(overwriteDatabases);
+        config->SetCaptureModules(captureModules);
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 
         if (consoleMode)

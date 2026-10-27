@@ -63,6 +63,7 @@ protected:
     void Handle_threads(CommandArguments& args);
     void Handle_reload(CommandArguments& args);
     void Handle_analyze(CommandArguments& args);
+    void Handle_capture(CommandArguments& args);
     void Handle_symfix(CommandArguments& args);
     void Handle_mod_info(CommandArguments& args);
     void Handle_sections(CommandArguments& args);

@@ -149,7 +149,13 @@
     <ClCompile Include="orthia_saved_process.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_capture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ui_tests_saved_process.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_tests_capture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="orthia_module_symbols.cpp">
@@ -278,6 +284,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_saved_process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_capture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ui_tests_fakes.h">

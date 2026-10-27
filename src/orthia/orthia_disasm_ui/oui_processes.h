@@ -85,6 +85,9 @@ namespace oui
         virtual bool IsRunning() const = 0;
         // 0 and the allocation holding address; an error when nothing is allocated there
         virtual int QueryMemoryRegion(unsigned long long address, MemoryRegionInfo& info) = 0;
+        // every region of the address space that is allocated, by address; allocationSize is 0 (not
+        // computed). The callback returns false to stop. An error when the map can't be read
+        virtual int EnumMemoryRegions(std::function<bool(const MemoryRegionInfo& info)> callback) { (void)callback; return 1; }
     };
 
     struct ProcessUnifiedId

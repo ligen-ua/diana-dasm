@@ -16,6 +16,8 @@ namespace orthia
         PlatformString_type m_procFolder;
         // opened from a saved folder (CSavedProcess): the folder is never removed, modules.xml never written
         bool m_savedView = false;
+        // --capture: a module's memory goes into the folder when its analysis is done
+        bool m_captureModules = false;
         // what modules.xml says, from the last ReloadModules; written by the live view
         SavedModuleList m_savedModules;
         std::mutex m_saveLock;
@@ -59,6 +61,7 @@ namespace orthia
         // before SetProcFolder: the item shows a saved folder, not a running process
         void SetSavedView() { m_savedView = true; }
         bool IsSavedView() const { return m_savedView; }
+        void SetCaptureModules(bool value) { m_captureModules = value; }
         void Init(std::shared_ptr<CModuleManager> moduleManager,
             std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
             std::shared_ptr<ModuleStorage> moduleStorage);

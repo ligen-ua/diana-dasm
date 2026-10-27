@@ -40,7 +40,7 @@ namespace orthia
         {
             return false;
         }
-        if (HasFloatingSnapshots(folder))
+        if (HasFloatingSnapshots(folder) || HasCapture(folder))
         {
             return true;
         }
@@ -592,6 +592,21 @@ namespace orthia
         if (moduleKnown && ((flagsToSet | flagsToRemove) & g_savedProcessModuleFlags))
         {
             SaveModuleFlags(module, flagsToSave);
+        }
+        // --capture: the module's memory as the analysis saw it
+        if (moduleKnown && (flagsToSet & ModuleInfo::flags_analyzeDone) && m_captureModules && !m_savedView &&
+            !module.IsFloating() && !m_procFolder.empty())
+        {
+            try
+            {
+                const auto stats = CaptureRange(*m_proc, m_procFolder, module.address, module.size);
+                ORTHIA_DEV_LOG(orthia::LogSeverity::Info, "Captured ", PlatformStringToUtf8(module.name), ": ",
+                    CLogParamEx(stats.bytes, 16), " bytes");
+            }
+            catch (const std::exception& e)
+            {
+                ORTHIA_LOG(orthia::LogSeverity::Warning, "Can't capture ", PlatformStringToUtf8(module.name), ": ", e.what());
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 #include "orthia_databases.h"
+#include "orthia_capture.h"
 #include "orthia_config.h"
 #include "orthia_model_interfaces.h"
 #include "orthia_floating_code.h"
@@ -321,6 +322,7 @@ namespace orthia
                 info.startKey = meta.startKey;
             }
             info.hasFloatingSnapshots = HasFloatingSnapshots(info.folder);
+            info.hasCapture = HasCapture(info.folder);
         }
         return info;
     }
@@ -567,7 +569,7 @@ namespace orthia
                 }
                 continue;
             }
-            if (info.hasFloatingSnapshots)
+            if (info.hasFloatingSnapshots || info.hasCapture)
             {
                 // evidence: only .database delete removes it
                 continue;
@@ -647,7 +649,7 @@ namespace orthia
         const auto now = fs::file_time_type::clock::now();
         for (const auto& info : EnumerateProcDatabases(procFolderWithSlash))
         {
-            if (info.pendingDelete || (!info.hasFloatingSnapshots && IsOlderThan(info, now, g_procFolderExpiration)))
+            if (info.pendingDelete || (!info.hasFloatingSnapshots && !info.hasCapture && IsOlderThan(info, now, g_procFolderExpiration)))
             {
                 try
                 {

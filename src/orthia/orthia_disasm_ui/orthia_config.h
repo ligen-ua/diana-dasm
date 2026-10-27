@@ -21,6 +21,7 @@ namespace orthia
         // true: every target opened in this run gets a new, empty database (--overwrite-db);
         // false: the database of an earlier open is reused when it fits
         bool m_overwriteDatabases = false;
+        bool m_captureModules = false;
 
     public:
         void Init();
@@ -39,5 +40,8 @@ namespace orthia
         void SetDeepAnalysis(bool value) { m_deepAnalysis = value; }
         bool GetOverwriteDatabases() const { return m_overwriteDatabases; }
         void SetOverwriteDatabases(bool value) { m_overwriteDatabases = value; }
+        // --capture: each analyzed module's memory into the process folder
+        bool GetCaptureModules() const { return m_captureModules; }
+        void SetCaptureModules(bool value) { m_captureModules = value; }
     };
 }

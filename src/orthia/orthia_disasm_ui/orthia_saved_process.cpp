@@ -228,6 +228,12 @@ namespace orthia
         m_meta(meta),
         m_list(list)
     {
+        ReadCaptureIndex(folder, m_capture);
+        for (const auto& region : m_capture.regions)
+        {
+            auto& end = m_allocationEnds[region.allocationBase ? region.allocationBase : region.base];
+            end = std::max<Address_type>(end, region.base + region.size);
+        }
         for (const auto& saved : m_list.modules)
         {
             const auto& mod = saved.module;
@@ -263,6 +269,61 @@ namespace orthia
         }
         --it;
         return (*it)->Contains(address) ? it->get() : nullptr;
+    }
+
+    const CapturedRegion* CSavedProcess::FindCaptured(Address_type address) const
+    {
+        const auto& regions = m_capture.regions;
+        auto it = std::upper_bound(regions.begin(), regions.end(), address,
+            [](Address_type value, const CapturedRegion& region) { return value < region.base; });
+        if (it == regions.begin())
+        {
+            return nullptr;
+        }
+        --it;
+        return address - it->base < it->size ? &*it : nullptr;
+    }
+
+    bool CSavedProcess::IsCaptured(Address_type address) const
+    {
+        const auto* region = FindCaptured(address);
+        return region && !region->file.empty();
+    }
+
+    void CSavedProcess::CopyCaptured(unsigned long long offset, void* pBuffer, size_t size, bool& found) const
+    {
+        const unsigned long long end = offset + size < offset ? ~0ull : offset + size;
+        const auto& regions = m_capture.regions;
+        auto it = std::upper_bound(regions.begin(), regions.end(), offset,
+            [](unsigned long long value, const CapturedRegion& region) { return value < region.base; });
+        if (it != regions.begin())
+        {
+            --it;
+        }
+        for (; it != regions.end() && it->base < end; ++it)
+        {
+            if (it->file.empty())
+            {
+                continue;
+            }
+            const unsigned long long start = std::max<unsigned long long>(offset, it->base);
+            const unsigned long long stop = std::min<unsigned long long>(end, it->base + it->size);
+            if (start >= stop)
+            {
+                continue;
+            }
+            std::ifstream stream(fs::path(m_folder) / g_captureFolder / Utf8ToPlatformString(it->file), std::ios::binary);
+            if (!stream)
+            {
+                continue;
+            }
+            stream.seekg((std::streamoff)(start - it->base));
+            stream.read((char*)pBuffer + (start - offset), (std::streamsize)(stop - start));
+            if (stream.gcount() == (std::streamsize)(stop - start))
+            {
+                found = true;
+            }
+        }
     }
 
     bool CSavedProcess::AddSnapshot(const FloatingRegionInfo& info)
@@ -341,11 +402,15 @@ namespace orthia
                 copy(source->GetBase(), image->GetMappedFile());
             }
         }
-        std::lock_guard<std::mutex> guard(m_lock);
-        for (const auto& snapshot : m_snapshots)
         {
-            copy(snapshot.base, snapshot.data);
+            std::lock_guard<std::mutex> guard(m_lock);
+            for (const auto& snapshot : m_snapshots)
+            {
+                copy(snapshot.base, snapshot.data);
+            }
         }
+        // the memory as it was: over the files and the snapshots
+        CopyCaptured(offset, pBuffer, size, found);
         return found ? 0 : 1;
     }
 
@@ -373,7 +438,8 @@ namespace orthia
             auto& source = m_sources[i];
             // its exports, which also loads the file
             std::unique_ptr<IModuleImage> image;
-            if (source->GetKind() != ImageSourceKind::None && source->GetImage())
+            const bool captured = IsCaptured(info.address);
+            if (captured || (source->GetKind() != ImageSourceKind::None && source->GetImage()))
             {
                 if (const auto* format = FindFormatByModule(info))
                 {
@@ -381,9 +447,9 @@ namespace orthia
                 }
             }
             info.imageSourceKnown = true;
-            info.imageSourceKind = (int)source->GetKind();
-            info.imageState = (int)source->GetState();
-            info.imageStateReason = source->GetStateReason();
+            info.imageSourceKind = (int)(captured ? ImageSourceKind::MemoryImage : source->GetKind());
+            info.imageState = (int)(captured ? ImageState::Ready : source->GetState());
+            info.imageStateReason = captured ? PlatformString_type() : source->GetStateReason();
             if (image)
             {
                 oui::ModuleDisasmContext context;
@@ -399,10 +465,55 @@ namespace orthia
         return 0;
     }
 
+    namespace
+    {
+        class CSavedThread : public oui::IThread
+        {
+            CapturedThread m_thread;
+        public:
+            explicit CSavedThread(const CapturedThread& thread) : m_thread(thread) {}
+            int GetInfo(oui::ThreadInfo& info) const override
+            {
+                info.tid = m_thread.tid;
+                info.startAddress = m_thread.startAddress;
+                if (!m_thread.startTime.empty())
+                {
+                    info.startTime.InitFromSQL(m_thread.startTime);
+                }
+                return 0;
+            }
+            int CaptureStack(int framesCount, std::vector<Address_type>& stack) const override
+            {
+                stack.assign(m_thread.stack.begin(), m_thread.stack.begin() +
+                    std::min<size_t>(m_thread.stack.size(), (size_t)std::max(framesCount, 0)));
+                return 0;
+            }
+        };
+        class CSavedThreadEnumerator : public oui::IThreadEnumerator
+        {
+            std::vector<CapturedThread> m_threads;
+            size_t m_next = 0;
+        public:
+            explicit CSavedThreadEnumerator(const std::vector<CapturedThread>& threads) : m_threads(threads) {}
+            std::tuple<int, std::shared_ptr<oui::IThread>> GetNextThread() override
+            {
+                if (m_next >= m_threads.size())
+                {
+                    return std::make_tuple(0, std::shared_ptr<oui::IThread>());
+                }
+                return std::make_tuple(0, std::shared_ptr<oui::IThread>(std::make_shared<CSavedThread>(m_threads[m_next++])));
+            }
+        };
+    }
+
     std::tuple<int, std::shared_ptr<oui::IThreadEnumerator>> CSavedProcess::CreateThreadEnumerator()
     {
-        // TODO: threads come with .capture
-        return std::make_tuple(1, std::shared_ptr<oui::IThreadEnumerator>());
+        // the threads of a .capture; none otherwise
+        if (!m_capture.hasThreads)
+        {
+            return std::make_tuple(1, std::shared_ptr<oui::IThreadEnumerator>());
+        }
+        return std::make_tuple(0, std::shared_ptr<oui::IThreadEnumerator>(std::make_shared<CSavedThreadEnumerator>(m_capture.threads)));
     }
 
     oui::ProcessStartInfo CSavedProcess::GetStartInfo() const
@@ -416,6 +527,19 @@ namespace orthia
     int CSavedProcess::QueryMemoryRegion(unsigned long long address, oui::MemoryRegionInfo& info)
     {
         info = oui::MemoryRegionInfo();
+        if (const auto* region = FindCaptured(address))
+        {
+            info.allocationBase = region->allocationBase ? region->allocationBase : region->base;
+            auto end = m_allocationEnds.find(info.allocationBase);
+            info.allocationSize = (end != m_allocationEnds.end() ? end->second : region->base + region->size) - info.allocationBase;
+            info.regionBase = region->base;
+            info.regionSize = region->size;
+            info.protect = region->protect;
+            info.committed = region->committed;
+            info.type = region->type;
+            info.mappedName = region->name;
+            return 0;
+        }
         {
             std::lock_guard<std::mutex> guard(m_lock);
             for (const auto& snapshot : m_snapshots)
