@@ -169,7 +169,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from; for a floating module, its allocation, code and entry points with the instructions that lead there |
 | `sections [-v] <module\|address>` | List the sections of a module: name, address, size and `RWX` flags; `-v` adds every header field (see [Sections](#sections)) |
 | `.reload [<module>]` | Reload symbols for a module |
-| `.analyze [/f] <module>` | Run the full analysis of a module, then find the floating code it leads to (processes). `/f` analyzes an analyzed module again |
+| `.analyze [/f] <module\|mask>` | Run the full analysis of a module, then find the floating code it leads to (processes). A mask (`k*`, `*`) queues every module `lm` lists that matches. `/f` analyzes an analyzed module again, and checks a stale floating module against the memory again |
 | `.symfix [<path>]` | Set the symbols directory |
 | `.database list` | List the databases in the data folder; needs no open target (see [databases.md](databases.md#managing-databases)) |
 | `.database delete <sel>...` | Delete databases, selected by a SHA-1 prefix, a pid or a file name; an open one is refused |
@@ -183,7 +183,7 @@ In the UI, press CTRL+C in the command edit box to stop a running command.
 
 The address of `u` and of the `db`/`dw`/`dd`/`dq`/`dp`/`dps` commands is an expression, not just a number.
 The same expressions work in the UI's *Go to address* dialog (G).
-The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`, `.reload` and `.analyze` take a module name (`.analyze` also takes `/f`).
+The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`, `.reload` and `.analyze` take a module name (`.analyze` also takes `/f` and a mask).
 `sections` takes a module name or an expression, and lists the module that contains the address.
 
 | Syntax | Meaning |
@@ -222,7 +222,15 @@ A floating module works like any other: `u fl_7ff7a5d70000`, `x fl_7ff7a5d70000!
 
 Floating modules are saved in the process database. When the same process is opened again, each one is
 checked against the memory (the allocation and a hash of its bytes); one that changed or went away is kept
-and shown as `stale`, and is not analyzed again.
+and shown as `stale`, and is not analyzed again. The check covers the executable pages of the allocation
+only: data written next to the code doesn't make a module stale, a change of protection does.
+
+`.analyze /f fl_<base>` on a stale module looks at the memory as it is now: when the allocation is still
+there with some of its entry points executable, the module is fingerprinted and analyzed again; when it is
+gone (or a module the OS reports took its place) the floating module is removed.
+
+Hooks are usually in the system modules, which are not analyzed on open: `.analyze *` analyzes every
+module, `.analyze kernel*` a few.
 
 Targets in zero-filled memory are left out: no code starts with `00 00`.
 
@@ -255,9 +263,9 @@ Regions:
 - [ ] A floating module where the OS reports a module later (one loaded there since) is hidden without a word.
 
 Stale and live memory:
-- [ ] The check against memory runs only when the process is opened again. A command to check the floating
-  modules of the open process again (and to analyze a changed one again) is missing.
-- [ ] A stale module stays until the database is deleted; there is no command to drop it.
+- [ ] The check against memory runs only when the process is opened again, or for one module with
+  `.analyze /f`. Checking every floating module of the open process at once is missing.
+- [ ] A stale module whose allocation is still there can't be dropped, only analyzed again.
 
 Commands and UI:
 - [ ] `save`: write a floating module (bytes, base, architecture, entry points) to a file or to another

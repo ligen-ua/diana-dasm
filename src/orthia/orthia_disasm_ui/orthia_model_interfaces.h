@@ -267,6 +267,8 @@ namespace orthia
         virtual PlatformString_type GetDatabaseFolder() const { return PlatformString_type(); }
         // adds the floating module of the region or replaces it (process items only)
         virtual void SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> /*info*/) {}
+        // forgets the floating module at the address (process items only)
+        virtual void RemoveFloatingModule(Address_type /*address*/) {}
     };
 
     class BaseWorkPlaceItem : public IWorkPlaceItem

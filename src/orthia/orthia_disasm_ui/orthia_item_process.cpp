@@ -222,6 +222,20 @@ namespace orthia
         m_moduleNames.Invalidate(address);
     }
 
+    void CProcessWorkplaceItem::RemoveFloatingModule(Address_type address)
+    {
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            if (!m_floatingModules.erase(address))
+            {
+                return;
+            }
+            m_moduleFlags.erase(address);
+            RebuildModulesNoLock();
+        }
+        m_moduleNames.Invalidate(address);
+    }
+
     void CProcessWorkplaceItem::LoadSavedFloatingModules()
     {
         auto moduleManager = m_moduleManager;

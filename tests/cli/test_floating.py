@@ -129,7 +129,20 @@ def test_full_analysis_again(orthia, helper):
 
 def test_analyze_usage(orthia, helper):
     res = orthia.run(".analyze /x helper", pid=helper.pid)
-    assert "Usage: .analyze [/f] <module>" in res.stdout + res.stderr, res
+    assert "Usage: .analyze [/f] <module|mask>" in res.stdout + res.stderr, res
+
+
+def test_analyze_mask(orthia, helper):
+    # a mask queues every module it matches; the floating code follows as with a name
+    res = orthia.run(".analyze orthia_floating_h*", "lmf", pid=helper.pid).assert_ok()
+    res.assert_line(r"^Modules queued: 1$")
+    assert_found(res, helper, helper.stub)
+    assert_found(res, helper, helper.handler)
+
+
+def test_analyze_mask_matches_nothing(orthia, helper):
+    res = orthia.run(".analyze no_such_module*", pid=helper.pid)
+    assert "No module matches: no_such_module*" in res.stdout + res.stderr, res
 
 
 def test_reopen_keeps_floating_modules_and_marks_stale(orthia_cold, helper):
@@ -146,4 +159,10 @@ def test_reopen_keeps_floating_modules_and_marks_stale(orthia_cold, helper):
     assert lmf_row(res, helper.stub)[2] == "analyzed", res
     assert lmf_row(res, helper.handler)[2] == "stale", res
     res.assert_line(r"^State: stale")
+
+    # .analyze /f checks it against the memory again: analyzed, and not stale on the next open
+    res = orthia_cold.run(f".analyze /f {floating_name(helper.handler)}", "lmf", pid=helper.pid).assert_ok()
+    assert_found(res, helper, helper.handler)
+    res = orthia_cold.run("lmf", pid=helper.pid).assert_ok()
+    assert_found(res, helper, helper.handler)
 

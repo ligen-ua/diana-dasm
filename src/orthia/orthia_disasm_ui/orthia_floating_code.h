@@ -61,8 +61,27 @@ namespace orthia
 
     // header and bytesHash from the memory as it is now
     void FingerprintFloatingRegion(oui::IProcess& process, FloatingRegionInfo& info);
-    // whether the allocation is still there with the same bytes
+    // whether the allocation is still there with the same executable bytes
     bool IsFloatingRegionUnchanged(oui::IProcess& process, const FloatingRegionInfo& info);
+    // the region as it is now: allocation, protection, fingerprint, the entries still in executable
+    // memory; no analysis yet. nullptr when the allocation went away, a module the OS reports took
+    // its place, or none of its entries is executable any more
+    std::shared_ptr<FloatingRegionInfo> RefreshFloatingRegion(oui::IProcess& process,
+        const std::vector<ModuleInfo>& modules,
+        const FloatingRegionInfo& info);
+    // drops a floating module: from the database and from the item
+    void RemoveFloatingModule(IWorkPlaceItem& item, Address_type address);
+    // saves a refreshed region in place of the old one, not stale and waiting for its analysis
+    void ReplaceFloatingRegion(IWorkPlaceItem& item, std::shared_ptr<FloatingRegionInfo> info);
+
+    enum class FloatingRefresh
+    {
+        refreshed,      // module is the region as it is now, waiting for its analysis
+        removed,        // the region is gone, so is the module
+        unavailable     // no process to look at: nothing changed
+    };
+    // .analyze /f on a stale floating module: checks it against the memory again
+    FloatingRefresh RefreshStaleFloatingModule(IWorkPlaceItem& item, ModuleInfo& module);
 
     // names for x: $entry_0001, ... by address
     void QueryFloatingNames(const FloatingRegionInfo& info, std::vector<NameInfo>& names);

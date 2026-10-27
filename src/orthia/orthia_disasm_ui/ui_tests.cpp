@@ -734,6 +734,8 @@ namespace
             std::vector<char> data;
             int protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write |
                           oui::MemoryRegionInfo::protect_exec;
+            // a part of the allocation that starts there (0: its own allocation)
+            orthia::Address_type allocationBase = 0;
         };
         int dianaMode = DIANA_MODE64;
         int dianaArch = DIANA_ARCH_X86;
@@ -755,6 +757,20 @@ namespace
                 if (address >= region.base && address - region.base < region.data.size())
                 {
                     fill(region.base, region.data.size(), region.protect, oui::MemoryRegionInfo::type_private);
+                    if (region.allocationBase)
+                    {
+                        // the allocation: every part with the same allocation base
+                        info.allocationBase = region.allocationBase;
+                        orthia::Address_type end = region.allocationBase;
+                        for (const auto& part : regions)
+                        {
+                            if (part.allocationBase == region.allocationBase)
+                            {
+                                end = std::max<orthia::Address_type>(end, part.base + part.data.size());
+                            }
+                        }
+                        info.allocationSize = end - region.allocationBase;
+                    }
                     return 0;
                 }
             }
@@ -1291,6 +1307,124 @@ TEST(FloatingCode, SavedAndStale)
         item->LoadSavedFloatingModules();
         EXPECT_TRUE(FloatingFixture::FindModule(*item, FloatingFixture::regionA).flags & orthia::ModuleInfo::flags_stale);
     }
+}
+
+// .analyze /f on a stale module: analyzed again from the memory as it is now
+TEST(FloatingCode, StaleRefreshed)
+{
+    FloatingFixture fixture;
+    {
+        auto item = fixture.OpenItem();
+        fixture.AnalyzeModule(*item);
+        orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+        FloatingFixture::AnalyzePending(*item);
+    }
+
+    // D now has more code: c3 at +0 becomes nop, so the code runs on to the ret at +1
+    fixture.process->regions.back().data[0] = (char)0x90;
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        item->LoadSavedModuleFlags();
+        auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        ASSERT_TRUE(d.flags & orthia::ModuleInfo::flags_stale);
+        EXPECT_EQ(FloatingFixture::regionD, d.floating->codeLast);
+
+        ASSERT_EQ(orthia::FloatingRefresh::refreshed, orthia::RefreshStaleFloatingModule(*item, d));
+        EXPECT_EQ(FloatingFixture::regionD, d.address);
+        const auto pending = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        EXPECT_FALSE(pending.flags & (orthia::ModuleInfo::flags_stale | orthia::ModuleInfo::flags_analyzeDone));
+        // the entries and their referrers stay
+        ASSERT_EQ(1u, pending.floating->entries.size());
+        EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::regionA }), pending.floating->entries[0].referrers);
+
+        FloatingFixture::AnalyzePending(*item);
+        const auto analyzed = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        EXPECT_TRUE(analyzed.flags & orthia::ModuleInfo::flags_analyzeDone);
+        EXPECT_EQ(FloatingFixture::regionD + 1, analyzed.floating->codeLast);
+    }
+
+    // saved as it is now: not stale on the next open
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        item->LoadSavedModuleFlags();
+        const auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        ASSERT_TRUE(d.IsFloating());
+        EXPECT_FALSE(d.flags & orthia::ModuleInfo::flags_stale);
+        EXPECT_TRUE(d.flags & orthia::ModuleInfo::flags_analyzeDone);
+        EXPECT_EQ(FloatingFixture::regionD + 1, d.floating->codeLast);
+    }
+}
+
+// .analyze /f on a stale module whose memory went away: the module goes too
+TEST(FloatingCode, StaleRemoved)
+{
+    FloatingFixture fixture;
+    {
+        auto item = fixture.OpenItem();
+        fixture.AnalyzeModule(*item);
+        orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+        FloatingFixture::AnalyzePending(*item);
+    }
+    // D freed; A stays but is no longer executable
+    fixture.process->regions.pop_back();
+    fixture.process->regions.front().protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write;
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        for (auto address : { FloatingFixture::regionD, FloatingFixture::regionA })
+        {
+            auto mod = FloatingFixture::FindModule(*item, address);
+            ASSERT_TRUE(mod.flags & orthia::ModuleInfo::flags_stale);
+            EXPECT_EQ(orthia::FloatingRefresh::removed, orthia::RefreshStaleFloatingModule(*item, mod));
+            EXPECT_FALSE(FloatingFixture::FindModule(*item, address).IsFloating());
+        }
+    }
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        EXPECT_FALSE(FloatingFixture::FindModule(*item, FloatingFixture::regionA).IsFloating());
+        EXPECT_FALSE(FloatingFixture::FindModule(*item, FloatingFixture::regionD).IsFloating());
+        EXPECT_FALSE(fixture.moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(FloatingFixture::regionA));
+    }
+}
+
+// the fingerprint covers the executable pages: data next to the code may change
+TEST(FloatingCode, HashCoversExecutablePages)
+{
+    CFakeProcess process;
+    const orthia::Address_type base = 0x20000000;
+    CFakeProcess::Region code;
+    code.base = base;
+    code.allocationBase = base;
+    code.data.assign(0x1000, (char)0xC3);
+    process.regions.push_back(code);
+    CFakeProcess::Region data;
+    data.base = base + 0x1000;
+    data.allocationBase = base;
+    data.data.assign(0x2000, 0);
+    data.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write;
+    process.regions.push_back(data);
+
+    orthia::FloatingRegionInfo info;
+    info.allocationBase = base;
+    info.allocationSize = 0x3000;
+    orthia::FingerprintFloatingRegion(process, info);
+    EXPECT_EQ(0x1000u, info.hashedSize);
+    EXPECT_TRUE(orthia::IsFloatingRegionUnchanged(process, info));
+
+    process.regions[1].data[0x10] = 1;
+    EXPECT_TRUE(orthia::IsFloatingRegionUnchanged(process, info));
+
+    process.regions[0].data[0x10] = (char)0x90;
+    EXPECT_FALSE(orthia::IsFloatingRegionUnchanged(process, info));
+    process.regions[0].data[0x10] = (char)0xC3;
+    EXPECT_TRUE(orthia::IsFloatingRegionUnchanged(process, info));
+
+    // the data part made executable: another fingerprint
+    process.regions[1].protect |= oui::MemoryRegionInfo::protect_exec;
+    EXPECT_FALSE(orthia::IsFloatingRegionUnchanged(process, info));
 }
 
 int RunTests()

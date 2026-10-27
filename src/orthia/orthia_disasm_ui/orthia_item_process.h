@@ -57,6 +57,7 @@ namespace orthia
         // way to drop a stale module
         void LoadSavedFloatingModules();
         void SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> info) override;
+        void RemoveFloatingModule(Address_type address) override;
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;

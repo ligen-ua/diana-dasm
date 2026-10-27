@@ -317,7 +317,7 @@ namespace orthia
 
     void CCommandProcessor::Handle_analyze(CommandArguments& args)
     {
-        const char* usage = "Usage: .analyze [/f] <module>";
+        const char* usage = "Usage: .analyze [/f] <module|mask>";
         // /f: the full analysis again, also of an analyzed module
         auto words = SplitCommandWords(args.text);
         bool force = false;
@@ -338,6 +338,63 @@ namespace orthia
             throw std::runtime_error(usage);
         }
         const auto moduleName = words[first];
+        auto enqueue = [&](const orthia::ModuleInfo& mod) {
+            args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
+                args.workspaceId, []() {
+                }, force);
+            args.model->GetAnalyzer().EnqueueAnalyzePrivateSymbols(args.item, args.progressHandler, mod.address,
+                args.workspaceId, []() {
+            });
+        };
+
+        // a mask (k*, *): every module lm lists whose name, or name without its extension, matches.
+        // Floating modules are left out, their analysis follows from the modules
+        if (moduleName.find_first_of(ORTHIA_TCSTR("*?")) != orthia::PlatformString_type::npos)
+        {
+            const auto mask = orthia::Downcase(moduleName);
+            std::vector<orthia::ModuleInfo> modules;
+            args.item->GetModules(modules);
+            auto reader = args.item->CreateMemoryReader();
+            size_t queued = 0;
+            for (const auto& mod : modules)
+            {
+                if (mod.IsFloating())
+                {
+                    continue;
+                }
+                auto name = orthia::Downcase(mod.name);
+                bool match = utils::match(mask, name);
+                if (!match)
+                {
+                    orthia::PlatformString_type extension;
+                    orthia::GetExtensionOfFile(name, &extension);
+                    if (!extension.empty())
+                    {
+                        name.erase(name.size() - extension.size() - 1);
+                        match = utils::match(mask, name);
+                    }
+                }
+                if (!match)
+                {
+                    continue;
+                }
+                // one module without image data doesn't stop the others
+                if (!orthia::IsModuleImageReadable(reader.get(), mod))
+                {
+                    args.ReplyLine(ORTHIA_TCSTR("Skipped, no image data: ") + mod.name);
+                    continue;
+                }
+                enqueue(mod);
+                ++queued;
+            }
+            if (!queued)
+            {
+                throw std::runtime_error("No module matches: " + orthia::PlatformStringToUtf8(moduleName));
+            }
+            args.ReplyLine(ORTHIA_TCSTR("Modules queued: ") + orthia::Utf8ToPlatformString(std::to_string(queued)));
+            return;
+        }
+
         bool moduleFound = false;
         oui::EnumModulesByName(args.item,
             moduleName,
@@ -345,13 +402,7 @@ namespace orthia
             {
                 // checked here: a failure in the background analysis cannot fail the command
                 CheckImageReadable(args.item->CreateMemoryReader().get(), mod);
-
-                args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
-                        args.workspaceId, []() {
-                        }, force);
-                args.model->GetAnalyzer().EnqueueAnalyzePrivateSymbols(args.item, args.progressHandler, mod.address,
-                    args.workspaceId, []() {
-                });
+                enqueue(mod);
                 moduleFound = true;
                 return false;
             }

@@ -289,22 +289,46 @@ namespace orthia
         return true;
     }
 
+    // the executable pages of the allocation only, with their offsets: data written next to the code
+    // (an RW part of the allocation) doesn't make the module stale, a protection change does
     static unsigned long long HashRegion(oui::IProcess& process, Address_type base, Address_type size, Address_type* pHashed)
     {
         unsigned long long hash = 0xcbf29ce484222325ULL;
-        const Address_type hashed = std::min(size, c_maxHashedSize);
+        Address_type hashed = 0;
         std::vector<unsigned char> buffer(c_readChunk);
-        for (Address_type offset = 0; offset < hashed; offset += c_readChunk)
+        const Address_type end = base + size;
+        for (Address_type address = base; address < end && hashed < c_maxHashedSize;)
         {
-            const size_t chunk = (size_t)std::min<Address_type>(c_readChunk, hashed - offset);
-            if (process.ReadExactEx2(base + offset, buffer.data(), chunk))
+            oui::MemoryRegionInfo region;
+            if (process.QueryMemoryRegion(address, region) || region.allocationBase != base ||
+                !region.regionSize || region.regionBase + region.regionSize <= address)
             {
-                // a page that can't be read counts as one
-                const unsigned char marker[] = { 0xFF, 0x00, 0xFF, 0x00 };
-                HashBytes(hash, marker, sizeof(marker));
-                continue;
+                break;
             }
-            HashBytes(hash, buffer.data(), chunk);
+            const Address_type regionEnd = std::min<Address_type>(end, region.regionBase + region.regionSize);
+            if (region.committed && (region.protect & oui::MemoryRegionInfo::protect_exec))
+            {
+                const unsigned long long offset = address - base;
+                HashBytes(hash, (const unsigned char*)&offset, sizeof(offset));
+                for (; address < regionEnd && hashed < c_maxHashedSize;)
+                {
+                    const size_t chunk = (size_t)std::min<Address_type>({ (Address_type)c_readChunk,
+                        regionEnd - address, c_maxHashedSize - hashed });
+                    if (process.ReadExactEx2(address, buffer.data(), chunk))
+                    {
+                        // a page that can't be read counts as one
+                        const unsigned char marker[] = { 0xFF, 0x00, 0xFF, 0x00 };
+                        HashBytes(hash, marker, sizeof(marker));
+                    }
+                    else
+                    {
+                        HashBytes(hash, buffer.data(), chunk);
+                    }
+                    address += chunk;
+                    hashed += chunk;
+                }
+            }
+            address = regionEnd;
         }
         if (pHashed)
         {
@@ -341,7 +365,108 @@ namespace orthia
             return false;
         }
         Address_type hashed = 0;
-        return HashRegion(process, info.allocationBase, info.hashedSize, &hashed) == info.bytesHash;
+        return HashRegion(process, info.allocationBase, info.allocationSize, &hashed) == info.bytesHash &&
+            hashed == info.hashedSize;
+    }
+
+    std::shared_ptr<FloatingRegionInfo> RefreshFloatingRegion(oui::IProcess& process,
+        const std::vector<ModuleInfo>& modules,
+        const FloatingRegionInfo& info)
+    {
+        oui::MemoryRegionInfo region;
+        if (process.QueryMemoryRegion(info.allocationBase, region) || region.allocationBase != info.allocationBase ||
+            !region.allocationSize)
+        {
+            return nullptr;
+        }
+        for (const auto& mod : modules)
+        {
+            if (!mod.IsFloating() && mod.address <= info.allocationBase + region.allocationSize - 1 &&
+                info.allocationBase <= mod.lastValidAddress)
+            {
+                // a module the OS reports is there now
+                return nullptr;
+            }
+        }
+        auto refreshed = std::make_shared<FloatingRegionInfo>();
+        refreshed->allocationBase = region.allocationBase;
+        refreshed->allocationSize = region.allocationSize;
+        refreshed->type = region.type;
+        refreshed->mappedName = region.mappedName;
+        // the entries that still are in executable memory of the allocation
+        for (const auto& entry : info.entries)
+        {
+            oui::MemoryRegionInfo entryRegion;
+            if (entry.address - refreshed->allocationBase >= refreshed->allocationSize ||
+                process.QueryMemoryRegion(entry.address, entryRegion) ||
+                !entryRegion.committed || !(entryRegion.protect & oui::MemoryRegionInfo::protect_exec))
+            {
+                continue;
+            }
+            if (refreshed->entries.empty())
+            {
+                refreshed->protect = entryRegion.protect;
+            }
+            refreshed->entries.push_back(entry);
+        }
+        if (refreshed->entries.empty())
+        {
+            return nullptr;
+        }
+        FingerprintFloatingRegion(process, *refreshed);
+        return refreshed;
+    }
+
+    // the tbl_modules row, the references made from it and its metainfo (cascade)
+    static void UnloadFloatingRow(CModuleManager& moduleManager, Address_type address)
+    {
+        if (moduleManager.QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(address))
+        {
+            moduleManager.UnloadModule(address);
+        }
+    }
+
+    void RemoveFloatingModule(IWorkPlaceItem& item, Address_type address)
+    {
+        if (auto moduleManager = item.GetModuleManager())
+        {
+            UnloadFloatingRow(*moduleManager, address);
+        }
+        item.RemoveFloatingModule(address);
+    }
+
+    void ReplaceFloatingRegion(IWorkPlaceItem& item, std::shared_ptr<FloatingRegionInfo> info)
+    {
+        auto moduleManager = item.GetModuleManager();
+        if (!moduleManager || !info)
+        {
+            return;
+        }
+        // the allocation may have another size now: a new row, not the old one
+        UnloadFloatingRow(*moduleManager, info->allocationBase);
+        SaveFloatingRegion(*moduleManager, *info);
+        item.SetFloatingModule(info);
+        item.UpdateModuleFlags(info->allocationBase, 0, ModuleInfo::flags_stale | ModuleInfo::flags_analyzeDone);
+    }
+
+    FloatingRefresh RefreshStaleFloatingModule(IWorkPlaceItem& item, ModuleInfo& module)
+    {
+        auto process = item.GetAssociatedProcess();
+        if (!process || !module.floating || !item.GetModuleManager())
+        {
+            return FloatingRefresh::unavailable;
+        }
+        std::vector<ModuleInfo> modules;
+        item.GetModules(modules);
+        auto refreshed = RefreshFloatingRegion(*process, modules, *module.floating);
+        if (!refreshed)
+        {
+            RemoveFloatingModule(item, module.address);
+            return FloatingRefresh::removed;
+        }
+        ReplaceFloatingRegion(item, refreshed);
+        module = MakeFloatingModule(refreshed, module.dianaMode, module.dianaArch);
+        return FloatingRefresh::refreshed;
     }
 
     void QueryFloatingNames(const FloatingRegionInfo& info, std::vector<NameInfo>& names)

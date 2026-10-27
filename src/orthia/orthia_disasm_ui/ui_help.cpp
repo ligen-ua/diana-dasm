@@ -22,7 +22,7 @@ namespace orthia
         { "cls", "Clear screen" },
         { "exit", "Exit program" },
         { ".reload [<module>]", "Reload symbols for module" },
-        { ".analyze [/f] <module>", "Analyze module and the floating code it leads to (/f: analyze again)" },
+        { ".analyze [/f] <module|mask>", "Analyze modules (k*, *) and the floating code they lead to (/f: analyze again)" },
         { ".symfix [<path>]", "Set symbols directory" },
         { "modinfo <module>", "Show PE/debug info for module" },
         { "sections [-v] <module|address>", "List sections of module (-v: all header fields)" },

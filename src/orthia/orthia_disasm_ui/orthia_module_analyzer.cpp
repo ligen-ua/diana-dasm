@@ -82,21 +82,35 @@ namespace orthia
     void CModuleAnalyzer::AnalyzeFloatingNow(std::shared_ptr<IWorkPlaceItem> item, const ModuleInfo& module, bool force)
     {
         auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        ModuleInfo current = module;
         if (module.flags & ModuleInfo::flags_stale)
         {
-            WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("floating-stale")), module.name));
-            return;
+            // /f: the memory as it is now
+            const auto refresh = force ? RefreshStaleFloatingModule(*item, current) : FloatingRefresh::unavailable;
+            if (refresh == FloatingRefresh::unavailable)
+            {
+                WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("floating-stale")), module.name));
+                return;
+            }
+            if (refresh == FloatingRefresh::removed)
+            {
+                WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("floating-gone")), module.name));
+                return;
+            }
+            WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("floating-refreshed")), module.name));
+            // the row is new: nothing to clear
+            force = false;
         }
-        if (force || !(module.flags & ModuleInfo::flags_analyzeDone))
+        if (force || !(current.flags & ModuleInfo::flags_analyzeDone))
         {
-            WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-floating")), module.name));
+            WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("analyzing-floating")), current.name));
             if (force)
             {
-                item->GetModuleManager()->ClearModuleReferences(module.address);
+                item->GetModuleManager()->ClearModuleReferences(current.address);
             }
-            AnalyzeFloatingModule(*item, module);
+            AnalyzeFloatingModule(*item, current);
         }
-        DiscoverFloatingCode(*item, module);
+        DiscoverFloatingCode(*item, current);
     }
 
     void CModuleAnalyzer::EnqueueAnalyzeFloating(std::shared_ptr<IWorkPlaceItem> item,

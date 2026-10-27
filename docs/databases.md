@@ -175,7 +175,7 @@ A floating module (`fl_<base>`) has a `tbl_modules` row for its allocation and a
 | `base`, `size` | the OS allocation (hex) |
 | `protect`, `type` | protection where the entry points are (1 read, 2 write, 4 execute) and the allocation type (0 private, 1 mapped file, 2 image) |
 | `mapped`, `header` | the mapped file or pseudo name, and `MZ`/`ELF` when the allocation starts with such a header |
-| `hash`, `hashed` | FNV-1a hash of the first `hashed` bytes (up to 16 MB), checked on reopen; a mismatch makes the module stale |
+| `hash`, `hashed` | FNV-1a hash of the executable pages of the allocation with their offsets, `hashed` bytes of them (up to 16 MB); checked on reopen, a mismatch makes the module stale |
 | `code_start`, `code_last` | the lowest and the highest instruction start the analysis found (0 before it) |
 | `entries` | `<entry>:<referrer>,<referrer>;<entry>:...` in hex: each entry point and the instructions that lead there |
 
