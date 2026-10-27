@@ -143,6 +143,9 @@
     <ClCompile Include="orthia_floating_code.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="orthia_sha256.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="orthia_module_symbols.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -263,6 +266,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="orthia_floating_code.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="orthia_sha256.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_shellcode_dialog.h">

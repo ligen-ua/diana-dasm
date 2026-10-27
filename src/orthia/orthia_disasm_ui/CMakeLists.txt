@@ -16,6 +16,7 @@ set(SOURCES
     orthia_helpers.cpp
     orthia_external_symbols.cpp
     orthia_floating_code.cpp
+    orthia_sha256.cpp
     orthia_image_source.cpp
     orthia_item_file.cpp
     orthia_module_names.cpp

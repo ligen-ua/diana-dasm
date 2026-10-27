@@ -30,15 +30,20 @@ namespace orthia
 
     // A folder is kept for the next open of the same process: only while it runs, and only when
     // its start is known (the folder name and meta.xml tell this process from a later one).
+    // A folder with floating code snapshots is evidence and stays after the process exits.
     // Orthia itself exits right after closing it
     static bool KeepProcFolder(const std::shared_ptr<oui::IProcess>& proc, const PlatformString_type& folder)
     {
-        if (!proc || !proc->GetStartInfo().IsKnown() || !proc->IsRunning())
+        const auto name = std::filesystem::path(folder).filename().native();
+        if (ParseProcFolderPid(name) == GetOwnPid())
         {
             return false;
         }
-        const auto name = std::filesystem::path(folder).filename().native();
-        return ParseProcFolderPid(name) != GetOwnPid();
+        if (HasFloatingSnapshots(folder))
+        {
+            return true;
+        }
+        return proc && proc->GetStartInfo().IsKnown() && proc->IsRunning();
     }
 
     // CProcessWorkplaceItem

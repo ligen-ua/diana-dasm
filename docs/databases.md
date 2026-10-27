@@ -64,11 +64,20 @@ opened itself (`--pid self`). At start Orthia removes any `proc/` folder that ha
 48 hours. `.database cleanup` removes folders at once, as soon as their process has exited
 (see [Managing databases](#managing-databases)).
 
+A folder with snapshots of floating code (`floating/*.bin`) is evidence: it stays when the process exits,
+neither the start nor `.database cleanup` removes it, and `.database list` marks it `(floating code saved)`.
+Only `.database delete` removes it. `--pid self` still removes its folder.
+
 The code analysis and the comments go into that database, and the analysis flags of each module
 (`flags` in its metainfo, with its name and size). A reopen trusts the flags of a module only when
 the module at that address still has the same name and size. The module list, exports and loaded
 private symbols are kept in memory and rebuilt from the live process. Floating modules are saved
 (metainfo type 6) and come back on a reopen, `stale` when their memory changed.
+
+When a floating module is found, and when `.analyze /f` checks a stale one again, the bytes of its
+allocation (up to 16 MB, from its base) are written to `floating/<base>_<sha256 prefix>.bin`; pages that
+can't be read are zero filled. Another snapshot of the same region with other bytes is a new file, and the
+old one stays. `modinfo` prints the path and the SHA-256.
 
 ## `meta.xml`
 
@@ -178,6 +187,8 @@ A floating module (`fl_<base>`) has a `tbl_modules` row for its allocation and a
 | `hash`, `hashed` | FNV-1a hash of the executable pages of the allocation with their offsets, `hashed` bytes of them (up to 16 MB); checked on reopen, a mismatch makes the module stale |
 | `code_start`, `code_last` | the lowest and the highest instruction start the analysis found (0 before it) |
 | `entries` | `<entry>:<referrer>,<referrer>;<entry>:...` in hex: each entry point and the instructions that lead there |
+| `snapshot`, `snapshot_size`, `snapshot_missing` | the file in `floating/` with the bytes as they were found, how many (hex), and how many of them couldn't be read (zero filled); missing when no snapshot was saved |
+| `sha256` | SHA-256 of the snapshot file |
 
 ## Dependencies
 
@@ -263,7 +274,8 @@ Removes what is no longer needed, and prints each folder with the reason:
 | `db/<sha1>` | it has no `data.db` and has not been written for an hour (a younger one may be being created) |
 | `*.deleting` | a `delete` that failed half way |
 
-A file database with a `data.db` is never removed by `cleanup`, and neither is anything open in this Orthia.
+A file database with a `data.db` is never removed by `cleanup`, and neither is anything open in this Orthia,
+nor a process folder with floating code snapshots.
 The process check goes through the same process provider that opens processes: a process Orthia can't
 open (another user's, for example) keeps its folder until the 48 hours pass. A folder another Orthia still
 uses is reported as `Kept` and is not an error.

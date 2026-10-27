@@ -38,6 +38,11 @@ namespace orthia
         Address_type codeStart = 0;
         Address_type codeLast = 0;
         std::vector<FloatingEntryInfo> entries; // by address
+        // the bytes as they were found: a file in the floating/ folder of the process database
+        std::string snapshotFile;               // utf8 file name; empty when none was saved
+        Address_type snapshotSize = 0;          // from the allocation base on
+        Address_type snapshotMissing = 0;       // bytes that couldn't be read, zero filled
+        std::string sha256;                     // of the snapshot file, hex
 
         Address_type GetLastAddress() const { return allocationBase + allocationSize - 1; }
         bool HasEntry(Address_type address) const;
@@ -61,6 +66,16 @@ namespace orthia
 
     // header and bytesHash from the memory as it is now
     void FingerprintFloatingRegion(oui::IProcess& process, FloatingRegionInfo& info);
+
+    // the folder of the snapshots in a process database folder
+    extern const ORTHIA_TCHAR* const g_floatingSnapshotFolder;
+    // whether a process database folder holds snapshots of floating code: such a folder is evidence,
+    // kept when the process exits, removed only by .database delete
+    bool HasFloatingSnapshots(const PlatformString_type& databaseFolder);
+    // writes the bytes of the allocation (up to 16 MB, unreadable pages zero filled) to
+    // <databaseFolder>/floating/<base>_<sha256 prefix>.bin and records it in info. An earlier
+    // snapshot with other bytes stays. False (and info unchanged) when it can't be written
+    bool SaveFloatingSnapshot(oui::IProcess& process, const PlatformString_type& databaseFolder, FloatingRegionInfo& info);
     // whether the allocation is still there with the same executable bytes
     bool IsFloatingRegionUnchanged(oui::IProcess& process, const FloatingRegionInfo& info);
     // the region as it is now: allocation, protection, fingerprint, the entries still in executable

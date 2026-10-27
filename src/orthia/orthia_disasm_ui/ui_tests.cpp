@@ -12,6 +12,7 @@
 #include "orthia_process_adapter.h"
 #include "orthia_image_source.h"
 #include "orthia_floating_code.h"
+#include "orthia_sha256.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 extern "C"
@@ -345,9 +346,15 @@ TEST(Databases, SelectForCleanup)
     auto openGone = MakeProcDatabase(ORTHIA_TCSTR("[6] open.exe"));
     auto openBroken = broken;
     openBroken.folder = ORTHIA_TCSTR("db/open-broken");
+    // floating code saved: evidence, kept when its process has exited or it is old
+    auto evidenceGone = MakeProcDatabase(ORTHIA_TCSTR("[7] evidence.exe"));
+    evidenceGone.hasFloatingSnapshots = true;
+    auto evidenceOld = MakeProcDatabase(ORTHIA_TCSTR("[8] evidence.exe"));
+    evidenceOld.hasFloatingSnapshots = true;
+    evidenceOld.lastWrite = old;
 
     std::vector<orthia::DatabaseInfo> all = { fresh, broken, brokenNew, oldFile, pending,
-        alive, gone, reused, unknown, expired, noPid, openGone, openBroken };
+        alive, gone, reused, unknown, expired, noPid, openGone, openBroken, evidenceGone, evidenceOld };
     std::map<orthia::PlatformString_type, orthia::PlatformString_type> open = {
         { openGone.folder, ORTHIA_TCSTR("open.exe") },
         { openBroken.folder, ORTHIA_TCSTR("x") },
@@ -1425,6 +1432,97 @@ TEST(FloatingCode, HashCoversExecutablePages)
     // the data part made executable: another fingerprint
     process.regions[1].protect |= oui::MemoryRegionInfo::protect_exec;
     EXPECT_FALSE(orthia::IsFloatingRegionUnchanged(process, info));
+}
+
+TEST(Sha256, KnownValues)
+{
+    EXPECT_EQ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", orthia::Sha256Hex("", 0));
+    EXPECT_EQ("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", orthia::Sha256Hex("abc", 3));
+    const std::string twoBlocks = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    EXPECT_EQ("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+        orthia::Sha256Hex(twoBlocks.data(), twoBlocks.size()));
+    // in pieces that don't fall on the blocks
+    const std::string million(1000000, 'a');
+    orthia::CSha256 sha;
+    for (size_t offset = 0; offset < million.size(); offset += 999)
+    {
+        sha.Update(million.data() + offset, std::min<size_t>(999, million.size() - offset));
+    }
+    EXPECT_EQ("cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0", sha.FinishHex());
+}
+
+// the bytes are saved when a region is found; the folder that holds them stays when the process is gone
+TEST(FloatingCode, Snapshot)
+{
+    namespace fs = std::filesystem;
+    FloatingFixture fixture;
+    const fs::path folder = fixture.root / ORTHIA_TCSTR("[1] fake");
+    fs::create_directories(folder);
+    std::string firstFile;
+    {
+        auto item = fixture.OpenItem();
+        item->SetProcFolder(folder.native());
+        fixture.AnalyzeModule(*item);
+        orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+        FloatingFixture::AnalyzePending(*item);
+
+        const auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+        ASSERT_TRUE(a.floating);
+        const auto& info = *a.floating;
+        ASSERT_FALSE(info.snapshotFile.empty());
+        EXPECT_EQ(0u, info.snapshotFile.find("10100000_"));
+        EXPECT_EQ(0x1000u, info.snapshotSize);
+        EXPECT_EQ(0u, info.snapshotMissing);
+        firstFile = info.snapshotFile;
+
+        // the file holds the bytes of the region, and its hash is the one recorded
+        const fs::path path = folder / orthia::g_floatingSnapshotFolder / orthia::Utf8ToPlatformString(info.snapshotFile);
+        std::ifstream file(path, std::ios::binary);
+        std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        EXPECT_EQ(fixture.process->regions.front().data, bytes);
+        EXPECT_EQ(orthia::Sha256Hex(bytes.data(), bytes.size()), info.sha256);
+        EXPECT_TRUE(orthia::HasFloatingSnapshots(folder.native()));
+        // D, found by the analysis of A, has one too
+        EXPECT_FALSE(FloatingFixture::FindModule(*item, FloatingFixture::regionD).floating->snapshotFile.empty());
+
+        std::vector<orthia::PlatformString_type> lines;
+        orthia::DescribeFloatingModule(*item, a, lines);
+        std::string text;
+        for (const auto& line : lines)
+        {
+            text += orthia::PlatformStringToUtf8(line) + "\n";
+        }
+        EXPECT_NE(std::string::npos, text.find("Snapshot: ")) << text;
+        EXPECT_NE(std::string::npos, text.find(info.snapshotFile + " (1000 bytes)")) << text;
+        EXPECT_NE(std::string::npos, text.find("SHA-256: " + info.sha256)) << text;
+    }
+    // the fake process doesn't run: without the snapshots the folder would be gone
+    ASSERT_TRUE(fs::is_directory(folder));
+
+    // reopened: the snapshot is in the saved record. A changed and refreshed: a second file, the first stays
+    fixture.process->regions.front().data[0x40] = (char)0x90;
+    {
+        auto item = fixture.OpenItem();
+        item->SetProcFolder(folder.native());
+        item->LoadSavedFloatingModules();
+        auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+        EXPECT_EQ(firstFile, a.floating->snapshotFile);
+        ASSERT_TRUE(a.flags & orthia::ModuleInfo::flags_stale);
+        ASSERT_EQ(orthia::FloatingRefresh::refreshed, orthia::RefreshStaleFloatingModule(*item, a));
+        const auto refreshed = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+        EXPECT_NE(firstFile, refreshed.floating->snapshotFile);
+        EXPECT_TRUE(fs::exists(folder / orthia::g_floatingSnapshotFolder / orthia::Utf8ToPlatformString(firstFile)));
+        EXPECT_TRUE(fs::exists(folder / orthia::g_floatingSnapshotFolder / orthia::Utf8ToPlatformString(refreshed.floating->snapshotFile)));
+    }
+
+    // a folder without snapshots goes when its process is gone, as before
+    const fs::path other = fixture.root / ORTHIA_TCSTR("[2] fake");
+    fs::create_directories(other);
+    {
+        auto item = fixture.OpenItem();
+        item->SetProcFolder(other.native());
+    }
+    EXPECT_FALSE(fs::exists(other));
 }
 
 int RunTests()

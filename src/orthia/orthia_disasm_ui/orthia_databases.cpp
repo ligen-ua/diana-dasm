@@ -1,6 +1,7 @@
 #include "orthia_databases.h"
 #include "orthia_config.h"
 #include "orthia_model_interfaces.h"
+#include "orthia_floating_code.h"
 #include "orthia_common_format.h"
 #include "oui_filesystem.h"
 #include "oui_processes.h"
@@ -319,6 +320,7 @@ namespace orthia
             {
                 info.startKey = meta.startKey;
             }
+            info.hasFloatingSnapshots = HasFloatingSnapshots(info.folder);
         }
         return info;
     }
@@ -565,6 +567,11 @@ namespace orthia
                 }
                 continue;
             }
+            if (info.hasFloatingSnapshots)
+            {
+                // evidence: only .database delete removes it
+                continue;
+            }
             if (IsOlderThan(info, now, g_procFolderExpiration))
             {
                 result.push_back({ info, ORTHIA_TCSTR("not written for 48 hours") });
@@ -640,7 +647,7 @@ namespace orthia
         const auto now = fs::file_time_type::clock::now();
         for (const auto& info : EnumerateProcDatabases(procFolderWithSlash))
         {
-            if (info.pendingDelete || IsOlderThan(info, now, g_procFolderExpiration))
+            if (info.pendingDelete || (!info.hasFloatingSnapshots && IsOlderThan(info, now, g_procFolderExpiration)))
             {
                 try
                 {

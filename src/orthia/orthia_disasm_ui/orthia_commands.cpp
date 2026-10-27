@@ -687,6 +687,10 @@ namespace orthia
             {
                 line += ORTHIA_TCSTR("  (open)");
             }
+            if (info.hasFloatingSnapshots)
+            {
+                line += ORTHIA_TCSTR("  (floating code saved)");
+            }
             args.ReplyLine(line);
         }
     }

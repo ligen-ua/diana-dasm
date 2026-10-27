@@ -79,6 +79,8 @@ namespace orthia
         std::string startKey;               // processes only, from meta.xml; empty when unknown
         bool hasDataDb = false;
         bool pendingDelete = false;         // left by a delete that failed half way
+        // processes only: snapshots of floating code, evidence. No cleanup removes it, .database delete does
+        bool hasFloatingSnapshots = false;
     };
 
     // What data.db says; read with a read-only connection, so unknown fields stay unset.

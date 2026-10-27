@@ -4,10 +4,12 @@ orthia_floating_helper (built next to the orthia binary) hooks a function of its
 diana patcher: the function jumps to the patcher's stub, the stub calls a handler in an allocation
 of its own. `.analyze` on the helper finds the stub as a floating module, and the stub leads to
 the handler."""
+import hashlib
 import platform
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -166,3 +168,29 @@ def test_reopen_keeps_floating_modules_and_marks_stale(orthia_cold, helper):
     res = orthia_cold.run("lmf", pid=helper.pid).assert_ok()
     assert_found(res, helper, helper.handler)
 
+
+
+def test_snapshot_is_evidence(orthia_cold, helper):
+    handler = floating_name(helper.handler)
+    res = orthia_cold.run(f".analyze {HELPER_NAME}", f"modinfo {handler}", pid=helper.pid).assert_ok()
+    match = res.assert_line(r"^Snapshot: (.+) \(([0-9a-f]+) bytes(, [0-9a-f]+ unreadable, zero filled)?\)$")
+    path = Path(match.group(1))
+    sha256 = res.assert_line(r"^SHA-256: ([0-9a-f]{64})$").group(1)
+    assert path.is_file(), res
+    data = path.read_bytes()
+    assert len(data) == int(match.group(2), 16), res
+    assert hashlib.sha256(data).hexdigest() == sha256, res
+    assert path.name.startswith(f"{helper.handler:x}_{sha256[:16]}"), path
+
+    # the process exits: the folder with the snapshots stays, and no cleanup removes it
+    helper.proc.stdin.close()
+    helper.proc.wait(timeout=30)
+    assert path.is_file()
+    res = orthia_cold.raw("--cmd", ".database list").assert_ok()
+    res.assert_line(rf"^pid {helper.pid}\s.*\(floating code saved\)$")
+    orthia_cold.raw("--cmd", ".database cleanup").assert_ok()
+    assert path.is_file()
+
+    # .database delete does
+    orthia_cold.raw("--cmd", f".database delete {helper.pid}").assert_ok()
+    assert not path.exists()

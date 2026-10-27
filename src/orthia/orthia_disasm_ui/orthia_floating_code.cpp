@@ -4,8 +4,12 @@
 #include "orthia_common_format.h"
 #include "orthia_common_print.h"
 #include "orthia_log.h"
+#include "orthia_sha256.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <set>
 #include <sstream>
@@ -22,6 +26,8 @@ namespace orthia
         // TODO: entry points past the window are not analyzed, bytes past it don't make a module stale
         const Address_type c_maxHashedSize = 16 * 1024 * 1024;
         const Address_type c_maxAnalyzedSize = 16 * 1024 * 1024;
+        // TODO: a JIT heap gives many big allocations; a budget per process, or an option
+        const Address_type c_maxSnapshotSize = 16 * 1024 * 1024;
         const size_t c_readChunk = 0x10000;
 
         std::string ToHex(unsigned long long value)
@@ -215,6 +221,13 @@ namespace orthia
         builder.AddMetadata("code_start", ToHex(info.codeStart));
         builder.AddMetadata("code_last", ToHex(info.codeLast));
         builder.AddMetadata("entries", entries);
+        if (!info.snapshotFile.empty())
+        {
+            builder.AddMetadata("snapshot", info.snapshotFile);
+            builder.AddMetadata("snapshot_size", ToHex(info.snapshotSize));
+            builder.AddMetadata("snapshot_missing", ToHex(info.snapshotMissing));
+            builder.AddMetadata("sha256", info.sha256);
+        }
         std::string text;
         builder.Produce(&text);
         return text;
@@ -256,6 +269,10 @@ namespace orthia
         queryHex("hashed", info.hashedSize);
         queryHex("code_start", info.codeStart);
         queryHex("code_last", info.codeLast);
+        parser.QueryMetadata(std::string("snapshot"), &info.snapshotFile);
+        queryHex("snapshot_size", info.snapshotSize);
+        queryHex("snapshot_missing", info.snapshotMissing);
+        parser.QueryMetadata(std::string("sha256"), &info.sha256);
 
         std::string entries;
         parser.QueryMetadata(std::string("entries"), &entries);
@@ -355,6 +372,84 @@ namespace orthia
         info.bytesHash = HashRegion(process, info.allocationBase, info.allocationSize, &info.hashedSize);
     }
 
+    const ORTHIA_TCHAR* const g_floatingSnapshotFolder = ORTHIA_TCSTR("floating");
+
+    bool HasFloatingSnapshots(const PlatformString_type& databaseFolder)
+    {
+        namespace fs = std::filesystem;
+        if (databaseFolder.empty())
+        {
+            return false;
+        }
+        std::error_code ec;
+        for (const auto& entry : fs::directory_iterator(fs::path(databaseFolder) / g_floatingSnapshotFolder, ec))
+        {
+            std::error_code ec2;
+            if (entry.is_regular_file(ec2) && entry.path().extension() == ORTHIA_TCSTR(".bin"))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool SaveFloatingSnapshot(oui::IProcess& process, const PlatformString_type& databaseFolder, FloatingRegionInfo& info)
+    {
+        namespace fs = std::filesystem;
+        if (databaseFolder.empty() || !info.allocationSize)
+        {
+            return false;
+        }
+        const size_t size = (size_t)std::min(info.allocationSize, c_maxSnapshotSize);
+        std::vector<char> bytes(size);
+        Address_type missing = 0;
+        for (size_t offset = 0; offset < size; offset += c_readChunk)
+        {
+            const size_t chunk = std::min(c_readChunk, size - offset);
+            if (process.ReadExactEx2(info.allocationBase + offset, bytes.data() + offset, chunk))
+            {
+                // a partial read may leave some of it filled: the whole chunk counts as missing
+                memset(bytes.data() + offset, 0, chunk);
+                missing += chunk;
+            }
+        }
+        const std::string sha256 = Sha256Hex(bytes.data(), bytes.size());
+        const std::string fileName = ToHex(info.allocationBase) + "_" + sha256.substr(0, 16) + ".bin";
+        try
+        {
+            const fs::path folder = fs::path(databaseFolder) / g_floatingSnapshotFolder;
+            fs::create_directories(folder);
+            const fs::path path = folder / Utf8ToPlatformString(fileName);
+            std::error_code ec;
+            // the same bytes are saved already
+            if (!fs::exists(path, ec))
+            {
+                const fs::path temp = folder / Utf8ToPlatformString(fileName + ".tmp");
+                {
+                    std::ofstream file(temp, std::ios::binary | std::ios::trunc);
+                    file.write(bytes.data(), (std::streamsize)bytes.size());
+                    file.close();
+                    if (!file)
+                    {
+                        throw std::runtime_error("can't write " + PlatformStringToUtf8(temp.native()));
+                    }
+                }
+                fs::rename(temp, path);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't save the floating code snapshot: ") + e.what());
+            (void)e;
+            return false;
+        }
+        info.snapshotFile = fileName;
+        info.snapshotSize = size;
+        info.snapshotMissing = missing;
+        info.sha256 = sha256;
+        return true;
+    }
+
     bool IsFloatingRegionUnchanged(oui::IProcess& process, const FloatingRegionInfo& info)
     {
         oui::MemoryRegionInfo region;
@@ -441,6 +536,11 @@ namespace orthia
         if (!moduleManager || !info)
         {
             return;
+        }
+        // the bytes as they are now; the snapshot of the old ones stays
+        if (auto process = item.GetAssociatedProcess())
+        {
+            SaveFloatingSnapshot(*process, item.GetDatabaseFolder(), *info);
         }
         // the allocation may have another size now: a new row, not the old one
         UnloadFloatingRow(*moduleManager, info->allocationBase);
@@ -674,6 +774,25 @@ namespace orthia
         }
         lines.push_back(ORTHIA_TCSTR("Bytes hash: ") + Utf8ToPlatformString(ToHex(info.bytesHash)) +
             ORTHIA_TCSTR(" (") + Utf8ToPlatformString(ToHex(info.hashedSize)) + ORTHIA_TCSTR(" bytes)"));
+        if (!info.snapshotFile.empty())
+        {
+            const auto folder = item.GetDatabaseFolder();
+            const auto path = folder.empty() ? std::filesystem::path(Utf8ToPlatformString(info.snapshotFile)) :
+                std::filesystem::path(folder) / g_floatingSnapshotFolder / Utf8ToPlatformString(info.snapshotFile);
+            PlatformString_type snapshot = ORTHIA_TCSTR("Snapshot: ") + path.native() +
+                ORTHIA_TCSTR(" (") + Utf8ToPlatformString(ToHex(info.snapshotSize)) + ORTHIA_TCSTR(" bytes");
+            if (info.snapshotMissing)
+            {
+                snapshot += ORTHIA_TCSTR(", ") + Utf8ToPlatformString(ToHex(info.snapshotMissing)) +
+                    ORTHIA_TCSTR(" unreadable, zero filled");
+            }
+            lines.push_back(snapshot + ORTHIA_TCSTR(")"));
+            lines.push_back(ORTHIA_TCSTR("SHA-256: ") + Utf8ToPlatformString(info.sha256));
+        }
+        else
+        {
+            lines.push_back(ORTHIA_TCSTR("Snapshot: none"));
+        }
         if (module.flags & ModuleInfo::flags_stale)
         {
             lines.push_back(ORTHIA_TCSTR("State: stale, the memory changed since it was found"));
@@ -705,8 +824,14 @@ namespace orthia
         std::vector<ModuleInfo> modules;
         item.GetModules(modules);
         auto found = CollectFloatingRegions(*moduleManager, *process, modules, source);
+        const auto databaseFolder = item.GetDatabaseFolder();
         for (const auto& info : found.changed)
         {
+            // the bytes as they are when found: a new region, or one saved before snapshots were
+            if (info->snapshotFile.empty())
+            {
+                SaveFloatingSnapshot(*process, databaseFolder, *info);
+            }
             SaveFloatingRegion(*moduleManager, *info);
             item.SetFloatingModule(info);
         }

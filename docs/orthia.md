@@ -173,7 +173,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `.symfix [<path>]` | Set the symbols directory |
 | `.database list` | List the databases in the data folder; needs no open target (see [databases.md](databases.md#managing-databases)) |
 | `.database delete <sel>...` | Delete databases, selected by a SHA-1 prefix, a pid or a file name; an open one is refused |
-| `.database cleanup` | Remove the databases of exited processes and broken or half-deleted folders |
+| `.database cleanup` | Remove the databases of exited processes and broken or half-deleted folders; a process folder with floating code snapshots stays |
 | `cls` | Clear the screen (UI only) |
 | `exit` | Exit the program (UI only) |
 
@@ -225,6 +225,12 @@ checked against the memory (the allocation and a hash of its bytes); one that ch
 and shown as `stale`, and is not analyzed again. The check covers the executable pages of the allocation
 only: data written next to the code doesn't make a module stale, a change of protection does.
 
+The bytes of each floating module are saved when it is found: `floating/<base>_<sha256 prefix>.bin` in the
+process database folder (up to 16 MB of the allocation, unreadable pages zero filled). `modinfo` prints the
+file and its SHA-256. The folder is then kept after the process exits, and only `.database delete` removes
+it (see [databases.md](databases.md#processes-procpid-name-start)). Opening such a folder after the process exited is
+not possible yet.
+
 `.analyze /f fl_<base>` on a stale module looks at the memory as it is now: when the allocation is still
 there with some of its entry points executable, the module is fingerprinted and analyzed again; when it is
 gone (or a module the OS reports took its place) the floating module is removed.
@@ -268,8 +274,10 @@ Stale and live memory:
 - [ ] A stale module whose allocation is still there can't be dropped, only analyzed again.
 
 Commands and UI:
-- [ ] `save`: write a floating module (bytes, base, architecture, entry points) to a file or to another
-  workspace item, once process information is persistent.
+- [x] The bytes are saved when a floating module is found, with their SHA-256, and the folder stays.
+- [ ] Open a saved process folder after the process exited: modules and floating modules from the database,
+  bytes from the snapshots.
+- [ ] Snapshots: 16 MB per allocation and no budget per process; a JIT heap can make many.
 - [ ] The Modules window leaves floating modules out; give them a view of their own.
 
 Architectures and tests:
