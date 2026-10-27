@@ -7,6 +7,11 @@
 #include "formats/orthia_image_format.h"
 #include "orthia_process_adapter.h"
 #include "oui_processes.h"
+#include "orthia_item_process.h"
+#include "orthia_module_manager.h"
+#include "orthia_floating_code.h"
+#include "orthia_databases.h"
+#include "orthia_saved_process.h"
 extern "C"
 {
 #include "diana_core.h"
@@ -224,6 +229,168 @@ namespace orthia_tests
         bool IsRunning() const override
         {
             return false;
+        }
+    };
+
+    // e8/e9 rel32 at offset of code placed at base
+    inline void PutRel32(std::vector<char>& code, size_t offset, unsigned char opcode, orthia::Address_type base, orthia::Address_type target)
+    {
+        code[offset] = (char)opcode;
+        const int rel = (int)(long long)(target - (base + offset + 5));
+        memcpy(&code[offset + 1], &rel, sizeof(rel));
+    }
+
+    // A process with one module (raw code) that calls into memory no module owns
+    struct FloatingFixture
+    {
+        static constexpr orthia::Address_type moduleBase = 0x10000000;
+        static constexpr orthia::Address_type regionA = 0x10100000;     // RWX, called twice
+        static constexpr orthia::Address_type otherModule = 0x10200000;
+        static constexpr orthia::Address_type regionData = 0x10300000;  // RW-
+        static constexpr orthia::Address_type regionD = 0x10400000;     // RWX, A jumps there
+
+        std::filesystem::path root;
+        // a process folder (meta.xml, data.db, modules.xml) that live items write and a saved view opens
+        bool processFolder = false;
+        std::shared_ptr<CFakeProcess> process = std::make_shared<CFakeProcess>();
+        std::shared_ptr<orthia::CModuleManager> moduleManager = std::make_shared<orthia::CModuleManager>();
+
+        explicit FloatingFixture(const ORTHIA_TCHAR* folderName = ORTHIA_TCSTR("orthia_test_floating"), bool processFolder_in = false)
+            :
+            processFolder(processFolder_in)
+        {
+            namespace fs = std::filesystem;
+            root = fs::temp_directory_path() / folderName;
+            std::error_code ec;
+            fs::remove_all(root, ec);
+            fs::create_directories(root);
+            if (processFolder)
+            {
+                orthia::FolderMeta meta;
+                meta.kind = orthia::g_folderKindProcess;
+                meta.dianaMode = DIANA_MODE64;
+                meta.dianaArch = DIANA_ARCH_X86;
+                meta.pid = 1;
+                meta.name = ORTHIA_TCSTR("[1] fake");
+                // a live item that closes removes the folder unless a capture or a snapshot is in it
+                // (the fake has no start time, so it doesn't count as running)
+                orthia::WriteFolderMeta((root / ORTHIA_TCSTR("meta.xml")).native(), meta);
+            }
+            moduleManager->Reinit((root / (processFolder ? ORTHIA_TCSTR("data.db") : ORTHIA_TCSTR("db.sqlite"))).native(), true);
+
+            const auto* raw = orthia::FindFormatById("raw");
+            CFakeProcess::Image module;
+            module.format = raw;
+            module.base = moduleBase;
+            module.data.assign(0x1000, (char)0xCC);
+            PutRel32(module.data, 0, 0xE8, moduleBase, regionA);
+            PutRel32(module.data, 5, 0xE8, moduleBase, regionA + 0x20);
+            PutRel32(module.data, 10, 0xE8, moduleBase, otherModule);
+            PutRel32(module.data, 15, 0xE8, moduleBase, regionData);
+            module.data[20] = (char)0xC3;
+            process->images.push_back(module);
+
+            CFakeProcess::Image other;
+            other.format = raw;
+            other.base = otherModule;
+            other.data.assign(0x1000, (char)0xC3);
+            process->images.push_back(other);
+
+            CFakeProcess::Region a;
+            a.base = regionA;
+            a.data.assign(0x1000, (char)0xCC);
+            PutRel32(a.data, 0, 0xE9, regionA, regionD);
+            a.data[0x20] = (char)0xC3;
+            process->regions.push_back(a);
+
+            CFakeProcess::Region data;
+            data.base = regionData;
+            data.data.assign(0x1000, 0);
+            data.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write;
+            process->regions.push_back(data);
+
+            CFakeProcess::Region d;
+            d.base = regionD;
+            d.data.assign(0x1000, (char)0xC3);
+            process->regions.push_back(d);
+        }
+        ~FloatingFixture()
+        {
+            moduleManager.reset();
+            std::error_code ec;
+            std::filesystem::remove_all(root, ec);
+        }
+        std::shared_ptr<orthia::CProcessWorkplaceItem> OpenItem()
+        {
+            auto item = std::make_shared<orthia::CProcessWorkplaceItem>(process, process->GetFullFileNameForUI(),
+                process->GetDianaMode(), process->GetDianaArch(), nullptr);
+            item->ReloadModules();
+            if (processFolder)
+            {
+                item->SetProcFolder(root.native());
+            }
+            item->Init(moduleManager, nullptr, nullptr);
+            return item;
+        }
+        // the same process opened again, as the database reuse does (CreateProcItemFS)
+        std::shared_ptr<orthia::CProcessWorkplaceItem> Reopen()
+        {
+            auto item = OpenItem();
+            item->LoadSavedFloatingModules();
+            item->LoadSavedModuleFlags();
+            return item;
+        }
+        // the folder opened as --proc-folder does (AddSavedProcess); needs processFolder
+        std::shared_ptr<orthia::CProcessWorkplaceItem> OpenSaved()
+        {
+            auto saved = orthia::OpenSavedProcess(root.native());
+            for (const auto& region : orthia::LoadFloatingRegions(*moduleManager))
+            {
+                saved->AddSnapshot(*region);
+            }
+            auto item = std::make_shared<orthia::CProcessWorkplaceItem>(saved, saved->GetFullFileNameForUI(),
+                saved->GetDianaMode(), saved->GetDianaArch(), nullptr);
+            item->SetSavedView();
+            item->ReloadModules();
+            item->SetProcFolder(root.native());
+            item->Init(moduleManager, nullptr, nullptr);
+            item->LoadSavedFloatingModules();
+            item->LoadSavedModuleFlags();
+            return item;
+        }
+        // the module analyzed, as .analyze leaves it
+        void AnalyzeModule(orthia::CProcessWorkplaceItem& item)
+        {
+            orthia::ProcessReaderAdapter reader(process.get());
+            moduleManager->ReloadRange(moduleBase, 0x1000, &reader, DIANA_MODE64, DIANA_ARCH_X86, 0);
+            item.UpdateModuleFlags(moduleBase, orthia::ModuleInfo::flags_analyzeDone, 0);
+        }
+        static orthia::ModuleInfo FindModule(const orthia::IWorkPlaceItem& item, orthia::Address_type address)
+        {
+            std::vector<orthia::ModuleInfo> modules;
+            item.GetModules(modules);
+            for (const auto& mod : modules)
+            {
+                if (mod.address == address)
+                    return mod;
+            }
+            return orthia::ModuleInfo();
+        }
+        // what the floating task does until nothing waits
+        static void AnalyzePending(orthia::IWorkPlaceItem& item)
+        {
+            for (int pass = 0; pass < 10; ++pass)
+            {
+                auto pending = orthia::QueryPendingFloatingModules(item);
+                if (pending.empty())
+                    return;
+                for (const auto& mod : pending)
+                {
+                    orthia::AnalyzeFloatingModule(item, mod);
+                    orthia::DiscoverFloatingCode(item, FindModule(item, mod.address));
+                }
+            }
+            FAIL() << "the floating modules don't stop coming";
         }
     };
 
