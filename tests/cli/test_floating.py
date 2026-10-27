@@ -322,3 +322,31 @@ def test_capture_needs_a_running_process(orthia_cold, helper):
     res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", ".capture")
     assert res.code == 1, res
     assert "Nothing to capture: not a running process" in res.stdout + res.stderr, res
+
+
+SUMMARY = r"^Floating code: \d+ modules?, \d+ referrers?(, \d+ stale)? \(lmf /v lists them\)$"
+
+
+def test_analysis_prints_a_floating_summary(orthia, helper):
+    res = orthia.run(f".analyze {HELPER_NAME}", pid=helper.pid).assert_ok()
+    assert re.search(SUMMARY, res.stderr, re.M), res
+    res = orthia.run(f".analyze {HELPER_NAME}", ".capture", pid=helper.pid).assert_ok()
+    res.assert_line(SUMMARY)
+
+
+def test_saved_view_stale_against_capture(orthia_cold, helper):
+    """found and analyzed live, changed, then .capture: the saved view says the capture differs,
+    the snapshot has the bytes that were analyzed"""
+    handler = floating_name(helper.handler)
+    orthia_cold.run(f".analyze {HELPER_NAME}", pid=helper.pid).assert_ok()
+    helper.change()
+    orthia_cold.run(".capture", pid=helper.pid).assert_ok()
+    helper.proc.stdin.close()
+    helper.proc.wait(timeout=30)
+
+    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lmf", "--cmd", f"modinfo {handler}").assert_ok()
+    assert lmf_row(res, helper.handler)[2] == "stale", res
+    assert lmf_row(res, helper.stub)[2] == "analyzed", res
+    res.assert_line(r"^Snapshot: .+\.bin \(")
+    res.assert_line(r"^Capture: .+\.bin \(")
+    res.assert_line(r"^State: stale, the captured memory differs from what was found and analyzed")

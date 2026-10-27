@@ -185,6 +185,15 @@ namespace orthia
             {
                 EnqueueAnalyzeFloating(item, op, workspaceId);
             }
+            else if (!op->IsCancelled())
+            {
+                // the last pass: what was found, in one line
+                const auto summary = FormatFloatingSummary(*item);
+                if (!summary.empty())
+                {
+                    WriteLog(oui::String(summary));
+                }
+            }
             Cleanup(itemId);
         });
     }

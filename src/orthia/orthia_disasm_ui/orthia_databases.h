@@ -118,6 +118,11 @@ namespace orthia
 
     std::vector<DatabaseInfo> EnumerateDatabases(const CConfigOptionsStorage& config);
     std::vector<DatabaseInfo> EnumerateProcDatabases(const PlatformString_type& procFolderWithSlash);
+    // the proc/ folder of an earlier open of the same process, by its pid and exact start key (meta.xml);
+    // empty when there is none. The name has the start in seconds, which can move between two opens
+    // (Linux computes it from the boot time, and the clock may be set in between)
+    PlatformString_type FindProcFolderByStart(const PlatformString_type& procFolderWithSlash,
+        unsigned long long pid, const std::string& startKey);
     DatabaseDetails QueryDatabaseDetails(const CConfigOptionsStorage& config, const DatabaseInfo& info);
 
     // Selectors: a sha1 prefix (6+ hex digits), a pid (decimal) or a file name (anything else,

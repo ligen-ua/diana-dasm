@@ -22,6 +22,9 @@ namespace orthia
         const size_t c_readChunk = 0x10000;
         // a read-modify-write of capture.xml at a time: .capture and --capture run on other threads
         std::mutex g_indexLock;
+        // the moves of region files into place and their removal: Windows refuses to replace a file
+        // another thread replaces at the same time. Taken after g_indexLock, never before it
+        std::mutex g_fileLock;
 
         std::string ToHex(unsigned long long value)
         {
@@ -132,11 +135,14 @@ namespace orthia
                 }
             }
             std::error_code ec;
-            fs::rename(temp, target, ec);
+            {
+                std::lock_guard<std::mutex> guard(g_fileLock);
+                fs::rename(temp, target, ec);
+            }
             if (ec)
             {
                 fs::remove(temp, ec);
-                throw std::runtime_error("Can't write " + PlatformStringToUtf8(target.native()));
+                throw std::runtime_error("Can't write " + PlatformStringToUtf8(target.native()) + ": " + ec.message());
             }
             region.file = fileName;
             region.missing = missing;
@@ -146,6 +152,7 @@ namespace orthia
         // range. Only those: another capture may be writing files the index doesn't have yet
         void RemoveReplacedFiles(const PlatformString_type& folder, const CaptureIndex& old, const CaptureIndex& index)
         {
+            std::lock_guard<std::mutex> guard(g_fileLock);
             for (const auto& region : old.regions)
             {
                 if (region.file.empty())

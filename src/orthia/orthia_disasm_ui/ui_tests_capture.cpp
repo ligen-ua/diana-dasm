@@ -7,8 +7,11 @@
 #include "orthia_item_process.h"
 #include "orthia_image_source.h"
 #include "orthia_databases.h"
+#include "orthia_floating_code.h"
+#include "orthia_module_manager.h"
 #include <atomic>
 #include <fstream>
+#include <mutex>
 #include <thread>
 
 using orthia_tests::CFakeProcess;
@@ -311,23 +314,30 @@ TEST(Capture, ConcurrentCaptures)
         process->regions.push_back(DataRegion(0x20000000 + i * 0x10000, (char)i, c_rw));
     }
     std::atomic<int> errors{ 0 };
+    std::mutex messagesLock;
+    std::string messages;
+    auto fail = [&](const std::exception& e) {
+        ++errors;
+        std::lock_guard<std::mutex> guard(messagesLock);
+        messages += std::string(e.what()) + "; ";
+    };
     auto full = std::thread([&]() {
         for (int i = 0; i < 30; ++i)
         {
             try { orthia::CaptureProcess(*process, folder.path.native(), nullptr); }
-            catch (const std::exception&) { ++errors; }
+            catch (const std::exception& e) { fail(e); }
         }
     });
     auto module = std::thread([&]() {
         for (int i = 0; i < 100; ++i)
         {
             try { orthia::CaptureRange(*process, folder.path.native(), 0x10000000, 0x40000); }
-            catch (const std::exception&) { ++errors; }
+            catch (const std::exception& e) { fail(e); }
         }
     });
     full.join();
     module.join();
-    EXPECT_EQ(0, errors.load());
+    EXPECT_EQ(0, errors.load()) << messages;
 
     // one index, each file it names whole, no temporary files left
     orthia::CaptureIndex index;
@@ -342,5 +352,76 @@ TEST(Capture, ConcurrentCaptures)
     for (const auto& entry : fs::directory_iterator(folder.path / orthia::g_captureFolder))
     {
         EXPECT_NE(ORTHIA_TCSTR(".tmp"), entry.path().extension().native()) << entry.path().string();
+    }
+}
+
+// A saved view checks its floating modules against the capture: the hook found and analyzed live,
+// then changed before .capture, is stale; the snapshot keeps the bytes that were analyzed
+TEST(Capture, SavedViewStaleAgainstCapture)
+{
+    enum class Case { Same, Changed, ChangedNoCapture };
+    for (auto kind : { Case::Same, Case::Changed, Case::ChangedNoCapture })
+    {
+        SCOPED_TRACE((int)kind);
+        TempFolder folder(ORTHIA_TCSTR("orthia_test_capture_stale"));
+        MakeProcessFolder(folder.path, orthia::SavedModuleList());
+        auto moduleManager = std::make_shared<orthia::CModuleManager>();
+        moduleManager->Reinit((folder.path / ORTHIA_TCSTR("data.db")).native(), true);
+
+        // live: the floating module is found, fingerprinted, its snapshot saved
+        auto process = std::make_shared<CFakeProcess>();
+        process->regions.push_back(DataRegion(0x40000000, (char)0xC3,
+            c_rw | oui::MemoryRegionInfo::protect_exec));
+        orthia::FloatingRegionInfo info;
+        info.allocationBase = 0x40000000;
+        info.allocationSize = 0x1000;
+        info.protect = c_rw | oui::MemoryRegionInfo::protect_exec;
+        info.AddReference(0x40000000, 0x10000010);
+        orthia::FingerprintFloatingRegion(*process, info);
+        ASSERT_TRUE(orthia::SaveFloatingSnapshot(*process, folder.path.native(), info));
+        orthia::SaveFloatingRegion(*moduleManager, info);
+
+        // the hook changes, then the capture
+        if (kind != Case::Same)
+        {
+            process->regions[0].data[0x10] = (char)0x90;
+        }
+        if (kind != Case::ChangedNoCapture)
+        {
+            orthia::CaptureProcess(*process, folder.path.native(), nullptr);
+        }
+
+        // the folder after the process exited
+        auto saved = orthia::OpenSavedProcess(folder.path.native());
+        for (const auto& region : orthia::LoadFloatingRegions(*moduleManager))
+        {
+            saved->AddSnapshot(*region);
+        }
+        orthia::CProcessWorkplaceItem item(saved, saved->GetFullFileNameForUI(), saved->GetDianaMode(), saved->GetDianaArch(), nullptr);
+        item.SetSavedView();
+        item.ReloadModules();
+        item.SetProcFolder(folder.path.native());
+        item.Init(moduleManager, nullptr, nullptr);
+        item.LoadSavedFloatingModules();
+
+        std::vector<orthia::ModuleInfo> modules;
+        item.GetModules(modules);
+        ASSERT_EQ(1u, modules.size());
+        const bool stale = (modules[0].flags & orthia::ModuleInfo::flags_stale) != 0;
+        EXPECT_EQ(kind == Case::Changed, stale);
+
+        std::vector<orthia::PlatformString_type> lines;
+        orthia::DescribeFloatingModule(item, modules[0], lines);
+        std::string text;
+        for (const auto& line : lines)
+        {
+            text += orthia::PlatformStringToUtf8(line) + "\n";
+        }
+        EXPECT_NE(std::string::npos, text.find("Snapshot: ")) << text;
+        EXPECT_EQ(kind != Case::ChangedNoCapture, text.find("Capture: ") != std::string::npos) << text;
+        EXPECT_EQ(kind == Case::Changed, text.find("the captured memory differs") != std::string::npos) << text;
+        EXPECT_EQ(kind == Case::Changed ? "Floating code: 1 module, 1 referrer, 1 stale (lmf /v lists them)" :
+            "Floating code: 1 module, 1 referrer (lmf /v lists them)", orthia::PlatformStringToUtf8(orthia::FormatFloatingSummary(item)));
+        moduleManager.reset();
     }
 }

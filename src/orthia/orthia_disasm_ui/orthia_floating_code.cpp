@@ -7,6 +7,7 @@
 #include "orthia_sha256.h"
 #include "orthia_process_adapter.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_capture.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -983,9 +984,32 @@ namespace orthia
         {
             lines.push_back(ORTHIA_TCSTR("Snapshot: none"));
         }
+        // the region in a capture of the process (.capture, --capture): the memory later than the snapshot
+        bool captured = false;
+        CaptureIndex capture;
+        const auto folder = item.GetDatabaseFolder();
+        if (!folder.empty() && ReadCaptureIndex(folder, capture))
+        {
+            for (const auto& region : capture.regions)
+            {
+                if (region.file.empty() || region.allocationBase != info.allocationBase)
+                {
+                    continue;
+                }
+                const auto path = std::filesystem::path(folder) / g_captureFolder / Utf8ToPlatformString(region.file);
+                lines.push_back(ORTHIA_TCSTR("Capture: ") + path.native() + ORTHIA_TCSTR(" (") +
+                    AddressToString(region.base, mode) + ORTHIA_TCSTR(", ") +
+                    Utf8ToPlatformString(ToHex(region.size)) + ORTHIA_TCSTR(" bytes)"));
+                captured = true;
+            }
+        }
         if (module.flags & ModuleInfo::flags_stale)
         {
-            lines.push_back(ORTHIA_TCSTR("State: stale, the memory changed since it was found"));
+            auto process = const_cast<IWorkPlaceItem&>(item).GetAssociatedProcess();
+            const bool savedView = process && !process->IsRunning() && captured;
+            lines.push_back(savedView ?
+                PlatformString_type(ORTHIA_TCSTR("State: stale, the captured memory differs from what was found and analyzed (the snapshot has that)")) :
+                PlatformString_type(ORTHIA_TCSTR("State: stale, the memory changed since it was found")));
         }
         lines.push_back(ORTHIA_TCSTR("Entries: ") + Utf8ToPlatformString(std::to_string(info.entries.size())));
         std::vector<ModuleInfo> modules;
@@ -1092,6 +1116,46 @@ namespace orthia
             row.to.resize(toWidth, ORTHIA_TCHAR(' '));
             lines.push_back(ORTHIA_TCSTR("  ") + row.from + ORTHIA_TCSTR("  -> ") + row.to + ORTHIA_TCSTR("  ") + row.notes);
         }
+    }
+
+    PlatformString_type FormatFloatingSummary(const IWorkPlaceItem& item)
+    {
+        std::vector<ModuleInfo> modules;
+        item.GetModules(modules);
+        size_t count = 0;
+        size_t referrers = 0;
+        size_t stale = 0;
+        for (const auto& module : modules)
+        {
+            if (!module.IsFloating() || !module.floating)
+            {
+                continue;
+            }
+            ++count;
+            if (module.flags & ModuleInfo::flags_stale)
+            {
+                ++stale;
+            }
+            for (const auto& entry : module.floating->entries)
+            {
+                referrers += entry.referrers.size() + entry.slots.size();
+            }
+        }
+        if (!count)
+        {
+            return PlatformString_type();
+        }
+        auto plural = [](size_t n, const char* one, const char* many) {
+            return std::to_string(n) + " " + (n == 1 ? one : many);
+        };
+        std::string text = "Floating code: " + plural(count, "module", "modules") + ", " +
+            plural(referrers, "referrer", "referrers");
+        if (stale)
+        {
+            text += ", " + std::to_string(stale) + " stale";
+        }
+        text += " (lmf /v lists them)";
+        return Utf8ToPlatformString(text);
     }
 
     bool DiscoverFloatingCode(IWorkPlaceItem& item, const ModuleInfo& source)

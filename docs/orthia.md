@@ -266,6 +266,10 @@ gone (or a module the OS reports took its place) the floating module is removed.
 Hooks are usually in the system modules, which are not analyzed on open: `.analyze *` analyzes every
 module, `.analyze kernel*` a few.
 
+When the floating code analysis is done, the log has one line for all of it:
+`Floating code: 4 modules, 7 referrers (lmf /v lists them)`, with `, 1 stale` when some are; `.capture`
+prints the same line.
+
 Targets in zero-filled memory are left out: no code starts with `00 00`.
 
 #### TODO
@@ -346,7 +350,9 @@ item is named `[1234] app.exe (saved)`. What it has:
   shows the original instructions there;
 - the bytes of the floating modules from their snapshots, so `u`, `lmf /v` and `modinfo` work as they did;
 - with a [capture](#capture-deep-mode), the memory as it was, over all of the above: `lm` shows `captured`,
-  the memory map and `threads` are the capture's.
+  the memory map and `threads` are the capture's. A floating module whose bytes in the capture differ from
+  what was found and analyzed (the hook changed before `.capture`) is `stale`; `modinfo` names its snapshot
+  (the bytes analyzed) and its capture files. `.analyze /f` on it analyzes the captured bytes.
 
 Anything else reads as missing. A saved folder is never removed when its item closes and is never written
 to except by the analysis. Process folders without floating code are removed 48 hours after their last

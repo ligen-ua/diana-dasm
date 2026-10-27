@@ -136,6 +136,10 @@ namespace orthia
     // A slot: "<slot> -> ...  RWX private [import slot: KERNEL32.dll!CreateFileW]", or [export: ...]
     void DescribeFloatingReferrers(const IWorkPlaceItem& item, std::vector<PlatformString_type>& lines);
 
+    // "Floating code: 4 modules, 7 referrers (lmf /v lists them)", with ", 1 stale" when some are;
+    // empty when the item has none
+    PlatformString_type FormatFloatingSummary(const IWorkPlaceItem& item);
+
     // Discovery from source: saves what it found and gives it to the item. True when a floating
     // module waits for its analysis. Process items only; false for the others
     bool DiscoverFloatingCode(IWorkPlaceItem& item, const ModuleInfo& source);

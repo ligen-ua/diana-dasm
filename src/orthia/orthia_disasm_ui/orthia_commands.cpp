@@ -373,6 +373,12 @@ namespace orthia
             ORTHIA_TCSTR(" of ") + Utf8ToPlatformString(std::to_string(stats.regions)) + ORTHIA_TCSTR(" regions, ") +
             megabytes(stats.bytes) + ORTHIA_TCSTR(" (") + megabytes(stats.missing) + ORTHIA_TCSTR(" unreadable), ") +
             Utf8ToPlatformString(std::to_string(stats.threads)) + ORTHIA_TCSTR(" threads"));
+        // the floating code known so far: its bytes are in the capture too, and in its snapshots
+        const auto summary = FormatFloatingSummary(*args.item);
+        if (!summary.empty())
+        {
+            args.ReplyLine(summary);
+        }
     }
 
     void CCommandProcessor::Handle_analyze(CommandArguments& args)

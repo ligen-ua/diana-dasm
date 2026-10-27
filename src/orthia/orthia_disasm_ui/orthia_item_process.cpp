@@ -339,12 +339,18 @@ namespace orthia
             ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't read the floating modules: ") + e.what());
             return;
         }
-        // read before the lock: hashing reads the process. A saved view has no memory to check:
-        // the snapshot is what was found
+        // read before the lock: hashing reads the process. A saved view checks against its capture,
+        // which is the memory later than the analysis; without one the snapshot is what was found
+        auto saved = std::dynamic_pointer_cast<CSavedProcess>(m_proc);
         std::vector<bool> unchanged;
         for (const auto& info : regions)
         {
-            unchanged.push_back(m_savedView || IsFloatingRegionUnchanged(*m_proc, *info));
+            if (m_savedView && !(saved && saved->IsCaptured(info->allocationBase)))
+            {
+                unchanged.push_back(true);
+                continue;
+            }
+            unchanged.push_back(IsFloatingRegionUnchanged(*m_proc, *info));
         }
         orthia::CAutoCriticalSection guard(m_lock);
         for (size_t i = 0; i < regions.size(); ++i)

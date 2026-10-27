@@ -363,6 +363,23 @@ namespace orthia
         return result;
     }
 
+    PlatformString_type FindProcFolderByStart(const PlatformString_type& procFolderWithSlash,
+        unsigned long long pid, const std::string& startKey)
+    {
+        if (!pid || startKey.empty())
+        {
+            return PlatformString_type();
+        }
+        for (const auto& info : EnumerateProcDatabases(procFolderWithSlash))
+        {
+            if (!info.pendingDelete && info.hasDataDb && info.pid == pid && info.startKey == startKey)
+            {
+                return info.folder;
+            }
+        }
+        return PlatformString_type();
+    }
+
     DatabaseDetails QueryDatabaseDetails(const CConfigOptionsStorage& config, const DatabaseInfo& info)
     {
         DatabaseDetails details;

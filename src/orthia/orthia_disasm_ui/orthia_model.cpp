@@ -250,6 +250,16 @@ namespace orthia
             auto folderName = GetFileSystem()->SyncSanitizeName(oui::String(
                 MakeProcFolderName(processName.native, startInfo.IsKnown() ? startInfo.unixSeconds : 0)));
             auto dbFolder = m_config->GetProcDBFolder() + AddSlash2(folderName.native);
+            // an earlier open of this process may have named its folder a second apart
+            if (!m_config->GetOverwriteDatabases() && startInfo.IsKnown())
+            {
+                const auto existing = FindProcFolderByStart(m_config->GetProcDBFolder(),
+                    ParseProcFolderPid(processName.native), startInfo.key);
+                if (!existing.empty())
+                {
+                    dbFolder = AddSlash2(existing);
+                }
+            }
             auto dbFileName = dbFolder + m_config->GetDBFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
             auto metaFileName = dbFolder + m_config->GetMetaFileName();

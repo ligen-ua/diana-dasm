@@ -510,3 +510,29 @@ TEST(SavedProcess, ResolveFolder)
     EXPECT_THROW(orthia::ResolveSavedProcessFolder(all, ORTHIA_TCSTR("78")), std::exception);
     EXPECT_THROW(orthia::OpenSavedProcess(folder.path.native()), std::exception);
 }
+
+// A second open of the same process finds its folder by the pid and the exact start, also when the
+// start in seconds came out a second apart (Linux: from the boot time, and the clock was set)
+TEST(SavedProcess, FolderFoundByStart)
+{
+    TempFolder folder(ORTHIA_TCSTR("orthia_test_proc_by_start"));
+    auto make = [&](const ORTHIA_TCHAR* name, unsigned long long pid, const char* key) {
+        const auto path = folder.path / name;
+        fs::create_directories(path);
+        WriteFile(path / ORTHIA_TCSTR("data.db"), {});
+        orthia::FolderMeta meta;
+        meta.kind = orthia::g_folderKindProcess;
+        meta.pid = pid;
+        meta.startKey = key;
+        orthia::WriteFolderMeta((path / ORTHIA_TCSTR("meta.xml")).native(), meta);
+        return path.native();
+    };
+    const auto first = make(ORTHIA_TCSTR("[5] app 20261027-170940"), 5, "boot:100");
+    make(ORTHIA_TCSTR("[5] app 20261027-180000"), 5, "boot:900");
+    make(ORTHIA_TCSTR("[6] app 20261027-170941"), 6, "boot:100");
+    const auto procFolder = orthia::AddSlash2(folder.path.native());
+    EXPECT_EQ(first, orthia::FindProcFolderByStart(procFolder, 5, "boot:100"));
+    EXPECT_EQ(orthia::PlatformString_type(), orthia::FindProcFolderByStart(procFolder, 5, "boot:200"));
+    EXPECT_EQ(orthia::PlatformString_type(), orthia::FindProcFolderByStart(procFolder, 7, "boot:100"));
+    EXPECT_EQ(orthia::PlatformString_type(), orthia::FindProcFolderByStart(procFolder, 5, ""));
+}
