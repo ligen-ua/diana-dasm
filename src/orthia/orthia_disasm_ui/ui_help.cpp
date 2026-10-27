@@ -16,7 +16,7 @@ namespace orthia
         { "x [/a|/n] [/v] <mask>", "Examine symbols (/a: by address, /n: by name, /v: show type)" },
         { "u <address> [L<length>]", "Unassemble address" },
         { "lm", "List loaded modules" },
-        { "lmf", "List floating code modules (found by .analyze)" },
+        { "lmf [/v]", "List floating code modules (found by .analyze); /v: what leads to each" },
         { "d[b,w,d,q,p,ps]", "Display memory" },
         { "threads", "Display threads" },
         { "cls", "Clear screen" },

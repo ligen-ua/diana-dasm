@@ -108,6 +108,13 @@ void CCommandProcessor::Handle_lm(CommandArguments& args, bool floating)
     auto rawArgs = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
     orthia::TrimStringAllWhiteSpace(rawArgs);
 
+    // lmf /v: and what leads to each entry point
+    bool verbose = false;
+    if (floating && rawArgs == "/v")
+    {
+        verbose = true;
+        rawArgs.clear();
+    }
     if (!rawArgs.empty())
     {
         throw std::runtime_error("Argument not supported: " + rawArgs);
@@ -207,6 +214,17 @@ void CCommandProcessor::Handle_lm(CommandArguments& args, bool floating)
 
         args.ReplyLine(line);
         line.clear();
+    }
+
+    if (verbose)
+    {
+        std::vector<orthia::PlatformString_type> lines;
+        orthia::DescribeFloatingReferrers(*args.item, lines);
+        args.ReplyLine(orthia::PlatformString_type());
+        for (const auto& text : lines)
+        {
+            args.ReplyLine(text);
+        }
     }
 }
 

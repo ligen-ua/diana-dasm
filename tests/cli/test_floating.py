@@ -122,6 +122,21 @@ def test_modinfo(orthia, helper):
     res.assert_line(rf"\$entry_0001\s+from {HELPER_NAME}(\.exe)?[+!]")
 
 
+def test_lmf_verbose_lists_referrers(orthia, helper):
+    stub = floating_name(helper.stub)
+    handler = floating_name(helper.handler)
+    res = orthia.run(f".analyze {HELPER_NAME}", "lmf /v", pid=helper.pid).assert_ok()
+    res.assert_line(r"^Referrers:$")
+    # the hooked function of the helper leads to the stub, the stub to the handler
+    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\S*\s+-> {stub}!\$entry_0001\s+RWX private")
+    res.assert_line(rf"^  {stub}!\S+\s+-> {handler}!\$entry_0001\s+RWX private")
+
+
+def test_lm_has_no_verbose_option(orthia, helper):
+    res = orthia.run("lm /v", pid=helper.pid)
+    assert "Argument not supported: /v" in res.stdout + res.stderr, res
+
+
 def test_full_analysis_again(orthia, helper):
     res = orthia.run(f".analyze {HELPER_NAME}", f".analyze /f {HELPER_NAME}", "lmf",
                      pid=helper.pid).assert_ok()

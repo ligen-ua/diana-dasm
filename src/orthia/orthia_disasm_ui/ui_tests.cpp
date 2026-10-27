@@ -1268,6 +1268,20 @@ TEST(FloatingCode, DiscoveryAndAnalysis)
     EXPECT_NE(std::string::npos, text.find("$entry_0002")) << text;
     EXPECT_NE(std::string::npos, text.find("from ")) << text;
     EXPECT_NE(std::string::npos, text.find("Entries: 2")) << text;
+
+    // lmf /v: by referrer, the module's two calls first, then A's jump to D
+    lines.clear();
+    orthia::DescribeFloatingReferrers(*item, lines);
+    ASSERT_EQ(4u, lines.size());
+    EXPECT_EQ(ORTHIA_TCSTR("Referrers:"), lines[0]);
+    auto row = [&](size_t i) { return orthia::PlatformStringToUtf8(lines[i]); };
+    EXPECT_NE(std::string::npos, row(1).find("-> fl_10100000!$entry_0001")) << row(1);
+    EXPECT_NE(std::string::npos, row(1).find("RWX private [function start]")) << row(1);
+    EXPECT_NE(std::string::npos, row(2).find("module+05h")) << row(2);
+    EXPECT_NE(std::string::npos, row(2).find("-> fl_10100000!$entry_0002")) << row(2);
+    EXPECT_EQ(std::string::npos, row(2).find("[function start]")) << row(2);
+    EXPECT_EQ(0u, row(3).find("  fl_10100000!$entry_0001")) << row(3);
+    EXPECT_NE(std::string::npos, row(3).find("-> fl_10400000!$entry_0001")) << row(3);
 }
 
 TEST(FloatingCode, SavedAndStale)

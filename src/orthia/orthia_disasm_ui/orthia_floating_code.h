@@ -122,6 +122,10 @@ namespace orthia
 
     // `modinfo` lines of a floating module; referrers named through the item
     void DescribeFloatingModule(const IWorkPlaceItem& item, const ModuleInfo& module, std::vector<PlatformString_type>& lines);
+    // `lmf /v`: what leads to the floating code of the item, one line per referrer and entry, by the
+    // referrer's address: "<referrer> -> fl_..!$entry_0001  RWX private [function start]". "function
+    // start": the referrer is at a name (an export, a symbol), as an inline hook over a prologue is
+    void DescribeFloatingReferrers(const IWorkPlaceItem& item, std::vector<PlatformString_type>& lines);
 
     // Discovery from source: saves what it found and gives it to the item. True when a floating
     // module waits for its analysis. Process items only; false for the others

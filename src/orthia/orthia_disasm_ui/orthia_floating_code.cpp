@@ -813,6 +813,78 @@ namespace orthia
         }
     }
 
+    void DescribeFloatingReferrers(const IWorkPlaceItem& item, std::vector<PlatformString_type>& lines)
+    {
+        std::vector<ModuleInfo> modules;
+        item.GetModules(modules);
+        struct Row
+        {
+            Address_type referrer = 0;
+            PlatformString_type from;
+            PlatformString_type to;
+            PlatformString_type notes;
+        };
+        std::vector<Row> rows;
+        const int mode = item.GetDianaMode();
+        for (const auto& module : modules)
+        {
+            if (!module.IsFloating() || !module.floating)
+            {
+                continue;
+            }
+            const auto& info = *module.floating;
+            // what the region is: the same for each of its rows
+            PlatformString_type regionNotes = FormatRegionProtect(info.protect) + ORTHIA_TCSTR(" ") + FormatRegionType(info.type);
+            if (!info.header.empty())
+            {
+                regionNotes += ORTHIA_TCSTR(" ") + Utf8ToPlatformString(info.header) + ORTHIA_TCSTR("-header");
+            }
+            if (!info.mappedName.empty())
+            {
+                regionNotes += ORTHIA_TCSTR(" ") + Utf8ToPlatformString(info.mappedName);
+            }
+            if (module.flags & ModuleInfo::flags_stale)
+            {
+                regionNotes += ORTHIA_TCSTR(" stale");
+            }
+            std::vector<NameInfo> names;
+            QueryFloatingNames(info, names);
+            for (size_t i = 0; i < info.entries.size(); ++i)
+            {
+                for (auto referrer : info.entries[i].referrers)
+                {
+                    Row row;
+                    row.referrer = referrer;
+                    const auto name = GetPreferredName(item.QueryAddressName(referrer)).native;
+                    row.from = name.empty() ? AddressToString(referrer, mode) : name;
+                    row.to = module.name + ORTHIA_TCSTR("!") + names[i].name.native;
+                    row.notes = regionNotes;
+                    if (!name.empty() && name.find(ORTHIA_TCHAR('+')) == PlatformString_type::npos)
+                    {
+                        row.notes += ORTHIA_TCSTR(" [function start]");
+                    }
+                    rows.push_back(std::move(row));
+                }
+            }
+        }
+        std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.referrer < b.referrer; });
+        size_t fromWidth = 0;
+        size_t toWidth = 0;
+        for (const auto& row : rows)
+        {
+            fromWidth = std::max(fromWidth, row.from.size());
+            toWidth = std::max(toWidth, row.to.size());
+        }
+        lines.push_back(rows.empty() ? PlatformString_type(ORTHIA_TCSTR("Referrers: none")) :
+            PlatformString_type(ORTHIA_TCSTR("Referrers:")));
+        for (auto& row : rows)
+        {
+            row.from.resize(fromWidth, ORTHIA_TCHAR(' '));
+            row.to.resize(toWidth, ORTHIA_TCHAR(' '));
+            lines.push_back(ORTHIA_TCSTR("  ") + row.from + ORTHIA_TCSTR("  -> ") + row.to + ORTHIA_TCSTR("  ") + row.notes);
+        }
+    }
+
     bool DiscoverFloatingCode(IWorkPlaceItem& item, const ModuleInfo& source)
     {
         auto process = item.GetAssociatedProcess();

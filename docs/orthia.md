@@ -163,7 +163,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `x [/a\|/n] [/v] <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched. `/a` sorts by address, `/n` by name (default: by type), `/v` shows the symbol type |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
 | `lm` | List modules with their status: `.NET`, `unresolved`, `linked`, `stale`, `unlinked`, `analyzed`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)). `.NET` marks a managed image: an IL-only one has no native entry point and almost no native code |
-| `lmf` | List the floating modules of a process: executable memory no module owns that the analysis led to, with protection, entry points and status (`pending`, `analyzed`, `stale`); see [Floating code](#floating-code) |
+| `lmf [/v]` | List the floating modules of a process: executable memory no module owns that the analysis led to, with protection, entry points and status (`pending`, `analyzed`, `stale`). `/v` adds what leads to each entry point; see [Floating code](#floating-code) |
 | `db`, `dw`, `dd`, `dq`, `dp`, `dps` | Display memory as bytes, words, dwords, qwords, pointers, or pointers with symbols |
 | `threads` | Display threads (processes only) |
 | `modinfo <module>` | Show file and debug info for a module (PE headers, PDB or ELF build id) and where its image comes from; for a floating module, its allocation, code and entry points with the instructions that lead there |
@@ -220,6 +220,19 @@ A floating module works like any other: `u fl_7ff7a5d70000`, `x fl_7ff7a5d70000!
 `$entry_0001`, `$entry_0002`, ... by address), `modinfo fl_7ff7a5d70000`, `.analyze fl_7ff7a5d70000`.
 `lm` and the Modules window leave them out; `lmf` lists them.
 
+`lmf /v` also lists what leads to the floating code, one line per instruction and entry point, by address:
+
+```
+Referrers:
+  fl_7ff74e840000!$entry_0001+1fh   -> fl_7ff74e850000!$entry_0001  RWX private
+  ntdll!NtProtectVirtualMemory      -> fl_7ff74e840000!$entry_0001  RWX private [function start]
+```
+
+After the arrow: the protection where the entry is, the allocation type (`private`, `mapped`, `image`), an
+`MZ-header` or `ELF-header` when the allocation starts with one, the mapped file, and `stale`.
+`[function start]` marks an instruction at a name (an export or a symbol): code at the start of a function
+that leaves its module is how an inline hook looks.
+
 Floating modules are saved in the process database. When the same process is opened again, each one is
 checked against the memory (the allocation and a hash of its bytes); one that changed or went away is kept
 and shown as `stale`, and is not analyzed again. The check covers the executable pages of the allocation
@@ -249,7 +262,9 @@ Entry points and targets:
   database has no kind, so discovery takes every reference that leaves a module, and filters by executable
   memory only. In a 32-bit process an `imm32` constant that falls into such an allocation adds an entry point
   (`push 6A0004h`); the CLI tests allow more than one entry there for that reason.
-- [ ] Mark how each entry was reached (call, jump, taken address) in `modinfo`, once the kind is stored.
+- [ ] Mark how each entry was reached (call, jump, taken address) in `modinfo` and `lmf /v`, once the kind is stored.
+- [ ] Report calls and jumps into memory that is not executable (a sleep-masked implant is RW while it
+  sleeps). Without the reference kind every constant that falls into a heap would be reported too.
 
 Targets:
 - [ ] Minidumps: there is no minidump support yet.
