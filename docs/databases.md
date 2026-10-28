@@ -172,7 +172,7 @@ When you query the database by hand, apply the XOR to the encoded columns.
 |---|---|---|
 | `tbl_modules` | `mod_address` (primary key), `mod_size`, `mod_name` | every module in the target's address space: the opened file and its dependencies |
 | `tbl_metainfo` | `meta_mod_id` (foreign key to `tbl_modules`, cascade delete), `meta_address`, `meta_type`, `meta_info` | per-module records, see below |
-| `tbl_references` | `ref_address_from`, `ref_address_to`, `ref_kind` | cross-references found by the code analysis, kept by the module they are made from: clearing or unloading a module removes the rows whose `ref_address_from` is inside it. `ref_kind`: 1 a call or a jump, 2 an address taken (`lea`, an immediate, `ADR`), 3 data read or written, 0 unknown (saved before version 5) |
+| `tbl_references` | `ref_address_from`, `ref_address_to`, `ref_kind` | cross-references found by the code analysis, kept by the module they are made from: clearing or unloading a module removes the rows whose `ref_address_from` is inside it. `ref_kind`: 1 a call or a jump, 2 an address taken (`lea`, an immediate, `ADR`) that is code or outside the module, 3 data read or written, or the address of data in the module taken (it never starts a route), 0 unknown (saved before version 5) |
 | `tbl_comments` | `com_address` (primary key), `com_text` | user comments (`;` in the disassembly view) |
 | `tbl_vm_vms`, `tbl_vm_modules` | | emulator state of the WinDbg plugin; unused by the disassembler |
 

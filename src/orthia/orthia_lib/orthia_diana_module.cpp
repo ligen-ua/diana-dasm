@@ -510,10 +510,12 @@ Address_type CDianaInstructionIterator::GetInstructionOffset()
 }
 static int GetReferenceKind(const Diana_XRef * pXRef)
 {
-    if (pXRef->m_flags & DI_XREF_ADDRESS_TAKEN)
-        return reference_address;
+    // the target is data: read or written, or its address taken (lea rcx, [rip+string]); such a target
+    // never starts a route
     if (pXRef->m_flags & DI_XREF_DATA)
         return reference_data;
+    if (pXRef->m_flags & DI_XREF_ADDRESS_TAKEN)
+        return reference_address;
     return reference_code;
 }
 void CDianaInstructionIterator::QueryRefsToCurrentInstuction(std::vector<CommonReferenceInfo> * pInfo)

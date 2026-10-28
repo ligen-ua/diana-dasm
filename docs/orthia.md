@@ -164,7 +164,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | Command | Description |
 |---|---|
 | `x [/a\|/n] [/v] <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched. `/a` sorts by address, `/n` by name (default: by type), `/v` shows the symbol type |
-| `xr [/a] <address> [L<length>]` | List the references to an address: each referrer with its kind (`code`: a call or a jump, `addr`: the address taken, `data`: read or written, `?`: saved by an older version) and its name. With `L<length>`, every address of the range that has references, with its referrers under it. `/a` prints the addresses only. References from other modules count, once the analysis of those modules saved them |
+| `xr [/a] <address> [L<length>]` | List the references to an address: each referrer with its kind (`code`: a call or a jump, `addr`: the address of code taken, `data`: data read, written or its address taken, `?`: saved by an older version) and its name. With `L<length>`, every address of the range that has references, with its referrers under it. `/a` prints the addresses only. References from other modules count, once the analysis of those modules saved them |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
 | `lm` | List modules with their status: `.NET`, `unresolved`, `linked`, `stale`, `unlinked`, `analyzed`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)). `.NET` marks a managed image: an IL-only one has no native entry point and almost no native code |
 | `lmf [/v]` | List the floating modules of a process: executable memory no module owns that the analysis led to, with protection, entry points and status (`pending`, `analyzed`, `stale`). `/v` adds what leads to each entry point; see [Floating code](#floating-code) |
@@ -271,7 +271,10 @@ When the floating code analysis is done, the log has one line for all of it:
 `Floating code: 4 modules, 7 referrers (lmf /v lists them)`, with `, 1 stale` when some are; `.capture`
 prints the same line.
 
-Targets in zero-filled memory are left out: no code starts with `00 00`.
+Targets in zero-filled memory are left out: no code starts with `00 00`. Data read or written there
+(`mov rax, [rip+X]`) is no entry point either. A taken address is: `lea`, `adr`, and an immediate the
+analysis takes for an address (`push offset callback`), so in a 32-bit process a constant that happens to
+point into executable memory adds an entry point too.
 
 #### TODO
 
@@ -285,11 +288,7 @@ Entry points and targets:
   (a hook through a DLL loaded for it), is not reported.
 - [x] Store the reference kind in `tbl_references` (code, taken address, data access); discovery skips data reads
   and writes.
-- [ ] An immediate the analysis takes for an address is a taken address too: in a 32-bit process an `imm32`
-  constant that falls into an executable allocation still adds an entry point (`push 6A0004h`); the CLI tests
-  allow more than one entry there for that reason. A kind of its own for immediates would let discovery tell them apart.
-- [ ] x64 `lea reg, [rip+X]` with X outside the module is not saved at all (diana_core `SaveNewRoute` drops a
-  target past the module before the observer is asked), so a taken address of floating code by `lea` is missed.
+- [x] x64 `lea reg, [rip+X]` and AArch64 `adr` with X outside the module are saved as taken addresses.
 - [x] Mark how each entry was reached (code, address taken) in `modinfo` and `lmf /v`.
 - [ ] Report calls and jumps into memory that is not executable (a sleep-masked implant is RW while it
   sleeps). Without the reference kind every constant that falls into a heap would be reported too.

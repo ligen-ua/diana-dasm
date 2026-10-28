@@ -212,7 +212,10 @@ TEST(References, Kinds)
     PutRipRelative(code, 0x0C, "\x48\x8B\x05", base, F::otherModule + 0x100); // mov rax, [rip+other's data]
     PutRipRelative(code, 0x13, "\x48\x8D\x0D", base, base + 0x40);          // lea rcx, [rip+function]
     PutMovRcxImm64(code, 0x1A, F::otherModule + 0x200);                     // mov rcx, other's function
-    code[0x24] = (char)0xC3;
+    PutRipRelative(code, 0x24, "\x48\x8D\x0D", base, F::otherModule + 0x300); // lea rcx, [rip+other's function]
+    PutRipRelative(code, 0x2B, "\x48\x8D\x0D", base, base + 0xA00);         // lea rcx, [rip+string]
+    code[0x32] = (char)0xC3;
+    code[0xA00] = code[0xA01] = code[0xA02] = 0x06;                         // push es: no code in 64-bit
     code[0x40] = (char)0xC3;
     auto item = fixture.OpenItem();
     fixture.AnalyzeModule(*item);
@@ -223,6 +226,9 @@ TEST(References, Kinds)
     EXPECT_EQ(orthia::reference_data, KindOf(refs, base + 0x0C, F::otherModule + 0x100));
     EXPECT_EQ(orthia::reference_address, KindOf(refs, base + 0x13, base + 0x40));
     EXPECT_EQ(orthia::reference_address, KindOf(refs, base + 0x1A, F::otherModule + 0x200));
+    EXPECT_EQ(orthia::reference_address, KindOf(refs, base + 0x24, F::otherModule + 0x300));
+    EXPECT_EQ(orthia::reference_data, KindOf(refs, base + 0x2B, base + 0xA00));
+    EXPECT_EQ(base + 0x40, fixture.moduleManager->QueryRouteStart(base + 0xA10));
 
     // the module's own data: xrefs to it, and no route starts there
     std::vector<orthia::CommonReferenceInfo> toData;
@@ -242,7 +248,8 @@ TEST(References, FloatingEntriesByKind)
     code.assign(0x1000, (char)0xCC);
     PutRipRelative(code, 0x00, "\x48\x8B\x05", base, F::regionD + 0x10);    // mov rax, [rip+D]
     PutMovRcxImm64(code, 0x07, F::regionA + 0x30);                          // mov rcx, A
-    code[0x11] = (char)0xC3;
+    PutRipRelative(code, 0x11, "\x48\x8D\x15", base, F::regionA + 0x50);    // lea rdx, [rip+A]
+    code[0x18] = (char)0xC3;
     auto item = fixture.OpenItem();
     fixture.AnalyzeModule(*item);
     orthia::DiscoverFloatingCode(*item, F::FindModule(*item, base));
@@ -250,14 +257,17 @@ TEST(References, FloatingEntriesByKind)
     EXPECT_FALSE(F::FindModule(*item, F::regionD).IsFloating());
     const auto a = F::FindModule(*item, F::regionA);
     ASSERT_TRUE(a.IsFloating());
-    ASSERT_EQ(1u, a.floating->entries.size());
+    ASSERT_EQ(2u, a.floating->entries.size());
     EXPECT_EQ(F::regionA + 0x30, a.floating->entries[0].address);
     EXPECT_EQ((std::vector<orthia::Address_type>{ base + 0x07 }), a.floating->entries[0].referrers);
     EXPECT_EQ((std::vector<int>{ orthia::reference_address }), a.floating->entries[0].referrerKinds);
+    EXPECT_EQ(F::regionA + 0x50, a.floating->entries[1].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ base + 0x11 }), a.floating->entries[1].referrers);
+    EXPECT_EQ((std::vector<int>{ orthia::reference_address }), a.floating->entries[1].referrerKinds);
 
     std::vector<orthia::PlatformString_type> lines;
     orthia::DescribeFloatingReferrers(*item, lines);
-    ASSERT_EQ(2u, lines.size());
+    ASSERT_EQ(3u, lines.size());
     EXPECT_NE(std::string::npos, orthia::PlatformStringToUtf8(lines[1]).find("[address taken]"))
         << orthia::PlatformStringToUtf8(lines[1]);
 }

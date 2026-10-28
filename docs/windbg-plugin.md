@@ -48,8 +48,8 @@ or
 
 (prints also the code)
 
-Each referrer is printed with its kind: `code` (a call or a jump), `addr` (the address taken: `lea`, an immediate),
-`data` (read or written) or `?` (saved before the profile had kinds).
+Each referrer is printed with its kind: `code` (a call or a jump), `addr` (the address of code taken: `lea`, an immediate),
+`data` (data read, written or its address taken) or `?` (saved before the profile had kinds).
 
 5) show all loaded modules
 > !orthia.lm

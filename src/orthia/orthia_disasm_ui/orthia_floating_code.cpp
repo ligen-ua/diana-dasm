@@ -778,10 +778,9 @@ namespace orthia
         {
             return result;
         }
-        // calls, jumps and taken addresses; data read or written there is no entry point.
-        // TODO: an immediate the analysis takes for an address is a taken address too, so a 32-bit
-        // constant that falls into an allocation still adds an entry. Other entry points (threads,
-        // stacks, pointers in data) are not looked at (docs/orthia.md, Floating code)
+        // calls, jumps and taken addresses (lea, adr, an immediate: push offset callback) into executable
+        // memory; data read or written there is no entry point. Other entry points (threads, stacks,
+        // pointers in data) are not looked at (docs/orthia.md, Floating code)
         std::vector<ModuleReference> refs;
         moduleManager.QueryDatabaseManager()->GetClassicDatabase()->QueryAllModuleReferences(source.address, source.size, refs);
 
