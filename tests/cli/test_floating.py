@@ -169,6 +169,20 @@ def test_lm_has_no_verbose_option(orthia, helper):
     assert "Argument not supported: /v" in res.stdout + res.stderr, res
 
 
+def test_threads_stack(orthia, helper):
+    """The main thread waits in a read of stdin: its stack goes from the C library into the helper.
+    Linux takes the registers of a blocked thread from /proc/<pid>/task/<tid>/syscall"""
+    if platform.machine().lower() not in ("amd64", "x86_64") or helper.bits != 64:
+        pytest.skip("the stack walk is x86-64 only on Linux and on ARM64 Windows")
+    res = orthia.run("threads", pid=helper.pid).assert_ok()
+    # the first thread is the main one
+    stack = res.stdout.split("Stack:", 1)[1].split("\n\n", 1)[0]
+    frames = [line.strip() for line in stack.splitlines() if line.strip()]
+    assert len(frames) >= 2, res
+    assert any(frame.startswith(HELPER_NAME) for frame in frames[1:]), res
+    assert "not available" not in frames[0], res
+
+
 def test_full_analysis_again(orthia, helper):
     res = orthia.run(f".analyze {HELPER_NAME}", f".analyze /f {HELPER_NAME}", "lmf",
                      pid=helper.pid).assert_ok()

@@ -169,6 +169,17 @@ namespace oui
 
     std::shared_ptr<IProcessSystem> CreateDefaultProcessProvider();
 
+    // A line of Linux /proc/<pid>/task/<tid>/syscall: "<nr> <6 args> <sp> <pc>" in a syscall, "-1 <sp> <pc>"
+    // blocked elsewhere, "running" on a CPU (no registers then)
+    struct ThreadSyscallState
+    {
+        bool running = false;
+        unsigned long long sp = 0;
+        unsigned long long pc = 0;
+    };
+    // false when the line has neither form
+    bool ParseThreadSyscallLine(const std::string& line, ThreadSyscallState& state);
+
     namespace fsui
     {
         using ProcessCompleteHandler_type = std::function<void(std::shared_ptr<BaseOperation>, std::shared_ptr<IProcess>, const OpenResult&)>;

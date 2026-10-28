@@ -8,6 +8,7 @@
 #include "orthia_utils.h"
 #include "formats/orthia_image_format.h"
 #include "orthia_diana_arch.h"
+#include "orthia_exec.h"
 
 extern "C"
 {
@@ -225,13 +226,35 @@ namespace oui
     // PosixThread
     // -------------------------------------------------------------------------
 
+    // The user sp and pc of a blocked thread. No ptrace (the sandbox denies it, and it would stop the thread):
+    // the file needs the same access as process_vm_readv
+    static int ReadThreadSyscallState(pid_t pid, pid_t tid, ThreadSyscallState& state)
+    {
+        char path[128];
+        snprintf(path, sizeof(path), "/proc/%d/task/%d/syscall", (int)pid, (int)tid);
+        int fd = open(path, O_RDONLY);
+        if (fd < 0)
+            return errno;
+        char buffer[256];
+        ssize_t r = read(fd, buffer, sizeof(buffer) - 1);
+        int error = r < 0 ? errno : 0;
+        close(fd);
+        if (error)
+            return error;
+        buffer[r] = 0;
+        if (!ParseThreadSyscallLine(buffer, state))
+            return EINVAL;
+        return 0;
+    }
+
     class CPosixThread : public IThread
     {
         pid_t m_pid;
         pid_t m_tid;
+        std::weak_ptr<IProcess> m_proc;
     public:
-        CPosixThread(pid_t pid, pid_t tid)
-            : m_pid(pid), m_tid(tid)
+        CPosixThread(pid_t pid, pid_t tid, std::weak_ptr<IProcess> proc)
+            : m_pid(pid), m_tid(tid), m_proc(proc)
         {}
 
         int GetInfo(ThreadInfo& info) const override
@@ -252,11 +275,34 @@ namespace oui
             return 0;
         }
 
-        int CaptureStack(int /*framesCount*/, std::vector<orthia::Address_type>& tstack) const override
+        int CaptureStack(int framesCount, std::vector<orthia::Address_type>& tstack) const override
         {
-            // Stack capture requires ptrace — deferred for first iteration
             tstack.clear();
-            return ENOTSUP;
+            auto proc = m_proc.lock();
+            if (!proc)
+                return ESRCH;
+            // the x86 emulator walks the stack, and its 32-bit walk needs EBP, which the file doesn't give
+            if (proc->GetDianaArch() != DIANA_ARCH_X86 || proc->GetDianaMode() != DIANA_MODE64)
+                return ENOTSUP;
+
+            ThreadSyscallState state;
+            if (int error = ReadThreadSyscallState(m_pid, m_tid, state))
+                return error;
+            if (state.running)
+                return EBUSY;
+
+            // the 64-bit walk needs only rip and rsp; the selectors are the user ones of x86-64 Linux
+            Diana_Processor_Registers_Context context;
+            memset(&context, 0, sizeof(context));
+            context.reg_RIP.value = state.pc;
+            context.reg_RSP.value = state.sp;
+            context.reg_CS.value = 0x33;
+            context.reg_SS.value = context.reg_DS.value = context.reg_ES.value = 0x2b;
+
+            orthia::ProcessReaderAdapter memReader(proc.get());
+            const long pageSize = sysconf(_SC_PAGESIZE);
+            return orthia::QueryThreadCallStack(&memReader, DIANA_MODE64, pageSize > 0 ? (unsigned int)pageSize : 0x1000,
+                &context, framesCount, &tstack);
         }
     };
 
@@ -267,10 +313,11 @@ namespace oui
     class CPosixThreadEnumerator : public IThreadEnumerator, Noncopyable
     {
         pid_t m_pid;
+        std::weak_ptr<IProcess> m_proc;
         DIR*  m_dir = nullptr;
     public:
-        CPosixThreadEnumerator(pid_t pid)
-            : m_pid(pid)
+        CPosixThreadEnumerator(pid_t pid, std::weak_ptr<IProcess> proc)
+            : m_pid(pid), m_proc(proc)
         {
             char path[64];
             snprintf(path, sizeof(path), "/proc/%d/task", (int)pid);
@@ -297,7 +344,7 @@ namespace oui
                     continue;
 
                 pid_t tid = (pid_t)atoi(entry->d_name);
-                return { 0, std::make_shared<CPosixThread>(m_pid, tid) };
+                return { 0, std::make_shared<CPosixThread>(m_pid, tid, m_proc) };
             }
         }
     };
@@ -571,7 +618,7 @@ namespace oui
 
         std::tuple<int, std::shared_ptr<IThreadEnumerator>> CreateThreadEnumerator() override
         {
-            auto enumerator = std::make_shared<CPosixThreadEnumerator>(m_pid);
+            auto enumerator = std::make_shared<CPosixThreadEnumerator>(m_pid, shared_from_this());
             std::shared_ptr<IThreadEnumerator> result = enumerator;
             return { 0, result };
         }

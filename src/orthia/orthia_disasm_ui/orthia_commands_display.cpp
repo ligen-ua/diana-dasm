@@ -83,8 +83,13 @@ void CCommandProcessor::Handle_threads(CommandArguments& args)
         args.ReplyLine(line);
 
         stack.clear();
-        thread->CaptureStack(20, stack);
+        const int stackError = thread->CaptureStack(20, stack);
         line = ORTHIA_TCSTR("Stack:");
+        if (stackError && stack.empty())
+        {
+            // ENOTSUP / ERROR_NOT_SUPPORTED for an architecture without a walker, EBUSY for a running Linux thread
+            line += ORTHIA_TCSTR(" not available, code: ") + orthia::ObjectToString(stackError);
+        }
         args.ReplyLine(line);
 
         for (auto& address: stack)

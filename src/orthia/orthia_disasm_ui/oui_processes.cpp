@@ -1,7 +1,48 @@
 #include "oui_processes.h"
+#include <cstdlib>
+#include <sstream>
 
 namespace oui
 {
+    bool ParseThreadSyscallLine(const std::string& line, ThreadSyscallState& state)
+    {
+        state = ThreadSyscallState();
+        std::istringstream stream(line);
+        std::vector<std::string> fields;
+        for (std::string field; stream >> field;)
+        {
+            fields.push_back(field);
+        }
+        if (fields.size() == 1 && fields[0] == "running")
+        {
+            state.running = true;
+            return true;
+        }
+        // the number, then the 6 arguments in a syscall; sp and pc are always the last two
+        if (fields.size() != 3 && fields.size() != 9)
+        {
+            return false;
+        }
+        if (fields.size() == 3 && fields[0] != "-1")
+        {
+            return false;
+        }
+        unsigned long long values[2] = {};
+        for (int i = 0; i < 2; ++i)
+        {
+            const std::string& text = fields[fields.size() - 2 + i];
+            char* end = nullptr;
+            values[i] = std::strtoull(text.c_str(), &end, 16);
+            if (text.compare(0, 2, "0x") != 0 || !end || *end)
+            {
+                return false;
+            }
+        }
+        state.sp = values[0];
+        state.pc = values[1];
+        return true;
+    }
+
     const int g_threadsCount = 1;
     CProcessSystem::CProcessSystem()
     {

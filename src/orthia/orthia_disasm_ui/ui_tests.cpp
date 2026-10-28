@@ -1418,6 +1418,30 @@ TEST(Sha256, KnownValues)
     EXPECT_EQ("cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0", sha.FinishHex());
 }
 
+TEST(Processes, ParseThreadSyscallLine)
+{
+    oui::ThreadSyscallState state;
+    // in a syscall (read on x86-64)
+    ASSERT_TRUE(oui::ParseThreadSyscallLine(
+        "0 0x3 0x7ffd5e2b1a40 0x2000 0x0 0x0 0x0 0x7ffd5e2b19f8 0x7f3c1a2b4e2d\n", state));
+    EXPECT_FALSE(state.running);
+    EXPECT_EQ(0x7ffd5e2b19f8ULL, state.sp);
+    EXPECT_EQ(0x7f3c1a2b4e2dULL, state.pc);
+    // blocked outside a syscall
+    ASSERT_TRUE(oui::ParseThreadSyscallLine("-1 0x7ffd00001000 0x401000\n", state));
+    EXPECT_FALSE(state.running);
+    EXPECT_EQ(0x7ffd00001000ULL, state.sp);
+    EXPECT_EQ(0x401000ULL, state.pc);
+    // on a CPU
+    ASSERT_TRUE(oui::ParseThreadSyscallLine("running\n", state));
+    EXPECT_TRUE(state.running);
+
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("", state));
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("5 0x1 0x2", state));
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("-1 0x1 zz", state));
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("-1 12 0x2", state));
+}
+
 // the bytes are saved when a region is found; the folder that holds them stays when the process is gone
 TEST(FloatingCode, Snapshot)
 {

@@ -549,15 +549,7 @@ namespace oui
             orthia::ProcessReaderAdapter memReader(proc.get());
             SYSTEM_INFO sysInfo;
             GetSystemInfo(&sysInfo);
-            orthia::CMemoryStorageOfModifiedData writeCache(&memReader, sysInfo.dwPageSize);
-            writeCache.SetCacheReads(true);
-
-            orthia::CProcessor processor(&writeCache, mode, 0);
-            processor.Init();
-            DI_CHECK(DianaProcessor_InitContext(processor.GetSelf(), &dianaContext));
-
-            processor.QueryCallStack(&tstack, framesCount);
-            return 0;
+            return orthia::QueryThreadCallStack(&memReader, mode, sysInfo.dwPageSize, &dianaContext, framesCount, &tstack);
         }
         HANDLE GetHandle()
         {

@@ -223,5 +223,23 @@ int Exec(orthia::IMemoryReader * pMemoryReader,
     return result;
 }
 
+int QueryThreadCallStack(orthia::IMemoryReader * pMemoryReader,
+                         int mode,
+                         unsigned int pageSize,
+                         const Diana_Processor_Registers_Context * pContext,
+                         int framesCount,
+                         std::vector<OPERAND_SIZE> * pCallStack)
+{
+    pCallStack->clear();
+    CMemoryStorageOfModifiedData readCache(pMemoryReader, pageSize);
+    readCache.SetCacheReads(true);
+
+    CProcessor proc(&readCache, mode, 0);
+    proc.Init();
+    DI_CHECK(DianaProcessor_InitContext(proc.GetSelf(), pContext));
+
+    proc.QueryCallStack(pCallStack, framesCount);
+    return 0;
+}
 
 }
