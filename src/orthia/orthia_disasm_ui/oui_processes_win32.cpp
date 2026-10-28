@@ -13,6 +13,7 @@
 #include "orthia_plugins_win32.h"
 #include "orthia_exec.h"
 #include "orthia_diana_arch.h"
+#include "orthia_stack_walk.h"
 
 extern "C"
 {
@@ -501,6 +502,25 @@ namespace oui
             {
                 return ERROR_INVALID_FUNCTION;
             }
+#if defined(_M_ARM64)
+            if (proc->GetDianaArch() == DIANA_ARCH_AARCH64)
+            {
+                // the Windows ARM64 ABI keeps x29 pointing at the frame record chain
+                CONTEXT context;
+                context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+                if (!GetThreadContext(m_handleGuard.Get(), &context))
+                {
+                    return GetLastError();
+                }
+                orthia::Arm64ThreadRegisters registers;
+                registers.pc = context.Pc;
+                registers.sp = context.Sp;
+                registers.fp = context.Fp;
+                registers.lr = context.Lr;
+                registers.hasFrameRegisters = true;
+                return orthia::WalkArm64Stack(*proc, registers, framesCount, tstack);
+            }
+#endif
             // the stack is walked by the x86 emulator from the thread's registers
             if (proc->GetDianaArch() != DIANA_ARCH_X86)
             {

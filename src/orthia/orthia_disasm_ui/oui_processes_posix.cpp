@@ -9,6 +9,7 @@
 #include "formats/orthia_image_format.h"
 #include "orthia_diana_arch.h"
 #include "orthia_exec.h"
+#include "orthia_stack_walk.h"
 
 extern "C"
 {
@@ -281,8 +282,11 @@ namespace oui
             auto proc = m_proc.lock();
             if (!proc)
                 return ESRCH;
-            // the x86 emulator walks the stack, and its 32-bit walk needs EBP, which the file doesn't give
-            if (proc->GetDianaArch() != DIANA_ARCH_X86 || proc->GetDianaMode() != DIANA_MODE64)
+            // x86-64: the x86 emulator walks the stack; its 32-bit walk needs EBP, which the file doesn't give.
+            // AArch64: the frame record chain
+            const bool isAarch64 = proc->GetDianaArch() == DIANA_ARCH_AARCH64;
+            const bool isX64 = proc->GetDianaArch() == DIANA_ARCH_X86 && proc->GetDianaMode() == DIANA_MODE64;
+            if (!isAarch64 && !isX64)
                 return ENOTSUP;
 
             ThreadSyscallState state;
@@ -290,6 +294,14 @@ namespace oui
                 return error;
             if (state.running)
                 return EBUSY;
+
+            if (isAarch64)
+            {
+                orthia::Arm64ThreadRegisters registers;
+                registers.pc = state.pc;
+                registers.sp = state.sp;
+                return orthia::WalkArm64Stack(*proc, registers, framesCount, tstack);
+            }
 
             // the 64-bit walk needs only rip and rsp; the selectors are the user ones of x86-64 Linux
             Diana_Processor_Registers_Context context;

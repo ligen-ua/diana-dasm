@@ -36,6 +36,7 @@ set(SOURCES
     formats/orthia_format_elf.cpp
     orthia_module_analyzer.cpp
     orthia_process_adapter.cpp
+    orthia_stack_walk.cpp
     oui_disasm_colors.cpp
     oui_goto_dialog.cpp
     oui_shellcode_dialog.cpp

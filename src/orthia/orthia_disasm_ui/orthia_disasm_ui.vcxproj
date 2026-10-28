@@ -314,6 +314,7 @@
     <ClCompile Include="orthia_module_names.cpp" />
     <ClCompile Include="orthia_module_symbols.cpp" />
     <ClCompile Include="orthia_process_adapter.cpp" />
+    <ClCompile Include="orthia_stack_walk.cpp" />
     <ClCompile Include="oui_disasm_colors.cpp" />
     <ClCompile Include="oui_goto_dialog.cpp" />
     <ClCompile Include="oui_shellcode_dialog.cpp" />
@@ -363,6 +364,7 @@
     <ClInclude Include="orthia_module_analyzer.h" />
     <ClInclude Include="orthia_module_names.h" />
     <ClInclude Include="orthia_process_adapter.h" />
+    <ClInclude Include="orthia_stack_walk.h" />
     <ClInclude Include="orthia_version.h" />
     <ClInclude Include="oui_disasm_colors.h" />
     <ClInclude Include="oui_goto_dialog.h" />

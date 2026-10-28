@@ -16,6 +16,7 @@
 #include "ui_tests_fakes.h"
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
+#include "orthia_stack_walk.h"
 extern "C"
 {
 #include "diana_core.h"
@@ -1440,6 +1441,134 @@ TEST(Processes, ParseThreadSyscallLine)
     EXPECT_FALSE(oui::ParseThreadSyscallLine("5 0x1 0x2", state));
     EXPECT_FALSE(oui::ParseThreadSyscallLine("-1 0x1 zz", state));
     EXPECT_FALSE(oui::ParseThreadSyscallLine("-1 12 0x2", state));
+}
+
+namespace
+{
+    void PutUInt32(std::vector<char>& data, size_t offset, unsigned int value)
+    {
+        for (int i = 0; i < 4; ++i)
+            data[offset + i] = (char)(value >> (8 * i));
+    }
+    void PutUInt64(std::vector<char>& data, size_t offset, unsigned long long value)
+    {
+        for (int i = 0; i < 8; ++i)
+            data[offset + i] = (char)(value >> (8 * i));
+    }
+
+    const orthia::Address_type c_code = 0x10000;
+    const orthia::Address_type c_stack = 0x7000000;
+
+    // code with calls (the return addresses are after them) and a stack with a chain of three frame records
+    orthia_tests::CFakeProcess MakeArm64Process()
+    {
+        orthia_tests::CFakeProcess process;
+        process.dianaArch = DIANA_ARCH_AARCH64;
+
+        orthia_tests::CFakeProcess::Region code;
+        code.base = c_code;
+        code.data.resize(0x1000);
+        for (size_t offset = 0; offset < code.data.size(); offset += 4)
+            PutUInt32(code.data, offset, 0xD503201F);      // nop
+        PutUInt32(code.data, 0x100, 0x94000010);           // bl
+        PutUInt32(code.data, 0x200, 0xD63F0100);           // blr x8
+        PutUInt32(code.data, 0x300, 0xD63F091F);           // blraaz x8
+        PutUInt32(code.data, 0x400, 0x97FFFFF0);           // bl (back)
+        code.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_exec;
+        process.regions.push_back(code);
+
+        orthia_tests::CFakeProcess::Region stack;
+        stack.base = c_stack;
+        stack.data.resize(0x2000);
+        stack.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write;
+        // a stale return address below the chain, with a "frame pointer" to nothing
+        PutUInt64(stack.data, 0x110, c_stack + 0x150);
+        PutUInt64(stack.data, 0x118, c_code + 0x204);
+        // the chain; the first return address is signed (a pointer authentication code in the high bits)
+        PutUInt64(stack.data, 0x200, c_stack + 0x400);
+        PutUInt64(stack.data, 0x208, 0x0023000000000000ull | (c_code + 0x104));
+        PutUInt64(stack.data, 0x400, c_stack + 0x800);
+        PutUInt64(stack.data, 0x408, c_code + 0x204);
+        PutUInt64(stack.data, 0x800, 0);
+        PutUInt64(stack.data, 0x808, c_code + 0x304);
+        process.regions.push_back(stack);
+        return process;
+    }
+}
+
+TEST(StackWalk, Arm64ReturnAddresses)
+{
+    auto process = MakeArm64Process();
+    EXPECT_TRUE(orthia::IsArm64ReturnAddress(process, c_code + 0x104));
+    EXPECT_TRUE(orthia::IsArm64ReturnAddress(process, c_code + 0x204));
+    EXPECT_TRUE(orthia::IsArm64ReturnAddress(process, c_code + 0x304));
+    // after a nop, not aligned, in memory that isn't executable, in no memory
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, c_code + 0x108));
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, c_code + 0x106));
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, c_stack + 0x20c));
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, 0x500000));
+    EXPECT_EQ(c_code + 0x104, orthia::StripArm64PointerAuth(0x0023000000000000ull | (c_code + 0x104)));
+}
+
+TEST(StackWalk, Arm64FrameRecords)
+{
+    auto process = MakeArm64Process();
+    const std::vector<orthia::Address_type> chain = { c_code + 0x104, c_code + 0x204, c_code + 0x304 };
+    std::vector<orthia::Address_type> stack;
+
+    // Windows, in a leaf function: lr first, then the chain from x29
+    orthia::Arm64ThreadRegisters registers;
+    registers.pc = c_code + 0xC00;
+    registers.sp = c_stack + 0x100;
+    registers.fp = c_stack + 0x200;
+    registers.lr = c_code + 0x404;
+    registers.hasFrameRegisters = true;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, stack));
+    std::vector<orthia::Address_type> expected = { c_code + 0x404 };
+    expected.insert(expected.end(), chain.begin(), chain.end());
+    EXPECT_EQ(expected, stack);
+
+    // a function that called something already: lr is a return into itself
+    registers.pc = c_code + 0x410;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, stack));
+    EXPECT_EQ(chain, stack);
+
+    // lr that the first record holds too: once
+    registers.pc = c_code + 0xC00;
+    registers.lr = c_code + 0x104;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, stack));
+    EXPECT_EQ(chain, stack);
+
+    // Linux: sp and pc only, the first record is searched; the stale one below it has no chain
+    orthia::Arm64ThreadRegisters noFrame;
+    noFrame.pc = c_code + 0x800;
+    noFrame.sp = c_stack + 0x100;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, noFrame, 20, stack));
+    EXPECT_EQ(chain, stack);
+
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, noFrame, 2, stack));
+    EXPECT_EQ(std::vector<orthia::Address_type>(chain.begin(), chain.begin() + 2), stack);
+
+    // sp in no memory
+    noFrame.sp = 0x500000;
+    EXPECT_NE(0, orthia::WalkArm64Stack(process, noFrame, 20, stack));
+    EXPECT_TRUE(stack.empty());
+}
+
+TEST(StackWalk, Arm64ChainGoesUp)
+{
+    auto process = MakeArm64Process();
+    // the second record points back down: the walk stops after it
+    auto& stack = process.regions[1].data;
+    PutUInt64(stack, 0x400, c_stack + 0x200);
+    orthia::Arm64ThreadRegisters registers;
+    registers.pc = c_code + 0x800;
+    registers.sp = c_stack + 0x100;
+    registers.fp = c_stack + 0x200;
+    registers.hasFrameRegisters = true;
+    std::vector<orthia::Address_type> result;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, result));
+    EXPECT_EQ(std::vector<orthia::Address_type>({ c_code + 0x104, c_code + 0x204 }), result);
 }
 
 // the bytes are saved when a region is found; the folder that holds them stays when the process is gone

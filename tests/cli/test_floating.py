@@ -172,8 +172,8 @@ def test_lm_has_no_verbose_option(orthia, helper):
 def test_threads_stack(orthia, helper):
     """The main thread waits in a read of stdin: its stack goes from the C library into the helper.
     Linux takes the registers of a blocked thread from /proc/<pid>/task/<tid>/syscall"""
-    if platform.machine().lower() not in ("amd64", "x86_64") or helper.bits != 64:
-        pytest.skip("the stack walk is x86-64 only on Linux and on ARM64 Windows")
+    if platform.machine().lower() not in ("amd64", "x86_64", "arm64", "aarch64") or helper.bits != 64:
+        pytest.skip("the stack walk is x86-64 and AArch64 only")
     res = orthia.run("threads", pid=helper.pid).assert_ok()
     # the first thread is the main one
     stack = res.stdout.split("Stack:", 1)[1].split("\n\n", 1)[0]
