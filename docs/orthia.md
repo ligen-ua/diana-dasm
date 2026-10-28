@@ -93,7 +93,7 @@ Problems setting up the sandbox are reported as warnings only when Orthia runs e
 ## Command line
 
 ```
-orthia [--file <filename>]... [--pid <pid>]... [--proc-folder <folder|pid>]... [--cmd <command>]... [--analyze] [--overwrite-db] [--no-sandbox]
+orthia [--file <filename>]... [--pid <pid>]... [--proc-folder <folder|pid>]... [--cmd <command>]... [--analyze] [--capture] [--overwrite-db] [--no-sandbox]
 orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <command>...
 ```
 

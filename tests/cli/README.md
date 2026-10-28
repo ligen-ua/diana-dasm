@@ -18,7 +18,7 @@ python -m pytest tests/cli --orthia path/to/orthia   # a specific binary (or set
 
 Without `--orthia`, the binary is looked up in `bin/Release/amd64/orthia.exe`, then in `cmake-release/…/orthia`.
 `run_tests.cmd` and `cmake-test.sh` run this suite after the C++ tests when pytest is installed.
-The suite also runs the gtests built into the binary (`orthia --run-tests`, from `ui_tests.cpp`), which no other runner starts.
+The suite also runs the gtests built into the binary (`orthia --run-tests`, from `ui_tests*.cpp`), which no other runner starts.
 
 ## Isolation
 
