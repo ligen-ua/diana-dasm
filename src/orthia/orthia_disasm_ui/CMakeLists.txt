@@ -57,6 +57,7 @@ set(SOURCES
     ui_tests_saved_process.cpp
     ui_tests_capture.cpp
     ui_tests_memory_changes.cpp
+    ui_tests_references.cpp
     ui_workspace_window.cpp
 )
 

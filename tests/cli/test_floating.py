@@ -139,6 +139,13 @@ def test_lmf_verbose_lists_referrers(orthia, helper):
     res.assert_line(rf"^  {stub}!\S+\s+-> {handler}!\$entry_0001\s+RWX private")
 
 
+def test_xr_lists_the_hook(orthia, helper):
+    # the hooked function of the helper leads to the stub: a jump (ARM64: a branch through a register)
+    res = orthia.run(f".analyze {HELPER_NAME}", f"xr {helper.stub:x}", pid=helper.pid).assert_ok()
+    target = re.escape(helper.address_text(helper.target))
+    res.assert_line(rf"^{target}\s+(code|addr)\s+{HELPER_NAME}(\.exe)?[+!]")
+
+
 def test_import_slot_hook(orthia, helper):
     if not helper.slot:
         pytest.skip("the helper found no import slot to hook")

@@ -57,6 +57,7 @@ protected:
     void ReportStop(CommandArguments& args);
     void Handle_u(CommandArguments& args);
     void Handle_x(CommandArguments& args);
+    void Handle_xr(CommandArguments& args);
     void Handle_d(CommandArguments& args, int itemSize, bool dps = false);
     // floating: lmf, the floating modules; lm: the others
     void Handle_lm(CommandArguments& args, bool floating);

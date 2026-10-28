@@ -243,7 +243,6 @@ namespace orthia
                 return;
             }
             auto reader = item->CreateMemoryReader();
-            auto db = moduleManager->QueryDatabaseManager()->GetClassicDatabase();
 
             if (op->IsCancelled())
             {
@@ -274,13 +273,13 @@ namespace orthia
                         WriteLog(oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("reloading-module")), mainIt->name));
                         if (reader)
                         {
-                            if (db->IsModuleExists(mainIt->address))
+                            // the calls and jumps saved by the modules analyzed before lead into it too;
+                            // the ones saved later count at the next .analyze /f
+                            const size_t incoming = moduleManager->AnalyzeModuleWithIncoming(mainIt->address, reader.get(), mainIt->name, 0);
+                            if (incoming)
                             {
-                                moduleManager->AnalyzeRegisteredModule(mainIt->address, reader.get(), mainIt->name, 0);
-                            }
-                            else
-                            {
-                                moduleManager->ReloadModule(mainIt->address, reader.get(), false, mainIt->name, 0);
+                                WriteLog(oui::PassParameter2(node->QueryValue(ORTHIA_TCSTR("incoming-entries")), mainIt->name,
+                                    oui::String(Utf8ToPlatformString(std::to_string(incoming)))));
                             }
                             item->UpdateModuleFlags(mainIt->address, ModuleInfo::flags_analyzeDone, 0);
                             // the analysis rewrites the names of the module and of its dependencies

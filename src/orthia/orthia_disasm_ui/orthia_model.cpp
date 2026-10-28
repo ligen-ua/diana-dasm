@@ -895,7 +895,7 @@ namespace orthia
                 if (needsAnalysis)
                 {
                     // opened before without --analyze
-                    info->moduleManager->AnalyzeRegisteredModule(imageBase, &reader, info->shortName.native, 0);
+                    info->moduleManager->AnalyzeModuleWithIncoming(imageBase, &reader, info->shortName.native, 0);
                     info->UpdateModuleFlags(imageBase, ModuleInfo::flags_analyzeDone, 0);
                 }
             }

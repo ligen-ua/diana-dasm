@@ -150,6 +150,47 @@ void CModuleManager::ReloadModuleWithHints(Address_type offset,
     fileSaver.SaveWithDedup(module, *dbManager, name);
 }
 
+size_t CModuleManager::AnalyzeModuleWithIncoming(Address_type offset,
+                                                 IMemoryReader * pMemoryReader,
+                                                 const orthia::PlatformString_type & name,
+                                                 int analyserFlags)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    CDianaModule module;
+    module.Init(offset, pMemoryReader);
+
+    auto dbManager = QueryDatabaseManager();
+    auto classicDatabase = dbManager->GetClassicDatabase();
+    std::vector<Address_type> hints;
+    // TODO: AArch32 external targets lose bit 0 in diana_core (SaveNewExternalRoute gets the
+    // address without it), so a T32 target would be analyzed as A32
+    if (!IsDianaArchArm32(module.GetDianaArch()))
+    {
+        classicDatabase->QueryIncomingCodeTargets(offset, module.GetModuleSize(), hints);
+    }
+    if (hints.empty())
+    {
+        module.Analyze(analyserFlags);
+    }
+    else
+    {
+        module.AnalyzeWithHints(analyserFlags, hints);
+    }
+
+    CDatabaseSaver fileSaver;
+    if (classicDatabase->IsModuleExists(offset))
+    {
+        // the module row stays: tbl_metainfo (exports, symbols, flags) is ON DELETE CASCADE from it
+        fileSaver.SaveWithDedup(module, *dbManager, name);
+    }
+    else
+    {
+        fileSaver.Save(module, *dbManager, name, true);
+    }
+    return hints.size();
+}
+
 void CModuleManager::RegisterRange(Address_type offset,
                                    Address_type size,
                                    const orthia::PlatformString_type & name)

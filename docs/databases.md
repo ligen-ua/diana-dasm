@@ -146,7 +146,7 @@ It is rewritten when the embedded copy differs.
 
 ### Versioning
 
-`tbl_version` holds one row per schema version applied; the current version is **4**.
+`tbl_version` holds one row per schema version applied; the current version is **5**.
 An older database is migrated step by step inside one transaction the first time it is opened.
 A database from a newer Orthia fails to open with `Unknown database version`.
 
@@ -156,6 +156,7 @@ A database from a newer Orthia fails to open with `Unknown database version`.
 | 1 to 2 | `tbl_metainfo` and `tbl_comments` |
 | 2 to 3 | addresses in `tbl_references` encoded for unsigned ordering, index `idx_ref_to` |
 | 3 to 4 | the same encoding for `tbl_metainfo.meta_address`, index `idx_metainfo_type_addr` |
+| 4 to 5 | `tbl_references.ref_kind`: what a reference does with its target; older rows are 0 (unknown) |
 
 ### Address encoding
 
@@ -171,7 +172,7 @@ When you query the database by hand, apply the XOR to the encoded columns.
 |---|---|---|
 | `tbl_modules` | `mod_address` (primary key), `mod_size`, `mod_name` | every module in the target's address space: the opened file and its dependencies |
 | `tbl_metainfo` | `meta_mod_id` (foreign key to `tbl_modules`, cascade delete), `meta_address`, `meta_type`, `meta_info` | per-module records, see below |
-| `tbl_references` | `ref_address_from`, `ref_address_to` | cross-references found by the code analysis |
+| `tbl_references` | `ref_address_from`, `ref_address_to`, `ref_kind` | cross-references found by the code analysis, kept by the module they are made from: clearing or unloading a module removes the rows whose `ref_address_from` is inside it. `ref_kind`: 1 a call or a jump, 2 an address taken (`lea`, an immediate, `ADR`), 3 data read or written, 0 unknown (saved before version 5) |
 | `tbl_comments` | `com_address` (primary key), `com_text` | user comments (`;` in the disassembly view) |
 | `tbl_vm_vms`, `tbl_vm_modules` | | emulator state of the WinDbg plugin; unused by the disassembler |
 

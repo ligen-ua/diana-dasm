@@ -2,7 +2,7 @@
 
 // Floating code: executable memory of a process that no loaded module owns (hooks, injected
 // code, JIT stubs). The analysis of a module records the jumps, calls and taken addresses that
-// leave it (tbl_references); the ones that land in such memory make a floating module per OS
+// leave it (tbl_references; data reads and writes don't count); the ones that land in such memory make a floating module per OS
 // allocation, "fl_<allocation base>". A floating module is raw code analyzed from its entry
 // points, and is saved in the process database (metainfo g_database_type_floatingRegion).
 
@@ -20,6 +20,7 @@ namespace orthia
     {
         Address_type address = 0;
         std::vector<Address_type> referrers;    // the instructions that lead here, sorted
+        std::vector<int> referrerKinds;         // ReferenceKind of each referrer, in the same order
         // the import slots and export entries that lead here, by slot; value unused
         std::vector<PointerSlotInfo> slots;
     };
@@ -48,8 +49,10 @@ namespace orthia
 
         Address_type GetLastAddress() const { return allocationBase + allocationSize - 1; }
         bool HasEntry(Address_type address) const;
-        // adds the entry and the referrer; true when either is new, *pNewEntry when the entry is
-        bool AddReference(Address_type entry, Address_type referrer, bool* pNewEntry = nullptr);
+        // adds the entry and the referrer; true when either is new or the referrer's kind got known,
+        // *pNewEntry when the entry is
+        bool AddReference(Address_type entry, Address_type referrer, bool* pNewEntry = nullptr,
+            int kind = reference_unknown);
         // the same for a slot that holds entry; true also when the slot's name changed
         bool AddSlot(Address_type entry, const PointerSlotInfo& slot, bool* pNewEntry = nullptr);
     };

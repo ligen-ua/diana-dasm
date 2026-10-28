@@ -350,4 +350,83 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize, bool dps)
     vmPrinter.Finish();
 }
 
+// xr [/a] <address> [L<length>]: the references to an address, or to each address of a range that
+// has any (as !x and !xr of the WinDbg extension). A line per referrer: its address, the kind
+// (code, addr: the address taken, data: read or written, ?: saved before the kinds were) and its name
+void CCommandProcessor::Handle_xr(CommandArguments& args)
+{
+    const Address_type maxLength = 0x10000000;
+    auto rawArgs = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
+    orthia::TrimStringAllWhiteSpace(rawArgs);
+
+    bool addressesOnly = false;
+    if (rawArgs.compare(0, 2, "/a") == 0 && (rawArgs.size() == 2 || rawArgs[2] == ' ' || rawArgs[2] == '\t'))
+    {
+        addressesOnly = true;
+        rawArgs.erase(0, 2);
+        orthia::TrimStringAllWhiteSpace(rawArgs);
+    }
+    if (rawArgs.empty() || rawArgs[0] == '/')
+    {
+        throw std::runtime_error("Usage: xr [/a] <address> [L<length>]");
+    }
+    auto resolver = std::make_shared<oui::NameResolverOverWorkplaceItem>(args.item);
+    const auto range = orthia::CaptureAddressRangeExp(orthia::Utf8ToPlatformString(rawArgs), resolver);
+    auto moduleManager = args.item->GetModuleManager();
+    if (!moduleManager)
+    {
+        throw std::runtime_error("No database");
+    }
+    const int mode = args.item->GetDianaMode();
+
+    auto formatReferrer = [&](const orthia::CommonReferenceInfo& ref, const orthia::PlatformString_type& indent) {
+        orthia::PlatformString_type line = indent + orthia::AddressToString(ref.address, mode);
+        if (!addressesOnly)
+        {
+            orthia::PlatformString_type kind = orthia::Utf8ToPlatformString(orthia::GetReferenceKindName(ref.kind));
+            kind.resize(4, ORTHIA_TCHAR(' '));
+            line += ORTHIA_TCSTR("  ") + kind + ORTHIA_TCSTR("  ") + orthia::QueryAddressNameDef(args.item.get(), ref.address, mode).native;
+        }
+        return line;
+    };
+
+    if (!range.length)
+    {
+        std::vector<orthia::CommonReferenceInfo> refs;
+        moduleManager->QueryReferencesToInstruction(range.address, &refs);
+        for (const auto& ref : refs)
+        {
+            args.ReplyLine(formatReferrer(ref, orthia::PlatformString_type()));
+        }
+        return;
+    }
+    if (!*range.length)
+    {
+        return;
+    }
+    if (*range.length > maxLength)
+    {
+        throw std::runtime_error("Length is too big");
+    }
+    std::vector<orthia::CommonRangeInfo> targets;
+    moduleManager->QueryReferencesToInstructionsRange(range.address, range.address + *range.length - 1, &targets);
+    for (const auto& target : targets)
+    {
+        orthia::PlatformString_type line = orthia::AddressToString(target.address, mode);
+        if (!addressesOnly)
+        {
+            const auto name = args.item->QueryAddressName(target.address).name.native;
+            if (!name.empty())
+            {
+                line += ORTHIA_TCSTR("  ") + name;
+            }
+        }
+        args.ReplyLine(line + ORTHIA_TCSTR(":"));
+        for (const auto& ref : target.references)
+        {
+            args.ReplyLine(formatReferrer(ref, ORTHIA_TCSTR("  ")));
+        }
+    }
+}
+
 }

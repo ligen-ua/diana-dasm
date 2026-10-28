@@ -337,6 +337,7 @@
     <ClCompile Include="ui_tests_saved_process.cpp" />
     <ClCompile Include="ui_tests_capture.cpp" />
     <ClCompile Include="ui_tests_memory_changes.cpp" />
+    <ClCompile Include="ui_tests_references.cpp" />
     <ClCompile Include="ui_workspace_window.cpp" />
   </ItemGroup>
   <ItemGroup>

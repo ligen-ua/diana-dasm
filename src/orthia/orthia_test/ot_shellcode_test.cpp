@@ -125,7 +125,8 @@ static RangeAnalysis AnalyzeRange(DI_UINT64 base, const std::vector<char>& code,
         it.QueryRefsToCurrentInstuction(&refs);
         for (auto& ref : refs)
         {
-            result.calls.insert({ ref.address, offset });
+            // the referrer is absolute, the instruction offset relative
+            result.calls.insert({ ref.address - base, offset });
         }
     }
     return result;

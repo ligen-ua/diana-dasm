@@ -164,6 +164,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | Command | Description |
 |---|---|
 | `x [/a\|/n] [/v] <mask>` | Examine symbols, e.g. `x nt!Ke*`; without `!`, the main module is searched. `/a` sorts by address, `/n` by name (default: by type), `/v` shows the symbol type |
+| `xr [/a] <address> [L<length>]` | List the references to an address: each referrer with its kind (`code`: a call or a jump, `addr`: the address taken, `data`: read or written, `?`: saved by an older version) and its name. With `L<length>`, every address of the range that has references, with its referrers under it. `/a` prints the addresses only. References from other modules count, once the analysis of those modules saved them |
 | `u <address> [L<count>]` | Disassemble `<count>` instructions |
 | `lm` | List modules with their status: `.NET`, `unresolved`, `linked`, `stale`, `unlinked`, `analyzed`, `symbols` (see [Dependencies in file mode](#dependencies-in-file-mode)). `.NET` marks a managed image: an IL-only one has no native entry point and almost no native code |
 | `lmf [/v]` | List the floating modules of a process: executable memory no module owns that the analysis led to, with protection, entry points and status (`pending`, `analyzed`, `stale`). `/v` adds what leads to each entry point; see [Floating code](#floating-code) |
@@ -173,7 +174,7 @@ The commands follow WinDbg syntax. Type them in the UI's command window, or pass
 | `sections [-v] <module\|address>` | List the sections of a module: name, address, size and `RWX` flags; `-v` adds every header field (see [Sections](#sections)) |
 | `.reload [<module>]` | Reload symbols for a module |
 | `.capture` | Save the memory of the process into its folder: the memory map, every committed readable region, the threads with their stacks (see [Capture](#capture-deep-mode)) |
-| `.analyze [/f] <module\|mask>` | Run the full analysis of a module, then find the floating code it leads to (processes). A mask (`k*`, `*`) queues every module `lm` lists that matches. `/f` analyzes an analyzed module again, and checks a stale floating module against the memory again |
+| `.analyze [/f] <module\|mask>` | Run the full analysis of a module, then find the floating code it leads to (processes). Besides its own entry points, the analysis starts from the calls and jumps that the modules analyzed before saved into it; those saved later count at the next `.analyze /f`. A mask (`k*`, `*`) queues every module `lm` lists that matches. `/f` analyzes an analyzed module again, and checks a stale floating module against the memory again |
 | `.symfix [<path>]` | Set the symbols directory |
 | `.database list` | List the databases in the data folder; needs no open target (see [databases.md](databases.md#managing-databases)) |
 | `.database delete <sel>...` | Delete databases, selected by a SHA-1 prefix, a pid or a file name; an open one is refused |
@@ -185,7 +186,7 @@ In the UI, press CTRL+C in the command edit box to stop a running command.
 
 ### Expressions
 
-The address of `u` and of the `db`/`dw`/`dd`/`dq`/`dp`/`dps` commands is an expression, not just a number.
+The address of `u`, `xr` and of the `db`/`dw`/`dd`/`dq`/`dp`/`dps` commands is an expression, not just a number.
 The same expressions work in the UI's *Go to address* dialog (G).
 The other commands take plain names or masks: `x` takes a symbol mask, `modinfo`, `.reload` and `.analyze` take a module name (`.analyze` also takes `/f` and a mask).
 `sections` takes a module name or an expression, and lists the module that contains the address.
@@ -282,11 +283,14 @@ Entry points and targets:
   the PLT ones; an ELF export whose symbol value was rewritten neither.
 - [ ] A slot that leads into memory that is not executable, or into another module than the one it imports from
   (a hook through a DLL loaded for it), is not reported.
-- [ ] Store the reference kind in `tbl_references` (call, jump, taken address, data access); a schema step. The
-  database has no kind, so discovery takes every reference that leaves a module, and filters by executable
-  memory only. In a 32-bit process an `imm32` constant that falls into such an allocation adds an entry point
-  (`push 6A0004h`); the CLI tests allow more than one entry there for that reason.
-- [ ] Mark how each entry was reached (call, jump, taken address) in `modinfo` and `lmf /v`, once the kind is stored.
+- [x] Store the reference kind in `tbl_references` (code, taken address, data access); discovery skips data reads
+  and writes.
+- [ ] An immediate the analysis takes for an address is a taken address too: in a 32-bit process an `imm32`
+  constant that falls into an executable allocation still adds an entry point (`push 6A0004h`); the CLI tests
+  allow more than one entry there for that reason. A kind of its own for immediates would let discovery tell them apart.
+- [ ] x64 `lea reg, [rip+X]` with X outside the module is not saved at all (diana_core `SaveNewRoute` drops a
+  target past the module before the observer is asked), so a taken address of floating code by `lea` is missed.
+- [x] Mark how each entry was reached (code, address taken) in `modinfo` and `lmf /v`.
 - [ ] Report calls and jumps into memory that is not executable (a sleep-masked implant is RW while it
   sleeps). Without the reference kind every constant that falls into a heap would be reported too.
 

@@ -141,6 +141,19 @@ namespace orthia
             return !process.ReadExactEx2(address, bytes, sizeof(bytes)) && !bytes[0] && !bytes[1];
         }
 
+        // "code", "address taken"; empty when unknown (saved before the kinds were)
+        PlatformString_type DescribeReferenceKind(const FloatingEntryInfo& entry, size_t index)
+        {
+            const int kind = index < entry.referrerKinds.size() ? entry.referrerKinds[index] : reference_unknown;
+            switch (kind)
+            {
+            case reference_code: return ORTHIA_TCSTR("code");
+            case reference_address: return ORTHIA_TCSTR("address taken");
+            case reference_data: return ORTHIA_TCSTR("data");
+            default: return PlatformString_type();
+            }
+        }
+
         bool OverlapsModule(const std::vector<ModuleInfo>& sorted, Address_type base, Address_type size)
         {
             const Address_type last = base + size - 1;
@@ -162,7 +175,7 @@ namespace orthia
         return it != entries.end() && it->address == address;
     }
 
-    bool FloatingRegionInfo::AddReference(Address_type entry, Address_type referrer, bool* pNewEntry)
+    bool FloatingRegionInfo::AddReference(Address_type entry, Address_type referrer, bool* pNewEntry, int kind)
     {
         if (pNewEntry)
         {
@@ -181,13 +194,22 @@ namespace orthia
             }
         }
         auto& referrers = it->referrers;
+        auto& kinds = it->referrerKinds;
+        kinds.resize(referrers.size(), reference_unknown);
         auto refIt = std::lower_bound(referrers.begin(), referrers.end(), referrer);
+        const auto index = refIt - referrers.begin();
         if (refIt != referrers.end() && *refIt == referrer)
         {
-            // a new entry has no referrers yet: nothing changed
+            // a new entry has no referrers yet: nothing changed, unless the kind got known
+            if (kinds[index] == reference_unknown && kind != reference_unknown)
+            {
+                kinds[index] = kind;
+                return true;
+            }
             return false;
         }
         referrers.insert(refIt, referrer);
+        kinds.insert(kinds.begin() + index, kind);
         return true;
     }
 
@@ -269,7 +291,8 @@ namespace orthia
 
     std::string FormatFloatingRegion(const FloatingRegionInfo& info)
     {
-        // entries: "<entry>:<referrer>,<referrer>;<entry>:..." in hex
+        // entries: "<entry>:<referrer>,<referrer>/<kind>;<entry>:..." in hex; the kind (c code,
+        // a address taken, d data) is left out when unknown
         std::string entries;
         for (const auto& entry : info.entries)
         {
@@ -286,6 +309,14 @@ namespace orthia
                     entries += ',';
                 }
                 entries += ToHex(entry.referrers[i]);
+                const int kind = i < entry.referrerKinds.size() ? entry.referrerKinds[i] : reference_unknown;
+                switch (kind)
+                {
+                case reference_code: entries += "/c"; break;
+                case reference_address: entries += "/a"; break;
+                case reference_data: entries += "/d"; break;
+                default: break;
+                }
             }
         }
         // slots: "<entry>:<i|e><slot>=<name>,...;<entry>:...", the entries that have any
@@ -396,19 +427,34 @@ namespace orthia
             }
             FloatingEntryInfo entry;
             entry.address = (Address_type)address;
+            std::vector<std::pair<Address_type, int>> referrers;
             if (colon != std::string::npos)
             {
                 for (const auto& ref : Split(item.substr(colon + 1), ','))
                 {
+                    // "<referrer>" from before the kinds, or "<referrer>/<kind>"
+                    const auto slash = ref.find('/');
                     unsigned long long referrer = 0;
-                    if (!ParseHex(ref, referrer))
+                    if (!ParseHex(ref.substr(0, slash), referrer))
                     {
                         return false;
                     }
-                    entry.referrers.push_back((Address_type)referrer);
+                    int kind = reference_unknown;
+                    if (slash != std::string::npos)
+                    {
+                        const auto letter = ref.substr(slash + 1);
+                        kind = letter == "c" ? reference_code : letter == "a" ? reference_address :
+                            letter == "d" ? reference_data : reference_unknown;
+                    }
+                    referrers.push_back({ (Address_type)referrer, kind });
                 }
             }
-            std::sort(entry.referrers.begin(), entry.referrers.end());
+            std::sort(referrers.begin(), referrers.end());
+            for (const auto& ref : referrers)
+            {
+                entry.referrers.push_back(ref.first);
+                entry.referrerKinds.push_back(ref.second);
+            }
             info.entries.push_back(entry);
         }
         std::sort(info.entries.begin(), info.entries.end(),
@@ -732,10 +778,11 @@ namespace orthia
         {
             return result;
         }
-        // TODO: tbl_references has no kind (call, jump, taken address, data): every reference that leaves
-        // the module counts, so a 32-bit imm32 that falls into an allocation adds an entry. Other entry
-        // points (threads, stacks, pointers in data) are not looked at (docs/orthia.md, Floating code)
-        std::vector<std::pair<Address_type, Address_type>> refs;
+        // calls, jumps and taken addresses; data read or written there is no entry point.
+        // TODO: an immediate the analysis takes for an address is a taken address too, so a 32-bit
+        // constant that falls into an allocation still adds an entry. Other entry points (threads,
+        // stacks, pointers in data) are not looked at (docs/orthia.md, Floating code)
+        std::vector<ModuleReference> refs;
         moduleManager.QueryDatabaseManager()->GetClassicDatabase()->QueryAllModuleReferences(source.address, source.size, refs);
 
         std::vector<ModuleInfo> sorted(modules);
@@ -762,9 +809,9 @@ namespace orthia
         };
         // from: an instruction of source, or a slot of it (slot != nullptr)
         auto addReference = [&](const std::shared_ptr<FloatingRegionInfo>& info, Address_type to, Address_type from,
-            const PointerSlotInfo* slot) {
+            const PointerSlotInfo* slot, int kind) {
             bool newEntry = false;
-            if (slot ? info->AddSlot(to, *slot, &newEntry) : info->AddReference(to, from, &newEntry))
+            if (slot ? info->AddSlot(to, *slot, &newEntry) : info->AddReference(to, from, &newEntry, kind))
             {
                 changed.insert(info->allocationBase);
             }
@@ -774,9 +821,9 @@ namespace orthia
             }
         };
 
-        auto consider = [&](Address_type from, Address_type to, const PointerSlotInfo* slot) {
-            // the range query includes the first byte after the module
-            if (!to || !source.IsInRange(from) || source.IsInRange(to))
+        auto consider = [&](Address_type from, Address_type to, const PointerSlotInfo* slot, int kind) {
+            // only what leaves the module
+            if (!to || kind == reference_data || !source.IsInRange(from) || source.IsInRange(to))
             {
                 return;
             }
@@ -796,12 +843,12 @@ namespace orthia
                 {
                     info = std::make_shared<FloatingRegionInfo>(*owner->floating);
                 }
-                addReference(info, to, from, slot);
+                addReference(info, to, from, slot, kind);
                 return;
             }
             if (auto info = findNew(to))
             {
-                addReference(info, to, from, slot);
+                addReference(info, to, from, slot, kind);
                 return;
             }
             if (std::any_of(rejected.begin(), rejected.end(),
@@ -838,17 +885,17 @@ namespace orthia
             info->mappedName = region.mappedName;
             regions[info->allocationBase] = info;
             created.insert(info->allocationBase);
-            addReference(info, to, from, slot);
+            addReference(info, to, from, slot, kind);
         };
 
         for (const auto& ref : refs)
         {
-            consider(ref.first, ref.second, nullptr);
+            consider(ref.from, ref.to, nullptr, ref.kind);
         }
         // a slot that leads out of the module into memory no module owns: an import or export hook
         for (const auto& slot : slots)
         {
-            consider(slot.slot, slot.value, &slot);
+            consider(slot.slot, slot.value, &slot, reference_unknown);
         }
 
         for (auto base : created)
@@ -1021,11 +1068,16 @@ namespace orthia
             const auto& entry = info.entries[i];
             line = ORTHIA_TCSTR("  ") + AddressToString(entry.address, mode) + ORTHIA_TCSTR("  ") + names[i].name.native;
             bool first = true;
-            for (auto referrer : entry.referrers)
+            for (size_t r = 0; r < entry.referrers.size(); ++r)
             {
                 line += first ? ORTHIA_TCSTR("  from ") : ORTHIA_TCSTR(", ");
                 first = false;
-                line += QueryAddressNameDef(&item, referrer, mode).native;
+                line += QueryAddressNameDef(&item, entry.referrers[r], mode).native;
+                const auto kind = DescribeReferenceKind(entry, r);
+                if (!kind.empty())
+                {
+                    line += ORTHIA_TCSTR(" (") + kind + ORTHIA_TCSTR(")");
+                }
             }
             for (const auto& slot : entry.slots)
             {
@@ -1075,8 +1127,9 @@ namespace orthia
             QueryFloatingNames(info, names);
             for (size_t i = 0; i < info.entries.size(); ++i)
             {
-                for (auto referrer : info.entries[i].referrers)
+                for (size_t r = 0; r < info.entries[i].referrers.size(); ++r)
                 {
+                    const auto referrer = info.entries[i].referrers[r];
                     Row row;
                     row.referrer = referrer;
                     const auto name = GetPreferredName(item.QueryAddressName(referrer)).native;
@@ -1086,6 +1139,11 @@ namespace orthia
                     if (!name.empty() && name.find(ORTHIA_TCHAR('+')) == PlatformString_type::npos)
                     {
                         row.notes += ORTHIA_TCSTR(" [function start]");
+                    }
+                    const auto kind = DescribeReferenceKind(info.entries[i], r);
+                    if (!kind.empty())
+                    {
+                        row.notes += ORTHIA_TCSTR(" [") + kind + ORTHIA_TCSTR("]");
                     }
                     rows.push_back(std::move(row));
                 }

@@ -45,6 +45,12 @@ public:
                                const orthia::PlatformString_type & name,
                                int analyserFlags,
                                const std::vector<Address_type> & hints);
+    // the full analysis of a module, registered or not: from its own entry points and from the
+    // calls and jumps other modules saved into it. Returns how many of those it started from
+    size_t AnalyzeModuleWithIncoming(Address_type offset,
+                                     IMemoryReader * pMemoryReader,
+                                     const orthia::PlatformString_type & name,
+                                     int analyserFlags);
     // code without headers: mode is the pointer size, arch DIANA_ARCH_*,
     // analyserFlags DI_ANALYSE_PE_FILE_SCAN_THROUGH to look at every place nothing refers to
     void ReloadRange(Address_type offset,

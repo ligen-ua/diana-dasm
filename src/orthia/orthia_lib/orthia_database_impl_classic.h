@@ -12,6 +12,14 @@ namespace orthia
 
 struct CommonReferenceInfo;
 
+// a row of tbl_references
+struct ModuleReference
+{
+    Address_type from = 0;
+    Address_type to = 0;
+    int kind = reference_unknown;
+};
+
 class CClassicDatabase;
 class CAutoRollbackClassicDatabase
 {
@@ -75,7 +83,7 @@ class CClassicDatabase:public orthia::RefCountedBase
     CSQLStatement m_stmtSelectAllComments;
     CSQLStatement m_stmtWriteComment;
 
-    void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to);
+    void InsertReference(sqlite3_stmt * stmt, Address_type from, Address_type to, int kind);
     void InsertModule(Address_type baseAddress, Address_type size, const orthia::PlatformString_type & moduleName);
     void BeginBatchInsert();   // no lock -- called with m_lock held by CClassicDatabaseBatch
     void CommitBatchInsert();  // no lock -- called with m_lock held by CClassicDatabaseBatch
@@ -118,12 +126,18 @@ public:
     void QueryReferencesToInstruction(Address_type offset, std::vector<CommonReferenceInfo> * pReferences);
     void QueryReferencesToInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult);
     void QueryReferencesFromInstructionsRange(Address_type address1, Address_type address2, std::vector<CommonRangeInfo> * pResult);
+    // the references made from inside [baseAddress, baseAddress + size), by from and to
+    void QueryAllModuleReferences(Address_type baseAddress, Address_type size,
+        std::vector<ModuleReference>& result);
     void QueryAllModuleReferences(Address_type baseAddress, Address_type size,
         std::vector<std::pair<Address_type, Address_type>>& result);
+    // the calls and jumps from outside [baseAddress, baseAddress + size) that lead inside it, by address
+    void QueryIncomingCodeTargets(Address_type baseAddress, Address_type size,
+        std::vector<Address_type>& result);
 
     // modules api
     void UnloadModule(Address_type address, bool bSilent);
-    // the references from inside [address, address + size]; the module row and its metainfo stay
+    // the references from inside [address, address + size); the module row and its metainfo stay
     void ClearModuleReferences(Address_type address, Address_type size);
     bool IsModuleExists(Address_type address);
     void QueryModules(std::vector<CommonModuleInfo> * pResult);

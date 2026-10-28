@@ -280,10 +280,6 @@ void CDisasmWindow::OnEnter()
         {
             return;
         }
-        if (tag->xrefs[xrefNum].external)
-        {
-            return;
-        }
         gotoAddress = tag->xrefs[xrefNum].address;
         handled = true;
     }
@@ -347,10 +343,6 @@ static bool HasXref(std::vector<orthia::CommonReferenceInfo>& xrefs, OPERAND_SIZ
 {
     for (auto& ref : xrefs)
     {
-        if (ref.external)
-        {
-            continue;
-        }
         if (ref.address == newOffset)
         {
             return true;

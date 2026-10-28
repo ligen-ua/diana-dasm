@@ -14,6 +14,7 @@ namespace orthia
     };
     static const CommandHelpItem g_commandHelpItems[] = {
         { "x [/a|/n] [/v] <mask>", "Examine symbols (/a: by address, /n: by name, /v: show type)" },
+        { "xr [/a] <address> [L<length>]", "References to the address, or into the range (/a: addresses only)" },
         { "u <address> [L<length>]", "Unassemble address" },
         { "lm", "List loaded modules" },
         { "lmf [/v]", "List floating code modules (found by .analyze); /v: what leads to each" },

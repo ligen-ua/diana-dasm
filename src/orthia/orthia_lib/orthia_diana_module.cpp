@@ -508,11 +508,20 @@ Address_type CDianaInstructionIterator::GetInstructionOffset()
 
     return m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction].m_offset;
 }
+static int GetReferenceKind(const Diana_XRef * pXRef)
+{
+    if (pXRef->m_flags & DI_XREF_ADDRESS_TAKEN)
+        return reference_address;
+    if (pXRef->m_flags & DI_XREF_DATA)
+        return reference_data;
+    return reference_code;
+}
 void CDianaInstructionIterator::QueryRefsToCurrentInstuction(std::vector<CommonReferenceInfo> * pInfo)
 {
     if (IsEmpty())
         throw std::runtime_error("Internal error");
 
+    const Address_type base = m_pModule->GetModuleAddress();
     Diana_Instruction * pInstruction = &m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction];
     const Diana_FList_List * pRefs = &pInstruction->m_referencesToThisInstruction;
     Diana_SubXRef * pSubRef = (Diana_SubXRef * )Diana_FList_First(pRefs);
@@ -523,8 +532,9 @@ void CDianaInstructionIterator::QueryRefsToCurrentInstuction(std::vector<CommonR
         // from a rolled back route
         if (!(pCurXRef->m_flags & DI_XREF_INVALID))
         {
-            pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[0].m_pInstruction->m_offset,
-                                    (pCurXRef->m_flags & DI_XREF_EXTERNAL)?true:false));
+            // the source is an instruction of the module: relative
+            pInfo->push_back(CommonReferenceInfo(base + pCurXRef->m_subrefs[0].m_pInstruction->m_offset,
+                                                 GetReferenceKind(pCurXRef)));
         }
         pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
     }
@@ -534,17 +544,28 @@ void CDianaInstructionIterator::QueryRefsFromCurrentInstruction(std::vector<Comm
     if (IsEmpty())
         throw std::runtime_error("Internal error");
 
+    const Address_type base = m_pModule->GetModuleAddress();
     Diana_Instruction * pInstruction = &m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction];
     const Diana_FList_List * pRefs = &pInstruction->m_referencesFromThisInstruction;
     Diana_SubXRef * pSubRef = (Diana_SubXRef * )Diana_FList_First(pRefs);
     pInfo->clear();
     while(pSubRef)
     {
-        Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 1);     
-        if ((pCurXRef->m_flags & DI_XREF_EXTERNAL) && !(pCurXRef->m_flags & DI_XREF_INVALID))
+        Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 1);
+        // only the targets that are no instruction of the module, the others come with their
+        // QueryRefsToCurrentInstuction: outside the module (absolute) and data in it (relative)
+        if (!(pCurXRef->m_flags & DI_XREF_INVALID))
         {
-            // save only externals to avoid duplicate with save_refs_to
-            pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[1].m_pInstruction->m_offset, true));
+            const Address_type target = pCurXRef->m_subrefs[1].m_pInstruction->m_offset;
+            if (pCurXRef->m_flags & DI_XREF_EXTERNAL)
+            {
+                pInfo->push_back(CommonReferenceInfo(target, GetReferenceKind(pCurXRef)));
+            }
+            else
+            if (pCurXRef->m_flags & DI_XREF_DATA)
+            {
+                pInfo->push_back(CommonReferenceInfo(base + target, GetReferenceKind(pCurXRef)));
+            }
         }
         pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
     }

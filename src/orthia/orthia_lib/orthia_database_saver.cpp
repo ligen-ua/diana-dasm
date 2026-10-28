@@ -45,15 +45,6 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
         iterator.QueryRefsToCurrentInstuction(&references);
         if (!references.empty())
         {
-            // diana returns relative offsets, convert it to the absolute ones
-            for(std::vector<CommonReferenceInfo>::iterator it = references.begin(), it_end = references.end();
-                it != it_end; ++it)
-            {
-                if (!it->external)
-                {
-                    it->address += baseAddress;
-                }
-            }
             classicDatabase->InsertReferencesToInstruction(offset+baseAddress, references);
         }
         iterator.QueryRefsFromCurrentInstruction(&references);
@@ -128,9 +119,6 @@ void CDatabaseSaver::SaveWithDedup(CDianaModule & dianaModule,
         iterator.QueryRefsToCurrentInstuction(&references);
         if (!references.empty())
         {
-            for (auto& r : references)
-                if (!r.external) r.address += baseAddress;
-
             filtered.clear();
             for (const auto& r : references)
             {

@@ -998,6 +998,7 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("threads"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_threads(args);  });
             parser.SetHandler(OUI_TCSTR("u"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_u(args);  });
             parser.SetHandler(OUI_TCSTR("x"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_x(args);  });
+            parser.SetHandler(OUI_TCSTR("xr"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_xr(args);  });
             parser.SetHandler(OUI_TCSTR("db"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 1);  });
             parser.SetHandler(OUI_TCSTR("dw"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 2);  });
             parser.SetHandler(OUI_TCSTR("dd"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 4);  });
