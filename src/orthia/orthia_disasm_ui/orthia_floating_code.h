@@ -115,6 +115,11 @@ namespace orthia
         // of them, the ones whose analysis is not up to date any more
         std::vector<Address_type> toAnalyze;
     };
+    // the taken addresses out of a module worth saving: into a module of the item, or (a process)
+    // into committed executable memory, where floating code is looked for. The rest are constants.
+    // Installed on the module manager of the item; the filter keeps a weak reference to it
+    void InstallExternalTargetFilter(const std::shared_ptr<IWorkPlaceItem>& item);
+
     // the floating code the references from source and its pointer slots lead to. modules: every
     // module of the process, floating ones too
     FloatingDiscovery CollectFloatingRegions(CModuleManager& moduleManager,

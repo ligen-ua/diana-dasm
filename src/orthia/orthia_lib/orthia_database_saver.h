@@ -9,8 +9,11 @@ namespace orthia
 
 class CDatabaseSaver
 {
+    ExternalTargetFilter_type m_externalTargetFilter;
+    // a reference out of the module that the filter drops
+    bool IsDropped(const CDianaModule & dianaModule, const CommonReferenceInfo & ref) const;
 public:
-    CDatabaseSaver();
+    explicit CDatabaseSaver(ExternalTargetFilter_type externalTargetFilter = ExternalTargetFilter_type());
     void Save(CDianaModule & dianaModule,
               CDatabaseManager & databaseManager,
               const orthia::PlatformString_type & moduleName,

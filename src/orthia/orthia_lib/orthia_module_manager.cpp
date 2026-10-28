@@ -7,6 +7,20 @@ namespace orthia
 CModuleManager::CModuleManager()
 {
 }
+void CModuleManager::SetExternalTargetFilter(ExternalTargetFilterFactory_type factory)
+{
+    CAutoCriticalSection guard(m_filterLock);
+    m_externalTargetFilter = std::move(factory);
+}
+ExternalTargetFilter_type CModuleManager::MakeExternalTargetFilter() const
+{
+    ExternalTargetFilterFactory_type factory;
+    {
+        CAutoCriticalSection guard(m_filterLock);
+        factory = m_externalTargetFilter;
+    }
+    return factory ? factory() : ExternalTargetFilter_type();
+}
 void CModuleManager::Reinit(const orthia::PlatformString_type & fullFileName,
                             bool bForce)
 {
@@ -69,7 +83,7 @@ void CModuleManager::ReloadRange(Address_type offset,
 
     module.Analyze(analyserFlags);
 
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     fileSaver.Save(module, *QueryDatabaseManager(), regionName.str(), true);
 }
 
@@ -93,7 +107,7 @@ void CModuleManager::ReloadModule(Address_type offset,
 
         dbManager->GetClassicDatabase()->UnloadModule(offset, true);
         
-        CDatabaseSaver fileSaver;
+        CDatabaseSaver fileSaver(MakeExternalTargetFilter());
         fileSaver.Save(module, *dbManager, name, true);
     }
 }
@@ -129,7 +143,7 @@ void CModuleManager::AnalyzeRegisteredModule(Address_type offset,
     // Neither UnloadModule nor replacing the tbl_modules row: tbl_metainfo (exports,
     // private symbols, module flags) is ON DELETE CASCADE from it. Only missing
     // references are added, so running it on an analyzed module is harmless.
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     fileSaver.SaveWithDedup(module, *QueryDatabaseManager(), name);
 }
 
@@ -146,7 +160,7 @@ void CModuleManager::ReloadModuleWithHints(Address_type offset,
     module.AnalyzeWithHints(analyserFlags, hints);
 
     auto dbManager = QueryDatabaseManager();
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     fileSaver.SaveWithDedup(module, *dbManager, name);
 }
 
@@ -178,7 +192,7 @@ size_t CModuleManager::AnalyzeModuleWithIncoming(Address_type offset,
         module.AnalyzeWithHints(analyserFlags, hints);
     }
 
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     if (classicDatabase->IsModuleExists(offset))
     {
         // the module row stays: tbl_metainfo (exports, symbols, flags) is ON DELETE CASCADE from it
@@ -240,7 +254,7 @@ std::pair<Address_type, Address_type> CModuleManager::AnalyzeRange(Address_type 
         }
     }
 
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     fileSaver.SaveWithDedup(module, *QueryDatabaseManager(), name);
     return extent;
 }

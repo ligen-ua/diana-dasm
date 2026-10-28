@@ -274,7 +274,9 @@ prints the same line.
 Targets in zero-filled memory are left out: no code starts with `00 00`. Data read or written there
 (`mov rax, [rip+X]`) is no entry point either. A taken address is: `lea`, `adr`, and an immediate the
 analysis takes for an address (`push offset callback`), so in a 32-bit process a constant that happens to
-point into executable memory adds an entry point too.
+point into executable memory adds an entry point too. A taken address outside the module is saved only when it
+leads into a module or into committed executable memory; the rest (`0CCCCCCCCh`, NTSTATUS codes, masks) are
+constants.
 
 #### TODO
 

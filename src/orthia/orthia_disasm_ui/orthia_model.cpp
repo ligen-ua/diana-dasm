@@ -789,6 +789,7 @@ namespace orthia
             }
             info->moduleManager = std::make_shared<CModuleManager>();
             info->moduleManager->Reinit(dbFileName, overwrite);
+            InstallExternalTargetFilter(info);
             persistentItemStorage->Init(info->moduleManager->QueryDatabaseManager());
 
             if (info->shortName.native == m_config->GetBinFileName())

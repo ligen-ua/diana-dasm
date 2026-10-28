@@ -378,6 +378,8 @@ namespace
 
         // before anything is opened: AddExecutable/AddProcess and the analyzer read it
         model->GetConfig()->SetDeepAnalysis(options.analyze);
+        // no UI to draw the output: the pump drains it as fast as it comes
+        model->GetCommandProcessor()->SetOutputPause(false);
 
         auto log = std::make_shared<CConsoleLog>();
         model->SetUILog(log);   // also initializes the analyzer

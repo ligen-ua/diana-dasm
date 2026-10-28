@@ -272,6 +272,30 @@ TEST(References, FloatingEntriesByKind)
         << orthia::PlatformStringToUtf8(lines[1]);
 }
 
+// an immediate is saved as a taken address only when it leads into a module or into executable memory
+TEST(References, ConstantsAreNotSaved)
+{
+    const orthia::Address_type base = F::moduleBase;
+    F fixture;
+    auto& code = fixture.process->images[0].data;
+    code.assign(0x1000, (char)0xCC);
+    PutMovRcxImm64(code, 0x00, 0xCCCCCCCCULL);                              // mov rcx, debug fill
+    PutMovRcxImm64(code, 0x0A, 0xC000000DULL);                              // mov rcx, STATUS_INVALID_PARAMETER
+    PutMovRcxImm64(code, 0x14, F::regionData + 0x10);                       // mov rcx, RW- memory
+    PutMovRcxImm64(code, 0x1E, F::regionA + 0x30);                          // mov rcx, RWX memory
+    PutMovRcxImm64(code, 0x28, F::otherModule + 0x200);                     // mov rcx, other's function
+    code[0x32] = (char)0xC3;
+    auto item = fixture.OpenItem();
+    fixture.AnalyzeModule(*item);
+
+    const auto refs = ModuleRefsWithKinds(fixture, base, 0x1000);
+    EXPECT_EQ(-1, KindOf(refs, base + 0x00, 0xCCCCCCCCULL));
+    EXPECT_EQ(-1, KindOf(refs, base + 0x0A, 0xC000000DULL));
+    EXPECT_EQ(-1, KindOf(refs, base + 0x14, F::regionData + 0x10));
+    EXPECT_EQ(orthia::reference_address, KindOf(refs, base + 0x1E, F::regionA + 0x30));
+    EXPECT_EQ(orthia::reference_address, KindOf(refs, base + 0x28, F::otherModule + 0x200));
+}
+
 // the kinds of the referrers are kept in the saved text; the text from before them reads as unknown
 TEST(References, FloatingKindsSaved)
 {

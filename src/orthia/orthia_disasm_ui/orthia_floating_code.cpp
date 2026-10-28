@@ -767,6 +767,53 @@ namespace orthia
         }
     }
 
+    void InstallExternalTargetFilter(const std::shared_ptr<IWorkPlaceItem>& item)
+    {
+        auto moduleManager = item ? item->GetModuleManager() : nullptr;
+        if (!moduleManager)
+        {
+            return;
+        }
+        std::weak_ptr<IWorkPlaceItem> weakItem = item;
+        moduleManager->SetExternalTargetFilter([weakItem]() -> ExternalTargetFilter_type {
+            auto item = weakItem.lock();
+            if (!item)
+            {
+                return ExternalTargetFilter_type();
+            }
+            auto modules = std::make_shared<std::vector<ModuleInfo>>();
+            item->GetModules(*modules);
+            std::sort(modules->begin(), modules->end(), [](const ModuleInfo& a, const ModuleInfo& b) { return a.address < b.address; });
+            auto process = item->GetAssociatedProcess();
+            // the regions asked about: base -> (size, executable)
+            auto regions = std::make_shared<std::map<Address_type, std::pair<Address_type, bool>>>();
+            return [modules, process, regions](Address_type address) {
+                if (FindModule(*modules, address))
+                {
+                    return true;
+                }
+                if (!process)
+                {
+                    return false;
+                }
+                auto it = regions->upper_bound(address);
+                if (it != regions->begin() && address - std::prev(it)->first < std::prev(it)->second.first)
+                {
+                    return std::prev(it)->second.second;
+                }
+                oui::MemoryRegionInfo region;
+                if (process->QueryMemoryRegion(address, region) || !region.regionSize || address - region.regionBase >= region.regionSize)
+                {
+                    (*regions)[address & ~(Address_type)0xFFF] = { 0x1000, false };
+                    return false;
+                }
+                const bool executable = region.committed && (region.protect & oui::MemoryRegionInfo::protect_exec);
+                (*regions)[region.regionBase] = { region.regionSize, executable };
+                return executable;
+            };
+        });
+    }
+
     FloatingDiscovery CollectFloatingRegions(CModuleManager& moduleManager,
         oui::IProcess& process,
         const std::vector<ModuleInfo>& modules,

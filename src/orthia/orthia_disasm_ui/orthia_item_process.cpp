@@ -117,6 +117,7 @@ namespace orthia
         m_moduleManager = moduleManager;
         m_persistentStorage = persistentItemStorage;
         m_moduleStorage = moduleStorage;
+        InstallExternalTargetFilter(weak_from_this().lock());
     }
     ModuleStorage* CProcessWorkplaceItem::GetModuleStorage()
     {

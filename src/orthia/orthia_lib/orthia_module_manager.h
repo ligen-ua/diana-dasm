@@ -19,8 +19,14 @@ class CModuleManager
     mutable CCriticalSection m_writeLock;
     mutable orthia::intrusive_ptr<CDatabaseManager> m_pDatabaseManager;
     orthia::PlatformString_type m_fullFileName;
+    mutable CCriticalSection m_filterLock;
+    ExternalTargetFilterFactory_type m_externalTargetFilter;
+    ExternalTargetFilter_type MakeExternalTargetFilter() const;
 public:
     CModuleManager();
+    // what decides, for each save, which taken addresses outside the module are kept
+    // (see ExternalTargetFilter_type); none: all of them
+    void SetExternalTargetFilter(ExternalTargetFilterFactory_type factory);
     void Reinit(const orthia::PlatformString_type & fullFileName, bool bForce);
     orthia::PlatformString_type GetDatabaseName() const;
     orthia::intrusive_ptr<CDatabaseManager> QueryDatabaseManager() const; 

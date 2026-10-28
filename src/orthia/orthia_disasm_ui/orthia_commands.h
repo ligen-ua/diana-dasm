@@ -38,6 +38,8 @@ public:
         orthia::PlatformString_type text;
 
         int linesWithoutSync = 0;
+        // a pause every few lines, so that the UI can draw them
+        bool pauseOutput = true;
         // non-empty when the command failed, sent as the final reply
         oui::String errorText;
         void ReplyLine(const oui::String& text);
@@ -47,6 +49,7 @@ protected:
 
     oui::CThreadPool m_pool;
     std::atomic_bool m_busy = false;
+    std::atomic_bool m_pauseOutput = true;
     void ExecuteImpl(ThreadPtr_type targetThread,
         oui::OperationPtr_type<ExecuteProgressHandler_type> progressHandler,
         oui::OperationPtr_type<SpecialUICommandHandler_type> uiCommandHandler,
@@ -83,6 +86,8 @@ public:
         std::shared_ptr<IWorkPlaceItem> item,
         std::shared_ptr<orthia::CProgramModel> model);
     bool IsBusy() const;
+    // false without a UI (--cmd): long output is written at full speed
+    void SetOutputPause(bool pause);
 
     // true for the commands that work on the data folder and need no open item
     static bool IsTargetless(const orthia::PlatformString_type& text);

@@ -43,7 +43,10 @@ namespace orthia
         if (++linesWithoutSync > g_maxLinesWithoutSync)
         {
             Sync();
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            if (pauseOutput)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
         }
     }
     void CCommandProcessor::CommandArguments::Sync()
@@ -989,6 +992,7 @@ namespace orthia
         CCommandParser parser;
         CommandArguments args = { progressHandler, parser, item, model, model->GetActiveItemId(), uiCommandHandler };
         args.text = text;
+        args.pauseOutput = m_pauseOutput;
 
         oui::ScopedGuard reportStopGuard([&]() { ReportStop(args); });
 
@@ -1041,6 +1045,10 @@ namespace orthia
     bool CCommandProcessor::IsBusy() const
     {
         return m_pool.GetTasksCount();
+    }
+    void CCommandProcessor::SetOutputPause(bool pause)
+    {
+        m_pauseOutput = pause;
     }
 
 }
