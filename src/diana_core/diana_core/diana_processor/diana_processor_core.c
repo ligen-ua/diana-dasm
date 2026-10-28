@@ -381,6 +381,29 @@ int DianaProcessor_AnalyzeCallJmpInstruction(DianaContext * pDianaContext,
         break;
 
     case diana_index:
+        if (pOp->value.rmIndex.reg == reg_RIP &&
+            (pOp->value.rmIndex.indexed_reg == reg_none ||
+             pOp->value.rmIndex.index == 0))
+        {
+            /* jmp/call [rip + disp] (an import, a PLT slot): the rip of this instruction, not the processor's,
+               which stays where the stack walk started */
+            DianaRmIndex  * pIndex = &pOp->value.rmIndex;
+            OPERAND_SIZE memSelector = 0, memAddress=0;
+            DI_CHECK(DianaProcessor_CalcIndex(pDianaContext,
+                                              pCallContext,
+                                              pIndex,
+                                              &memSelector,
+                                              &memAddress));
+            memAddress = rip + pDianaResult->iFullCmdSize + pIndex->dispValue;
+            DI_CHECK(DianaProcessor_GetMemValue(pCallContext,
+                                                memSelector,
+                                                memAddress,
+                                                pDianaContext->iCurrentCmd_addressSize,
+                                                &newRIP,
+                                                0,
+                                                pIndex->seg_reg));
+            break;
+        }
         if ((pOp->value.rmIndex.indexed_reg == reg_none ||
             pOp->value.rmIndex.index == 0) &&
             pOp->value.rmIndex.dispSize)
@@ -591,6 +614,80 @@ int AnalyzeStack(DianaProcessor * pCallContext,
     
     return 0;
 }
+/* the conditional jumps the walk took in the current function: one met again is a loop, the walk falls through */
+#define DIANA_STACK_WALK_TAKEN_JUMPS   64
+/* the stack where the walk took unconditional jumps in the current function: possible tail calls */
+#define DIANA_STACK_WALK_JUMP_SLOTS    16
+static int DianaProcessor_IsJumpTaken(const OPERAND_SIZE * pTakenJumps, int count, OPERAND_SIZE rip)
+{
+    int i = 0;
+    for (; i < count; ++i)
+    {
+        if (pTakenJumps[i] == rip)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* a return address: the instruction before it is a call (rel32, [rip + disp32], [reg + disp], reg) */
+static int DianaProcessor_IsAfterCall(DianaProcessor * pCallContext, OPERAND_SIZE address)
+{
+    DI_CHAR buffer[7];
+    unsigned char * p = (unsigned char *)buffer;
+    OPERAND_SIZE bytesRead = 0;
+    if (address < sizeof(buffer))
+    {
+        return 0;
+    }
+    if (DianaProcessor_ReadMemory(pCallContext,
+                                  GET_REG_CS,
+                                  address - sizeof(buffer),
+                                  buffer,
+                                  sizeof(buffer),
+                                  &bytesRead,
+                                  0,
+                                  reg_CS) != DI_SUCCESS || bytesRead != sizeof(buffer))
+    {
+        return 0;
+    }
+    /* p[6] is the last byte before the address */
+    if (p[2] == 0xE8)
+    {
+        return 1;   /* call rel32 */
+    }
+    if (p[1] == 0xFF && (p[2] & 0xF8) == 0x90 && (p[2] & 7) != 4)
+    {
+        return 1;   /* call [reg + disp32] */
+    }
+    if (p[1] == 0xFF && p[2] == 0x15)
+    {
+        return 1;   /* call [rip + disp32] (32-bit: [disp32]) */
+    }
+    if (p[4] == 0xFF && (p[5] & 0xF8) == 0x50 && (p[5] & 7) != 4)
+    {
+        return 1;   /* call [reg + disp8] */
+    }
+    if (p[0] == 0xFF && p[1] == 0x94)
+    {
+        return 1;   /* call [base + index * scale + disp32] */
+    }
+    if (p[3] == 0xFF && p[4] == 0x54)
+    {
+        return 1;   /* call [base + index * scale + disp8] */
+    }
+    if (p[4] == 0xFF && p[5] == 0x14)
+    {
+        return 1;   /* call [base + index * scale] */
+    }
+    if (p[5] == 0xFF && ((p[6] & 0xF8) == 0xD0 || ((p[6] & 0xF8) == 0x10 && (p[6] & 7) != 4 && (p[6] & 7) != 5)))
+    {
+        return 1;   /* call reg, call [reg] */
+    }
+    return 0;
+}
+
 static
 int DianaProcessor_QueryCurrentStack_Impl(DianaProcessor * pProc,
                                           DianaProcessorStackHandler_type pObserver,
@@ -605,6 +702,18 @@ int DianaProcessor_QueryCurrentStack_Impl(DianaProcessor * pProc,
     DianaContext context;
     DianaParserResult result;
     UtilsProcessorContext readStream;
+    OPERAND_SIZE takenJumps[DIANA_STACK_WALK_TAKEN_JUMPS];
+    int takenJumpsCount = 0;
+    /* rbp as the walk goes: leave needs it. Unknown when the thread's registers have none (Linux gives rip and rsp
+       only) until the walk passes pop rbp or mov rbp, rsp */
+    OPERAND_SIZE knownRBP = GET_REG_RBP;
+    int isRBPKnown = knownRBP != 0;
+    OPERAND_SIZE jumpSlots[DIANA_STACK_WALK_JUMP_SLOTS];
+    OPERAND_SIZE jumpRBPs[DIANA_STACK_WALK_JUMP_SLOTS];
+    int jumpRBPKnown[DIANA_STACK_WALK_JUMP_SLOTS];
+    int jumpSlotsCount = 0;
+    /* the stack where the current function's part starts: its return address can't be below it */
+    OPERAND_SIZE frameBase = currentFunctionRSP;
 
     Diana_InitContext(&context, pProc->m_context.iMainMode_addressSize);
 
@@ -618,20 +727,25 @@ int DianaProcessor_QueryCurrentStack_Impl(DianaProcessor * pProc,
         OPERAND_SIZE_SIGNED diff = 0;
         int isCall = 0;
         int woW64 = 0;
-        
-        int iRes = Diana_ParseCmd(&context,
-                                  Diana_GetRootLine(),
-                                  &readStream.parent,
-                                  &result);
-        DI_CHECK(iRes);
+        int continueExecution = 0;
+        int retSize = 0;
+        OPERAND_SIZE retSlot = 0;
+        OPERAND_SIZE newRIP = 0;
+
+        if (Diana_ParseCmd(&context,
+                           Diana_GetRootLine(),
+                           &readStream.parent,
+                           &result) != DI_SUCCESS)
+        {
+            goto frame_failed;
+        }
         if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_int)
         {
             // try
-            OPERAND_SIZE newRIP = 0;
-            if (AnalyzeStack(pProc, 
-                             rip, 
-                             currentFunctionRSP, 
-                             currentFunctionStackDiff, 
+            if (AnalyzeStack(pProc,
+                             rip,
+                             currentFunctionRSP,
+                             currentFunctionStackDiff,
                              &newRIP,
                              &currentFunctionRSP))
             {
@@ -639,9 +753,12 @@ int DianaProcessor_QueryCurrentStack_Impl(DianaProcessor * pProc,
                 Diana_ClearCache(&context);
                 readStream.streamPointer = rip;
                 currentFunctionStackDiff = 0;
+                takenJumpsCount = 0;
+                jumpSlotsCount = 0;
+                frameBase = currentFunctionRSP;
                 continue;
             }
-            break;
+            goto frame_failed;
         }
 
         if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_jmp &&
@@ -654,61 +771,124 @@ int DianaProcessor_QueryCurrentStack_Impl(DianaProcessor * pProc,
             currentFunctionStackDiff = 0;
         }
 
+        if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_leave && isRBPKnown)
+        {
+            /* mov rsp, rbp; pop rbp */
+            OPERAND_SIZE savedRBP = 0;
+            if (DianaProcessor_GetMemValue(pCallContext,
+                                           GET_REG_SS,
+                                           knownRBP,
+                                           context.iCurrentCmd_addressSize,
+                                           &savedRBP,
+                                           0,
+                                           reg_SS) != DI_SUCCESS)
+            {
+                goto frame_failed;
+            }
+            currentFunctionRSP = knownRBP + context.iCurrentCmd_addressSize;
+            currentFunctionStackDiff = 0;
+            knownRBP = savedRBP;
+            rip += result.iFullCmdSize;
+            continue;
+        }
+        if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_pop &&
+            result.iLinkedOpCount == 1 &&
+            result.linkedOperands[0].type == diana_register &&
+            (result.linkedOperands[0].value.recognizedRegister == reg_RBP ||
+             result.linkedOperands[0].value.recognizedRegister == reg_EBP))
+        {
+            /* the caller's rbp; the stack diff of the pop is counted below as usual */
+            OPERAND_SIZE savedRBP = 0;
+            isRBPKnown = DianaProcessor_GetMemValue(pCallContext,
+                                                    GET_REG_SS,
+                                                    currentFunctionRSP + currentFunctionStackDiff,
+                                                    context.iCurrentCmd_addressSize,
+                                                    &savedRBP,
+                                                    0,
+                                                    reg_SS) == DI_SUCCESS;
+            knownRBP = savedRBP;
+        }
+        if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_mov &&
+            result.iLinkedOpCount == 2 &&
+            result.linkedOperands[0].type == diana_register &&
+            result.linkedOperands[1].type == diana_register &&
+            (result.linkedOperands[0].value.recognizedRegister == reg_RBP ||
+             result.linkedOperands[0].value.recognizedRegister == reg_EBP) &&
+            (result.linkedOperands[1].value.recognizedRegister == reg_RSP ||
+             result.linkedOperands[1].value.recognizedRegister == reg_ESP))
+        {
+            knownRBP = currentFunctionRSP + currentFunctionStackDiff;
+            isRBPKnown = 1;
+        }
+
         if (woW64 || result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_ret)
         {
             // query ret
-            int continueExecution = 0;
-            int retSize = 0;
-            OPERAND_SIZE offset = currentFunctionRSP + 
-                                  currentFunctionStackDiff;
-            OPERAND_SIZE newRIP = 0;
-            DI_CHECK(DianaProcessor_GetMemValue(pCallContext,
-                                                GET_REG_SS,
-                                                offset,
-                                                context.iCurrentCmd_addressSize,
-                                                &newRIP,
-                                                0,
-                                                reg_SS));
-
-            ++*pReportCount;
-            DI_CHECK(pObserver(pProc, pCustomContext, newRIP, &continueExecution));
-            
-            if (!continueExecution)
-            {
-                return DI_SUCCESS;
-            }
-            // go further
             if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_ret &&
                 result.iLinkedOpCount == 1)
             {
                 retSize = (int)result.linkedOperands[0].value.imm;
             }
-            currentFunctionStackDiff = 0;
-            currentFunctionRSP = offset + context.iCurrentCmd_addressSize + retSize;
-            rip = newRIP;
-            Diana_ClearCache(&context);
-            readStream.streamPointer = rip;
-            continue;
+            retSlot = currentFunctionRSP + currentFunctionStackDiff;
+            if (DianaProcessor_GetMemValue(pCallContext,
+                                           GET_REG_SS,
+                                           retSlot,
+                                           context.iCurrentCmd_addressSize,
+                                           &newRIP,
+                                           0,
+                                           reg_SS) != DI_SUCCESS)
+            {
+                goto frame_failed;
+            }
+            if (!woW64 && (retSlot < frameBase || !DianaProcessor_IsAfterCall(pCallContext, newRIP)))
+            {
+                /* the walk lost the stack on its way here */
+                retSize = 0;
+                goto frame_failed;
+            }
+            goto report_return;
         }
 
         if (result.pInfo->m_pGroupInfo->m_pLinkedInfo &&
             (result.pInfo->m_pGroupInfo->m_pLinkedInfo->flags & DIANA_GT_IS_JUMP))
         {
-            OPERAND_SIZE newRIP = 0;
-            DI_CHECK(DianaProcessor_AnalyzeCallJmpInstruction(&context, 
-                                                              &result,
-                                                              pProc,
-                                                              rip,
-                                                              &newRIP));
-             if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_jmp ||
-                 newRIP > rip)
-             {
-                 // go there
+            if (DianaProcessor_AnalyzeCallJmpInstruction(&context,
+                                                         &result,
+                                                         pProc,
+                                                         rip,
+                                                         &newRIP) != DI_SUCCESS)
+            {
+                if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_jmp)
+                {
+                    /* jmp reg: a tail call or a switch */
+                    goto frame_failed;
+                }
+                newRIP = 0;
+            }
+            if (result.pInfo->m_pGroupInfo->m_commandId == diana_cmd_jmp ||
+                (newRIP > rip && !DianaProcessor_IsJumpTaken(takenJumps, takenJumpsCount, rip)))
+            {
+                if (result.pInfo->m_pGroupInfo->m_commandId != diana_cmd_jmp)
+                {
+                    if (takenJumpsCount < DIANA_STACK_WALK_TAKEN_JUMPS)
+                    {
+                        takenJumps[takenJumpsCount++] = rip;
+                    }
+                }
+                else if (jumpSlotsCount < DIANA_STACK_WALK_JUMP_SLOTS)
+                {
+                    /* where the return address is if this is a tail call */
+                    jumpSlots[jumpSlotsCount] = currentFunctionRSP + currentFunctionStackDiff;
+                    jumpRBPs[jumpSlotsCount] = knownRBP;
+                    jumpRBPKnown[jumpSlotsCount] = isRBPKnown;
+                    ++jumpSlotsCount;
+                }
+                // go there
                 rip = newRIP;
                 Diana_ClearCache(&context);
                 readStream.streamPointer = rip;
                 continue;
-             }
+            }
         }
         {
             int status = Diana_AnalyzeInstructionStackDiff(&context,
@@ -722,20 +902,71 @@ int DianaProcessor_QueryCurrentStack_Impl(DianaProcessor * pProc,
         }
         if (isCall)
         {
-            OPERAND_SIZE newRIP = 0;
+            /* the callee's ret imm (stdcall); 0 when it can't be followed (call reg) */
             diff = 0;
-            DI_CHECK(DianaProcessor_AnalyzeCallJmpInstruction(&context, 
-                                                              &result,
-                                                              pProc,
-                                                              rip,
-                                                              &newRIP));
-
-            DI_CHECK(DianaProcessor_QueryFunctionDiff(pProc,
-                                                      newRIP,
-                                                      &diff));
+            if (DianaProcessor_AnalyzeCallJmpInstruction(&context,
+                                                         &result,
+                                                         pProc,
+                                                         rip,
+                                                         &newRIP) != DI_SUCCESS ||
+                DianaProcessor_QueryFunctionDiff(pProc,
+                                                 newRIP,
+                                                 &diff) != DI_SUCCESS)
+            {
+                diff = 0;
+            }
         }
         currentFunctionStackDiff += diff;
         rip += result.iFullCmdSize;
+        continue;
+
+frame_failed:
+        /* the walk can't follow this function. The return address is where the stack is now, or where an
+           unconditional jump (a tail call) left it, the latest first; the instruction before it must be a call */
+        {
+            int k = jumpSlotsCount;
+            retSlot = currentFunctionRSP + currentFunctionStackDiff;
+            for (;;)
+            {
+                if (retSlot >= frameBase &&
+                    DianaProcessor_GetMemValue(pCallContext,
+                                               GET_REG_SS,
+                                               retSlot,
+                                               context.iCurrentCmd_addressSize,
+                                               &newRIP,
+                                               0,
+                                               reg_SS) == DI_SUCCESS &&
+                    DianaProcessor_IsAfterCall(pCallContext, newRIP))
+                {
+                    break;
+                }
+                if (!k)
+                {
+                    return DI_ERROR;
+                }
+                --k;
+                retSlot = jumpSlots[k];
+                knownRBP = jumpRBPs[k];
+                isRBPKnown = jumpRBPKnown[k];
+            }
+        }
+
+report_return:
+        ++*pReportCount;
+        DI_CHECK(pObserver(pProc, pCustomContext, newRIP, &continueExecution));
+        if (!continueExecution)
+        {
+            return DI_SUCCESS;
+        }
+        // go further
+        currentFunctionStackDiff = 0;
+        takenJumpsCount = 0;
+        jumpSlotsCount = 0;
+        currentFunctionRSP = retSlot + context.iCurrentCmd_addressSize + retSize;
+        frameBase = currentFunctionRSP;
+        rip = newRIP;
+        Diana_ClearCache(&context);
+        readStream.streamPointer = rip;
     }
     return DI_END;
 }
