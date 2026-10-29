@@ -102,6 +102,9 @@
     <ClCompile Include="oui_button.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="oui_checkbox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="oui_text_markup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -201,6 +204,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_button.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="oui_checkbox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_text_markup.h">

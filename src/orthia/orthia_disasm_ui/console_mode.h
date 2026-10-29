@@ -25,7 +25,7 @@ namespace orthia
         std::vector<PlatformString_type> files;         // --file
         std::vector<unsigned long long> pids;           // --pid
         std::vector<PlatformString_type> procFolders;   // --proc-folder
-        bool analyze = false;                           // --analyze
+        // --no-analysis, --no-symbols: the config, CConfigOptionsStorage::GetCliAutoTasks
         FileFormatOptions fileFormat;
     };
 

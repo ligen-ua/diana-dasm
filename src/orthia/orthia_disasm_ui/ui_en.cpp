@@ -162,6 +162,16 @@ void InitLanguage_EN(orthia::intrusive_ptr<orthia::CTextManager> textManager)
         << textManager->RegisterValue(ORTHIA_TCSTR("mode-label"), ORTHIA_TCSTR("Architecture (Left/Right to change):"))
         ;
 
+    textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.autotasks"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("New Database"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("message"), ORTHIA_TCSTR("%1 has no database yet. Start now:"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("analyze"), ORTHIA_TCSTR("Analyze the code"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("symbols"), ORTHIA_TCSTR("Load the symbols"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("hint"), ORTHIA_TCSTR("Space toggles. Later: .analyze, .reload"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("ok"), ORTHIA_TCSTR("OK"))
+        << textManager->RegisterValue(ORTHIA_TCSTR("cancel"), ORTHIA_TCSTR("Cancel"))
+        ;
+
     // main
     textManager->RegisterNode(ORTHIA_TCSTR("ui.dialog.main"))
         << textManager->RegisterValue(ORTHIA_TCSTR("caption"), ORTHIA_TCSTR("Orthia Disassembler"))

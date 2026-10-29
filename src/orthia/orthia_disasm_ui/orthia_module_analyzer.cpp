@@ -266,7 +266,7 @@ namespace orthia
                         item->UpdateModuleFlags(mainIt->address, 0, ModuleInfo::flags_analyzeDone);
                         mainIt->flags &= ~ModuleInfo::flags_analyzeDone;
                     }
-                    // not IsModuleExists: a quick open (--cmd without --analyze) registers the module unanalyzed
+                    // not IsModuleExists: every open registers the module unanalyzed, the analysis comes here
                     if (!(mainIt->flags & ModuleInfo::flags_analyzeDone))
                     {
                         auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));

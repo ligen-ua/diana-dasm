@@ -82,7 +82,8 @@ orthia --pid 1234
 Run commands without the UI:
 ```
 orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
-orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
+orthia --file ntoskrnl.exe --cmd 'x nt!KeBugCheck*'
+orthia --file ntoskrnl.exe --no-analysis --no-symbols --cmd lm
 orthia --pid 1234 --cmd '.analyze *' --cmd 'lmf /v' --cmd .capture
 orthia --proc-folder 1234 --cmd lm --cmd lmf
 ```

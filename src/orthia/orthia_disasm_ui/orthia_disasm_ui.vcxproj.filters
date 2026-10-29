@@ -182,6 +182,9 @@
     <ClCompile Include="oui_shellcode_dialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="oui_auto_tasks_dialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="orthia_model.h">
@@ -311,6 +314,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oui_shellcode_dialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="oui_auto_tasks_dialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

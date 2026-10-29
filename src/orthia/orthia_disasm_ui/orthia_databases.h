@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_utils.h"
+#include "orthia_config.h"
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -39,7 +40,16 @@ namespace orthia
         PlatformString_type name;           // "[pid] name"
         long long startUnix = 0;            // see oui::ProcessStartInfo
         std::string startKey;
+
+        // what the user chose to start when the database was made (AutoTasks):
+        // -1 not chosen (made by --cmd, or before the choice existed), 0 off, 1 on
+        int autoAnalysis = -1;
+        int autoSymbols = -1;
     };
+
+    // the tasks chosen for the folder: the ones not chosen are on
+    AutoTasks GetFolderAutoTasks(const FolderMeta& meta);
+    void SetFolderAutoTasks(FolderMeta& meta, const AutoTasks& tasks);
 
     // the layout of a folder: data.db, target.bin, DIRINFO, parameters.xml, meta.xml.
     // Raise it when a folder made by this version can't be used by an older one, and raise

@@ -93,7 +93,7 @@ Problems setting up the sandbox are reported as warnings only when Orthia runs e
 ## Command line
 
 ```
-orthia [--file <filename>]... [--pid <pid>]... [--proc-folder <folder|pid>]... [--cmd <command>]... [--analyze] [--capture] [--overwrite-db] [--no-sandbox]
+orthia [--file <filename>]... [--pid <pid>]... [--proc-folder <folder|pid>]... [--cmd <command>]... [--no-analysis] [--no-symbols] [--capture] [--overwrite-db] [--no-sandbox]
 orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <command>...
 ```
 
@@ -103,7 +103,9 @@ orthia --file <filename> --format raw --base <address> --arch <arch> --cmd <comm
 | `--pid <pid>` | open the process with the given id: decimal, `0x`-prefixed hex, or `self` for Orthia's own process |
 | `--proc-folder <folder\|pid>` | open a saved process folder after the process exited: a `proc/` folder, its `data.db`, or a pid or folder name as `.database list` shows them (see [Saved process folders](#saved-process-folders)) |
 | `--cmd <command>` | run `<command>` without the UI and exit; repeat it for more commands, they run in order |
-| `--analyze` | with `--cmd`: deep code analysis and symbol loading on open |
+| `--no-analysis` | no code analysis of the opened target; `.analyze` does it later (see [What starts after an open](#what-starts-after-an-open)) |
+| `--no-symbols` | no symbol loading for the opened target; `.reload` does it later |
+| `--analyze` | accepted for older scripts and ignored: the analysis is the default |
 | `--format <format>` | with `--cmd`: open the `--file` as `pe`, `elf` or `raw` (code without headers) instead of the format it is detected as |
 | `--base <address>` | with `--format raw`: where the code is placed (ARM code: a multiple of 4, Thumb: of 2) |
 | `--arch <arch>` | with `--format raw`: how the code is disassembled and analyzed: `x86`, `x64`, `arm64`, `arm` or `thumb` |
@@ -129,16 +131,32 @@ orthia --file C:\Windows\System32\notepad.exe
 orthia --pid 1234
 orthia --proc-folder 1234 --cmd lmf
 orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
-orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
-orthia --file firmware.bin --format raw --base 0x8000 --arch thumb --analyze --cmd 'u 8000 L20'
+orthia --file ntoskrnl.exe --cmd 'x nt!KeBugCheck*'
+orthia --file ntoskrnl.exe --no-analysis --no-symbols --cmd lm
+orthia --file firmware.bin --format raw --base 0x8000 --arch thumb --cmd 'u 8000 L20'
 orthia --cmd '.database list'
 ```
 
-### Quick open vs `--analyze`
+### What starts after an open
 
-By default, `--cmd` opens a target quickly: headers, modules, imports and exports only.
-`--analyze` does what the UI always does: cross-references, PDB loading and private-symbol analysis.
-A database created by a quick open is upgraded in place by a later `--analyze` open, or by `.analyze <module>`.
+The disassembly shows as soon as the headers, modules, imports and exports are read. Two long tasks then run in
+the background: the **code analysis** of the main module (cross-references, the floating code it leads to) and the
+**symbols** (PDBs; of every module for a process, of the main module for a file). When both run, the module is analyzed
+again with its private symbols.
+
+- **UI, new database:** a *New Database* dialog asks which of the two to start; both are checked.
+  Space or a click toggles a box, Tab moves, Enter starts. Esc or Cancel starts nothing, and the target stays open.
+  The answer is saved in the folder's [`meta.xml`](databases.md#metaxml).
+- **UI, database of an earlier open:** no dialog. The choice made then is used; a database made before the dialog
+  existed, or by `--cmd`, gets both. What is done already (an analyzed module) is not done again.
+- **UI with `--no-analysis` or `--no-symbols`:** the targets on the command line open with these, without the dialog.
+  Targets opened later from the menu still get it.
+- **`--cmd`:** both run unless `--no-analysis` or `--no-symbols` turns them off; the commands run after they finish.
+  Nothing is saved: the options are for that run only.
+
+Raw code (`--format raw`, or a file the UI opens as shellcode) is analyzed when it opens, as its whole range, so
+there is nothing to ask about. `.analyze <module>` and `.reload` start the tasks by hand at any time; a database
+created without the analysis is upgraded in place, and nothing in it is thrown away.
 
 ### Exit codes (`--cmd` mode)
 

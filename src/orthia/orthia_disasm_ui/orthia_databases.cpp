@@ -65,6 +65,20 @@ namespace orthia
     const char* const g_folderKindFile = "file";
     const char* const g_folderKindProcess = "process";
 
+    AutoTasks GetFolderAutoTasks(const FolderMeta& meta)
+    {
+        AutoTasks tasks;
+        tasks.analyze = meta.autoAnalysis != 0;
+        tasks.symbols = meta.autoSymbols != 0;
+        return tasks;
+    }
+
+    void SetFolderAutoTasks(FolderMeta& meta, const AutoTasks& tasks)
+    {
+        meta.autoAnalysis = tasks.analyze ? 1 : 0;
+        meta.autoSymbols = tasks.symbols ? 1 : 0;
+    }
+
     bool ReadFolderMeta(const PlatformString_type& fileName, FolderMeta& meta)
     {
         std::ifstream stream(fs::path(fileName), std::ios::binary);
@@ -102,6 +116,8 @@ namespace orthia
         parser.QueryMetadata(ORTHIA_TCSTR("name"), &result.name);
         parser.QueryMetadata("start", &result.startUnix);
         parser.QueryMetadata(std::string("start_key"), &result.startKey);
+        parser.QueryMetadata("auto_analysis", &result.autoAnalysis);
+        parser.QueryMetadata("auto_symbols", &result.autoSymbols);
         meta = std::move(result);
         return true;
     }
@@ -149,6 +165,14 @@ namespace orthia
             builder.AddMetadata("image_base", meta.imageBase);
             builder.AddMetadata("size", meta.size);
             builder.AddMetadata(std::string("sha1"), meta.sha1);
+        }
+        if (meta.autoAnalysis >= 0)
+        {
+            builder.AddMetadata("auto_analysis", meta.autoAnalysis);
+        }
+        if (meta.autoSymbols >= 0)
+        {
+            builder.AddMetadata("auto_symbols", meta.autoSymbols);
         }
         // plain XML text: the blob form, Produce(std::vector<char>*), ends with '\0'
         // and that makes the file invalid XML for other tools

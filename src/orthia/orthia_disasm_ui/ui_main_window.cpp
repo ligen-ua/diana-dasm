@@ -334,13 +334,13 @@ void CMainWindow::OnAfterInit(std::shared_ptr<oui::CWindowsPool> pool)
         }
         if (info.process)
         {
-            if (!AsyncOpenProcess(info.process))
+            if (!AsyncOpenProcess(info.process, true))
             {
                 m_outputWindow->AddLine(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("file-error-name")), info.process->GetFullFileNameForUI()));
             }
             continue;
         }
-        if (!AsyncOpenFile(info.file))
+        if (!AsyncOpenFile(info.file, true))
         {
             m_outputWindow->AddLine(oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("file-error-name")), info.file->GetFullFileNameForUI()));
         }

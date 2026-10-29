@@ -40,12 +40,13 @@ and a rebuilt file gets a new one.
 
 Dependency files (imported DLLs and shared objects) are **not** copied. See [Dependencies](#dependencies).
 
-### Quick open and `--analyze`
+### Analysis and symbols
 
-A `--cmd` run without `--analyze` records only headers, modules, imports and exports.
-The UI, and `--cmd` with `--analyze`, add cross-references, PDB symbols and the private-symbol analysis.
-A database created by a quick open is upgraded in place by a later deep open, or by `.analyze <module>`;
-nothing is thrown away.
+An open records the headers, modules, imports and exports. The code analysis and the symbols are background tasks
+after it, which the UI asks about for a new database and `--no-analysis` / `--no-symbols` turn off
+(see [What starts after an open](orthia.md#what-starts-after-an-open)).
+A database created without them is upgraded in place by a later open that runs them, or by `.analyze <module>`
+and `.reload`; nothing is thrown away.
 
 ## Processes: `proc/[pid] name <start>/`
 
@@ -130,6 +131,7 @@ Every `db/` and `proc/` folder made since `meta.xml` was added has one, in the s
 | `diana_mode`, `diana_arch` | the pointer size and the architecture, as in `parameters.xml` |
 | `format`, `image_base`, `size`, `sha1` | files: the format the file opened as (`pe`, `elf`, `raw`), where it is mapped, its size and SHA-1 |
 | `pid`, `name`, `start`, `start_key` | processes: the pid, `[pid] name`, the start (UTC seconds) and the exact start that decides reuse |
+| `auto_analysis`, `auto_symbols` | what the UI's *New Database* dialog started, `1` or `0`; the next opens in the UI do the same. Missing when no one was asked (`--cmd`, the command line options, older folders): both then run |
 
 A file database written before `meta.xml` gets one on its next open. `--overwrite-db` writes a new one with
 the new database.

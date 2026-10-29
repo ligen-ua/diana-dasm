@@ -318,6 +318,7 @@
     <ClCompile Include="oui_disasm_colors.cpp" />
     <ClCompile Include="oui_goto_dialog.cpp" />
     <ClCompile Include="oui_shellcode_dialog.cpp" />
+    <ClCompile Include="oui_auto_tasks_dialog.cpp" />
     <ClCompile Include="oui_open_process_dialog.cpp" />
     <ClCompile Include="oui_processes.cpp" />
     <ClCompile Include="oui_processes_win32.cpp" />
@@ -370,6 +371,7 @@
     <ClInclude Include="oui_disasm_colors.h" />
     <ClInclude Include="oui_goto_dialog.h" />
     <ClInclude Include="oui_shellcode_dialog.h" />
+    <ClInclude Include="oui_auto_tasks_dialog.h" />
     <ClInclude Include="oui_open_process_dialog.h" />
     <ClInclude Include="oui_processes.h" />
     <ClInclude Include="oui_sandbox_win32.h" />

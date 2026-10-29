@@ -17,6 +17,8 @@
 #include "orthia_module_manager.h"
 #include "orthia_database_module.h"
 #include "orthia_stack_walk.h"
+#include "orthia_model.h"
+#include "oui_checkbox.h"
 extern "C"
 {
 #include "diana_core.h"
@@ -275,6 +277,140 @@ TEST(Databases, FolderMetaRoundTrip)
         std::ofstream(fs::path(fileName), std::ios::binary | std::ios::trunc).write(data.data(), (std::streamsize)data.size());
     }
     EXPECT_FALSE(orthia::ReadFolderMeta(fileName, meta));
+}
+
+// what the user chose to start on the first open, kept for the next ones
+TEST(Databases, FolderMetaAutoTasks)
+{
+    namespace fs = std::filesystem;
+    const fs::path root = fs::temp_directory_path() / ORTHIA_TCSTR("orthia_test_folder_meta_tasks");
+    std::error_code ec;
+    fs::remove_all(root, ec);
+    fs::create_directories(root);
+    oui::ScopedGuard cleanup([&]() { std::error_code ec2; fs::remove_all(root, ec2); });
+    const auto fileName = (root / ORTHIA_TCSTR("meta.xml")).native();
+
+    // not chosen: not written, read as not chosen, and that means both
+    orthia::FolderMeta file;
+    file.kind = orthia::g_folderKindFile;
+    file.sha1 = "aa";
+    orthia::WriteFolderMeta(fileName, file);
+    orthia::FolderMeta meta;
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, meta));
+    EXPECT_EQ(-1, meta.autoAnalysis);
+    EXPECT_EQ(-1, meta.autoSymbols);
+    {
+        std::ifstream stream(fs::path(fileName), std::ios::binary);
+        std::string text((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+        EXPECT_EQ(std::string::npos, text.find("auto_"));
+    }
+    EXPECT_TRUE(orthia::GetFolderAutoTasks(meta).analyze);
+    EXPECT_TRUE(orthia::GetFolderAutoTasks(meta).symbols);
+
+    // chosen, then rewritten in place: the other fields stay
+    orthia::AutoTasks tasks;
+    tasks.analyze = true;
+    tasks.symbols = false;
+    orthia::SetFolderAutoTasks(meta, tasks);
+    orthia::WriteFolderMeta(fileName, meta);
+    orthia::FolderMeta reread;
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, reread));
+    EXPECT_EQ(1, reread.autoAnalysis);
+    EXPECT_EQ(0, reread.autoSymbols);
+    EXPECT_EQ(std::string("aa"), reread.sha1);
+    EXPECT_EQ(meta.createdUnix, reread.createdUnix);
+    EXPECT_TRUE(orthia::GetFolderAutoTasks(reread).analyze);
+    EXPECT_FALSE(orthia::GetFolderAutoTasks(reread).symbols);
+}
+
+TEST(Databases, ResolveAutoTasks)
+{
+    orthia::AutoTasks none;
+    none.analyze = false;
+    none.symbols = false;
+    orthia::AutoTasks symbolsOnly;
+    symbolsOnly.analyze = false;
+    auto same = [](const orthia::AutoTasks& a, const orthia::AutoTasks& b) {
+        return a.analyze == b.analyze && a.symbols == b.symbols;
+    };
+
+    // --cmd, or the UI with --no-analysis/--no-symbols: what is given, new database or not
+    orthia::OpenOptions fixed;
+    fixed.policy = orthia::AutoTasksPolicy::Fixed;
+    fixed.tasks = symbolsOnly;
+    orthia::FolderMeta chosenNone;
+    orthia::SetFolderAutoTasks(chosenNone, none);
+    bool ask = true;
+    EXPECT_TRUE(same(symbolsOnly, orthia::ResolveAutoTasks(fixed, true, nullptr, &ask)));
+    EXPECT_FALSE(ask);
+    EXPECT_TRUE(same(symbolsOnly, orthia::ResolveAutoTasks(fixed, false, &chosenNone, &ask)));
+    EXPECT_FALSE(ask);
+
+    // the UI, a new database: nothing yet, ask
+    orthia::OpenOptions askIfNew;
+    askIfNew.policy = orthia::AutoTasksPolicy::AskIfNew;
+    EXPECT_TRUE(same(none, orthia::ResolveAutoTasks(askIfNew, true, nullptr, &ask)));
+    EXPECT_TRUE(ask);
+
+    // the UI, a database of an earlier open: the choice made then, or both when there was none
+    EXPECT_TRUE(same(none, orthia::ResolveAutoTasks(askIfNew, false, &chosenNone, &ask)));
+    EXPECT_FALSE(ask);
+    orthia::FolderMeta notChosen;
+    EXPECT_TRUE(same(orthia::AutoTasks(), orthia::ResolveAutoTasks(askIfNew, false, &notChosen, &ask)));
+    EXPECT_FALSE(ask);
+    EXPECT_TRUE(same(orthia::AutoTasks(), orthia::ResolveAutoTasks(askIfNew, false, nullptr, &ask)));
+    EXPECT_FALSE(ask);
+}
+
+TEST(Controls, CheckBoxToggles)
+{
+    auto profile = std::make_shared<oui::ButtonColorProfile>();
+    auto check = std::make_shared<oui::CCheckBox>(profile, []() { return oui::String(OUI_STR("text")); }, true);
+    std::vector<bool> changes;
+    check->SetChangeHandler([&](bool checked) { changes.push_back(checked); });
+    EXPECT_TRUE(check->IsChecked());
+
+    oui::WindowEventContext context;
+    auto key = [](oui::VirtualKey virtualKey, const oui::String& text, int state) {
+        oui::InputEvent evt;
+        evt.keyEvent.valid = true;
+        evt.keyEvent.virtualKey = virtualKey;
+        evt.keyEvent.rawText = text;
+        evt.keyState.state = state;
+        return evt;
+    };
+    const oui::String space(OUI_STR(" "));
+
+    // Space toggles
+    auto evt = key(oui::VirtualKey::None, space, 0);
+    EXPECT_TRUE(check->ProcessEvent(evt, context));
+    EXPECT_FALSE(check->IsChecked());
+
+    // Ctrl+Space, Enter and other text don't, and Enter goes on to the dialog
+    evt = key(oui::VirtualKey::None, space, oui::KeyState::AnyCtrl);
+    check->ProcessEvent(evt, context);
+    evt = key(oui::VirtualKey::Enter, oui::String(), 0);
+    EXPECT_FALSE(check->ProcessEvent(evt, context));
+    evt = key(oui::VirtualKey::None, oui::String(OUI_STR("x")), 0);
+    check->ProcessEvent(evt, context);
+    EXPECT_FALSE(check->IsChecked());
+
+    // a click toggles on the release
+    oui::InputEvent mouse;
+    mouse.mouseEvent.valid = true;
+    mouse.mouseEvent.button = oui::MouseButton::Left;
+    mouse.mouseEvent.state = oui::MouseState::Pressed;
+    oui::MouseEventContext mouseContext;
+    check->HandleMouseEvent(oui::Rect(), mouse, mouseContext);
+    EXPECT_FALSE(check->IsChecked());
+    mouse.mouseEvent.state = oui::MouseState::Released;
+    check->HandleMouseEvent(oui::Rect(), mouse, mouseContext);
+    EXPECT_TRUE(check->IsChecked());
+
+    // SetChecked is not a change by the user
+    check->SetChecked(false);
+    EXPECT_FALSE(check->IsChecked());
+    EXPECT_EQ((std::vector<bool>{ false, true }), changes);
 }
 
 TEST(Databases, ResolveSelectors)

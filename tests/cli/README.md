@@ -29,24 +29,25 @@ Every run sets two environment variables that the binary honours:
 | `ORTHIA_HOME` | `%APPDATA%\Orthia` / `$XDG_DATA_HOME/Orthia` (databases) |
 | `ORTHIA_SYMBOL_PATH` | default symbol folders (`C:\Sym;C:\Symbols`, `~/sym;~/symbols`) |
 
-## Quick open vs `--analyze`
+## Quick open vs full open
 
-By default `--cmd` opens a target quickly: headers, modules, imports and exports only. It skips deep code analysis and symbol loading.
-`--analyze` gives the full behaviour the UI uses: cross-references, PDB loading and private-symbol analysis.
-A DB created quickly is upgraded in place by a later `--analyze` open or by `.analyze <module>`, and its names are kept.
+`--cmd` runs the code analysis and loads the symbols by default, as the UI does. A quick open
+(`--no-analysis --no-symbols`) reads only headers, modules, imports and exports.
+`Orthia.run` adds these two options unless the instance was made with `analyze=True`; `Orthia.raw` adds nothing.
+A DB created quickly is upgraded in place by a later full open or by `.analyze <module>`, and its names are kept.
 
 Fixtures in `conftest.py`:
 
 | Fixture | Mode | DB | Symbols |
 |---|---|---|---|
 | `orthia` | quick | shared across the session (warm) | none |
-| `orthia_full` | `--analyze` | its own, shared across the session | none |
-| `orthia_pdb` | `--analyze` | its own, shared across the session | `ntkrnlmp.pdb` from `data/private/pe/nt.zip` |
-| `orthia_self_pdb` | `--analyze` | its own, shared across the session | the PDB of the binary under test (Windows) |
+| `orthia_full` | full | its own, shared across the session | none |
+| `orthia_pdb` | full | its own, shared across the session | `ntkrnlmp.pdb` from `data/private/pe/nt.zip` |
+| `orthia_self_pdb` | full | its own, shared across the session | the PDB of the binary under test (Windows) |
 | `orthia_cold` | quick | new for each test | none |
 
 `orthia_cold.with_(analyze=True)` or `.with_(symbol_path=…)` gives a variant that uses the same home.
-Fixtures never share a home: an `--analyze` open upgrades the DB and loaded symbols persist in it, so shared homes would make results depend on test order.
+Fixtures never share a home: a full open upgrades the DB and loaded symbols persist in it, so shared homes would make results depend on test order.
 After the session, every test DB is checked with `PRAGMA foreign_key_check`.
 
 ## Test data

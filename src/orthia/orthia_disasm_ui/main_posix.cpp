@@ -42,8 +42,11 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "                    exited: a path, its data.db, or a pid or name of .database list\n";
     out << "  --cmd <command>   run <command> without UI and exit\n";
     out << "                    (repeatable, one command per --cmd, executed in order)\n";
-    out << "  --analyze         with --cmd: deep code analysis and symbol loading on open\n";
-    out << "                    (default: headers, modules, imports and exports only)\n";
+    out << "  --no-analysis     no code analysis of the opened target (.analyze does it later)\n";
+    out << "  --no-symbols      no symbol loading for the opened target (.reload does it later)\n";
+    out << "                    (default: both; the UI asks when a target has no database\n";
+    out << "                    yet, unless one of these is given)\n";
+    out << "  --analyze         accepted for compatibility: analysis is the default\n";
     out << "  --format <format> with --cmd: open the --file as pe, elf or raw (code without\n";
     out << "                    headers) instead of the format it is detected as\n";
     out << "  --base <address>  with --format raw: where the code is placed\n";
@@ -99,7 +102,8 @@ int main(int argc, const char* argv[])
     std::vector<std::string> procFoldersToOpen;
     std::vector<std::string> commandsToRun;
     const std::string programName = GetProgramName(argc > 0 ? argv[0] : nullptr);
-    bool analyze = false;
+    orthia::AutoTasks autoTasks;
+    bool autoTasksExplicit = false;
     bool overwriteDatabases = false;
     bool captureModules = false;
 
@@ -199,8 +203,19 @@ int main(int argc, const char* argv[])
             }
             if (strcmp(argv[i], "--analyze") == 0)
             {
-                // the UI always analyzes, so it only matters with --cmd
-                analyze = true;
+                // the default now; kept so that older scripts still run
+                continue;
+            }
+            if (strcmp(argv[i], "--no-analysis") == 0)
+            {
+                autoTasks.analyze = false;
+                autoTasksExplicit = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--no-symbols") == 0)
+            {
+                autoTasks.symbols = false;
+                autoTasksExplicit = true;
                 continue;
             }
             if (strcmp(argv[i], "--capture") == 0)
@@ -316,12 +331,13 @@ int main(int argc, const char* argv[])
 
         config->SetOverwriteDatabases(overwriteDatabases);
         config->SetCaptureModules(captureModules);
+        config->SetCliAutoTasks(autoTasks, autoTasksExplicit);
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 
         if (consoleMode)
         {
             const int result = orthia::RunConsoleMode(programModel,
-                { commandsToRun, filenamesToOpen, processesToOpen, procFoldersToOpen, analyze, fileFormat });
+                { commandsToRun, filenamesToOpen, processesToOpen, procFoldersToOpen, fileFormat });
             programModel.reset();
             return result;
         }

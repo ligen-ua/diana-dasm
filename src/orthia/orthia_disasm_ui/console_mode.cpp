@@ -195,6 +195,15 @@ namespace
         fflush(stdout);
     }
 
+    // no one to ask: what the command line says (--no-analysis, --no-symbols), for every database
+    OpenOptions GetConsoleOpenOptions(const std::shared_ptr<CProgramModel>& model)
+    {
+        OpenOptions options;
+        options.policy = AutoTasksPolicy::Fixed;
+        options.tasks = model->GetConfig()->GetCliAutoTasks();
+        return options;
+    }
+
     // Mirrors CMainWindow::AsyncOpenFile/AsyncOpenProcess: the model call itself runs
     // on the file system pool, the completion handler comes back on the pump thread.
     template<class CompleteHandler_type, class Submit_type>
@@ -255,7 +264,8 @@ namespace
         }
         return OpenTargetAndWait<oui::fsui::FileCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::FileCompleteHandler_type>> handler) {
-                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler, fileFormat]() {
+                const OpenOptions openOptions = GetConsoleOpenOptions(model);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler, fileFormat, openOptions]() {
                     // ParseFileFormatOptions checked the format and its parameters
                     const IImageFormat* format = nullptr;
                     MapFileParameters params;
@@ -269,7 +279,7 @@ namespace
                             params.dianaArch = fileFormat.dianaArch;
                         }
                     }
-                    model->AddExecutable(file, handler, format, params);
+                    model->AddExecutable(file, handler, openOptions, format, params);
                 });
             });
     }
@@ -295,8 +305,9 @@ namespace
         }
         return OpenTargetAndWait<oui::fsui::ProcessCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::ProcessCompleteHandler_type>> handler) {
-                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler]() {
-                    model->AddProcess(process, handler);
+                const OpenOptions openOptions = GetConsoleOpenOptions(model);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler, openOptions]() {
+                    model->AddProcess(process, handler, openOptions);
                 });
             });
     }
@@ -317,8 +328,9 @@ namespace
         }
         return OpenTargetAndWait<oui::fsui::ProcessCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::ProcessCompleteHandler_type>> handler) {
-                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler]() {
-                    model->AddSavedProcess(process, handler);
+                const OpenOptions openOptions = GetConsoleOpenOptions(model);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler, openOptions]() {
+                    model->AddSavedProcess(process, handler, openOptions);
                 });
             });
     }
@@ -376,8 +388,6 @@ namespace
 #endif
         CHeadlessPump pump;
 
-        // before anything is opened: AddExecutable/AddProcess and the analyzer read it
-        model->GetConfig()->SetDeepAnalysis(options.analyze);
         // no UI to draw the output: the pump drains it as fast as it comes
         model->GetCommandProcessor()->SetOutputPause(false);
 

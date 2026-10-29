@@ -17,6 +17,8 @@ import pytest
 pytestmark = pytest.mark.process
 
 HELPER_NAME = "orthia_floating_helper"
+# Orthia.raw adds nothing: what Orthia.run gives orthia_cold, a quick open (no analysis, no symbols)
+QUICK = ("--no-analysis", "--no-symbols")
 # "00007ff7`a5d70000  00007ff7`a5d71000   fl_7ff7a5d70000   RWX      1        analyzed"
 LMF_ROW = r"^(\S+)\s+(\S+)\s+{name}\s+(\S+)\s+(\d+)\s+(\S+)$"
 
@@ -272,7 +274,7 @@ def test_saved_folder_after_exit(orthia_cold, helper):
     helper.proc.stdin.close()
     helper.proc.wait(timeout=30)
 
-    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lm", "--cmd", "lmf",
+    res = orthia_cold.raw(*QUICK, "--proc-folder", helper.pid, "--cmd", "lm", "--cmd", "lmf",
                           "--cmd", f"u {stub}!$entry_0001 L1",
                           "--cmd", f"modinfo {HELPER_NAME}").assert_ok()
     assert_found(res, helper, helper.stub)
@@ -289,14 +291,14 @@ def test_saved_folder_after_exit(orthia_cold, helper):
     # by its path too, or its data.db; the folder stays
     folders = list((orthia_cold.home / "proc").iterdir())
     assert len(folders) == 1, folders
-    res = orthia_cold.raw("--proc-folder", str(folders[0] / "data.db"), "--cmd", "lmf").assert_ok()
+    res = orthia_cold.raw(*QUICK, "--proc-folder", str(folders[0] / "data.db"), "--cmd", "lmf").assert_ok()
     assert_found(res, helper, helper.stub)
     assert (folders[0] / "data.db").is_file()
     assert (folders[0] / "modules.xml").is_file()
 
 
 def test_saved_folder_not_found(orthia_cold):
-    res = orthia_cold.raw("--proc-folder", "no_such_folder_or_pid", "--cmd", "lmf")
+    res = orthia_cold.raw(*QUICK, "--proc-folder", "no_such_folder_or_pid", "--cmd", "lmf")
     assert res.code == 3, res
     assert "Can't open the saved process folder" in res.stderr, res
 
@@ -310,7 +312,7 @@ def test_capture_after_exit(orthia_cold, helper):
     helper.proc.stdin.close()
     helper.proc.wait(timeout=30)
 
-    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lm", "--cmd", "lmf",
+    res = orthia_cold.raw(*QUICK, "--proc-folder", helper.pid, "--cmd", "lm", "--cmd", "lmf",
                           "--cmd", f"u {helper.target:x} L1", "--cmd", "threads",
                           "--cmd", f"modinfo {HELPER_NAME}").assert_ok()
     res.assert_line(rf"^\S+\s+\S+\s+{HELPER_NAME}(\.exe)?\s+captured, analyzed$")
@@ -332,7 +334,7 @@ def test_capture_option_saves_analyzed_modules(orthia_cold, helper):
     orthia_cold.run(f".analyze {HELPER_NAME}", pid=helper.pid, options=("--capture",)).assert_ok()
     helper.proc.stdin.close()
     helper.proc.wait(timeout=30)
-    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lm", "--cmd", f"u {helper.target:x} L1").assert_ok()
+    res = orthia_cold.raw(*QUICK, "--proc-folder", helper.pid, "--cmd", "lm", "--cmd", f"u {helper.target:x} L1").assert_ok()
     res.assert_line(rf"^\S+\s+\S+\s+{HELPER_NAME}(\.exe)?\s+captured, analyzed$")
     assert re.search(r"\s+linked$", res.stdout, re.M), res
     target = re.escape(helper.address_text(helper.target))
@@ -343,7 +345,7 @@ def test_capture_needs_a_running_process(orthia_cold, helper):
     orthia_cold.run(f".analyze {HELPER_NAME}", pid=helper.pid).assert_ok()
     helper.proc.stdin.close()
     helper.proc.wait(timeout=30)
-    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", ".capture")
+    res = orthia_cold.raw(*QUICK, "--proc-folder", helper.pid, "--cmd", ".capture")
     assert res.code == 1, res
     assert "Nothing to capture: not a running process" in res.stdout + res.stderr, res
 
@@ -368,7 +370,7 @@ def test_saved_view_stale_against_capture(orthia_cold, helper):
     helper.proc.stdin.close()
     helper.proc.wait(timeout=30)
 
-    res = orthia_cold.raw("--proc-folder", helper.pid, "--cmd", "lmf", "--cmd", f"modinfo {handler}").assert_ok()
+    res = orthia_cold.raw(*QUICK, "--proc-folder", helper.pid, "--cmd", "lmf", "--cmd", f"modinfo {handler}").assert_ok()
     assert lmf_row(res, helper.handler)[2] == "stale", res
     assert lmf_row(res, helper.stub)[2] == "analyzed", res
     res.assert_line(r"^Snapshot: .+\.bin \(")

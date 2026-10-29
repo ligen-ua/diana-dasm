@@ -40,6 +40,7 @@ set(SOURCES
     oui_disasm_colors.cpp
     oui_goto_dialog.cpp
     oui_shellcode_dialog.cpp
+    oui_auto_tasks_dialog.cpp
     oui_open_process_dialog.cpp
     oui_processes.cpp
     ui_command_window.cpp

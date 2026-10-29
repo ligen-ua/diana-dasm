@@ -80,6 +80,10 @@ class CMainWindow:public oui::SimpleBrush<oui::Fullscreen<oui::CWindow>>, public
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler = nullptr);
     bool AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode, int dianaArch,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> outerHandler = nullptr);
+    // initialTarget: given on the command line; --no-analysis/--no-symbols open it without asking
+    orthia::OpenOptions GetOpenOptions(bool initialTarget) const;
+    // model_OpenResult_extraInfo_AskAutoTasks: the new database of the item, what to start
+    void ShowAutoTasksDialog(int workspaceId);
     void SetFocusImpl() override;
 
     void SetDefaultTitle();
@@ -95,8 +99,8 @@ public:
     void AddInitialTextOutputInfo(const oui::String& text);
     void ConstructChilds() override;
     bool ProcessEvent(oui::InputEvent& evt, oui::WindowEventContext& evtContext) override;
-    bool AsyncOpenFile(std::shared_ptr<oui::IFile2> file);
-    bool AsyncOpenProcess(std::shared_ptr<oui::IProcess> process);
+    bool AsyncOpenFile(std::shared_ptr<oui::IFile2> file, bool initialTarget = false);
+    bool AsyncOpenProcess(std::shared_ptr<oui::IProcess> process, bool initialTarget = false);
     std::shared_ptr<CSectionsWindow> GetSectionsWindow() { return m_sectionsWindow; }
     void SwitchToSectionsPanel();
 };
