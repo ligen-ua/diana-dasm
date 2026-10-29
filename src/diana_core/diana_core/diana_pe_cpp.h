@@ -82,6 +82,14 @@ public:
     virtual ~CBasePeLinkImportsObserver()
     {
     }
+    // Valid in QueryFunctionByName/ByOrdinal: where the function is reported (ReportInfo, just before
+    // the call):
+    //  - a PE import: its IAT slot; an ELF import: its GOT slot (the stream's address + the slot)
+    //  - a PE export: its AddressOfFunctions entry (an RVA), not the export's value
+    //  - an ELF export: the address of its name in the string table
+    // The value itself is *pAddress (a PE forwarder: 0, and hint is the forwarder string's RVA).
+    // Code relies on this (import names keyed by slot, floating code slot hooks): see the
+    // PointerSlots tests in ui_tests.cpp
     OPERAND_SIZE GetLastAddress() const
     {
         return m_lastAddress;
@@ -95,6 +103,7 @@ public:
                                      DI_UINT32 hint,
                                      OPERAND_SIZE * pAddress) = 0;
 
+    // reportInfo_fnc, before each function; see GetLastAddress for what address is
     virtual void ReportInfo(OPERAND_SIZE address) { m_lastAddress = address; }
 
     DianaPeFile_LinkImports_Observer * GetParent() 

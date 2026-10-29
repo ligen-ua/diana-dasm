@@ -37,16 +37,24 @@ static void PrintUsage(std::ostream& out, const std::string& programName)
     out << "Options:\n";
     out << "  --file <filename> open the given executable file\n";
     out << "  --pid <pid>       open the process with the given id (\"self\" for this process)\n";
+    out << "  --proc-folder <folder|pid>\n";
+    out << "                    open a saved process folder (proc/...) after the process\n";
+    out << "                    exited: a path, its data.db, or a pid or name of .database list\n";
     out << "  --cmd <command>   run <command> without UI and exit\n";
     out << "                    (repeatable, one command per --cmd, executed in order)\n";
-    out << "  --analyze         with --cmd: deep code analysis and symbol loading on open\n";
-    out << "                    (default: headers, modules, imports and exports only)\n";
+    out << "  --no-analysis     no code analysis of the opened target (.analyze does it later)\n";
+    out << "  --no-symbols      no symbol loading for the opened target (.reload does it later)\n";
+    out << "                    (default: both; the UI asks when a target has no database\n";
+    out << "                    yet, unless one of these is given)\n";
+    out << "  --analyze         accepted for compatibility: analysis is the default\n";
     out << "  --format <format> with --cmd: open the --file as pe, elf or raw (code without\n";
     out << "                    headers) instead of the format it is detected as\n";
     out << "  --base <address>  with --format raw: where the code is placed\n";
     out << "  --arch <arch>     with --format raw: how it is disassembled, x86, x64,\n";
     out << "                    arm64, arm or thumb\n";
     out << "                    (the UI asks for these when it doesn't recognize a file)\n";
+    out << "  --capture         save the memory of each analyzed module of a process into\n";
+    out << "                    its folder (deep mode: see .capture)\n";
     out << "  --overwrite-db    new, empty databases for the targets opened in this run\n";
     out << "                    (default: reuse the database of an earlier open)\n";
     out << "  --no-sandbox     no privilege drop under sudo and no syscall filter\n";
@@ -91,16 +99,20 @@ int main(int argc, const char* argv[])
 
     std::vector<unsigned long long> processesToOpen;
     std::vector<std::string> filenamesToOpen;
+    std::vector<std::string> procFoldersToOpen;
     std::vector<std::string> commandsToRun;
     const std::string programName = GetProgramName(argc > 0 ? argv[0] : nullptr);
-    bool analyze = false;
+    orthia::AutoTasks autoTasks;
+    bool autoTasksExplicit = false;
     bool overwriteDatabases = false;
+    bool captureModules = false;
 
     try
     {
         bool nextIsPid = false;
         bool nextIsCmd = false;
         bool nextIsFile = false;
+        bool nextIsProcFolder = false;
         bool dropPrivileges = true;
         std::optional<std::string> formatArg, baseArg, archArg;
         std::optional<std::string>* nextValue = nullptr;      // --format, --base, --arch
@@ -123,6 +135,12 @@ int main(int argc, const char* argv[])
             {
                 filenamesToOpen.push_back(argv[i]);
                 nextIsFile = false;
+                continue;
+            }
+            if (nextIsProcFolder)
+            {
+                procFoldersToOpen.push_back(argv[i]);
+                nextIsProcFolder = false;
                 continue;
             }
             if (nextIsPid)
@@ -158,6 +176,11 @@ int main(int argc, const char* argv[])
                 nextIsCmd = true;
                 continue;
             }
+            if (strcmp(argv[i], "--proc-folder") == 0)
+            {
+                nextIsProcFolder = true;
+                continue;
+            }
             if (strcmp(argv[i], "--file") == 0)
             {
                 nextIsFile = true;
@@ -180,8 +203,24 @@ int main(int argc, const char* argv[])
             }
             if (strcmp(argv[i], "--analyze") == 0)
             {
-                // the UI always analyzes, so it only matters with --cmd
-                analyze = true;
+                // the default now; kept so that older scripts still run
+                continue;
+            }
+            if (strcmp(argv[i], "--no-analysis") == 0)
+            {
+                autoTasks.analyze = false;
+                autoTasksExplicit = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--no-symbols") == 0)
+            {
+                autoTasks.symbols = false;
+                autoTasksExplicit = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--capture") == 0)
+            {
+                captureModules = true;
                 continue;
             }
             if (strcmp(argv[i], "--overwrite-db") == 0)
@@ -217,7 +256,7 @@ int main(int argc, const char* argv[])
             PrintUsage(std::cerr, programName);
             return orthia::consoleExit_Usage;
         }
-        if (nextIsPid || nextIsCmd || nextIsFile || nextValue)
+        if (nextIsPid || nextIsCmd || nextIsFile || nextIsProcFolder || nextValue)
         {
             std::cerr << "Missing value for " << argv[argc - 1] << "\n\n";
             PrintUsage(std::cerr, programName);
@@ -291,12 +330,14 @@ int main(int argc, const char* argv[])
         }
 
         config->SetOverwriteDatabases(overwriteDatabases);
+        config->SetCaptureModules(captureModules);
+        config->SetCliAutoTasks(autoTasks, autoTasksExplicit);
         auto programModel = std::make_shared<orthia::CProgramModel>(config);
 
         if (consoleMode)
         {
             const int result = orthia::RunConsoleMode(programModel,
-                { commandsToRun, filenamesToOpen, processesToOpen, analyze, fileFormat });
+                { commandsToRun, filenamesToOpen, processesToOpen, procFoldersToOpen, fileFormat });
             programModel.reset();
             return result;
         }
@@ -311,7 +352,7 @@ int main(int argc, const char* argv[])
             programModel->Stop();
         });
 
-        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen);
+        rootWindow->AddInitialTargets(filenamesToOpen, processesToOpen, procFoldersToOpen);
         app.Loop(rootWindow);
     }
     catch (const std::exception& err)

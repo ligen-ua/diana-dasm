@@ -7,6 +7,20 @@ namespace orthia
 CModuleManager::CModuleManager()
 {
 }
+void CModuleManager::SetExternalTargetFilter(ExternalTargetFilterFactory_type factory)
+{
+    CAutoCriticalSection guard(m_filterLock);
+    m_externalTargetFilter = std::move(factory);
+}
+ExternalTargetFilter_type CModuleManager::MakeExternalTargetFilter() const
+{
+    ExternalTargetFilterFactory_type factory;
+    {
+        CAutoCriticalSection guard(m_filterLock);
+        factory = m_externalTargetFilter;
+    }
+    return factory ? factory() : ExternalTargetFilter_type();
+}
 void CModuleManager::Reinit(const orthia::PlatformString_type & fullFileName,
                             bool bForce)
 {
@@ -69,7 +83,7 @@ void CModuleManager::ReloadRange(Address_type offset,
 
     module.Analyze(analyserFlags);
 
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     fileSaver.Save(module, *QueryDatabaseManager(), regionName.str(), true);
 }
 
@@ -93,7 +107,7 @@ void CModuleManager::ReloadModule(Address_type offset,
 
         dbManager->GetClassicDatabase()->UnloadModule(offset, true);
         
-        CDatabaseSaver fileSaver;
+        CDatabaseSaver fileSaver(MakeExternalTargetFilter());
         fileSaver.Save(module, *dbManager, name, true);
     }
 }
@@ -129,7 +143,7 @@ void CModuleManager::AnalyzeRegisteredModule(Address_type offset,
     // Neither UnloadModule nor replacing the tbl_modules row: tbl_metainfo (exports,
     // private symbols, module flags) is ON DELETE CASCADE from it. Only missing
     // references are added, so running it on an analyzed module is harmless.
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     fileSaver.SaveWithDedup(module, *QueryDatabaseManager(), name);
 }
 
@@ -146,8 +160,116 @@ void CModuleManager::ReloadModuleWithHints(Address_type offset,
     module.AnalyzeWithHints(analyserFlags, hints);
 
     auto dbManager = QueryDatabaseManager();
-    CDatabaseSaver fileSaver;
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
     fileSaver.SaveWithDedup(module, *dbManager, name);
+}
+
+size_t CModuleManager::AnalyzeModuleWithIncoming(Address_type offset,
+                                                 IMemoryReader * pMemoryReader,
+                                                 const orthia::PlatformString_type & name,
+                                                 int analyserFlags)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    CDianaModule module;
+    module.Init(offset, pMemoryReader);
+
+    auto dbManager = QueryDatabaseManager();
+    auto classicDatabase = dbManager->GetClassicDatabase();
+    std::vector<Address_type> hints;
+    // TODO: AArch32 external targets lose bit 0 in diana_core (SaveNewExternalRoute gets the
+    // address without it), so a T32 target would be analyzed as A32
+    if (!IsDianaArchArm32(module.GetDianaArch()))
+    {
+        classicDatabase->QueryIncomingCodeTargets(offset, module.GetModuleSize(), hints);
+    }
+    if (hints.empty())
+    {
+        module.Analyze(analyserFlags);
+    }
+    else
+    {
+        module.AnalyzeWithHints(analyserFlags, hints);
+    }
+
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
+    if (classicDatabase->IsModuleExists(offset))
+    {
+        // the module row stays: tbl_metainfo (exports, symbols, flags) is ON DELETE CASCADE from it
+        fileSaver.SaveWithDedup(module, *dbManager, name);
+    }
+    else
+    {
+        fileSaver.Save(module, *dbManager, name, true);
+    }
+    return hints.size();
+}
+
+void CModuleManager::RegisterRange(Address_type offset,
+                                   Address_type size,
+                                   const orthia::PlatformString_type & name)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    auto classicDatabase = QueryDatabaseManager()->GetClassicDatabase();
+    // replacing the row would drop its metainfo (ON DELETE CASCADE)
+    if (classicDatabase->IsModuleExists(offset))
+    {
+        return;
+    }
+    CAutoRollbackClassicDatabase rollback;
+    classicDatabase->StartSaveModule(offset, size, name, &rollback, true);
+    classicDatabase->DoneSave();
+    rollback.Reset();
+}
+
+std::pair<Address_type, Address_type> CModuleManager::AnalyzeRange(Address_type offset,
+                                  Address_type size,
+                                  IMemoryReader * pMemoryReader,
+                                  int mode,
+                                  int arch,
+                                  int analyserFlags,
+                                  const std::vector<Address_type> & entryPoints,
+                                  const orthia::PlatformString_type & name)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    CDianaModule module;
+    module.InitRaw(offset, size, pMemoryReader, mode, arch);
+    module.AnalyzeWithHints(analyserFlags, entryPoints);
+
+    std::pair<Address_type, Address_type> extent(0, 0);
+    {
+        CDianaInstructionIterator iterator;
+        module.QueryInstructionIterator(&iterator);
+        bool first = true;
+        for (; !iterator.IsEmpty(); iterator.MoveToNext())
+        {
+            const Address_type address = iterator.GetInstructionOffset() + offset;
+            if (first || address < extent.first)
+                extent.first = address;
+            if (first || address > extent.second)
+                extent.second = address;
+            first = false;
+        }
+    }
+
+    CDatabaseSaver fileSaver(MakeExternalTargetFilter());
+    fileSaver.SaveWithDedup(module, *QueryDatabaseManager(), name);
+    return extent;
+}
+
+void CModuleManager::ClearModuleReferences(Address_type offset)
+{
+    CAutoCriticalSection guard(m_writeLock);
+
+    auto classicDatabase = QueryDatabaseManager()->GetClassicDatabase();
+    CommonModuleInfo info;
+    if (!classicDatabase->QueryModule(offset, &info))
+    {
+        return;
+    }
+    classicDatabase->ClearModuleReferences(offset, info.size);
 }
 
 // module info

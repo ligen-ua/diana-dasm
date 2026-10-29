@@ -1,6 +1,8 @@
 #include "orthia_databases.h"
+#include "orthia_capture.h"
 #include "orthia_config.h"
 #include "orthia_model_interfaces.h"
+#include "orthia_floating_code.h"
 #include "orthia_common_format.h"
 #include "oui_filesystem.h"
 #include "oui_processes.h"
@@ -63,6 +65,20 @@ namespace orthia
     const char* const g_folderKindFile = "file";
     const char* const g_folderKindProcess = "process";
 
+    AutoTasks GetFolderAutoTasks(const FolderMeta& meta)
+    {
+        AutoTasks tasks;
+        tasks.analyze = meta.autoAnalysis != 0;
+        tasks.symbols = meta.autoSymbols != 0;
+        return tasks;
+    }
+
+    void SetFolderAutoTasks(FolderMeta& meta, const AutoTasks& tasks)
+    {
+        meta.autoAnalysis = tasks.analyze ? 1 : 0;
+        meta.autoSymbols = tasks.symbols ? 1 : 0;
+    }
+
     bool ReadFolderMeta(const PlatformString_type& fileName, FolderMeta& meta)
     {
         std::ifstream stream(fs::path(fileName), std::ios::binary);
@@ -100,6 +116,8 @@ namespace orthia
         parser.QueryMetadata(ORTHIA_TCSTR("name"), &result.name);
         parser.QueryMetadata("start", &result.startUnix);
         parser.QueryMetadata(std::string("start_key"), &result.startKey);
+        parser.QueryMetadata("auto_analysis", &result.autoAnalysis);
+        parser.QueryMetadata("auto_symbols", &result.autoSymbols);
         meta = std::move(result);
         return true;
     }
@@ -147,6 +165,14 @@ namespace orthia
             builder.AddMetadata("image_base", meta.imageBase);
             builder.AddMetadata("size", meta.size);
             builder.AddMetadata(std::string("sha1"), meta.sha1);
+        }
+        if (meta.autoAnalysis >= 0)
+        {
+            builder.AddMetadata("auto_analysis", meta.autoAnalysis);
+        }
+        if (meta.autoSymbols >= 0)
+        {
+            builder.AddMetadata("auto_symbols", meta.autoSymbols);
         }
         // plain XML text: the blob form, Produce(std::vector<char>*), ends with '\0'
         // and that makes the file invalid XML for other tools
@@ -319,6 +345,8 @@ namespace orthia
             {
                 info.startKey = meta.startKey;
             }
+            info.hasFloatingSnapshots = HasFloatingSnapshots(info.folder);
+            info.hasCapture = HasCapture(info.folder);
         }
         return info;
     }
@@ -357,6 +385,66 @@ namespace orthia
         std::vector<DatabaseInfo> result;
         EnumerateFolder(nullptr, procFolderWithSlash, DatabaseInfo::Kind::Process, result);
         return result;
+    }
+
+    PlatformString_type FormatSize(unsigned long long size)
+    {
+        const char* units[] = { "B", "KB", "MB", "GB", "TB" };
+        double value = (double)size;
+        int unit = 0;
+        while (value >= 1024 && unit < 4)
+        {
+            value /= 1024;
+            ++unit;
+        }
+        char buffer[32];
+        if (unit == 0)
+        {
+            snprintf(buffer, sizeof(buffer), "%llu B", size);
+        }
+        else
+        {
+            snprintf(buffer, sizeof(buffer), "%.1f %s", value, units[unit]);
+        }
+        return Utf8ToPlatformString(buffer);
+    }
+
+    PlatformString_type FormatFileTime(std::filesystem::file_time_type time)
+    {
+        if (time == std::filesystem::file_time_type::min())
+        {
+            return ORTHIA_TCSTR("?");
+        }
+        // C++17 has no clock_cast: go through the distance from now
+        auto systemTime = std::chrono::system_clock::now() +
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(time - std::filesystem::file_time_type::clock::now());
+        std::time_t value = std::chrono::system_clock::to_time_t(systemTime);
+        tm local = { 0 };
+#ifdef DIANA_HAS_WIN32
+        localtime_s(&local, &value);
+#else
+        localtime_r(&value, &local);
+#endif
+        char buffer[32];
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &local);
+        return Utf8ToPlatformString(buffer);
+    }
+
+    PlatformString_type FindProcFolderByStart(const PlatformString_type& procFolderWithSlash,
+        unsigned long long pid, const std::string& startKey)
+    {
+        if (!pid || startKey.empty())
+        {
+            return PlatformString_type();
+        }
+        for (const auto& info : EnumerateProcDatabases(procFolderWithSlash))
+        {
+            if (!info.pendingDelete && info.hasDataDb && info.pid == pid && info.startKey == startKey)
+            {
+                return info.folder;
+            }
+        }
+        return PlatformString_type();
     }
 
     DatabaseDetails QueryDatabaseDetails(const CConfigOptionsStorage& config, const DatabaseInfo& info)
@@ -565,6 +653,11 @@ namespace orthia
                 }
                 continue;
             }
+            if (info.hasFloatingSnapshots || info.hasCapture)
+            {
+                // evidence: only .database delete removes it
+                continue;
+            }
             if (IsOlderThan(info, now, g_procFolderExpiration))
             {
                 result.push_back({ info, ORTHIA_TCSTR("not written for 48 hours") });
@@ -640,7 +733,7 @@ namespace orthia
         const auto now = fs::file_time_type::clock::now();
         for (const auto& info : EnumerateProcDatabases(procFolderWithSlash))
         {
-            if (info.pendingDelete || IsOlderThan(info, now, g_procFolderExpiration))
+            if (info.pendingDelete || (!info.hasFloatingSnapshots && !info.hasCapture && IsOlderThan(info, now, g_procFolderExpiration)))
             {
                 try
                 {

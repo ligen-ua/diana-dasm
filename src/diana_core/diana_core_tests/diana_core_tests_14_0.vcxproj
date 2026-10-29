@@ -286,6 +286,7 @@
     <ClCompile Include="test_new.cpp" />
     <ClCompile Include="test_or.cpp" />
     <ClCompile Include="test_patchers.cpp" />
+    <ClCompile Include="test_patchers_arm.cpp" />
     <ClCompile Include="test_push.cpp" />
     <ClCompile Include="test_sse4.cpp" />
     <ClCompile Include="test_stack.cpp" />

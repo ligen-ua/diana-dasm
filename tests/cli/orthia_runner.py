@@ -151,7 +151,8 @@ def check_x_sort_orders(orthia: "Orthia", mask: str, **target) -> List[Tuple[Opt
 
 class Orthia:
     """A configured orthia binary: one data home (databases), one symbol path, and
-    whether targets are opened with --analyze (deep analysis + symbols) or quickly."""
+    whether targets are opened fully (analysis + symbols, the --cmd default) or quickly
+    (--no-analysis --no-symbols)."""
 
     def __init__(self, exe: Path, home: Path, symbol_path: Path, analyze: bool = False,
                  timeout: float = 300):
@@ -194,8 +195,8 @@ class Orthia:
             raise ValueError("pass exactly one of file= or pid=")
         args: List[str] = ["--file", str(file)] if file is not None else ["--pid", str(pid)]
         args += list(options)
-        if self.analyze:
-            args.append("--analyze")
+        if not self.analyze:
+            args += ["--no-analysis", "--no-symbols"]
         for cmd in cmds:
             args += ["--cmd", cmd]
         return self.raw(*args, timeout=timeout)

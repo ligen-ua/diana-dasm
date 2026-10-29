@@ -9,6 +9,7 @@ typedef struct _DianaHook_InternalMessage
     DianaReadWriteRandomStream * pReadWriteStream;
     DianaHook_Allocator * pAllocator;
     int processorMode;
+    int arch;
     DianaHook_CustomOptions * pCustomOptions;
     OPERAND_SIZE addressToHook;
     OPERAND_SIZE patchContext;
@@ -19,7 +20,7 @@ typedef struct _DianaHook_InternalMessage
     DianaContext context;
     int jumpsCounter;
     
-    // work buffer
+    /* work buffer */
     DIANA_SIZE_T workBufferMetaSize;
     char workBufferMeta[DIANAHOOK_INTERNALMESSAGE_WORK_BUFFER_SIZE_META];
 

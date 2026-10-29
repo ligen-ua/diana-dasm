@@ -11,9 +11,22 @@
 #include "orthia_item_process.h"
 #include "orthia_process_adapter.h"
 #include "orthia_image_source.h"
+#include "orthia_floating_code.h"
+#include "orthia_sha256.h"
+#include "ui_tests_fakes.h"
+#include "orthia_module_manager.h"
+#include "orthia_database_module.h"
+#include "orthia_stack_walk.h"
+#include "orthia_model.h"
+#include "oui_checkbox.h"
+extern "C"
+{
+#include "diana_core.h"
+}
 #ifndef _WIN32
 #include "oui_privileges_posix.h"
 #endif
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -266,6 +279,140 @@ TEST(Databases, FolderMetaRoundTrip)
     EXPECT_FALSE(orthia::ReadFolderMeta(fileName, meta));
 }
 
+// what the user chose to start on the first open, kept for the next ones
+TEST(Databases, FolderMetaAutoTasks)
+{
+    namespace fs = std::filesystem;
+    const fs::path root = fs::temp_directory_path() / ORTHIA_TCSTR("orthia_test_folder_meta_tasks");
+    std::error_code ec;
+    fs::remove_all(root, ec);
+    fs::create_directories(root);
+    oui::ScopedGuard cleanup([&]() { std::error_code ec2; fs::remove_all(root, ec2); });
+    const auto fileName = (root / ORTHIA_TCSTR("meta.xml")).native();
+
+    // not chosen: not written, read as not chosen, and that means both
+    orthia::FolderMeta file;
+    file.kind = orthia::g_folderKindFile;
+    file.sha1 = "aa";
+    orthia::WriteFolderMeta(fileName, file);
+    orthia::FolderMeta meta;
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, meta));
+    EXPECT_EQ(-1, meta.autoAnalysis);
+    EXPECT_EQ(-1, meta.autoSymbols);
+    {
+        std::ifstream stream(fs::path(fileName), std::ios::binary);
+        std::string text((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+        EXPECT_EQ(std::string::npos, text.find("auto_"));
+    }
+    EXPECT_TRUE(orthia::GetFolderAutoTasks(meta).analyze);
+    EXPECT_TRUE(orthia::GetFolderAutoTasks(meta).symbols);
+
+    // chosen, then rewritten in place: the other fields stay
+    orthia::AutoTasks tasks;
+    tasks.analyze = true;
+    tasks.symbols = false;
+    orthia::SetFolderAutoTasks(meta, tasks);
+    orthia::WriteFolderMeta(fileName, meta);
+    orthia::FolderMeta reread;
+    ASSERT_TRUE(orthia::ReadFolderMeta(fileName, reread));
+    EXPECT_EQ(1, reread.autoAnalysis);
+    EXPECT_EQ(0, reread.autoSymbols);
+    EXPECT_EQ(std::string("aa"), reread.sha1);
+    EXPECT_EQ(meta.createdUnix, reread.createdUnix);
+    EXPECT_TRUE(orthia::GetFolderAutoTasks(reread).analyze);
+    EXPECT_FALSE(orthia::GetFolderAutoTasks(reread).symbols);
+}
+
+TEST(Databases, ResolveAutoTasks)
+{
+    orthia::AutoTasks none;
+    none.analyze = false;
+    none.symbols = false;
+    orthia::AutoTasks symbolsOnly;
+    symbolsOnly.analyze = false;
+    auto same = [](const orthia::AutoTasks& a, const orthia::AutoTasks& b) {
+        return a.analyze == b.analyze && a.symbols == b.symbols;
+    };
+
+    // --cmd, or the UI with --no-analysis/--no-symbols: what is given, new database or not
+    orthia::OpenOptions fixed;
+    fixed.policy = orthia::AutoTasksPolicy::Fixed;
+    fixed.tasks = symbolsOnly;
+    orthia::FolderMeta chosenNone;
+    orthia::SetFolderAutoTasks(chosenNone, none);
+    bool ask = true;
+    EXPECT_TRUE(same(symbolsOnly, orthia::ResolveAutoTasks(fixed, true, nullptr, &ask)));
+    EXPECT_FALSE(ask);
+    EXPECT_TRUE(same(symbolsOnly, orthia::ResolveAutoTasks(fixed, false, &chosenNone, &ask)));
+    EXPECT_FALSE(ask);
+
+    // the UI, a new database: nothing yet, ask
+    orthia::OpenOptions askIfNew;
+    askIfNew.policy = orthia::AutoTasksPolicy::AskIfNew;
+    EXPECT_TRUE(same(none, orthia::ResolveAutoTasks(askIfNew, true, nullptr, &ask)));
+    EXPECT_TRUE(ask);
+
+    // the UI, a database of an earlier open: the choice made then, or both when there was none
+    EXPECT_TRUE(same(none, orthia::ResolveAutoTasks(askIfNew, false, &chosenNone, &ask)));
+    EXPECT_FALSE(ask);
+    orthia::FolderMeta notChosen;
+    EXPECT_TRUE(same(orthia::AutoTasks(), orthia::ResolveAutoTasks(askIfNew, false, &notChosen, &ask)));
+    EXPECT_FALSE(ask);
+    EXPECT_TRUE(same(orthia::AutoTasks(), orthia::ResolveAutoTasks(askIfNew, false, nullptr, &ask)));
+    EXPECT_FALSE(ask);
+}
+
+TEST(Controls, CheckBoxToggles)
+{
+    auto profile = std::make_shared<oui::ButtonColorProfile>();
+    auto check = std::make_shared<oui::CCheckBox>(profile, []() { return oui::String(OUI_STR("text")); }, true);
+    std::vector<bool> changes;
+    check->SetChangeHandler([&](bool checked) { changes.push_back(checked); });
+    EXPECT_TRUE(check->IsChecked());
+
+    oui::WindowEventContext context;
+    auto key = [](oui::VirtualKey virtualKey, const oui::String& text, int state) {
+        oui::InputEvent evt;
+        evt.keyEvent.valid = true;
+        evt.keyEvent.virtualKey = virtualKey;
+        evt.keyEvent.rawText = text;
+        evt.keyState.state = state;
+        return evt;
+    };
+    const oui::String space(OUI_STR(" "));
+
+    // Space toggles
+    auto evt = key(oui::VirtualKey::None, space, 0);
+    EXPECT_TRUE(check->ProcessEvent(evt, context));
+    EXPECT_FALSE(check->IsChecked());
+
+    // Ctrl+Space, Enter and other text don't, and Enter goes on to the dialog
+    evt = key(oui::VirtualKey::None, space, oui::KeyState::AnyCtrl);
+    check->ProcessEvent(evt, context);
+    evt = key(oui::VirtualKey::Enter, oui::String(), 0);
+    EXPECT_FALSE(check->ProcessEvent(evt, context));
+    evt = key(oui::VirtualKey::None, oui::String(OUI_STR("x")), 0);
+    check->ProcessEvent(evt, context);
+    EXPECT_FALSE(check->IsChecked());
+
+    // a click toggles on the release
+    oui::InputEvent mouse;
+    mouse.mouseEvent.valid = true;
+    mouse.mouseEvent.button = oui::MouseButton::Left;
+    mouse.mouseEvent.state = oui::MouseState::Pressed;
+    oui::MouseEventContext mouseContext;
+    check->HandleMouseEvent(oui::Rect(), mouse, mouseContext);
+    EXPECT_FALSE(check->IsChecked());
+    mouse.mouseEvent.state = oui::MouseState::Released;
+    check->HandleMouseEvent(oui::Rect(), mouse, mouseContext);
+    EXPECT_TRUE(check->IsChecked());
+
+    // SetChecked is not a change by the user
+    check->SetChecked(false);
+    EXPECT_FALSE(check->IsChecked());
+    EXPECT_EQ((std::vector<bool>{ false, true }), changes);
+}
+
 TEST(Databases, ResolveSelectors)
 {
     std::vector<orthia::DatabaseInfo> all = {
@@ -338,9 +485,15 @@ TEST(Databases, SelectForCleanup)
     auto openGone = MakeProcDatabase(ORTHIA_TCSTR("[6] open.exe"));
     auto openBroken = broken;
     openBroken.folder = ORTHIA_TCSTR("db/open-broken");
+    // floating code saved: evidence, kept when its process has exited or it is old
+    auto evidenceGone = MakeProcDatabase(ORTHIA_TCSTR("[7] evidence.exe"));
+    evidenceGone.hasFloatingSnapshots = true;
+    auto evidenceOld = MakeProcDatabase(ORTHIA_TCSTR("[8] evidence.exe"));
+    evidenceOld.hasFloatingSnapshots = true;
+    evidenceOld.lastWrite = old;
 
     std::vector<orthia::DatabaseInfo> all = { fresh, broken, brokenNew, oldFile, pending,
-        alive, gone, reused, unknown, expired, noPid, openGone, openBroken };
+        alive, gone, reused, unknown, expired, noPid, openGone, openBroken, evidenceGone, evidenceOld };
     std::map<orthia::PlatformString_type, orthia::PlatformString_type> open = {
         { openGone.folder, ORTHIA_TCSTR("open.exe") },
         { openBroken.folder, ORTHIA_TCSTR("x") },
@@ -707,142 +860,8 @@ TEST(ImageFormats, MapErrorMessage)
     }
 }
 
-namespace
-{
-    // A process made of images that the formats mapped: what the OS layer of a live process reports,
-    // for machines this host can't run. The modules are opened as both OS layers open them
-    class CFakeProcess : public oui::IProcess
-    {
-    public:
-        struct Image
-        {
-            const orthia::IImageFormat* format = nullptr;
-            orthia::Address_type base = 0;
-            std::vector<char> data;
-        };
-        int dianaMode = DIANA_MODE64;
-        int dianaArch = DIANA_ARCH_X86;
-        std::vector<Image> images;
-
-        std::tuple<int, unsigned long long> GetSizeInBytes() const override
-        {
-            return std::make_tuple(0, dianaMode == DIANA_MODE32 ? 0xFFFFFFFFull : ~0ull);
-        }
-        int ReadExact(std::shared_ptr<oui::BaseOperation>, unsigned long long offset, size_t size, std::vector<char>& data) override
-        {
-            data.resize(size);
-            return ReadExactEx2(offset, data.data(), size);
-        }
-        oui::String GetFullFileName() const override
-        {
-            oui::String name;
-            name.native = OUI_TCSTR("[1] fake");
-            return name;
-        }
-        oui::String GetFullFileNameForUI() const override
-        {
-            return GetFullFileName();
-        }
-        int ReadExactEx2(unsigned long long offset, void* pBuffer, size_t size) override
-        {
-            memset(pBuffer, 0, size);
-            bool found = false;
-            for (const auto& image : images)
-            {
-                const unsigned long long imageEnd = image.base + image.data.size();
-                const unsigned long long start = std::max<unsigned long long>(offset, image.base);
-                const unsigned long long end = std::min<unsigned long long>(offset + size, imageEnd);
-                if (start < end)
-                {
-                    memcpy((char*)pBuffer + (start - offset), image.data.data() + (start - image.base), (size_t)(end - start));
-                    found = true;
-                }
-            }
-            return found ? 0 : 1;
-        }
-        orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) override
-        {
-            std::vector<char> buffer(size);
-            if (ReadExactEx2(offset, buffer.data(), size))
-            {
-                return orthia::WorkAddressData();
-            }
-            auto* pBufferStart = buffer.data();
-            return orthia::WorkAddressData(pBufferStart, size, nullptr, orthia::WorkAddressData::flags_FullValid,
-                [buffer = std::move(buffer)](orthia::WorkAddressData*) mutable {});
-        }
-        int QueryModules(std::vector<orthia::ModuleInfo>& modules, int& processModuleOffset,
-            std::function<void(const orthia::ModuleInfo& info, oui::ModuleDisasmContext&)> contextCallback) override
-        {
-            processModuleOffset = 0;
-            modules.clear();
-            orthia::ProcessReaderAdapter reader(this);
-            for (const auto& image : images)
-            {
-                orthia::ModuleInfo info;
-                info.name = OUI_TCSTR("module");
-                info.address = image.base;
-                info.size = image.data.size();
-                info.lastValidAddress = image.base + image.data.size() - 1;
-                if (auto moduleImage = image.format->OpenModuleImage(reader, image.base, image.data.size()))
-                {
-                    const auto range = moduleImage->GetRange();
-                    info.dianaMode = range.dianaMode;
-                    info.dianaArch = range.dianaArch;
-                    info.entryPoint = range.entryPoint ? range.entryPoint : info.address;
-                    info.builtInFlags |= image.format->GetBuiltInFlag() | moduleImage->GetExtraBuiltInFlags();
-                    oui::ModuleDisasmContext context;
-                    context.image = moduleImage.get();
-                    contextCallback(info, context);
-                }
-                modules.push_back(info);
-            }
-            return 0;
-        }
-        std::tuple<int, std::shared_ptr<oui::IThreadEnumerator>> CreateThreadEnumerator() override
-        {
-            return std::make_tuple(1, std::shared_ptr<oui::IThreadEnumerator>());
-        }
-        int GetDianaMode() const override
-        {
-            return dianaMode;
-        }
-        int GetDianaArch() const override
-        {
-            return dianaArch;
-        }
-        oui::ProcessStartInfo GetStartInfo() const override
-        {
-            return oui::ProcessStartInfo();
-        }
-        bool IsRunning() const override
-        {
-            return false;
-        }
-    };
-
-    // data/ of the source tree, above the folder of the binary (bin/Release/amd64, cmake-release/src/...)
-    std::filesystem::path FindTestData(const std::filesystem::path& relative)
-    {
-        namespace fs = std::filesystem;
-        fs::path dir = fs::path(orthia::GetCurrentProcessDir()).parent_path();
-        for (int i = 0; i < 8; ++i)
-        {
-            std::error_code error;
-            const fs::path candidate = dir / ORTHIA_TCSTR("data") / relative;
-            if (fs::exists(candidate, error))
-            {
-                return candidate;
-            }
-            if (dir == dir.parent_path())
-            {
-                break;
-            }
-            dir = dir.parent_path();
-        }
-        return fs::path();
-    }
-}
+using orthia_tests::CFakeProcess;
+using orthia_tests::FindTestData;
 
 // An ARM process, as an ARM host reports it: its modules get their architecture from their headers,
 // the rest of the address space (heap, JIT code) is the process's own
@@ -919,8 +938,973 @@ TEST(ProcessArch, ModulesAndProcessRange)
     }
 }
 
+namespace
+{
+    // a test file mapped at 0x10000000 as the only module of a fake process
+    struct MappedTestModule
+    {
+        std::shared_ptr<CFakeProcess> process = std::make_shared<CFakeProcess>();
+        orthia::ModuleInfo module;
+        std::vector<char> image;
+        orthia::Address_type base = 0;
+
+        // false when data/ isn't there
+        bool Open(const ORTHIA_TCHAR* file, const char* formatId)
+        {
+            const auto path = FindTestData(file);
+            if (path.empty())
+                return false;
+            std::vector<char> data;
+            {
+                std::ifstream stream(path, std::ios::binary);
+                data.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+            }
+            const auto* format = orthia::FindFormatById(formatId);
+            EXPECT_NE(nullptr, format);
+            orthia::MapFileParameters params;
+            params.imageBase = 0x10000000;
+            const auto mapped = format->MapFile(data, params);
+            base = mapped->GetImageBase();
+            image = mapped->GetMappedFile();
+            return AddImage(format, base, image);
+        }
+        bool AddImage(const orthia::IImageFormat* format, orthia::Address_type imageBase, const std::vector<char>& bytes)
+        {
+            CFakeProcess::Image item;
+            item.format = format;
+            item.base = imageBase;
+            item.data = bytes;
+            process->images.push_back(item);
+            orthia::CProcessWorkplaceItem processItem(process, process->GetFullFileNameForUI(),
+                process->GetDianaMode(), process->GetDianaArch(), nullptr);
+            processItem.ReloadModules();
+            std::vector<orthia::ModuleInfo> modules;
+            processItem.GetModules(modules);
+            EXPECT_EQ(1u, modules.size());
+            if (modules.empty())
+                return false;
+            module = modules[0];
+            return true;
+        }
+        unsigned long long Read(orthia::Address_type address, size_t size) const
+        {
+            unsigned long long value = 0;
+            EXPECT_LE(address - base + size, image.size());
+            if (address - base + size <= image.size())
+                memcpy(&value, image.data() + (size_t)(address - base), size);
+            return value;
+        }
+    };
+
+    std::vector<orthia::PointerSlotInfo> SlotsOfKind(const std::vector<orthia::PointerSlotInfo>& slots, int kind)
+    {
+        std::vector<orthia::PointerSlotInfo> result;
+        for (const auto& slot : slots)
+        {
+            if (slot.kind == kind)
+                result.push_back(slot);
+        }
+        return result;
+    }
+}
+
+// diana_core reports each function to CBasePeLinkImportsObserver::ReportInfo (GetLastAddress) before
+// the call: a PE export at its AddressOfFunctions entry, which holds the export's RVA. Floating code
+// takes that entry for the slot an export hook rewrites
+TEST(PointerSlots, PeExportReportedAtItsEntry)
+{
+    MappedTestModule test;
+    if (!test.Open(ORTHIA_TCSTR("pe/tls_x86_64.dll"), "pe"))
+        GTEST_SKIP() << "data/ not found above " << orthia::PlatformStringToUtf8(orthia::GetCurrentProcessDir());
+    const auto exports = SlotsOfKind(orthia::QueryModulePointerSlots(*test.process, test.module),
+        orthia::PointerSlotInfo::kind_export);
+    ASSERT_FALSE(exports.empty());
+    // AddressOfFunctions from the export directory (lld leaves it unaligned here: 0x207b)
+    const auto nt = test.base + test.Read(test.base + 0x3c, 4);
+    const auto exportDirectory = test.base + test.Read(nt + 24 + 112, 4);
+    const auto functions = test.base + test.Read(exportDirectory + 0x1c, 4);
+    const auto functionCount = test.Read(exportDirectory + 0x14, 4);
+    bool found = false;
+    for (const auto& slot : exports)
+    {
+        SCOPED_TRACE(slot.name);
+        // an entry of AddressOfFunctions, which holds the RVA of the export
+        EXPECT_GE(slot.slot, functions);
+        EXPECT_LT(slot.slot, functions + 4 * functionCount);
+        EXPECT_EQ(0u, (slot.slot - functions) % 4);
+        EXPECT_EQ(slot.value - test.base, test.Read(slot.slot, 4));
+        found = found || slot.name == "tls_reasons";
+    }
+    EXPECT_TRUE(found);
+}
+
+// an ELF import at its GOT slot: data/elf/linked_x64 imports exp_func_07 and exp_func_21 through the
+// slots at 0x4008 and 0x4000 (see ot_elf_test.cpp)
+TEST(PointerSlots, ElfImportReportedAtItsSlot)
+{
+    MappedTestModule test;
+    if (!test.Open(ORTHIA_TCSTR("elf/linked_x64"), "elf"))
+        GTEST_SKIP() << "data/ not found above " << orthia::PlatformStringToUtf8(orthia::GetCurrentProcessDir());
+    const auto imports = SlotsOfKind(orthia::QueryModulePointerSlots(*test.process, test.module),
+        orthia::PointerSlotInfo::kind_import);
+    std::map<std::string, orthia::Address_type> byName;
+    for (const auto& slot : imports)
+    {
+        for (const char* name : { "exp_func_07", "exp_func_21" })
+        {
+            if (slot.name.find(name) != std::string::npos)
+                byName[name] = slot.slot;
+        }
+        // what the slot holds now
+        EXPECT_EQ(test.Read(slot.slot, 8), slot.value) << slot.name;
+    }
+    EXPECT_EQ(test.base + 0x4008, byName["exp_func_07"]);
+    EXPECT_EQ(test.base + 0x4000, byName["exp_func_21"]);
+}
+
+#ifdef _MSC_VER
+extern "C" char __ImageBase;
+
+// a PE import at its IAT slot: the imports of this test binary, as it is loaded
+TEST(PointerSlots, PeImportReportedAtItsIatSlot)
+{
+    const char* base = &__ImageBase;
+    auto read32 = [](const char* p) { unsigned int v = 0; memcpy(&v, p, 4); return v; };
+    const char* nt = base + read32(base + 0x3c);
+    const char* optional = nt + 24;
+    const bool pe64 = *(const unsigned short*)optional == 0x20b;
+    const unsigned int sizeOfImage = read32(optional + 56);
+    // IMAGE_DIRECTORY_ENTRY_IAT
+    const char* iatEntry = optional + (pe64 ? 112 : 96) + 12 * 8;
+    const unsigned int iatRva = read32(iatEntry);
+    const unsigned int iatSize = read32(iatEntry + 4);
+    ASSERT_TRUE(iatRva && iatSize);
+
+    MappedTestModule test;
+    test.process->dianaMode = pe64 ? DIANA_MODE64 : DIANA_MODE32;
+    test.base = (orthia::Address_type)(uintptr_t)base;
+    test.image.assign(base, base + sizeOfImage);
+    ASSERT_TRUE(test.AddImage(orthia::FindFormatById("pe"), test.base, test.image));
+    const auto imports = SlotsOfKind(orthia::QueryModulePointerSlots(*test.process, test.module),
+        orthia::PointerSlotInfo::kind_import);
+    ASSERT_FALSE(imports.empty());
+    const size_t pointerSize = pe64 ? 8 : 4;
+    bool kernel32 = false;
+    for (const auto& slot : imports)
+    {
+        SCOPED_TRACE(slot.name);
+        const auto offset = slot.slot - test.base;
+        EXPECT_GE(offset, iatRva);
+        EXPECT_LT(offset, iatRva + iatSize);
+        EXPECT_EQ(0u, offset % pointerSize);
+        EXPECT_EQ(test.Read(slot.slot, pointerSize), slot.value);
+        std::string lower = slot.name;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return (char)tolower(c); });
+        kernel32 = kernel32 || lower.find("kernel32.dll!") == 0;
+    }
+    EXPECT_TRUE(kernel32);
+}
+#endif
+
+using orthia_tests::PutRel32;
+using orthia_tests::FloatingFixture;
+
+// TODO: the same tests for AArch64 and AArch32 (A32, T32 with bit 0 of the entry) floating code
+
+// x86 call targets outside the module are saved as absolute addresses, also below the module
+TEST(FloatingCode, ExternalTargetsAreAbsolute)
+{
+    struct Case
+    {
+        int mode;
+        orthia::Address_type base;
+        orthia::Address_type target;
+    };
+    const Case cases[] = {
+        { DIANA_MODE64, 0x10000000, 0x10100000 },
+        { DIANA_MODE64, 0x10000000, 0x00400000 },
+        { DIANA_MODE32, 0x10000000, 0x10100000 },
+        { DIANA_MODE32, 0x10000000, 0x00400000 },
+    };
+    for (const auto& item : cases)
+    {
+        SCOPED_TRACE(std::to_string(item.mode) + " " + std::to_string(item.target));
+        FloatingFixture fixture;
+        fixture.process->images.clear();
+        fixture.process->dianaMode = item.mode;
+        CFakeProcess::Image module;
+        module.format = orthia::FindFormatById("raw");
+        module.base = item.base;
+        module.data.assign(0x100, (char)0xCC);
+        PutRel32(module.data, 0, 0xE8, item.base, item.target);
+        PutRel32(module.data, 5, 0xE8, item.base, item.base + 0x80);
+        module.data[10] = (char)0xC3;
+        module.data[0x80] = (char)0xC3;
+        fixture.process->images.push_back(module);
+
+        orthia::ProcessReaderAdapter reader(fixture.process.get());
+        fixture.moduleManager->ReloadRange(item.base, 0x100, &reader, item.mode, DIANA_ARCH_X86, 0);
+        std::vector<std::pair<orthia::Address_type, orthia::Address_type>> refs;
+        fixture.moduleManager->QueryDatabaseManager()->GetClassicDatabase()->QueryAllModuleReferences(item.base, 0x100, refs);
+        bool external = false;
+        bool internal = false;
+        for (const auto& ref : refs)
+        {
+            external |= ref.first == item.base && ref.second == item.target;
+            internal |= ref.first == item.base + 5 && ref.second == item.base + 0x80;
+        }
+        EXPECT_TRUE(external);
+        EXPECT_TRUE(internal);
+    }
+}
+
+TEST(FloatingCode, RegionTextRoundTrip)
+{
+    orthia::FloatingRegionInfo info;
+    info.allocationBase = 0x7ff600010000ULL;
+    info.allocationSize = 0x3000;
+    info.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_exec;
+    info.type = oui::MemoryRegionInfo::type_mapped;
+    info.mappedName = "/tmp/a b.bin";
+    info.header = "MZ";
+    info.bytesHash = 0xfedcba9876543210ULL;
+    info.hashedSize = 0x3000;
+    info.codeStart = 0x7ff600010010ULL;
+    info.codeLast = 0x7ff600010040ULL;
+    info.AddReference(0x7ff600010040ULL, 0x401000);
+    info.AddReference(0x7ff600010010ULL, 0x401020);
+    info.AddReference(0x7ff600010010ULL, 0x401010);
+    // an import slot, an export entry; the name keeps the separators of the text
+    orthia::PointerSlotInfo import;
+    import.slot = 0x403008;
+    import.kind = orthia::PointerSlotInfo::kind_import;
+    import.name = "KERNEL32.dll!Create,File;W:x=%";
+    info.AddSlot(0x7ff600010040ULL, import);
+    orthia::PointerSlotInfo exported;
+    exported.slot = 0x402000;
+    exported.kind = orthia::PointerSlotInfo::kind_export;
+    exported.name = "NtClose";
+    info.AddSlot(0x7ff600010040ULL, exported);
+    EXPECT_FALSE(info.AddSlot(0x7ff600010040ULL, exported));
+
+    orthia::FloatingRegionInfo parsed;
+    ASSERT_TRUE(orthia::ParseFloatingRegion(orthia::FormatFloatingRegion(info), parsed));
+    EXPECT_EQ(info.allocationBase, parsed.allocationBase);
+    EXPECT_EQ(info.allocationSize, parsed.allocationSize);
+    EXPECT_EQ(info.protect, parsed.protect);
+    EXPECT_EQ(info.type, parsed.type);
+    EXPECT_EQ(info.mappedName, parsed.mappedName);
+    EXPECT_EQ(info.header, parsed.header);
+    EXPECT_EQ(info.bytesHash, parsed.bytesHash);
+    EXPECT_EQ(info.hashedSize, parsed.hashedSize);
+    EXPECT_EQ(info.codeStart, parsed.codeStart);
+    EXPECT_EQ(info.codeLast, parsed.codeLast);
+    ASSERT_EQ(2u, parsed.entries.size());
+    EXPECT_EQ(0x7ff600010010ULL, parsed.entries[0].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ 0x401010, 0x401020 }), parsed.entries[0].referrers);
+    EXPECT_EQ(0x7ff600010040ULL, parsed.entries[1].address);
+    EXPECT_TRUE(parsed.entries[0].slots.empty());
+    ASSERT_EQ(2u, parsed.entries[1].slots.size());
+    EXPECT_EQ(0x402000u, parsed.entries[1].slots[0].slot);
+    EXPECT_EQ(orthia::PointerSlotInfo::kind_export, parsed.entries[1].slots[0].kind);
+    EXPECT_EQ("NtClose", parsed.entries[1].slots[0].name);
+    EXPECT_EQ(0x403008u, parsed.entries[1].slots[1].slot);
+    EXPECT_EQ(orthia::PointerSlotInfo::kind_import, parsed.entries[1].slots[1].kind);
+    EXPECT_EQ(import.name, parsed.entries[1].slots[1].name);
+
+    EXPECT_FALSE(orthia::ParseFloatingRegion("<x/>", parsed));
+    EXPECT_EQ(ORTHIA_TCSTR("fl_7ff600010000"), orthia::MakeFloatingModuleName(info.allocationBase));
+    EXPECT_EQ(ORTHIA_TCSTR("R-X"), orthia::FormatRegionProtect(info.protect));
+}
+
+TEST(FloatingCode, DiscoveryAndAnalysis)
+{
+    FloatingFixture fixture;
+    auto item = fixture.OpenItem();
+    fixture.AnalyzeModule(*item);
+
+    const auto source = FloatingFixture::FindModule(*item, FloatingFixture::moduleBase);
+    ASSERT_EQ(FloatingFixture::moduleBase, source.address);
+    EXPECT_TRUE(orthia::DiscoverFloatingCode(*item, source));
+
+    // one module for the two calls into A; the other module and the data are not floating code
+    std::vector<orthia::ModuleInfo> modules;
+    item->GetModules(modules);
+    ASSERT_EQ(3u, modules.size());
+    const auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+    ASSERT_TRUE(a.IsFloating());
+    ASSERT_TRUE(a.floating);
+    EXPECT_EQ(ORTHIA_TCSTR("fl_10100000"), a.name);
+    EXPECT_EQ(0x1000u, a.size);
+    EXPECT_EQ(oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write | oui::MemoryRegionInfo::protect_exec,
+        a.floating->protect);
+    ASSERT_EQ(2u, a.floating->entries.size());
+    EXPECT_EQ(FloatingFixture::regionA, a.floating->entries[0].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::moduleBase }), a.floating->entries[0].referrers);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, a.floating->entries[1].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::moduleBase + 5 }), a.floating->entries[1].referrers);
+    EXPECT_FALSE(a.flags & orthia::ModuleInfo::flags_analyzeDone);
+
+    // the names: x fl_10100000!*, and the address of fl_10100000!$entry_20h
+    std::vector<orthia::NameInfo> names;
+    item->QueryNames(a.address, orthia::NameSelectionKey(), 10, names);
+    ASSERT_EQ(2u, names.size());
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_00h"), names[0].name.native);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, names[1].address);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, item->QueryAddressByName(oui::String(ORTHIA_TCSTR("fl_10100000!$entry_20h")), 0));
+    EXPECT_EQ(FloatingFixture::regionA, item->QueryAddressByName(oui::String(ORTHIA_TCSTR("fl_10100000")), 0));
+    EXPECT_EQ(FloatingFixture::regionA, item->GetRangeInfo(FloatingFixture::regionA + 0x10).address);
+
+    // a discovery again finds nothing new
+    EXPECT_TRUE(orthia::DiscoverFloatingCode(*item, source));
+    EXPECT_EQ(1u, orthia::QueryPendingFloatingModules(*item).size());
+
+    // the analysis of A leads to D
+    FloatingFixture::AnalyzePending(*item);
+    const auto analyzedA = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+    EXPECT_TRUE(analyzedA.flags & orthia::ModuleInfo::flags_analyzeDone);
+    EXPECT_EQ(FloatingFixture::regionA, analyzedA.floating->codeStart);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, analyzedA.floating->codeLast);
+    const auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+    ASSERT_TRUE(d.IsFloating());
+    EXPECT_TRUE(d.flags & orthia::ModuleInfo::flags_analyzeDone);
+    ASSERT_EQ(1u, d.floating->entries.size());
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::regionA }), d.floating->entries[0].referrers);
+    EXPECT_TRUE(orthia::QueryPendingFloatingModules(*item).empty());
+
+    std::vector<orthia::PlatformString_type> lines;
+    orthia::DescribeFloatingModule(*item, analyzedA, lines);
+    std::string text;
+    for (const auto& line : lines)
+    {
+        text += orthia::PlatformStringToUtf8(line) + "\n";
+    }
+    EXPECT_NE(std::string::npos, text.find("Floating code: RWX, private")) << text;
+    EXPECT_NE(std::string::npos, text.find("$entry_20h")) << text;
+    EXPECT_NE(std::string::npos, text.find("from ")) << text;
+    EXPECT_NE(std::string::npos, text.find("Entries: 2")) << text;
+
+    // lmf /v: by referrer, the module's two calls first, then A's jump to D
+    lines.clear();
+    orthia::DescribeFloatingReferrers(*item, lines);
+    ASSERT_EQ(4u, lines.size());
+    EXPECT_EQ(ORTHIA_TCSTR("Referrers:"), lines[0]);
+    auto row = [&](size_t i) { return orthia::PlatformStringToUtf8(lines[i]); };
+    EXPECT_NE(std::string::npos, row(1).find("-> fl_10100000!$entry_00h")) << row(1);
+    EXPECT_NE(std::string::npos, row(1).find("RWX private [function start]")) << row(1);
+    EXPECT_NE(std::string::npos, row(2).find("module+05h")) << row(2);
+    EXPECT_NE(std::string::npos, row(2).find("-> fl_10100000!$entry_20h")) << row(2);
+    EXPECT_EQ(std::string::npos, row(2).find("[function start]")) << row(2);
+    EXPECT_EQ(0u, row(3).find("  fl_10100000!$entry_00h")) << row(3);
+    EXPECT_NE(std::string::npos, row(3).find("-> fl_10400000!$entry_00h")) << row(3);
+}
+
+// two modules call into one region: the entry both call has one name and both referrers, and the
+// entry the later module adds below another one leaves that one's name as it was
+TEST(FloatingCode, TwoModulesOneRegion)
+{
+    FloatingFixture fixture;
+    fixture.AddSecondModule();
+    auto item = fixture.OpenItem();
+    const auto entry20 = oui::String(ORTHIA_TCSTR("fl_10100000!$entry_20h"));
+
+    // the first module: entries at 0 and 20h
+    fixture.AnalyzeModule(*item);
+    EXPECT_TRUE(orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase)));
+    std::vector<orthia::NameInfo> names;
+    item->QueryNames(FloatingFixture::regionA, orthia::NameSelectionKey(), 10, names);
+    ASSERT_EQ(2u, names.size());
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_00h"), names[0].name.native);
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_20h"), names[1].name.native);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, item->QueryAddressByName(entry20, 0));
+    FloatingFixture::AnalyzePending(*item);
+    EXPECT_TRUE(orthia::QueryPendingFloatingModules(*item).empty());
+
+    // the second module: the entry at 0 again, and a new one at 10h
+    fixture.AnalyzeModule(*item, FloatingFixture::secondModule);
+    const auto second = FloatingFixture::FindModule(*item, FloatingFixture::secondModule);
+    ASSERT_EQ(FloatingFixture::secondModule, second.address);
+    EXPECT_TRUE(orthia::DiscoverFloatingCode(*item, second));
+
+    const auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+    ASSERT_TRUE(a.floating);
+    ASSERT_EQ(3u, a.floating->entries.size());
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::moduleBase, FloatingFixture::secondModule }),
+        a.floating->entries[0].referrers);
+    EXPECT_EQ(FloatingFixture::regionA + 0x10, a.floating->entries[1].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::secondModule + 5 }), a.floating->entries[1].referrers);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, a.floating->entries[2].address);
+
+    // the names by offset: 20h is still 20h, the new entry is 10h
+    names.clear();
+    item->QueryNames(FloatingFixture::regionA, orthia::NameSelectionKey(), 10, names);
+    ASSERT_EQ(3u, names.size());
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_00h"), names[0].name.native);
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_10h"), names[1].name.native);
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_20h"), names[2].name.native);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, item->QueryAddressByName(entry20, 0));
+    EXPECT_EQ(FloatingFixture::regionA + 0x10, item->QueryAddressByName(oui::String(ORTHIA_TCSTR("fl_10100000!$entry_10h")), 0));
+
+    // a new entry: A waits for its analysis again
+    const auto pending = orthia::QueryPendingFloatingModules(*item);
+    ASSERT_EQ(1u, pending.size());
+    EXPECT_EQ(FloatingFixture::regionA, pending[0].address);
+    FloatingFixture::AnalyzePending(*item);
+
+    std::vector<orthia::PlatformString_type> lines;
+    orthia::DescribeFloatingModule(*item, FloatingFixture::FindModule(*item, FloatingFixture::regionA), lines);
+    std::string text;
+    for (const auto& line : lines)
+    {
+        text += orthia::PlatformStringToUtf8(line) + "\n";
+    }
+    EXPECT_NE(std::string::npos, text.find("Entries: 3")) << text;
+    const auto entry0 = text.find("$entry_00h  from module");
+    ASSERT_NE(std::string::npos, entry0) << text;
+    EXPECT_NE(std::string::npos, text.find(", second", entry0)) << text;
+    EXPECT_NE(std::string::npos, text.find("$entry_10h  from second+05h")) << text;
+
+    // lmf /v: by referrer, each module's rows to the entry at 0
+    lines.clear();
+    orthia::DescribeFloatingReferrers(*item, lines);
+    std::vector<std::string> toEntry0;
+    for (const auto& line : lines)
+    {
+        const auto row = orthia::PlatformStringToUtf8(line);
+        if (row.find("-> fl_10100000!$entry_00h") != std::string::npos)
+            toEntry0.push_back(row);
+    }
+    ASSERT_EQ(2u, toEntry0.size());
+    EXPECT_EQ(0u, toEntry0[0].find("  module ")) << toEntry0[0];
+    EXPECT_EQ(0u, toEntry0[1].find("  second ")) << toEntry0[1];
+}
+
+// a pass of the floating task works on copies of the pending modules taken before it. A, analyzed
+// first, adds an entry to D, which waits in the same pass with the second module's entry only: the
+// entry A added stays, and D is analyzed from it too
+TEST(FloatingCode, EntryAddedInTheSamePass)
+{
+    FloatingFixture fixture;
+    CFakeProcess::Image second;
+    second.format = orthia::FindFormatById("raw");
+    second.base = FloatingFixture::secondModule;
+    second.name = ORTHIA_TCSTR("second");
+    second.data.assign(0x1000, (char)0xCC);
+    PutRel32(second.data, 0, 0xE8, FloatingFixture::secondModule, FloatingFixture::regionD + 0x10);
+    second.data[5] = (char)0xC3;
+    fixture.process->images.push_back(second);
+    auto item = fixture.OpenItem();
+
+    fixture.AnalyzeModule(*item);
+    fixture.AnalyzeModule(*item, FloatingFixture::secondModule);
+    orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+    orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::secondModule));
+    const auto pending = orthia::QueryPendingFloatingModules(*item);
+    ASSERT_EQ(2u, pending.size());
+    EXPECT_EQ(FloatingFixture::regionA, pending[0].address);
+    EXPECT_EQ(FloatingFixture::regionD, pending[1].address);
+    ASSERT_EQ(1u, pending[1].floating->entries.size());
+
+    FloatingFixture::AnalyzePending(*item);
+    const auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+    ASSERT_TRUE(d.floating);
+    ASSERT_EQ(2u, d.floating->entries.size());
+    EXPECT_EQ(FloatingFixture::regionD, d.floating->entries[0].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::regionA }), d.floating->entries[0].referrers);
+    EXPECT_EQ(FloatingFixture::regionD + 0x10, d.floating->entries[1].address);
+    EXPECT_TRUE(d.flags & orthia::ModuleInfo::flags_analyzeDone);
+    EXPECT_EQ(FloatingFixture::regionD, d.floating->codeStart);
+    EXPECT_EQ(FloatingFixture::regionD + 0x10, d.floating->codeLast);
+    EXPECT_TRUE(orthia::QueryPendingFloatingModules(*item).empty());
+}
+
+// an import slot of the module that leads into memory no module owns: an entry with the slot,
+// listed by lmf /v; slots that stay in the module or lead to another one don't count
+TEST(FloatingCode, PointerSlots)
+{
+    FloatingFixture fixture;
+    auto item = fixture.OpenItem();
+    fixture.AnalyzeModule(*item);
+    const auto source = FloatingFixture::FindModule(*item, FloatingFixture::moduleBase);
+
+    auto makeSlot = [](orthia::Address_type slot, orthia::Address_type value, const char* name) {
+        orthia::PointerSlotInfo info;
+        info.slot = slot;
+        info.value = value;
+        info.kind = orthia::PointerSlotInfo::kind_import;
+        info.name = name;
+        return info;
+    };
+    std::vector<orthia::PointerSlotInfo> slots = {
+        makeSlot(FloatingFixture::moduleBase + 0x800, FloatingFixture::regionD + 0x10, "KERNEL32.dll!CreateFileW"),
+        makeSlot(FloatingFixture::moduleBase + 0x808, FloatingFixture::otherModule, "other!f"),
+        makeSlot(FloatingFixture::moduleBase + 0x810, FloatingFixture::moduleBase + 0x20, "own"),
+        makeSlot(FloatingFixture::moduleBase + 0x818, FloatingFixture::regionData, "data"),
+    };
+    std::vector<orthia::ModuleInfo> modules;
+    item->GetModules(modules);
+    auto found = orthia::CollectFloatingRegions(*fixture.moduleManager, *fixture.process, modules, source, slots);
+
+    std::shared_ptr<orthia::FloatingRegionInfo> d;
+    for (const auto& info : found.changed)
+    {
+        if (info->allocationBase == FloatingFixture::regionD)
+            d = info;
+    }
+    ASSERT_TRUE(d);
+    ASSERT_EQ(1u, d->entries.size());
+    EXPECT_EQ(FloatingFixture::regionD + 0x10, d->entries[0].address);
+    EXPECT_TRUE(d->entries[0].referrers.empty());
+    ASSERT_EQ(1u, d->entries[0].slots.size());
+    EXPECT_EQ(FloatingFixture::moduleBase + 0x800, d->entries[0].slots[0].slot);
+    EXPECT_EQ("KERNEL32.dll!CreateFileW", d->entries[0].slots[0].name);
+    EXPECT_NE(found.toAnalyze.end(), std::find(found.toAnalyze.begin(), found.toAnalyze.end(), FloatingFixture::regionD));
+    // the other slots: nothing
+    for (const auto& info : found.changed)
+    {
+        for (const auto& entry : info->entries)
+        {
+            if (info != d)
+                EXPECT_TRUE(entry.slots.empty());
+        }
+    }
+
+    // saved and named
+    orthia::SaveFloatingRegion(*fixture.moduleManager, *d);
+    item->SetFloatingModule(d);
+    std::vector<orthia::PlatformString_type> lines;
+    orthia::DescribeFloatingReferrers(*item, lines);
+    std::string text;
+    for (const auto& line : lines)
+    {
+        text += orthia::PlatformStringToUtf8(line) + "\n";
+    }
+    EXPECT_NE(std::string::npos, text.find("module+0800h")) << text;
+    EXPECT_NE(std::string::npos, text.find("-> fl_10400000!$entry_10h")) << text;
+    EXPECT_NE(std::string::npos, text.find("RWX private [import slot: KERNEL32.dll!CreateFileW]")) << text;
+
+    lines.clear();
+    orthia::DescribeFloatingModule(*item, FloatingFixture::FindModule(*item, FloatingFixture::regionD), lines);
+    text.clear();
+    for (const auto& line : lines)
+    {
+        text += orthia::PlatformStringToUtf8(line) + "\n";
+    }
+    EXPECT_NE(std::string::npos, text.find("from module+0800h (import slot: KERNEL32.dll!CreateFileW)")) << text;
+}
+
+TEST(FloatingCode, SavedAndStale)
+{
+    FloatingFixture fixture;
+    {
+        auto item = fixture.OpenItem();
+        fixture.AnalyzeModule(*item);
+        orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+        FloatingFixture::AnalyzePending(*item);
+    }
+
+    // the same process opened again: as the database reuse does
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        item->LoadSavedModuleFlags();
+        const auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+        ASSERT_TRUE(a.IsFloating());
+        EXPECT_TRUE(a.flags & orthia::ModuleInfo::flags_analyzeDone);
+        EXPECT_FALSE(a.flags & orthia::ModuleInfo::flags_stale);
+        EXPECT_EQ(2u, a.floating->entries.size());
+        EXPECT_EQ(FloatingFixture::regionA + 0x20, a.floating->codeLast);
+        EXPECT_TRUE(FloatingFixture::FindModule(*item, FloatingFixture::regionD).IsFloating());
+        EXPECT_TRUE(orthia::QueryPendingFloatingModules(*item).empty());
+    }
+
+    // D changed: kept and stale, not analyzed again
+    fixture.process->regions.back().data[1] = (char)0x90;
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        item->LoadSavedModuleFlags();
+        const auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        ASSERT_TRUE(d.IsFloating());
+        EXPECT_TRUE(d.flags & orthia::ModuleInfo::flags_stale);
+        EXPECT_FALSE(FloatingFixture::FindModule(*item, FloatingFixture::regionA).flags & orthia::ModuleInfo::flags_stale);
+    }
+
+    // A gone: stale too
+    fixture.process->regions.erase(fixture.process->regions.begin());
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        EXPECT_TRUE(FloatingFixture::FindModule(*item, FloatingFixture::regionA).flags & orthia::ModuleInfo::flags_stale);
+    }
+}
+
+// .analyze /f on a stale module: analyzed again from the memory as it is now
+TEST(FloatingCode, StaleRefreshed)
+{
+    FloatingFixture fixture;
+    {
+        auto item = fixture.OpenItem();
+        fixture.AnalyzeModule(*item);
+        orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+        FloatingFixture::AnalyzePending(*item);
+    }
+
+    // D now has more code: c3 at +0 becomes nop, so the code runs on to the ret at +1
+    fixture.process->regions.back().data[0] = (char)0x90;
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        item->LoadSavedModuleFlags();
+        auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        ASSERT_TRUE(d.flags & orthia::ModuleInfo::flags_stale);
+        EXPECT_EQ(FloatingFixture::regionD, d.floating->codeLast);
+
+        ASSERT_EQ(orthia::FloatingRefresh::refreshed, orthia::RefreshStaleFloatingModule(*item, d));
+        EXPECT_EQ(FloatingFixture::regionD, d.address);
+        const auto pending = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        EXPECT_FALSE(pending.flags & (orthia::ModuleInfo::flags_stale | orthia::ModuleInfo::flags_analyzeDone));
+        // the entries and their referrers stay
+        ASSERT_EQ(1u, pending.floating->entries.size());
+        EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::regionA }), pending.floating->entries[0].referrers);
+
+        FloatingFixture::AnalyzePending(*item);
+        const auto analyzed = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        EXPECT_TRUE(analyzed.flags & orthia::ModuleInfo::flags_analyzeDone);
+        EXPECT_EQ(FloatingFixture::regionD + 1, analyzed.floating->codeLast);
+    }
+
+    // saved as it is now: not stale on the next open
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        item->LoadSavedModuleFlags();
+        const auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+        ASSERT_TRUE(d.IsFloating());
+        EXPECT_FALSE(d.flags & orthia::ModuleInfo::flags_stale);
+        EXPECT_TRUE(d.flags & orthia::ModuleInfo::flags_analyzeDone);
+        EXPECT_EQ(FloatingFixture::regionD + 1, d.floating->codeLast);
+    }
+}
+
+// .analyze /f on a stale module whose memory went away: the module goes too
+TEST(FloatingCode, StaleRemoved)
+{
+    FloatingFixture fixture;
+    {
+        auto item = fixture.OpenItem();
+        fixture.AnalyzeModule(*item);
+        orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+        FloatingFixture::AnalyzePending(*item);
+    }
+    // D freed; A stays but is no longer executable
+    fixture.process->regions.pop_back();
+    fixture.process->regions.front().protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write;
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        for (auto address : { FloatingFixture::regionD, FloatingFixture::regionA })
+        {
+            auto mod = FloatingFixture::FindModule(*item, address);
+            ASSERT_TRUE(mod.flags & orthia::ModuleInfo::flags_stale);
+            EXPECT_EQ(orthia::FloatingRefresh::removed, orthia::RefreshStaleFloatingModule(*item, mod));
+            EXPECT_FALSE(FloatingFixture::FindModule(*item, address).IsFloating());
+        }
+    }
+    {
+        auto item = fixture.OpenItem();
+        item->LoadSavedFloatingModules();
+        EXPECT_FALSE(FloatingFixture::FindModule(*item, FloatingFixture::regionA).IsFloating());
+        EXPECT_FALSE(FloatingFixture::FindModule(*item, FloatingFixture::regionD).IsFloating());
+        EXPECT_FALSE(fixture.moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(FloatingFixture::regionA));
+    }
+}
+
+// the fingerprint covers the executable pages: data next to the code may change
+TEST(FloatingCode, HashCoversExecutablePages)
+{
+    CFakeProcess process;
+    const orthia::Address_type base = 0x20000000;
+    CFakeProcess::Region code;
+    code.base = base;
+    code.allocationBase = base;
+    code.data.assign(0x1000, (char)0xC3);
+    process.regions.push_back(code);
+    CFakeProcess::Region data;
+    data.base = base + 0x1000;
+    data.allocationBase = base;
+    data.data.assign(0x2000, 0);
+    data.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write;
+    process.regions.push_back(data);
+
+    orthia::FloatingRegionInfo info;
+    info.allocationBase = base;
+    info.allocationSize = 0x3000;
+    orthia::FingerprintFloatingRegion(process, info);
+    EXPECT_EQ(0x1000u, info.hashedSize);
+    EXPECT_TRUE(orthia::IsFloatingRegionUnchanged(process, info));
+
+    process.regions[1].data[0x10] = 1;
+    EXPECT_TRUE(orthia::IsFloatingRegionUnchanged(process, info));
+
+    process.regions[0].data[0x10] = (char)0x90;
+    EXPECT_FALSE(orthia::IsFloatingRegionUnchanged(process, info));
+    process.regions[0].data[0x10] = (char)0xC3;
+    EXPECT_TRUE(orthia::IsFloatingRegionUnchanged(process, info));
+
+    // the data part made executable: another fingerprint
+    process.regions[1].protect |= oui::MemoryRegionInfo::protect_exec;
+    EXPECT_FALSE(orthia::IsFloatingRegionUnchanged(process, info));
+}
+
+TEST(Sha256, KnownValues)
+{
+    EXPECT_EQ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", orthia::Sha256Hex("", 0));
+    EXPECT_EQ("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", orthia::Sha256Hex("abc", 3));
+    const std::string twoBlocks = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    EXPECT_EQ("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+        orthia::Sha256Hex(twoBlocks.data(), twoBlocks.size()));
+    // in pieces that don't fall on the blocks
+    const std::string million(1000000, 'a');
+    orthia::CSha256 sha;
+    for (size_t offset = 0; offset < million.size(); offset += 999)
+    {
+        sha.Update(million.data() + offset, std::min<size_t>(999, million.size() - offset));
+    }
+    EXPECT_EQ("cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0", sha.FinishHex());
+}
+
+TEST(Processes, ParseThreadSyscallLine)
+{
+    oui::ThreadSyscallState state;
+    // in a syscall (read on x86-64)
+    ASSERT_TRUE(oui::ParseThreadSyscallLine(
+        "0 0x3 0x7ffd5e2b1a40 0x2000 0x0 0x0 0x0 0x7ffd5e2b19f8 0x7f3c1a2b4e2d\n", state));
+    EXPECT_FALSE(state.running);
+    EXPECT_EQ(0x7ffd5e2b19f8ULL, state.sp);
+    EXPECT_EQ(0x7f3c1a2b4e2dULL, state.pc);
+    // blocked outside a syscall
+    ASSERT_TRUE(oui::ParseThreadSyscallLine("-1 0x7ffd00001000 0x401000\n", state));
+    EXPECT_FALSE(state.running);
+    EXPECT_EQ(0x7ffd00001000ULL, state.sp);
+    EXPECT_EQ(0x401000ULL, state.pc);
+    // on a CPU
+    ASSERT_TRUE(oui::ParseThreadSyscallLine("running\n", state));
+    EXPECT_TRUE(state.running);
+
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("", state));
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("5 0x1 0x2", state));
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("-1 0x1 zz", state));
+    EXPECT_FALSE(oui::ParseThreadSyscallLine("-1 12 0x2", state));
+}
+
+namespace
+{
+    void PutUInt32(std::vector<char>& data, size_t offset, unsigned int value)
+    {
+        for (int i = 0; i < 4; ++i)
+            data[offset + i] = (char)(value >> (8 * i));
+    }
+    void PutUInt64(std::vector<char>& data, size_t offset, unsigned long long value)
+    {
+        for (int i = 0; i < 8; ++i)
+            data[offset + i] = (char)(value >> (8 * i));
+    }
+
+    const orthia::Address_type c_code = 0x10000;
+    const orthia::Address_type c_stack = 0x7000000;
+
+    // code with calls (the return addresses are after them) and a stack with a chain of three frame records
+    orthia_tests::CFakeProcess MakeArm64Process()
+    {
+        orthia_tests::CFakeProcess process;
+        process.dianaArch = DIANA_ARCH_AARCH64;
+
+        orthia_tests::CFakeProcess::Region code;
+        code.base = c_code;
+        code.data.resize(0x1000);
+        for (size_t offset = 0; offset < code.data.size(); offset += 4)
+            PutUInt32(code.data, offset, 0xD503201F);      // nop
+        PutUInt32(code.data, 0x100, 0x94000010);           // bl
+        PutUInt32(code.data, 0x200, 0xD63F0100);           // blr x8
+        PutUInt32(code.data, 0x300, 0xD63F091F);           // blraaz x8
+        PutUInt32(code.data, 0x400, 0x97FFFFF0);           // bl (back)
+        code.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_exec;
+        process.regions.push_back(code);
+
+        orthia_tests::CFakeProcess::Region stack;
+        stack.base = c_stack;
+        stack.data.resize(0x2000);
+        stack.protect = oui::MemoryRegionInfo::protect_read | oui::MemoryRegionInfo::protect_write;
+        // a stale return address below the chain, with a "frame pointer" to nothing
+        PutUInt64(stack.data, 0x110, c_stack + 0x150);
+        PutUInt64(stack.data, 0x118, c_code + 0x204);
+        // the chain; the first return address is signed (a pointer authentication code in the high bits)
+        PutUInt64(stack.data, 0x200, c_stack + 0x400);
+        PutUInt64(stack.data, 0x208, 0x0023000000000000ull | (c_code + 0x104));
+        PutUInt64(stack.data, 0x400, c_stack + 0x800);
+        PutUInt64(stack.data, 0x408, c_code + 0x204);
+        PutUInt64(stack.data, 0x800, 0);
+        PutUInt64(stack.data, 0x808, c_code + 0x304);
+        process.regions.push_back(stack);
+        return process;
+    }
+}
+
+TEST(StackWalk, Arm64ReturnAddresses)
+{
+    auto process = MakeArm64Process();
+    EXPECT_TRUE(orthia::IsArm64ReturnAddress(process, c_code + 0x104));
+    EXPECT_TRUE(orthia::IsArm64ReturnAddress(process, c_code + 0x204));
+    EXPECT_TRUE(orthia::IsArm64ReturnAddress(process, c_code + 0x304));
+    // after a nop, not aligned, in memory that isn't executable, in no memory
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, c_code + 0x108));
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, c_code + 0x106));
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, c_stack + 0x20c));
+    EXPECT_FALSE(orthia::IsArm64ReturnAddress(process, 0x500000));
+    EXPECT_EQ(c_code + 0x104, orthia::StripArm64PointerAuth(0x0023000000000000ull | (c_code + 0x104)));
+}
+
+TEST(StackWalk, Arm64FrameRecords)
+{
+    auto process = MakeArm64Process();
+    const std::vector<orthia::Address_type> chain = { c_code + 0x104, c_code + 0x204, c_code + 0x304 };
+    std::vector<orthia::Address_type> stack;
+
+    // Windows, in a leaf function: lr first, then the chain from x29
+    orthia::Arm64ThreadRegisters registers;
+    registers.pc = c_code + 0xC00;
+    registers.sp = c_stack + 0x100;
+    registers.fp = c_stack + 0x200;
+    registers.lr = c_code + 0x404;
+    registers.hasFrameRegisters = true;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, stack));
+    std::vector<orthia::Address_type> expected = { c_code + 0x404 };
+    expected.insert(expected.end(), chain.begin(), chain.end());
+    EXPECT_EQ(expected, stack);
+
+    // a function that called something already: lr is a return into itself
+    registers.pc = c_code + 0x410;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, stack));
+    EXPECT_EQ(chain, stack);
+
+    // lr that the first record holds too: once
+    registers.pc = c_code + 0xC00;
+    registers.lr = c_code + 0x104;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, stack));
+    EXPECT_EQ(chain, stack);
+
+    // Linux: sp and pc only, the first record is searched; the stale one below it has no chain
+    orthia::Arm64ThreadRegisters noFrame;
+    noFrame.pc = c_code + 0x800;
+    noFrame.sp = c_stack + 0x100;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, noFrame, 20, stack));
+    EXPECT_EQ(chain, stack);
+
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, noFrame, 2, stack));
+    EXPECT_EQ(std::vector<orthia::Address_type>(chain.begin(), chain.begin() + 2), stack);
+
+    // sp in no memory
+    noFrame.sp = 0x500000;
+    EXPECT_NE(0, orthia::WalkArm64Stack(process, noFrame, 20, stack));
+    EXPECT_TRUE(stack.empty());
+}
+
+TEST(StackWalk, Arm64ChainGoesUp)
+{
+    auto process = MakeArm64Process();
+    // the second record points back down: the walk stops after it
+    auto& stack = process.regions[1].data;
+    PutUInt64(stack, 0x400, c_stack + 0x200);
+    orthia::Arm64ThreadRegisters registers;
+    registers.pc = c_code + 0x800;
+    registers.sp = c_stack + 0x100;
+    registers.fp = c_stack + 0x200;
+    registers.hasFrameRegisters = true;
+    std::vector<orthia::Address_type> result;
+    ASSERT_EQ(0, orthia::WalkArm64Stack(process, registers, 20, result));
+    EXPECT_EQ(std::vector<orthia::Address_type>({ c_code + 0x104, c_code + 0x204 }), result);
+}
+
+// the bytes are saved when a region is found; the folder that holds them stays when the process is gone
+TEST(FloatingCode, Snapshot)
+{
+    namespace fs = std::filesystem;
+    FloatingFixture fixture;
+    const fs::path folder = fixture.root / ORTHIA_TCSTR("[1] fake");
+    fs::create_directories(folder);
+    std::string firstFile;
+    {
+        auto item = fixture.OpenItem();
+        item->SetProcFolder(folder.native());
+        fixture.AnalyzeModule(*item);
+        orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+        FloatingFixture::AnalyzePending(*item);
+
+        const auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+        ASSERT_TRUE(a.floating);
+        const auto& info = *a.floating;
+        ASSERT_FALSE(info.snapshotFile.empty());
+        EXPECT_EQ(0u, info.snapshotFile.find("10100000_"));
+        EXPECT_EQ(0x1000u, info.snapshotSize);
+        EXPECT_EQ(0u, info.snapshotMissing);
+        firstFile = info.snapshotFile;
+
+        // the file holds the bytes of the region, and its hash is the one recorded
+        const fs::path path = folder / orthia::g_floatingSnapshotFolder / orthia::Utf8ToPlatformString(info.snapshotFile);
+        std::ifstream file(path, std::ios::binary);
+        std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        EXPECT_EQ(fixture.process->regions.front().data, bytes);
+        EXPECT_EQ(orthia::Sha256Hex(bytes.data(), bytes.size()), info.sha256);
+        EXPECT_TRUE(orthia::HasFloatingSnapshots(folder.native()));
+        // D, found by the analysis of A, has one too
+        EXPECT_FALSE(FloatingFixture::FindModule(*item, FloatingFixture::regionD).floating->snapshotFile.empty());
+
+        std::vector<orthia::PlatformString_type> lines;
+        orthia::DescribeFloatingModule(*item, a, lines);
+        std::string text;
+        for (const auto& line : lines)
+        {
+            text += orthia::PlatformStringToUtf8(line) + "\n";
+        }
+        EXPECT_NE(std::string::npos, text.find("Snapshot: ")) << text;
+        EXPECT_NE(std::string::npos, text.find(info.snapshotFile + " (1000 bytes)")) << text;
+        EXPECT_NE(std::string::npos, text.find("SHA-256: " + info.sha256)) << text;
+    }
+    // closing never removes the folder; the snapshots also keep it from expiring
+    ASSERT_TRUE(fs::is_directory(folder));
+
+    // reopened: the snapshot is in the saved record. A changed and refreshed: a second file, the first stays
+    fixture.process->regions.front().data[0x40] = (char)0x90;
+    {
+        auto item = fixture.OpenItem();
+        item->SetProcFolder(folder.native());
+        item->LoadSavedFloatingModules();
+        auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+        EXPECT_EQ(firstFile, a.floating->snapshotFile);
+        ASSERT_TRUE(a.flags & orthia::ModuleInfo::flags_stale);
+        ASSERT_EQ(orthia::FloatingRefresh::refreshed, orthia::RefreshStaleFloatingModule(*item, a));
+        const auto refreshed = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+        EXPECT_NE(firstFile, refreshed.floating->snapshotFile);
+        EXPECT_TRUE(fs::exists(folder / orthia::g_floatingSnapshotFolder / orthia::Utf8ToPlatformString(firstFile)));
+        EXPECT_TRUE(fs::exists(folder / orthia::g_floatingSnapshotFolder / orthia::Utf8ToPlatformString(refreshed.floating->snapshotFile)));
+    }
+
+    // a folder without snapshots stays too, although its process is gone: it is a saved process
+    // until it expires or .database cleanup removes it
+    const fs::path other = fixture.root / ORTHIA_TCSTR("[2] fake");
+    fs::create_directories(other);
+    {
+        auto item = fixture.OpenItem();
+        item->SetProcFolder(other.native());
+    }
+    EXPECT_TRUE(fs::exists(other));
+}
+
 int RunTests()
 {
+    // --run-tests comes before the app's own init: the analysis needs the decoder tables
+    Diana_Init();
     testing::internal::CaptureStderr();
     testing::internal::GetCapturedStderr();
     ::testing::InitGoogleTest();

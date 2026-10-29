@@ -8,6 +8,8 @@
 #include "orthia_utils.h"
 #include "formats/orthia_image_format.h"
 #include "orthia_diana_arch.h"
+#include "orthia_exec.h"
+#include "orthia_stack_walk.h"
 
 extern "C"
 {
@@ -225,13 +227,35 @@ namespace oui
     // PosixThread
     // -------------------------------------------------------------------------
 
+    // The user sp and pc of a blocked thread. No ptrace (the sandbox denies it, and it would stop the thread):
+    // the file needs the same access as process_vm_readv
+    static int ReadThreadSyscallState(pid_t pid, pid_t tid, ThreadSyscallState& state)
+    {
+        char path[128];
+        snprintf(path, sizeof(path), "/proc/%d/task/%d/syscall", (int)pid, (int)tid);
+        int fd = open(path, O_RDONLY);
+        if (fd < 0)
+            return errno;
+        char buffer[256];
+        ssize_t r = read(fd, buffer, sizeof(buffer) - 1);
+        int error = r < 0 ? errno : 0;
+        close(fd);
+        if (error)
+            return error;
+        buffer[r] = 0;
+        if (!ParseThreadSyscallLine(buffer, state))
+            return EINVAL;
+        return 0;
+    }
+
     class CPosixThread : public IThread
     {
         pid_t m_pid;
         pid_t m_tid;
+        std::weak_ptr<IProcess> m_proc;
     public:
-        CPosixThread(pid_t pid, pid_t tid)
-            : m_pid(pid), m_tid(tid)
+        CPosixThread(pid_t pid, pid_t tid, std::weak_ptr<IProcess> proc)
+            : m_pid(pid), m_tid(tid), m_proc(proc)
         {}
 
         int GetInfo(ThreadInfo& info) const override
@@ -252,11 +276,45 @@ namespace oui
             return 0;
         }
 
-        int CaptureStack(int /*framesCount*/, std::vector<orthia::Address_type>& tstack) const override
+        int CaptureStack(int framesCount, std::vector<orthia::Address_type>& tstack) const override
         {
-            // Stack capture requires ptrace — deferred for first iteration
             tstack.clear();
-            return ENOTSUP;
+            auto proc = m_proc.lock();
+            if (!proc)
+                return ESRCH;
+            // x86-64: the x86 emulator walks the stack; its 32-bit walk needs EBP, which the file doesn't give.
+            // AArch64: the frame record chain
+            const bool isAarch64 = proc->GetDianaArch() == DIANA_ARCH_AARCH64;
+            const bool isX64 = proc->GetDianaArch() == DIANA_ARCH_X86 && proc->GetDianaMode() == DIANA_MODE64;
+            if (!isAarch64 && !isX64)
+                return ENOTSUP;
+
+            ThreadSyscallState state;
+            if (int error = ReadThreadSyscallState(m_pid, m_tid, state))
+                return error;
+            if (state.running)
+                return EBUSY;
+
+            if (isAarch64)
+            {
+                orthia::Arm64ThreadRegisters registers;
+                registers.pc = state.pc;
+                registers.sp = state.sp;
+                return orthia::WalkArm64Stack(*proc, registers, framesCount, tstack);
+            }
+
+            // the 64-bit walk needs only rip and rsp; the selectors are the user ones of x86-64 Linux
+            Diana_Processor_Registers_Context context;
+            memset(&context, 0, sizeof(context));
+            context.reg_RIP.value = state.pc;
+            context.reg_RSP.value = state.sp;
+            context.reg_CS.value = 0x33;
+            context.reg_SS.value = context.reg_DS.value = context.reg_ES.value = 0x2b;
+
+            orthia::ProcessReaderAdapter memReader(proc.get());
+            const long pageSize = sysconf(_SC_PAGESIZE);
+            return orthia::QueryThreadCallStack(&memReader, DIANA_MODE64, pageSize > 0 ? (unsigned int)pageSize : 0x1000,
+                &context, framesCount, &tstack);
         }
     };
 
@@ -267,10 +325,11 @@ namespace oui
     class CPosixThreadEnumerator : public IThreadEnumerator, Noncopyable
     {
         pid_t m_pid;
+        std::weak_ptr<IProcess> m_proc;
         DIR*  m_dir = nullptr;
     public:
-        CPosixThreadEnumerator(pid_t pid)
-            : m_pid(pid)
+        CPosixThreadEnumerator(pid_t pid, std::weak_ptr<IProcess> proc)
+            : m_pid(pid), m_proc(proc)
         {
             char path[64];
             snprintf(path, sizeof(path), "/proc/%d/task", (int)pid);
@@ -297,7 +356,7 @@ namespace oui
                     continue;
 
                 pid_t tid = (pid_t)atoi(entry->d_name);
-                return { 0, std::make_shared<CPosixThread>(m_pid, tid) };
+                return { 0, std::make_shared<CPosixThread>(m_pid, tid, m_proc) };
             }
         }
     };
@@ -312,6 +371,9 @@ namespace oui
         unsigned long long endAddr   = 0;
         unsigned long long offset    = 0;
         std::string        path;
+        std::string        pseudoName;   // [heap], [stack], [anon:...], [vdso]: not a file
+        bool               isRead    = false;
+        bool               isWrite   = false;
         bool               isExec    = false;
     };
 
@@ -339,9 +401,13 @@ namespace oui
                 path);
             if (matched >= 4)
             {
+                e.isRead = (perms[0] == 'r');
+                e.isWrite = (perms[1] == 'w');
                 e.isExec = (perms[2] == 'x');
                 if (matched >= 8 && path[0] == '/')
                     e.path = path;
+                else if (matched >= 8)
+                    e.pseudoName = path;
                 entries.push_back(e);
             }
         }
@@ -370,6 +436,51 @@ namespace oui
         {}
 
         ProcessStartInfo GetStartInfo() const override { return m_startInfo; }
+        // a maps line is the allocation: Linux keeps no allocation base.
+        // TODO: a mapping that mprotect split is several lines, so several floating modules
+        int QueryMemoryRegion(unsigned long long address, MemoryRegionInfo& info) override
+        {
+            info = MemoryRegionInfo();
+            for (const auto& e : ParseMaps(m_pid))
+            {
+                if (address < e.startAddr || address >= e.endAddr)
+                    continue;
+                info.allocationBase = info.regionBase = e.startAddr;
+                info.allocationSize = info.regionSize = e.endAddr - e.startAddr;
+                info.committed = true;
+                info.protect = (e.isRead ? MemoryRegionInfo::protect_read : 0) |
+                               (e.isWrite ? MemoryRegionInfo::protect_write : 0) |
+                               (e.isExec ? MemoryRegionInfo::protect_exec : 0);
+                info.type = e.path.empty() ? MemoryRegionInfo::type_private : MemoryRegionInfo::type_mapped;
+                info.mappedName = e.path.empty() ? e.pseudoName : e.path;
+                return 0;
+            }
+            return ENOENT;
+        }
+        int EnumMemoryRegions(std::function<bool(const MemoryRegionInfo& info)> callback) override
+        {
+            const auto entries = ParseMaps(m_pid);
+            if (entries.empty())
+                return ENOENT;
+            for (const auto& e : entries)
+            {
+                MemoryRegionInfo info;
+                info.allocationBase = info.regionBase = e.startAddr;
+                info.regionSize = e.endAddr - e.startAddr;
+                info.committed = true;
+                info.protect = (e.isRead ? MemoryRegionInfo::protect_read : 0) |
+                               (e.isWrite ? MemoryRegionInfo::protect_write : 0) |
+                               (e.isExec ? MemoryRegionInfo::protect_exec : 0);
+                info.type = e.path.empty() ? MemoryRegionInfo::type_private : MemoryRegionInfo::type_mapped;
+                info.mappedName = e.path.empty() ? e.pseudoName : e.path;
+                // [vvar] can't be read by another process
+                if (e.pseudoName == "[vvar]" || e.pseudoName == "[vvar_vclock]")
+                    info.protect = 0;
+                if (!callback(info))
+                    return 0;
+            }
+            return 0;
+        }
         bool IsRunning() const override
         {
             // the pid may run another process by now: the start tells them apart
@@ -519,7 +630,7 @@ namespace oui
 
         std::tuple<int, std::shared_ptr<IThreadEnumerator>> CreateThreadEnumerator() override
         {
-            auto enumerator = std::make_shared<CPosixThreadEnumerator>(m_pid);
+            auto enumerator = std::make_shared<CPosixThreadEnumerator>(m_pid, shared_from_this());
             std::shared_ptr<IThreadEnumerator> result = enumerator;
             return { 0, result };
         }

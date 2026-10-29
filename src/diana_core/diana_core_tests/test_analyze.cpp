@@ -218,6 +218,18 @@ static void test_analyzer_address_taken_code()
     DIANA_TEST_ASSERT(pXRef && !(pXRef->m_flags & (DI_XREF_DATA|DI_XREF_INVALID)));
 }
 
+// lea rcx, [rip+X] past the module: an external address-taken xref, as the observer reports it
+static void test_analyzer_address_taken_external()
+{
+    unsigned char code[] = {  0x48, 0x8d, 0x0d, 0x00, 0x01, 0x00, 0x00  // lea rcx, [rip+100h] -> 107h :0
+                            , 0xc3                                      // ret                         :7
+                            };
+    AnalyzedCode analyzed(code, sizeof(code), DIANA_MODE64);
+    DIANA_TEST_ASSERT(analyzed.owner.m_actualSize == 2);
+    Diana_XRef * pXRef = FindXRefFrom(analyzed.At(0), 0x107, DI_XREF_EXTERNAL|DI_XREF_ADDRESS_TAKEN);
+    DIANA_TEST_ASSERT(pXRef && !(pXRef->m_flags & (DI_XREF_DATA|DI_XREF_INVALID)));
+}
+
 // a minimal PE32+ x64 image in memory (module layout): .text at 0x1000, .pdata at 0x2000
 static void put16(unsigned char * p, size_t offset, DI_UINT32 value) 
 { 
@@ -321,6 +333,7 @@ void test_analyze()
     DIANA_TEST(test_analyzer_data_access_x86());
     DIANA_TEST(test_analyzer_address_taken_data());
     DIANA_TEST(test_analyzer_address_taken_code());
+    DIANA_TEST(test_analyzer_address_taken_external());
     DIANA_TEST(test_analyzer_pdata_x64());
     DIANA_TEST(test_analyzer_scan_through_x86());
 }

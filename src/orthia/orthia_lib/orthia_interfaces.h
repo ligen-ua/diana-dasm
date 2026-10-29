@@ -4,6 +4,7 @@
 #include "orthia_utils.h"
 #include "diana_pe_cpp.h"
 #include "orthia_common_time.h"
+#include <functional>
 
 namespace orthia
 {
@@ -90,15 +91,41 @@ public:
     }
 };
 
+// what a reference does with its target: ref_kind in tbl_references
+enum ReferenceKind
+{
+    reference_unknown = 0,  // saved before the kinds were
+    reference_code = 1,     // a call or a jump
+    reference_address = 2,  // the address taken: lea, an immediate, ADR/ADRP+ADD
+    reference_data = 3      // read or written
+};
+// "code", "addr", "data", "?"
+inline const char* GetReferenceKindName(int kind)
+{
+    switch (kind)
+    {
+    case reference_code: return "code";
+    case reference_address: return "addr";
+    case reference_data: return "data";
+    default: return "?";
+    }
+}
+
+// an immediate the analysis takes for an address is mostly a constant (0xCCCCCCCC, an NTSTATUS, a mask):
+// a taken address outside the module is saved only when this says true for its target
+using ExternalTargetFilter_type = std::function<bool(Address_type)>;
+// one filter per save, so that it can look at the modules and the memory as they are then
+using ExternalTargetFilterFactory_type = std::function<ExternalTargetFilter_type()>;
+
 struct CommonReferenceInfo
 {
-    Address_type address;
-    bool external;
+    Address_type address;   // absolute
+    int kind;               // ReferenceKind
     CommonReferenceInfo(Address_type address_in,
-                       bool external_in)
+                        int kind_in = reference_unknown)
       :
         address(address_in),
-        external(external_in)
+        kind(kind_in)
     {
     }
 };

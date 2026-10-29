@@ -2,6 +2,8 @@
 #include "orthia_image_source.h"
 #include "orthia_model.h"
 #include "ui_common.h"
+#include "orthia_floating_code.h"
+#include <algorithm>
 
 namespace orthia
 {
@@ -81,8 +83,13 @@ void CCommandProcessor::Handle_threads(CommandArguments& args)
         args.ReplyLine(line);
 
         stack.clear();
-        thread->CaptureStack(20, stack);
+        const int stackError = thread->CaptureStack(20, stack);
         line = ORTHIA_TCSTR("Stack:");
+        if (stackError && stack.empty())
+        {
+            // ENOTSUP / ERROR_NOT_SUPPORTED for an architecture without a walker, EBUSY for a running Linux thread
+            line += ORTHIA_TCSTR(" not available, code: ") + orthia::ObjectToString(stackError);
+        }
         args.ReplyLine(line);
 
         for (auto& address: stack)
@@ -101,11 +108,18 @@ void CCommandProcessor::Handle_threads(CommandArguments& args)
     }
 }
 
-void CCommandProcessor::Handle_lm(CommandArguments& args)
+void CCommandProcessor::Handle_lm(CommandArguments& args, bool floating)
 {
     auto rawArgs = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
     orthia::TrimStringAllWhiteSpace(rawArgs);
 
+    // lmf /v: and what leads to each entry point
+    bool verbose = false;
+    if (floating && rawArgs == "/v")
+    {
+        verbose = true;
+        rawArgs.clear();
+    }
     if (!rawArgs.empty())
     {
         throw std::runtime_error("Argument not supported: " + rawArgs);
@@ -113,6 +127,9 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
         
     std::vector<orthia::ModuleInfo> modules;
     args.item->GetModules(modules);
+    // lm: what the OS reports; lmf: the floating code the analysis found
+    modules.erase(std::remove_if(modules.begin(), modules.end(),
+        [floating](const orthia::ModuleInfo& mod) { return mod.IsFloating() != floating; }), modules.end());
 
     orthia::PlatformString_type line;
     int dianaMode = args.item->GetDianaMode();
@@ -132,6 +149,10 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
     orthia::PlatformString_type columnEnd(ORTHIA_TCSTR("end"));
     orthia::PlatformString_type columnName(ORTHIA_TCSTR("module name")); 
     orthia::PlatformString_type columnStatus(ORTHIA_TCSTR("status"));
+    // lmf only
+    orthia::PlatformString_type columnProtect(ORTHIA_TCSTR("protect"));
+    orthia::PlatformString_type columnEntries(ORTHIA_TCSTR("entries"));
+    const size_t extraColumnSize = columnProtect.size() + 2;
     // the column is at least as wide as its header, or short names cut it ("module nstatus")
     if ((int)columnName.size() > maxModuleNameSize)
     {
@@ -154,6 +175,16 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
     column.resize(maxModuleNameSize + 3, ORTHIA_TCHAR(' '));
     line += column;
 
+    if (floating)
+    {
+        column = columnProtect;
+        column.resize(extraColumnSize, ORTHIA_TCHAR(' '));
+        line += column;
+        column = columnEntries;
+        column.resize(extraColumnSize, ORTHIA_TCHAR(' '));
+        line += column;
+    }
+
     // add status
     line += columnStatus;
 
@@ -170,10 +201,35 @@ void CCommandProcessor::Handle_lm(CommandArguments& args)
         column.resize(maxModuleNameSize + 3, ORTHIA_TCHAR(' '));
         line += column;
 
-        line += orthia::ModuleStatusText(mod);
+        if (floating)
+        {
+            column = mod.floating ? orthia::FormatRegionProtect(mod.floating->protect) : orthia::PlatformString_type();
+            column.resize(extraColumnSize, ORTHIA_TCHAR(' '));
+            line += column;
+            column = orthia::Utf8ToPlatformString(std::to_string(mod.floating ? mod.floating->entries.size() : 0));
+            column.resize(extraColumnSize, ORTHIA_TCHAR(' '));
+            line += column;
+            line += (mod.flags & orthia::ModuleInfo::flags_stale) ? ORTHIA_TCSTR("stale") :
+                    (mod.flags & orthia::ModuleInfo::flags_analyzeDone) ? ORTHIA_TCSTR("analyzed") : ORTHIA_TCSTR("pending");
+        }
+        else
+        {
+            line += orthia::ModuleStatusText(mod);
+        }
 
         args.ReplyLine(line);
         line.clear();
+    }
+
+    if (verbose)
+    {
+        std::vector<orthia::PlatformString_type> lines;
+        orthia::DescribeFloatingReferrers(*args.item, lines);
+        args.ReplyLine(orthia::PlatformString_type());
+        for (const auto& text : lines)
+        {
+            args.ReplyLine(text);
+        }
     }
 }
 
@@ -292,6 +348,85 @@ void CCommandProcessor::Handle_d(CommandArguments& args, int itemSize, bool dps)
         bytesLeft -= sizeToRead;    
     }
     vmPrinter.Finish();
+}
+
+// xr [/a] <address> [L<length>]: the references to an address, or to each address of a range that
+// has any (as !x and !xr of the WinDbg extension). A line per referrer: its address, the kind
+// (code, addr: the address taken, data: read or written, ?: saved before the kinds were) and its name
+void CCommandProcessor::Handle_xr(CommandArguments& args)
+{
+    const Address_type maxLength = 0x10000000;
+    auto rawArgs = args.parser.GetTokenizer().GetTokenizer().GetNextRawString();
+    orthia::TrimStringAllWhiteSpace(rawArgs);
+
+    bool addressesOnly = false;
+    if (rawArgs.compare(0, 2, "/a") == 0 && (rawArgs.size() == 2 || rawArgs[2] == ' ' || rawArgs[2] == '\t'))
+    {
+        addressesOnly = true;
+        rawArgs.erase(0, 2);
+        orthia::TrimStringAllWhiteSpace(rawArgs);
+    }
+    if (rawArgs.empty() || rawArgs[0] == '/')
+    {
+        throw std::runtime_error("Usage: xr [/a] <address> [L<length>]");
+    }
+    auto resolver = std::make_shared<oui::NameResolverOverWorkplaceItem>(args.item);
+    const auto range = orthia::CaptureAddressRangeExp(orthia::Utf8ToPlatformString(rawArgs), resolver);
+    auto moduleManager = args.item->GetModuleManager();
+    if (!moduleManager)
+    {
+        throw std::runtime_error("No database");
+    }
+    const int mode = args.item->GetDianaMode();
+
+    auto formatReferrer = [&](const orthia::CommonReferenceInfo& ref, const orthia::PlatformString_type& indent) {
+        orthia::PlatformString_type line = indent + orthia::AddressToString(ref.address, mode);
+        if (!addressesOnly)
+        {
+            orthia::PlatformString_type kind = orthia::Utf8ToPlatformString(orthia::GetReferenceKindName(ref.kind));
+            kind.resize(4, ORTHIA_TCHAR(' '));
+            line += ORTHIA_TCSTR("  ") + kind + ORTHIA_TCSTR("  ") + orthia::QueryAddressNameDef(args.item.get(), ref.address, mode).native;
+        }
+        return line;
+    };
+
+    if (!range.length)
+    {
+        std::vector<orthia::CommonReferenceInfo> refs;
+        moduleManager->QueryReferencesToInstruction(range.address, &refs);
+        for (const auto& ref : refs)
+        {
+            args.ReplyLine(formatReferrer(ref, orthia::PlatformString_type()));
+        }
+        return;
+    }
+    if (!*range.length)
+    {
+        return;
+    }
+    if (*range.length > maxLength)
+    {
+        throw std::runtime_error("Length is too big");
+    }
+    std::vector<orthia::CommonRangeInfo> targets;
+    moduleManager->QueryReferencesToInstructionsRange(range.address, range.address + *range.length - 1, &targets);
+    for (const auto& target : targets)
+    {
+        orthia::PlatformString_type line = orthia::AddressToString(target.address, mode);
+        if (!addressesOnly)
+        {
+            const auto name = args.item->QueryAddressName(target.address).name.native;
+            if (!name.empty())
+            {
+                line += ORTHIA_TCSTR("  ") + name;
+            }
+        }
+        args.ReplyLine(line + ORTHIA_TCSTR(":"));
+        for (const auto& ref : target.references)
+        {
+            args.ReplyLine(formatReferrer(ref, ORTHIA_TCSTR("  ")));
+        }
+    }
 }
 
 }

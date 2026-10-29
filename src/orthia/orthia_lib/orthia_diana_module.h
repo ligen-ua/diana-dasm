@@ -21,7 +21,10 @@ public:
     void MoveToFirst();
     void MoveToNext();
     bool IsEmpty() const;
+    // from the module start
     Address_type GetInstructionOffset();
+    // absolute addresses with their kind: the instructions that refer to this one, and the targets
+    // of this one that are no instruction of the module (outside it, or data in it)
     void QueryRefsToCurrentInstuction(std::vector<CommonReferenceInfo> * pInfo);
     void QueryRefsFromCurrentInstruction(std::vector<CommonReferenceInfo> * pInfo);
 };

@@ -44,6 +44,30 @@ namespace oui
         bool IsKnown() const { return !key.empty(); }
     };
 
+    // The OS allocation that holds an address: VirtualQueryEx on Windows, a /proc/<pid>/maps line on Linux
+    struct MemoryRegionInfo
+    {
+        static const int protect_read = 1;
+        static const int protect_write = 2;
+        static const int protect_exec = 4;
+
+        static const int type_private = 0;   // VirtualAlloc, anonymous mmap, [heap]
+        static const int type_mapped = 1;    // a mapped file (not an image)
+        static const int type_image = 2;     // SEC_IMAGE (Windows)
+
+        // the whole allocation: on Windows every region with the same AllocationBase
+        unsigned long long allocationBase = 0;
+        unsigned long long allocationSize = 0;
+        // the part around the address with one protection
+        unsigned long long regionBase = 0;
+        unsigned long long regionSize = 0;
+        int protect = 0;            // of the region holding the address, protect_*
+        bool committed = false;     // of the region holding the address
+        int type = type_private;
+        // a mapped file or a pseudo name ("[heap]", "[anon:...]"); may be empty
+        std::string mappedName;
+    };
+
     struct IProcess:IFile
     {
         virtual orthia::WorkAddressData ReadExactEx(unsigned long long offset, size_t size) = 0;
@@ -59,6 +83,11 @@ namespace oui
         virtual ProcessStartInfo GetStartInfo() const = 0;
         // false once the process has exited (and its pid may run another one)
         virtual bool IsRunning() const = 0;
+        // 0 and the allocation holding address; an error when nothing is allocated there
+        virtual int QueryMemoryRegion(unsigned long long address, MemoryRegionInfo& info) = 0;
+        // every region of the address space that is allocated, by address; allocationSize is 0 (not
+        // computed). The callback returns false to stop. An error when the map can't be read
+        virtual int EnumMemoryRegions(std::function<bool(const MemoryRegionInfo& info)> callback) { (void)callback; return 1; }
     };
 
     struct ProcessUnifiedId
@@ -139,6 +168,17 @@ namespace oui
     };
 
     std::shared_ptr<IProcessSystem> CreateDefaultProcessProvider();
+
+    // A line of Linux /proc/<pid>/task/<tid>/syscall: "<nr> <6 args> <sp> <pc>" in a syscall, "-1 <sp> <pc>"
+    // blocked elsewhere, "running" on a CPU (no registers then)
+    struct ThreadSyscallState
+    {
+        bool running = false;
+        unsigned long long sp = 0;
+        unsigned long long pc = 0;
+    };
+    // false when the line has neither form
+    bool ParseThreadSyscallLine(const std::string& line, ThreadSyscallState& state);
 
     namespace fsui
     {

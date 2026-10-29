@@ -136,3 +136,47 @@ def test_upgrade_keeps_private_symbols(orthia_cold, data, me, wmain, export_addr
     full.run("lm", **me).assert_ok()
     assert full.resolve("orthia!wmain", **me) == wmain
     assert_names_intact(full, me, export_addr)
+
+
+def run_with(orthia, me, *options, cmds=("lm",)):
+    """--cmd with these options exactly: the runner's own --no-analysis --no-symbols left out."""
+    args = ["--file", str(me["file"]), *options]
+    for cmd in cmds:
+        args += ["--cmd", cmd]
+    return orthia.raw(*args)
+
+
+def test_default_open_analyzes(orthia_cold, me, self_pe):
+    """--cmd without --no-analysis and --no-symbols: the full open."""
+    res = run_with(orthia_cold, me).assert_ok()
+    res.assert_line(r"\borthia\.exe\s+analyzed$")
+    assert db_counts(orthia_cold.home, self_pe.image_base)[1] > 0
+
+
+def test_analyze_option_is_accepted(orthia_cold, me):
+    run_with(orthia_cold, me, "--analyze").assert_ok().assert_line(r"\borthia\.exe\s+analyzed$")
+
+
+def test_cmd_saves_no_choice(orthia_cold, me):
+    """The UI asks what to start on a new database and keeps the answer in meta.xml;
+    the options of --cmd are for that run only."""
+    run_with(orthia_cold, me, "--no-symbols").assert_ok()
+    (meta,) = list(Path(orthia_cold.home).rglob("meta.xml"))
+    assert "auto_" not in meta.read_text(encoding="utf-8", errors="replace")
+
+
+@pytest.mark.symbols
+def test_no_analysis_loads_symbols(orthia_cold, data, me, self_pe, wmain):
+    with_pdb = orthia_cold.with_(symbol_path=data.self_symbols)
+    res = run_with(with_pdb, me, "--no-analysis", cmds=("db orthia!wmain L1", "lm")).assert_ok()
+    res.assert_line(r"\borthia\.exe\s+symbols$")     # no "analyzed"
+    assert res.first_addr() == wmain
+    assert db_counts(orthia_cold.home, self_pe.image_base)[1] == 0
+
+
+@pytest.mark.symbols
+def test_no_symbols_analyzes(orthia_cold, data, me):
+    with_pdb = orthia_cold.with_(symbol_path=data.self_symbols)
+    res = run_with(with_pdb, me, "--no-symbols", cmds=("lm", "x orthia!wmain")).assert_ok()
+    res.assert_line(r"\borthia\.exe\s+analyzed$")    # no "symbols"
+    assert "orthia.exe!wmain" not in res.symbols, res

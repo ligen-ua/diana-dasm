@@ -3,6 +3,9 @@
 #include "ui_help.h"
 #include "oui_goto_dialog.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_saved_process.h"
+#include "oui_open_saved_dialog.h"
+#include "oui_auto_tasks_dialog.h"
 
 void CMainWindow::ToggleMenu(bool openPopup)
 {
@@ -24,6 +27,22 @@ void CMainWindow::OnFileOpen(std::shared_ptr<oui::IFile> file, const oui::fsui::
     {
         // no error; the model has logged what was opened
         OnWorkspaceItemChanged(result);
+
+        auto askIt = result.extraInfo.find(orthia::model_OpenResult_extraInfo_AskAutoTasks);
+        auto idIt = result.extraInfo.find(orthia::model_OpenResult_extraInfo_WorkspaceId);
+        if (askIt != result.extraInfo.end() && idIt != result.extraInfo.end())
+        {
+            // after this reply has closed the open dialog: modal windows close in the
+            // reverse order they opened
+            std::weak_ptr<CMainWindow> weakMe = oui::GetPtr_t<CMainWindow>(this);
+            const int workspaceId = std::any_cast<int>(idIt->second);
+            GetThread()->AddTask([weakMe, workspaceId]() {
+                if (auto p = weakMe.lock())
+                {
+                    p->ShowAutoTasksDialog(workspaceId);
+                }
+            });
+        }
         return;
     }
 
@@ -73,6 +92,46 @@ void CMainWindow::ShowShellcodeDialog(std::shared_ptr<oui::IFile2> file,
     dialog->Dock();
 }
 
+orthia::OpenOptions CMainWindow::GetOpenOptions(bool initialTarget) const
+{
+    orthia::OpenOptions options;
+    auto config = m_model->GetConfig();
+    if (initialTarget && config->IsCliAutoTasksExplicit())
+    {
+        options.policy = orthia::AutoTasksPolicy::Fixed;
+        options.tasks = config->GetCliAutoTasks();
+        return options;
+    }
+    options.policy = orthia::AutoTasksPolicy::AskIfNew;
+    return options;
+}
+
+void CMainWindow::ShowAutoTasksDialog(int workspaceId)
+{
+    orthia::WorkplaceItem item;
+    if (!m_model->QueryWorkspaceItem(workspaceId, item))
+    {
+        // closed meanwhile
+        return;
+    }
+    auto node = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.autotasks"));
+    oui::CAutoTasksDialog::Strings strings;
+    strings.message = oui::PassParameter1(node->QueryValue(ORTHIA_TCSTR("message")), item.name);
+    strings.analyze = node->QueryValue(ORTHIA_TCSTR("analyze"));
+    strings.symbols = node->QueryValue(ORTHIA_TCSTR("symbols"));
+    strings.hint = node->QueryValue(ORTHIA_TCSTR("hint"));
+    strings.ok = node->QueryValue(ORTHIA_TCSTR("ok"));
+    strings.cancel = node->QueryValue(ORTHIA_TCSTR("cancel"));
+
+    auto model = m_model;
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::CAutoTasksDialog>(strings, orthia::AutoTasks(),
+        [model, workspaceId](const orthia::AutoTasks& tasks) {
+            model->StartAutoTasks(workspaceId, tasks);
+        }));
+    dialog->SetCaption(node->QueryValue(ORTHIA_TCSTR("caption")));
+    dialog->Dock();
+}
+
 bool CMainWindow::AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI_UINT64 baseAddress, int dianaMode, int dianaArch,
     oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> outerHandler)
 {
@@ -91,16 +150,17 @@ bool CMainWindow::AsyncOpenFileAsShellcode(std::shared_ptr<oui::IFile2> file, DI
     });
 
     m_model->GetFileSystem()->AsyncExecute(GetThread(),
-        [file, baseAddress, dianaMode, dianaArch, model = m_model, innerHandler = std::move(innerHandler)]() {
+        [file, baseAddress, dianaMode, dianaArch, model = m_model, innerHandler = std::move(innerHandler),
+         options = GetOpenOptions(false)]() {
         orthia::MapFileParameters params;
         params.imageBase = baseAddress;
         params.dianaMode = dianaMode;
         params.dianaArch = dianaArch;
-        model->AddExecutable(file, innerHandler, orthia::FindFormatById("raw"), params);
+        model->AddExecutable(file, innerHandler, options, orthia::FindFormatById("raw"), params);
     });
     return true;
 }
-bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile2> file)
+bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile2> file, bool initialTarget)
 {
     auto me = oui::GetPtr_t<CMainWindow>(this);
     std::weak_ptr<CMainWindow> weakMe = me;
@@ -117,13 +177,14 @@ bool CMainWindow::AsyncOpenFile(std::shared_ptr<oui::IFile2> file)
         }
     });
 
-    m_model->GetFileSystem()->AsyncExecute(GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
-        model->AddExecutable(file, completeHandler);
+    m_model->GetFileSystem()->AsyncExecute(GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler),
+        options = GetOpenOptions(initialTarget)] {
+        model->AddExecutable(file, completeHandler, options);
     });
     return true;
 }
 
-bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process)
+bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process, bool initialTarget)
 {
     auto me = oui::GetPtr_t<CMainWindow>(this);
     std::weak_ptr<CMainWindow> weakMe = me;
@@ -143,8 +204,14 @@ bool CMainWindow::AsyncOpenProcess(std::shared_ptr<oui::IProcess> process)
         }
     });
 
-    m_model->GetFileSystem()->AsyncExecute(GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler)] {
-        model->AddProcess(process, completeHandler);
+    m_model->GetFileSystem()->AsyncExecute(GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler),
+        options = GetOpenOptions(initialTarget)] {
+        if (auto saved = std::dynamic_pointer_cast<orthia::CSavedProcess>(process))
+        {
+            model->AddSavedProcess(saved, completeHandler, options);
+            return;
+        }
+        model->AddProcess(process, completeHandler, options);
     });
     return true;
 }
@@ -181,8 +248,9 @@ oui::fsui::OpenResult CMainWindow::HandleOpenExecutable(std::shared_ptr<oui::COp
         });
 
         // a file opened by hand before is reopened by the model with the saved parameters
-        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler)] {
-            model->AddExecutable(file, completeHandler);
+        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [file, model = m_model, completeHandler = std::move(completeHandler),
+            options = GetOpenOptions(false)] {
+            model->AddExecutable(file, completeHandler, options);
         });
     }
     return oui::fsui::OpenResult();
@@ -213,8 +281,9 @@ oui::fsui::OpenResult CMainWindow::HandleOpenProcess(std::shared_ptr<oui::COpenP
             rawHandler(op, proc, result);
         });
 
-        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler)] {
-            model->AddProcess(process, completeHandler);
+        m_model->GetFileSystem()->AsyncExecute(dialog->GetThread(), [process, model = m_model, completeHandler = std::move(completeHandler),
+            options = GetOpenOptions(false)] {
+            model->AddProcess(process, completeHandler, options);
         });
     }
     return oui::fsui::OpenResult();
@@ -278,6 +347,40 @@ void CMainWindow::OpenExecutable()
             model->AsyncOpenFileWithType(thread, fileId, std::move(resultCallback));
         },
         oui::FileInfo::flag_any_executable));
+    dialog->Dock();
+}
+void CMainWindow::OpenSavedProcess()
+{
+    auto me = oui::GetPtr_t<CMainWindow>(this);
+    std::weak_ptr<CMainWindow> weakMe = me;
+    if (!me)
+    {
+        return;
+    }
+    oui::CommonDialogStrings dialogStrings;
+    GetCommonDialogStrings(ORTHIA_TCSTR("ui.dialog.opensaved"), dialogStrings);
+    auto dialog = AddChildAndInit_t(std::make_shared<oui::COpenSavedProcessDialog>(dialogStrings,
+        [model = m_model]() {
+            return orthia::EnumerateProcDatabases(model->GetConfig()->GetProcDBFolder());
+        },
+        [=](const orthia::PlatformString_type& argument) {
+            auto p = weakMe.lock();
+            if (!p)
+            {
+                return oui::fsui::OpenResult(OUI_TCSTR("Error"));
+            }
+            try
+            {
+                // what --proc-folder takes; the folder is read here, the module files on the FS thread
+                auto process = p->m_model->OpenSavedProcessFolder(argument);
+                p->AsyncOpenProcess(process);
+            }
+            catch (const std::exception& e)
+            {
+                return oui::fsui::OpenResult(oui::String(orthia::Utf8ToPlatformString(e.what())));
+            }
+            return oui::fsui::OpenResult();
+        }));
     dialog->Dock();
 }
 void CMainWindow::ToggleWorkspaceView()
@@ -357,6 +460,11 @@ void CMainWindow::ConstuctMenu()
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_process")),
                 [this]() {  OpenProcess();  },
                 oui::Hotkey(oui::VirtualKey::kP)
+            },
+            {
+                uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("open_saved")),
+                [this]() {  OpenSavedProcess();  },
+                oui::Hotkey(oui::VirtualKey::kS)
             },
             {
                 uiMenuTextNodeFile->QueryValue(ORTHIA_TCSTR("close_item")),

@@ -1,4 +1,6 @@
 #include "orthia_commands.h"
+#include "orthia_capture.h"
+#include <filesystem>
 #include "orthia_expressions.h"
 #include "ui_common.h"
 #include "ui_disasm_memory_writer.h"
@@ -10,6 +12,7 @@
 #include "orthia_databases.h"
 #include "orthia_helpers.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_floating_code.h"
 #include <ctime>
 #include <set>
 
@@ -40,7 +43,10 @@ namespace orthia
         if (++linesWithoutSync > g_maxLinesWithoutSync)
         {
             Sync();
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            if (pauseOutput)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
         }
     }
     void CCommandProcessor::CommandArguments::Sync()
@@ -314,13 +320,150 @@ namespace orthia
         }
     }
 
+    void CCommandProcessor::Handle_capture(CommandArguments& args)
+    {
+        if (SplitCommandWords(args.text).size() > 1)
+        {
+            throw std::runtime_error("Usage: .capture");
+        }
+        auto process = args.item->GetAssociatedProcess();
+        if (!process || !process->IsRunning())
+        {
+            throw std::runtime_error("Nothing to capture: not a running process");
+        }
+        const auto folder = args.item->GetDatabaseFolder();
+        if (folder.empty())
+        {
+            throw std::runtime_error("The process has no database folder");
+        }
+        auto megabytes = [](unsigned long long bytes) {
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "%.1f MB", (double)bytes / (1024.0 * 1024.0));
+            return Utf8ToPlatformString(buffer);
+        };
+        const auto target = (std::filesystem::path(folder) / g_captureFolder).native();
+        args.ReplyLine(ORTHIA_TCSTR("Capturing the memory of the process: ") + target);
+        unsigned long long reported = 0;
+        size_t regionsSinceSync = 0;
+        bool cancelled = false;
+        const auto stats = CaptureProcess(*process, folder, [&](const CaptureStats& progress) {
+            try
+            {
+                if (progress.bytes - reported >= 256ull * 1024 * 1024)
+                {
+                    reported = progress.bytes;
+                    args.ReplyLine(ORTHIA_TCSTR("  ") + megabytes(progress.bytes));
+                }
+                else if (++regionsSinceSync >= 32)
+                {
+                    regionsSinceSync = 0;
+                    args.Sync();
+                }
+            }
+            catch (const RequestCanceledException&)
+            {
+                cancelled = true;
+                return false;
+            }
+            return true;
+        });
+        if (cancelled)
+        {
+            // the bytes saved so far stay, the capture says it is incomplete
+            throw RequestCanceledException();
+        }
+        args.ReplyLine(ORTHIA_TCSTR("Captured: ") + Utf8ToPlatformString(std::to_string(stats.savedRegions)) +
+            ORTHIA_TCSTR(" of ") + Utf8ToPlatformString(std::to_string(stats.regions)) + ORTHIA_TCSTR(" regions, ") +
+            megabytes(stats.bytes) + ORTHIA_TCSTR(" (") + megabytes(stats.missing) + ORTHIA_TCSTR(" unreadable), ") +
+            Utf8ToPlatformString(std::to_string(stats.threads)) + ORTHIA_TCSTR(" threads"));
+        // the floating code known so far: its bytes are in the capture too, and in its snapshots
+        const auto summary = FormatFloatingSummary(*args.item);
+        if (!summary.empty())
+        {
+            args.ReplyLine(summary);
+        }
+    }
+
     void CCommandProcessor::Handle_analyze(CommandArguments& args)
     {
-        auto moduleName = orthia::ReadStringOrRaw(args.parser.GetTokenizer().GetTokenizer());
-        if (moduleName.empty())
+        const char* usage = "Usage: .analyze [/f] <module|mask>";
+        // /f: the full analysis again, also of an analyzed module
+        auto words = SplitCommandWords(args.text);
+        bool force = false;
+        size_t first = 1;
+        for (; first < words.size() && !words[first].empty() && words[first][0] == '/'; ++first)
+        {
+            if (words[first] == ORTHIA_TCSTR("/f"))
+                force = true;
+            else
+                throw std::runtime_error(usage);
+        }
+        if (words.size() == first)
         {
             throw std::runtime_error("Module name expected");
         }
+        if (words.size() != first + 1)
+        {
+            throw std::runtime_error(usage);
+        }
+        const auto moduleName = words[first];
+        auto enqueue = [&](const orthia::ModuleInfo& mod) {
+            args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
+                args.workspaceId, []() {
+                }, force);
+            args.model->GetAnalyzer().EnqueueAnalyzePrivateSymbols(args.item, args.progressHandler, mod.address,
+                args.workspaceId, []() {
+            });
+        };
+
+        // a mask (k*, *): every module lm lists whose name, or name without its extension, matches.
+        // Floating modules are left out, their analysis follows from the modules
+        if (moduleName.find_first_of(ORTHIA_TCSTR("*?")) != orthia::PlatformString_type::npos)
+        {
+            const auto mask = orthia::Downcase(moduleName);
+            std::vector<orthia::ModuleInfo> modules;
+            args.item->GetModules(modules);
+            auto reader = args.item->CreateMemoryReader();
+            size_t queued = 0;
+            for (const auto& mod : modules)
+            {
+                if (mod.IsFloating())
+                {
+                    continue;
+                }
+                auto name = orthia::Downcase(mod.name);
+                bool match = utils::match(mask, name);
+                if (!match)
+                {
+                    orthia::PlatformString_type extension;
+                    orthia::GetExtensionOfFile(name, &extension);
+                    if (!extension.empty())
+                    {
+                        name.erase(name.size() - extension.size() - 1);
+                        match = utils::match(mask, name);
+                    }
+                }
+                if (!match)
+                {
+                    continue;
+                }
+                // one module without image data doesn't stop the others
+                if (!orthia::IsModuleImageReadable(reader.get(), mod))
+                {
+                    args.ReplyLine(ORTHIA_TCSTR("Skipped, no image data: ") + mod.name);
+                    continue;
+                }
+                enqueue(mod);
+                ++queued;
+            }
+            if (!queued)
+            {
+                throw std::runtime_error("No module matches: " + orthia::PlatformStringToUtf8(moduleName));
+            }
+            args.ReplyLine(ORTHIA_TCSTR("Modules queued: ") + orthia::Utf8ToPlatformString(std::to_string(queued)));
+            return;
+        }
+
         bool moduleFound = false;
         oui::EnumModulesByName(args.item,
             moduleName,
@@ -328,13 +471,7 @@ namespace orthia
             {
                 // checked here: a failure in the background analysis cannot fail the command
                 CheckImageReadable(args.item->CreateMemoryReader().get(), mod);
-
-                args.model->GetAnalyzer().EnqueueAnalyze(args.item, args.progressHandler, mod.address,
-                        args.workspaceId, []() {
-                        });
-                args.model->GetAnalyzer().EnqueueAnalyzePrivateSymbols(args.item, args.progressHandler, mod.address,
-                    args.workspaceId, []() {
-                });
+                enqueue(mod);
                 moduleFound = true;
                 return false;
             }
@@ -375,6 +512,19 @@ namespace orthia
             orthia::PlatformString_type line;
             line = ORTHIA_TCSTR("Module: ") + mod.name;
             args.ReplyLine(line);
+
+            if (mod.IsFloating())
+            {
+                // no file and no headers: the memory and what leads there
+                std::vector<orthia::PlatformString_type> lines;
+                orthia::DescribeFloatingModule(*args.item, mod, lines);
+                for (const auto& text : lines)
+                {
+                    args.ReplyLine(text);
+                }
+                moduleFound = true;
+                return false;
+            }
 
             line = ORTHIA_TCSTR("Full name: ") + orthia::StripLongPathPrefix(mod.fullName);
             args.ReplyLine(line);
@@ -477,49 +627,6 @@ namespace orthia
         return text;
     }
 
-    static PlatformString_type FormatSize(unsigned long long size)
-    {
-        const char* units[] = { "B", "KB", "MB", "GB", "TB" };
-        double value = (double)size;
-        int unit = 0;
-        while (value >= 1024 && unit < 4)
-        {
-            value /= 1024;
-            ++unit;
-        }
-        char buffer[32];
-        if (unit == 0)
-        {
-            snprintf(buffer, sizeof(buffer), "%llu B", size);
-        }
-        else
-        {
-            snprintf(buffer, sizeof(buffer), "%.1f %s", value, units[unit]);
-        }
-        return Utf8ToPlatformString(buffer);
-    }
-
-    static PlatformString_type FormatFileTime(std::filesystem::file_time_type time)
-    {
-        if (time == std::filesystem::file_time_type::min())
-        {
-            return ORTHIA_TCSTR("?");
-        }
-        // C++17 has no clock_cast: go through the distance from now
-        auto systemTime = std::chrono::system_clock::now() +
-            std::chrono::duration_cast<std::chrono::system_clock::duration>(time - std::filesystem::file_time_type::clock::now());
-        std::time_t value = std::chrono::system_clock::to_time_t(systemTime);
-        tm local = { 0 };
-#ifdef DIANA_HAS_WIN32
-        localtime_s(&local, &value);
-#else
-        localtime_r(&value, &local);
-#endif
-        char buffer[32];
-        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &local);
-        return Utf8ToPlatformString(buffer);
-    }
-
     static PlatformString_type DescribeDatabase(const DatabaseInfo& info)
     {
         if (info.originalName.empty() || info.originalName == info.folderName)
@@ -605,6 +712,14 @@ namespace orthia
             if (openFolders.count(info.folder))
             {
                 line += ORTHIA_TCSTR("  (open)");
+            }
+            if (info.hasFloatingSnapshots)
+            {
+                line += ORTHIA_TCSTR("  (floating code saved)");
+            }
+            if (info.hasCapture)
+            {
+                line += ORTHIA_TCSTR("  (captured)");
             }
             args.ReplyLine(line);
         }
@@ -877,6 +992,7 @@ namespace orthia
         CCommandParser parser;
         CommandArguments args = { progressHandler, parser, item, model, model->GetActiveItemId(), uiCommandHandler };
         args.text = text;
+        args.pauseOutput = m_pauseOutput;
 
         oui::ScopedGuard reportStopGuard([&]() { ReportStop(args); });
 
@@ -886,15 +1002,18 @@ namespace orthia
             parser.SetHandler(OUI_TCSTR("threads"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_threads(args);  });
             parser.SetHandler(OUI_TCSTR("u"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_u(args);  });
             parser.SetHandler(OUI_TCSTR("x"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_x(args);  });
+            parser.SetHandler(OUI_TCSTR("xr"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_xr(args);  });
             parser.SetHandler(OUI_TCSTR("db"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 1);  });
             parser.SetHandler(OUI_TCSTR("dw"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 2);  });
             parser.SetHandler(OUI_TCSTR("dd"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 4);  });
             parser.SetHandler(OUI_TCSTR("dq"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, 8);  });
             parser.SetHandler(OUI_TCSTR("dp"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, args.item->GetDianaMode());  });
             parser.SetHandler(OUI_TCSTR("dps"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_d(args, args.item->GetDianaMode(), true);  });
-            parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args);  });
+            parser.SetHandler(OUI_TCSTR("lm"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args, false);  });
+            parser.SetHandler(OUI_TCSTR("lmf"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_lm(args, true);  });
             parser.SetHandler(OUI_TCSTR(".reload"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_reload(args);  });
             parser.SetHandler(OUI_TCSTR(".analyze"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_analyze(args);  });
+            parser.SetHandler(OUI_TCSTR(".capture"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_capture(args);  });
             parser.SetHandler(OUI_TCSTR(".symfix"), [&](CCommandParser& parser) mutable { Handle_symfix(args);  });
             parser.SetHandler(OUI_TCSTR("modinfo"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_mod_info(args);  });
             parser.SetHandler(OUI_TCSTR("sections"), [&](CCommandParser& parser) mutable { NeedItem(args); Handle_sections(args);  });
@@ -926,6 +1045,10 @@ namespace orthia
     bool CCommandProcessor::IsBusy() const
     {
         return m_pool.GetTasksCount();
+    }
+    void CCommandProcessor::SetOutputPause(bool pause)
+    {
+        m_pauseOutput = pause;
     }
 
 }

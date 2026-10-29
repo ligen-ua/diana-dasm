@@ -40,16 +40,17 @@ and a rebuilt file gets a new one.
 
 Dependency files (imported DLLs and shared objects) are **not** copied. See [Dependencies](#dependencies).
 
-### Quick open and `--analyze`
+### Analysis and symbols
 
-A `--cmd` run without `--analyze` records only headers, modules, imports and exports.
-The UI, and `--cmd` with `--analyze`, add cross-references, PDB symbols and the private-symbol analysis.
-A database created by a quick open is upgraded in place by a later deep open, or by `.analyze <module>`;
-nothing is thrown away.
+An open records the headers, modules, imports and exports. The code analysis and the symbols are background tasks
+after it, which the UI asks about for a new database and `--no-analysis` / `--no-symbols` turn off
+(see [What starts after an open](orthia.md#what-starts-after-an-open)).
+A database created without them is upgraded in place by a later open that runs them, or by `.analyze <module>`
+and `.reload`; nothing is thrown away.
 
 ## Processes: `proc/[pid] name <start>/`
 
-A live process gets `data.db`, `DIRINFO` and `meta.xml` in a folder named after its pid, its short name
+A live process gets `data.db`, `DIRINFO`, `meta.xml` and `modules.xml` in a folder named after its pid, its short name
 and when it started, in UTC: `proc/[1234] notepad.exe 20261021-153012/`. A later process that gets the same
 pid gets its own folder. When the start can't be read the folder is named `[pid] name`, as before
 `meta.xml` existed.
@@ -59,15 +60,63 @@ The folder name has the start in seconds only; `meta.xml` has it exactly (the cr
 the boot id and start ticks on Linux), and a database is reused only when that matches.
 `--overwrite-db` starts with a new, empty database instead.
 
-The folder is deleted when the process item is closed after the process has exited, and when Orthia
-opened itself (`--pid self`). At start Orthia removes any `proc/` folder that has not been written for
-48 hours. `.database cleanup` removes folders at once, as soon as their process has exited
-(see [Managing databases](#managing-databases)).
+Closing the process item, or Orthia, never deletes the folder: a later `--cmd` run or the UI opens the same
+database while the process runs, and after it exits the folder is a [saved process](orthia.md#saved-process-folders).
+Folders go in two places only: at start Orthia removes any `proc/` folder that has not been written for
+48 hours, and `.database cleanup` removes folders at once, as soon as their process has exited
+(see [Managing databases](#managing-databases)). An Orthia that opened itself (`--pid self`) leaves a folder
+too; every run has its own pid, so it is never reused and expires like the others.
+
+A folder with snapshots of floating code (`floating/*.bin`) is evidence: neither the start nor
+`.database cleanup` removes it, and `.database list` marks it `(floating code saved)`.
+Only `.database delete` removes it.
 
 The code analysis and the comments go into that database, and the analysis flags of each module
-(`flags` in its metainfo, with its name and size). A reopen trusts the flags of a module only when
-the module at that address still has the same name and size. The module list, exports and loaded
-private symbols are kept in memory and rebuilt from the live process.
+(`flags` in its metainfo, with its name, size and the `id_*` identity of its build). The database follows
+the module list, on open and each time it is reloaded:
+- a module that unloaded keeps its analysis: it is evidence, and the same build loading again at the same
+  place gets it back (its flags too);
+- a module at that place that is another one (another name, size, start or build) gets none of it: the old
+  rows are dropped, with the references made from them and their metainfo;
+- comments stay, they belong to addresses. Exports and loaded private symbols are kept
+in memory and rebuilt from the live process. The module list is also written to `modules.xml`, see below. Floating modules are saved
+(metainfo type 6) and come back on a reopen, `stale` when their memory changed.
+
+When a floating module is found, and when `.analyze /f` checks a stale one again, the bytes of its
+allocation (up to 16 MB, from its base) are written to `floating/<base>_<sha256 prefix>.bin`; pages that
+can't be read are zero filled. Another snapshot of the same region with other bytes is a new file, and the
+old one stays. `modinfo` prints the path and the SHA-256.
+
+### `modules.xml`
+
+What the OS reported as the modules of the process, written by the live view when the process is opened
+and again whenever the module list is reloaded (only when it changed). `--proc-folder` reads it to open the
+folder after the process exited ([orthia.md](orthia.md#saved-process-folders)).
+
+```xml
+<modules format_version="1" main="7ff65ed70000">
+    <module base="7ff65ed70000" size="2b6000" name="app.exe" path="C:\dirpp.exe" mode="8" arch="0"
+        entry="7ff65ed82844" builtin="1" id_format="1" id_timestamp="6716f0aa" id_sizeofimage="2b6000"/>
+</modules>
+```
+
+`main` is the base of the process image, `mode`/`arch` are `DIANA_MODE*`/`DIANA_ARCH_*`, `builtin` the
+`builtInFlags` (format bits). The `id_*` attributes tell the build of the module's file, as in module metainfo:
+PE timestamp and `SizeOfImage` from the headers in memory, or the ELF build-id (`id_buildid`); a module without
+them has no bytes when the folder is opened later.
+
+### Capture
+
+`.capture` and `--capture` ([orthia.md](orthia.md#capture-deep-mode)) write `capture/` in the process folder:
+
+| File | What it holds |
+|---|---|
+| `capture.xml` | the memory map: `<region base size allocation protect committed type name file missing/>` per region, `file` when its bytes were saved; `<threads>` with `<thread tid start created stack/>` (`stack`: return addresses, hex, space separated); `complete="0"` when `.capture` was stopped |
+| `<base>_<size>.bin` | the bytes of a region, unreadable chunks zero filled (`missing` bytes of them) |
+
+A newer capture of a range replaces the regions saved over it (their files are removed) and keeps the
+rest. A folder with `capture/capture.xml` is evidence: `.database list` marks it `(captured)`, only
+`.database delete` removes it.
 
 ## `meta.xml`
 
@@ -84,6 +133,7 @@ Every `db/` and `proc/` folder made since `meta.xml` was added has one, in the s
 | `diana_mode`, `diana_arch` | the pointer size and the architecture, as in `parameters.xml` |
 | `format`, `image_base`, `size`, `sha1` | files: the format the file opened as (`pe`, `elf`, `raw`), where it is mapped, its size and SHA-1 |
 | `pid`, `name`, `start`, `start_key` | processes: the pid, `[pid] name`, the start (UTC seconds) and the exact start that decides reuse |
+| `auto_analysis`, `auto_symbols` | what the UI's *New Database* dialog started, `1` or `0`; the next opens in the UI do the same. Missing when no one was asked (`--cmd`, the command line options, older folders): both then run |
 
 A file database written before `meta.xml` gets one on its next open. `--overwrite-db` writes a new one with
 the new database.
@@ -100,7 +150,7 @@ It is rewritten when the embedded copy differs.
 
 ### Versioning
 
-`tbl_version` holds one row per schema version applied; the current version is **4**.
+`tbl_version` holds one row per schema version applied; the current version is **5**.
 An older database is migrated step by step inside one transaction the first time it is opened.
 A database from a newer Orthia fails to open with `Unknown database version`.
 
@@ -110,6 +160,7 @@ A database from a newer Orthia fails to open with `Unknown database version`.
 | 1 to 2 | `tbl_metainfo` and `tbl_comments` |
 | 2 to 3 | addresses in `tbl_references` encoded for unsigned ordering, index `idx_ref_to` |
 | 3 to 4 | the same encoding for `tbl_metainfo.meta_address`, index `idx_metainfo_type_addr` |
+| 4 to 5 | `tbl_references.ref_kind`: what a reference does with its target; older rows are 0 (unknown) |
 
 ### Address encoding
 
@@ -125,7 +176,7 @@ When you query the database by hand, apply the XOR to the encoded columns.
 |---|---|---|
 | `tbl_modules` | `mod_address` (primary key), `mod_size`, `mod_name` | every module in the target's address space: the opened file and its dependencies |
 | `tbl_metainfo` | `meta_mod_id` (foreign key to `tbl_modules`, cascade delete), `meta_address`, `meta_type`, `meta_info` | per-module records, see below |
-| `tbl_references` | `ref_address_from`, `ref_address_to` | cross-references found by the code analysis |
+| `tbl_references` | `ref_address_from`, `ref_address_to`, `ref_kind` | cross-references found by the code analysis, kept by the module they are made from: clearing or unloading a module removes the rows whose `ref_address_from` is inside it. `ref_kind`: 1 a call or a jump, 2 an address taken (`lea`, an immediate, `ADR`) that is code or outside the module (outside: only into a module or committed executable memory; other immediates are constants and are not saved), 3 data read or written, or the address of data in the module taken (it never starts a route), 0 unknown (saved before version 5) |
 | `tbl_comments` | `com_address` (primary key), `com_text` | user comments (`;` in the disassembly view) |
 | `tbl_vm_vms`, `tbl_vm_modules` | | emulator state of the WinDbg plugin; unused by the disassembler |
 
@@ -143,6 +194,7 @@ Foreign keys are enforced on every connection, so deleting a module row removes 
 | 3 | export | the export's address |
 | 4 | private symbol (from a PDB) | the symbol's address |
 | 5 | AArch32 code map: what the bytes are from here on | the address where it changes |
+| 6 | floating module: an allocation of a process that the analysis led to (processes only) | the module address |
 
 Import, export and symbol records carry `address` (the target) and `name`.
 
@@ -165,6 +217,20 @@ The module description carries:
 | `id_format`, `id_buildid` | ELF identity: 2 and the GNU build id |
 | `sha1` | SHA-1 of the dependency's file, for the planned shared image store |
 | `iat_slots` | main module only: import records are keyed by their slot, so they can be replayed |
+
+A floating module (`fl_<base>`) has a `tbl_modules` row for its allocation and a record of type 6:
+
+| Attribute | Meaning |
+|---|---|
+| `base`, `size` | the OS allocation (hex) |
+| `protect`, `type` | protection where the entry points are (1 read, 2 write, 4 execute) and the allocation type (0 private, 1 mapped file, 2 image) |
+| `mapped`, `header` | the mapped file or pseudo name, and `MZ`/`ELF` when the allocation starts with such a header |
+| `hash`, `hashed` | FNV-1a hash of the executable pages of the allocation with their offsets, `hashed` bytes of them (up to 16 MB); checked on reopen, a mismatch makes the module stale |
+| `code_start`, `code_last` | the lowest and the highest instruction start the analysis found (0 before it) |
+| `entries` | `<entry>:<referrer>,<referrer>;<entry>:...` in hex: each entry point and the instructions that lead there |
+| `slots` | `<entry>:<i\|e><slot>=<name>,...;<entry>:...`: the import slots (`i`) and export entries (`e`) that lead to an entry, the slot in hex, the import or export name with `%`, `,`, `;`, `:`, `=` as `%XX`; missing when there are none |
+| `snapshot`, `snapshot_size`, `snapshot_missing` | the file in `floating/` with the bytes as they were found, how many (hex), and how many of them couldn't be read (zero filled); missing when no snapshot was saved |
+| `sha256` | SHA-256 of the snapshot file |
 
 ## Dependencies
 
@@ -250,7 +316,8 @@ Removes what is no longer needed, and prints each folder with the reason:
 | `db/<sha1>` | it has no `data.db` and has not been written for an hour (a younger one may be being created) |
 | `*.deleting` | a `delete` that failed half way |
 
-A file database with a `data.db` is never removed by `cleanup`, and neither is anything open in this Orthia.
+A file database with a `data.db` is never removed by `cleanup`, and neither is anything open in this Orthia,
+nor a process folder with floating code snapshots.
 The process check goes through the same process provider that opens processes: a process Orthia can't
 open (another user's, for example) keeps its folder until the 48 hours pass. A folder another Orthia still
 uses is reported as `Kept` and is not an error.

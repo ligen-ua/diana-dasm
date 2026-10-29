@@ -1,5 +1,6 @@
 #include "orthia_item_process.h"
 #include <filesystem>
+#include <set>
 #include "orthia_memory_cache.h"
 #include "orthia_streams.h"
 #include "orthia_process_adapter.h"
@@ -11,33 +12,14 @@
 #include "orthia_sections.h"
 #include "orthia_databases.h"
 #include "formats/orthia_image_format.h"
-#ifndef DIANA_HAS_WIN32
-#include <unistd.h>
-#endif
+#include "orthia_floating_code.h"
 
 namespace orthia
 {
 
-    static unsigned long long GetOwnPid()
+    static const PlatformString_type& GetSavedModuleName(const ModuleInfo& module)
     {
-#ifdef DIANA_HAS_WIN32
-        return GetCurrentProcessId();
-#else
-        return (unsigned long long)getpid();
-#endif
-    }
-
-    // A folder is kept for the next open of the same process: only while it runs, and only when
-    // its start is known (the folder name and meta.xml tell this process from a later one).
-    // Orthia itself exits right after closing it
-    static bool KeepProcFolder(const std::shared_ptr<oui::IProcess>& proc, const PlatformString_type& folder)
-    {
-        if (!proc || !proc->GetStartInfo().IsKnown() || !proc->IsRunning())
-        {
-            return false;
-        }
-        const auto name = std::filesystem::path(folder).filename().native();
-        return ParseProcFolderPid(name) != GetOwnPid();
+        return module.fullName.empty() ? module.name : module.fullName;
     }
 
     // CProcessWorkplaceItem
@@ -46,17 +28,40 @@ namespace orthia
         m_moduleManager = nullptr;
         m_persistentStorage = nullptr;
         m_moduleStorage = nullptr;
-
-        if (!m_procFolder.empty() && !KeepProcFolder(m_proc, m_procFolder))
-        {
-            std::error_code ec;
-            std::filesystem::remove_all(std::filesystem::path(m_procFolder), ec);
-        }
+        // the folder stays: the next open of the same process reuses it, an exited one is a
+        // saved process. CleanupExpiredProcFolders and .database cleanup remove folders
     }
     void CProcessWorkplaceItem::SetProcFolder(const PlatformString_type& folder)
     {
-        m_procFolder = folder;
-        orthia::EraseLastSlash(m_procFolder);
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            m_procFolder = folder;
+            orthia::EraseLastSlash(m_procFolder);
+        }
+        SaveModuleList();
+    }
+    void CProcessWorkplaceItem::SaveModuleList()
+    {
+        PlatformString_type folder;
+        SavedModuleList list;
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            if (m_savedView || m_procFolder.empty())
+            {
+                return;
+            }
+            folder = m_procFolder;
+            list = m_savedModules;
+        }
+        std::lock_guard<std::mutex> saveGuard(m_saveLock);
+        try
+        {
+            WriteSavedModules(folder, list);
+        }
+        catch (const std::exception& e)
+        {
+            ORTHIA_LOG(orthia::LogSeverity::Warning, "Can't save the module list: ", e.what());
+        }
     }
     CProcessWorkplaceItem::CProcessWorkplaceItem(std::shared_ptr<oui::IProcess> proc,
         const oui::String& shortName,
@@ -78,6 +83,7 @@ namespace orthia
         m_moduleManager = moduleManager;
         m_persistentStorage = persistentItemStorage;
         m_moduleStorage = moduleStorage;
+        InstallExternalTargetFilter(weak_from_this().lock());
     }
     ModuleStorage* CProcessWorkplaceItem::GetModuleStorage()
     {
@@ -130,9 +136,17 @@ namespace orthia
     {
         orthia::flat_map<orthia::Address_type, NameInfo> exports;
         std::vector<orthia::ModuleInfo> modules;
+        // what tells the build of each module's file, for modules.xml
+        std::map<Address_type, ImageIdentity> identities;
         int processModuleOffset = 0;
         m_proc->QueryModules(modules, processModuleOffset,
             [&](const orthia::ModuleInfo& moduleInfo, oui::ModuleDisasmContext& context) {
+
+            ImageIdentity identity;
+            if (!m_savedView && context.image->QueryIdentity(identity))
+            {
+                identities[moduleInfo.address] = identity;
+            }
 
             std::vector<NameInfo> names;
             context.image->QueryNames(names);
@@ -145,16 +159,91 @@ namespace orthia
         });
 
         Address_type processModuleAddress = 0;
+        SavedModuleList savedModules;
         if (!modules.empty() && processModuleOffset != -1 && processModuleOffset < (int)modules.size())
         {
             processModuleAddress = modules[processModuleOffset].entryPoint;
+            savedModules.mainModule = modules[processModuleOffset].address;
         }
         std::sort(modules.begin(), modules.end(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
+        for (const auto& mod : modules)
+        {
+            SavedModuleInfo saved;
+            saved.module.address = mod.address;
+            saved.module.size = mod.size;
+            saved.module.lastValidAddress = mod.lastValidAddress;
+            saved.module.name = mod.name;
+            saved.module.fullName = mod.fullName;
+            saved.module.dianaMode = mod.dianaMode;
+            saved.module.dianaArch = mod.dianaArch;
+            saved.module.entryPoint = mod.entryPoint;
+            saved.module.builtInFlags = mod.builtInFlags;
+            auto it = identities.find(mod.address);
+            if (it != identities.end())
+            {
+                saved.identity = it->second;
+            }
+            savedModules.modules.push_back(std::move(saved));
+        }
 
         exports.sort();
         m_moduleNames.Clear();
 
-        orthia::CAutoCriticalSection guard(m_lock);
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            // the flags of a module that unloaded or changed go with it: another module at its
+            // address is not analyzed. SyncDatabaseModules gives them back when it returns
+            for (const auto& old : m_osModules)
+            {
+                const bool stays = std::any_of(modules.begin(), modules.end(), [&](const orthia::ModuleInfo& mod) {
+                    return mod.address == old.address && mod.size == old.size && GetSavedModuleName(mod) == GetSavedModuleName(old);
+                });
+                if (!stays && !m_floatingModules.count(old.address))
+                {
+                    m_moduleFlags.erase(old.address);
+                }
+            }
+            m_osModules = std::move(modules);
+            m_osExports = std::move(exports);
+            m_savedModules = std::move(savedModules);
+            RebuildModulesNoLock();
+            if (m_processModuleAddress == 0)
+            {
+                m_processModuleAddress = processModuleAddress;
+            }
+        }
+        // the module list can change while the process runs: modules.xml and the database follow
+        SaveModuleList();
+        SyncDatabaseModules();
+    }
+
+    // m_modules and m_exports from the OS modules and the floating ones. A floating module where
+    // the OS reports a module now (it loaded there since) gives way. TODO: say so instead of hiding it
+    void CProcessWorkplaceItem::RebuildModulesNoLock()
+    {
+        std::vector<orthia::ModuleInfo> modules = m_osModules;
+        auto exports = m_osExports;
+        for (const auto& [address, floating] : m_floatingModules)
+        {
+            const bool overlaps = std::any_of(m_osModules.begin(), m_osModules.end(), [&](const orthia::ModuleInfo& mod) {
+                return mod.address <= floating.lastValidAddress && floating.address <= mod.lastValidAddress;
+            });
+            if (overlaps)
+            {
+                continue;
+            }
+            modules.push_back(floating);
+            std::vector<NameInfo> names;
+            QueryFloatingNames(*floating.floating, names);
+            for (auto& info : names)
+            {
+                info.name.native = floating.name + OUI_STR("!") + info.name.native;
+                exports.insert(info.address, info);
+            }
+        }
+        std::sort(modules.begin(), modules.end(), [](auto& m1, auto& m2) { return m1.address < m2.address; });
+        exports.sort();
+
         m_modules = std::move(modules);
         m_exports = std::move(exports);
         m_modulesIndex.clear();
@@ -168,10 +257,79 @@ namespace orthia
             if (it != m_moduleFlags.end())
                 mod.flags |= it->second;
         }
-        if (m_processModuleAddress == 0)
+    }
+
+    void CProcessWorkplaceItem::SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> info)
+    {
+        if (!info)
         {
-            m_processModuleAddress = processModuleAddress;
+            return;
         }
+        const Address_type address = info->allocationBase;
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            m_floatingModules[address] = MakeFloatingModule(std::move(info), m_dianaMode, m_dianaArch);
+            RebuildModulesNoLock();
+        }
+        m_moduleNames.Invalidate(address);
+    }
+
+    void CProcessWorkplaceItem::RemoveFloatingModule(Address_type address)
+    {
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            if (!m_floatingModules.erase(address))
+            {
+                return;
+            }
+            m_moduleFlags.erase(address);
+            RebuildModulesNoLock();
+        }
+        m_moduleNames.Invalidate(address);
+    }
+
+    void CProcessWorkplaceItem::LoadSavedFloatingModules()
+    {
+        auto moduleManager = m_moduleManager;
+        if (!moduleManager)
+        {
+            return;
+        }
+        std::vector<std::shared_ptr<FloatingRegionInfo>> regions;
+        try
+        {
+            regions = LoadFloatingRegions(*moduleManager);
+        }
+        catch (const std::exception& e)
+        {
+            (void)e;
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't read the floating modules: ") + e.what());
+            return;
+        }
+        // read before the lock: hashing reads the process. A saved view checks against its capture,
+        // which is the memory later than the analysis; without one the snapshot is what was found
+        auto saved = std::dynamic_pointer_cast<CSavedProcess>(m_proc);
+        std::vector<bool> unchanged;
+        for (const auto& info : regions)
+        {
+            if (m_savedView && !(saved && saved->IsCaptured(info->allocationBase)))
+            {
+                unchanged.push_back(true);
+                continue;
+            }
+            unchanged.push_back(IsFloatingRegionUnchanged(*m_proc, *info));
+        }
+        orthia::CAutoCriticalSection guard(m_lock);
+        for (size_t i = 0; i < regions.size(); ++i)
+        {
+            const Address_type address = regions[i]->allocationBase;
+            m_floatingModules[address] = MakeFloatingModule(regions[i], m_dianaMode, m_dianaArch);
+            if (!unchanged[i])
+            {
+                m_moduleFlags[address] |= ModuleInfo::flags_stale;
+            }
+        }
+        RebuildModulesNoLock();
     }
     void CProcessWorkplaceItem::OnPrivateSymbolLoaded(Address_type addr, const oui::String& name)
     {
@@ -180,6 +338,12 @@ namespace orthia
         if (it != m_exports.end())
         {
             it->second.privateSymbol = name;
+        }
+        // m_exports is rebuilt from it when a floating module comes
+        auto osIt = m_osExports.find(addr);
+        if (osIt != m_osExports.end())
+        {
+            osIt->second.privateSymbol = name;
         }
     }
     void CProcessWorkplaceItem::OnModuleSymbolsLoaded(Address_type moduleAddress)
@@ -241,6 +405,17 @@ namespace orthia
                 {
                     info.name = import.name.native.empty() ? oui::String(OUI_TCSTR("<unknown>")) : import.name;
                 }
+                names.Add(std::move(info));
+            }
+        }
+
+        // a floating module has no headers: its names are its entry points
+        if (module.floating)
+        {
+            std::vector<NameInfo> found;
+            QueryFloatingNames(*module.floating, found);
+            for (auto& info : found)
+            {
                 names.Add(std::move(info));
             }
         }
@@ -367,11 +542,6 @@ namespace orthia
     static const int g_savedProcessModuleFlags = ModuleInfo::flags_analyzeDone | ModuleInfo::flags_analyzePrivateDone;
 
     // what tells a module at an address from another one loaded there later
-    static const PlatformString_type& GetSavedModuleName(const ModuleInfo& module)
-    {
-        return module.fullName.empty() ? module.name : module.fullName;
-    }
-
     void CProcessWorkplaceItem::UpdateModuleFlags(Address_type moduleAddress, int flagsToSet, int flagsToRemove)
     {
         ModuleInfo module;
@@ -396,6 +566,21 @@ namespace orthia
         {
             SaveModuleFlags(module, flagsToSave);
         }
+        // --capture: the module's memory as the analysis saw it
+        if (moduleKnown && (flagsToSet & ModuleInfo::flags_analyzeDone) && m_captureModules && !m_savedView &&
+            !module.IsFloating() && !m_procFolder.empty())
+        {
+            try
+            {
+                const auto stats = CaptureRange(*m_proc, m_procFolder, module.address, module.size);
+                ORTHIA_DEV_LOG(orthia::LogSeverity::Info, "Captured ", PlatformStringToUtf8(module.name), ": ",
+                    CLogParamEx(stats.bytes, 16), " bytes");
+            }
+            catch (const std::exception& e)
+            {
+                ORTHIA_LOG(orthia::LogSeverity::Warning, "Can't capture ", PlatformStringToUtf8(module.name), ": ", e.what());
+            }
+        }
     }
 
     void CProcessWorkplaceItem::SaveModuleFlags(const ModuleInfo& module, int flags)
@@ -417,6 +602,8 @@ namespace orthia
             builder.AddMetadata(ORTHIA_TCSTR("fullname"), GetSavedModuleName(module));
             builder.AddMetadata("size", (unsigned long long)module.size);
             builder.AddMetadata("flags", flags);
+            // what tells this build from another at the same place and size
+            WriteImageIdentity(builder, QuerySavedIdentity(module.address));
             std::string text;
             builder.Produce(&text);
             database->InsertMetaInfo(module.address, g_database_type_moduleMetaInfo, text, module.address, true);
@@ -428,7 +615,25 @@ namespace orthia
         }
     }
 
+    ImageIdentity CProcessWorkplaceItem::QuerySavedIdentity(Address_type moduleAddress) const
+    {
+        orthia::CAutoCriticalSection guard(m_lock);
+        for (const auto& saved : m_savedModules.modules)
+        {
+            if (saved.module.address == moduleAddress)
+            {
+                return saved.identity;
+            }
+        }
+        return ImageIdentity();
+    }
+
     void CProcessWorkplaceItem::LoadSavedModuleFlags()
+    {
+        SyncDatabaseModules();
+    }
+
+    void CProcessWorkplaceItem::SyncDatabaseModules()
     {
         auto moduleManager = m_moduleManager;
         if (!moduleManager)
@@ -440,10 +645,13 @@ namespace orthia
             PlatformString_type name;
             unsigned long long size = 0;
             int flags = 0;
+            ImageIdentity identity;
         };
+        std::vector<CommonModuleInfo> rows;
         std::map<Address_type, Saved> saved;
         try
         {
+            moduleManager->QueryLoadedModules(&rows);
             moduleManager->QueryDatabaseManager()->GetClassicDatabase()->QueryMetaInfo(g_database_type_moduleMetaInfo,
                 [&](Address_type moduleAddress, int, const std::string& text, Address_type)
             {
@@ -454,6 +662,7 @@ namespace orthia
                     parser.QueryMetadata(ORTHIA_TCSTR("fullname"), &record.name);
                     parser.QueryMetadata("size", &record.size);
                     parser.QueryMetadata("flags", &record.flags);
+                    ReadImageIdentity(parser, record.identity);
                     saved[moduleAddress] = std::move(record);
                 }
                 return true;
@@ -462,22 +671,112 @@ namespace orthia
         catch (const std::exception& e)
         {
             (void)e;
-            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't read the module flags: ") + e.what());
+            ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't read the saved modules: ") + e.what());
             return;
         }
 
-        orthia::CAutoCriticalSection guard(m_lock);
-        for (auto& mod : m_modules)
+        std::vector<orthia::ModuleInfo> osModules;
+        std::map<Address_type, orthia::ModuleInfo> floating;
         {
-            auto it = saved.find(mod.address);
-            // another module loaded at the same address since: analyzed again
-            if (it == saved.end() || it->second.size != (unsigned long long)mod.size || it->second.name != GetSavedModuleName(mod))
+            orthia::CAutoCriticalSection guard(m_lock);
+            osModules = m_osModules;
+            floating = m_floatingModules;
+        }
+
+        std::vector<Address_type> toDrop;
+        std::map<Address_type, int> toRestore;
+        for (const auto& row : rows)
+        {
+            if (!row.size)
             {
                 continue;
             }
-            const int flags = it->second.flags & g_savedProcessModuleFlags;
-            m_moduleFlags[mod.address] |= flags;
-            mod.flags |= flags;
+            // a floating module is checked against the memory (stale), never dropped here
+            auto floatingIt = floating.find(row.address);
+            if (floatingIt != floating.end())
+            {
+                auto it = saved.find(row.address);
+                if (it != saved.end() && it->second.size == (unsigned long long)floatingIt->second.size &&
+                    it->second.name == GetSavedModuleName(floatingIt->second))
+                {
+                    toRestore[row.address] = it->second.flags & g_savedProcessModuleFlags;
+                }
+                continue;
+            }
+            const Address_type rowLast = row.address + row.size - 1;
+            std::vector<const orthia::ModuleInfo*> over;
+            for (const auto& mod : osModules)
+            {
+                if (mod.address <= rowLast && row.address <= mod.lastValidAddress)
+                {
+                    over.push_back(&mod);
+                }
+            }
+            if (over.empty())
+            {
+                // unloaded: kept
+                continue;
+            }
+            auto it = saved.find(row.address);
+            const Saved* record = it == saved.end() ? nullptr : &it->second;
+            // the row has the size the analysis mapped, which is not the OS-reported one (a PE may end
+            // with its last section, an ELF with its bss): the module at the row's address, and the
+            // size, name and build in the metainfo
+            auto at = std::find_if(over.begin(), over.end(), [&](const orthia::ModuleInfo* mod) { return mod->address == row.address; });
+            bool same = at != over.end();
+            if (same && record)
+            {
+                const auto identity = QuerySavedIdentity(row.address);
+                same = record->size == (unsigned long long)(*at)->size &&
+                    record->name == GetSavedModuleName(**at) &&
+                    (!record->identity.IsValid() || !identity.IsValid() || SameIdentity(record->identity, identity));
+            }
+            if (same)
+            {
+                if (record)
+                {
+                    toRestore[row.address] = record->flags & g_savedProcessModuleFlags;
+                }
+                continue;
+            }
+            if (!m_savedView)
+            {
+                toDrop.push_back(row.address);
+            }
+        }
+
+        for (auto address : toDrop)
+        {
+            try
+            {
+                moduleManager->UnloadModule(address);
+                ORTHIA_LOG(orthia::LogSeverity::Info, "Another module is at ", CLogParamEx(address, 16), ": the analysis saved there is dropped");
+            }
+            catch (const std::exception& e)
+            {
+                (void)e;
+                ORTHIA_DEV_LOG(orthia::LogSeverity::Warning, std::string("Can't drop a replaced module: ") + e.what());
+            }
+        }
+        if (toDrop.empty() && toRestore.empty())
+        {
+            return;
+        }
+        {
+            orthia::CAutoCriticalSection guard(m_lock);
+            for (auto address : toDrop)
+            {
+                m_moduleFlags.erase(address);
+            }
+            for (const auto& [address, flags] : toRestore)
+            {
+                m_moduleFlags[address] |= flags;
+            }
+            RebuildModulesNoLock();
+        }
+        for (auto address : toDrop)
+        {
+            m_moduleNames.Invalidate(address);
         }
     }
 

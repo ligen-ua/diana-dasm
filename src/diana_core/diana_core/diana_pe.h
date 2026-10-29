@@ -104,7 +104,10 @@ typedef int (* DianaPeFile_LinkImports_Observer_QueryFunctionByName_fnc)(void * 
                                                                          const char * pFunctionName,
                                                                          DI_UINT32 hint,
                                                                          OPERAND_SIZE * pAddress);
-typedef int (* DianaPeFile_LinkImports_Observer_ReportInfo_fnc)(void * pThis, 
+/* called before each function: an import at its slot (IAT, ELF GOT), a PE export at its entry in
+   AddressOfFunctions (an RVA), an ELF export at its name. The function's value goes to the query
+   callback in pAddress. Callers depend on this (orthia: PointerSlots tests in ui_tests.cpp) */
+typedef int (* DianaPeFile_LinkImports_Observer_ReportInfo_fnc)(void * pThis,
                                                                    OPERAND_SIZE address);
 
 typedef struct _DianaPeFile_LinkImports_Observer

@@ -138,7 +138,12 @@ namespace orthia
             SetState(ImageState::Stale, DescribeIdentityMismatch(m_identity, actual));
             return nullptr;
         }
-        if (image->GetMappedFile().size() != m_size)
+        // in whole pages, and the file may map more than the range: a process reports SizeOfImage
+        // (the mapping may end with the last section), or for an ELF the file-backed mappings only
+        // (the image goes on to the end of bss). The identity tells the build; a file too small for
+        // the range is another one
+        auto pages = [](Address_type size) { return (size + 0xFFF) & ~(Address_type)0xFFF; };
+        if (pages(image->GetMappedFile().size()) < pages(m_size))
         {
             SetState(ImageState::Stale, "mapped size mismatch");
             return nullptr;
@@ -315,6 +320,9 @@ namespace orthia
                     append(ORTHIA_TCSTR("unlinked"));
                 }
                 break;
+            case ImageSourceKind::MemoryImage:
+                append(ORTHIA_TCSTR("captured"));
+                break;
             default:
                 break;
             }
@@ -335,6 +343,8 @@ namespace orthia
         {
         case ImageSourceKind::Main:
             return ORTHIA_TCSTR("main");
+        case ImageSourceKind::MemoryImage:
+            return ORTHIA_TCSTR("captured (the process memory)");
         case ImageSourceKind::LinkedFile:
         {
             auto state = (ImageState)mod.imageState;

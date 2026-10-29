@@ -1,5 +1,6 @@
 #include "orthia_database_saver.h"
 #include "orthia_diana_module.h"
+#include <algorithm>
 
 namespace orthia
 {
@@ -16,8 +17,20 @@ static void SaveArmCodeMap(CDianaModule & dianaModule, CClassicDatabase & classi
     }
 }
 
-CDatabaseSaver::CDatabaseSaver()
+CDatabaseSaver::CDatabaseSaver(ExternalTargetFilter_type externalTargetFilter)
+    :
+        m_externalTargetFilter(std::move(externalTargetFilter))
 {
+}
+
+// only taken addresses: calls, jumps and data accesses out of the module are what the code does
+bool CDatabaseSaver::IsDropped(const CDianaModule & dianaModule, const CommonReferenceInfo & ref) const
+{
+    if (!m_externalTargetFilter || ref.kind != reference_address)
+        return false;
+    if (ref.address - dianaModule.GetModuleAddress() < dianaModule.GetModuleSize())
+        return false;
+    return !m_externalTargetFilter(ref.address);
 }
 
 void CDatabaseSaver::Save(CDianaModule & dianaModule,
@@ -34,6 +47,7 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
     std::vector<CommonReferenceInfo> references;
     CDianaInstructionIterator iterator;
     dianaModule.QueryInstructionIterator(&iterator);
+    auto isDropped = [&](const CommonReferenceInfo & ref) { return IsDropped(dianaModule, ref); };
 
     CClassicDatabaseModuleCleaner cleaner(classicDatabase.get());
     CAutoRollbackClassicDatabase rollback;
@@ -45,21 +59,13 @@ void CDatabaseSaver::Save(CDianaModule & dianaModule,
         iterator.QueryRefsToCurrentInstuction(&references);
         if (!references.empty())
         {
-            // diana returns relative offsets, convert it to the absolute ones
-            for(std::vector<CommonReferenceInfo>::iterator it = references.begin(), it_end = references.end();
-                it != it_end; ++it)
-            {
-                if (!it->external)
-                {
-                    it->address += baseAddress;
-                }
-            }
             classicDatabase->InsertReferencesToInstruction(offset+baseAddress, references);
         }
         iterator.QueryRefsFromCurrentInstruction(&references);
+        references.erase(std::remove_if(references.begin(), references.end(), isDropped), references.end());
         if (!references.empty())
         {
-            classicDatabase->InsertReferencesFromInstruction(offset+baseAddress, references);    
+            classicDatabase->InsertReferencesFromInstruction(offset+baseAddress, references);
         }
         iterator.MoveToNext();
         if (!(i % 10))
@@ -128,9 +134,6 @@ void CDatabaseSaver::SaveWithDedup(CDianaModule & dianaModule,
         iterator.QueryRefsToCurrentInstuction(&references);
         if (!references.empty())
         {
-            for (auto& r : references)
-                if (!r.external) r.address += baseAddress;
-
             filtered.clear();
             for (const auto& r : references)
             {
@@ -148,7 +151,7 @@ void CDatabaseSaver::SaveWithDedup(CDianaModule & dianaModule,
             filtered.clear();
             for (const auto& r : references)
             {
-                if (!xrefExistsFrom(absOffset, r.address))
+                if (!xrefExistsFrom(absOffset, r.address) && !IsDropped(dianaModule, r))
                     filtered.push_back(r);
             }
             if (!filtered.empty())

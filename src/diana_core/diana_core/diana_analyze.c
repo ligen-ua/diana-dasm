@@ -511,6 +511,30 @@ int SaveNewRoute(DianaAnalyzeSession * pSession,
     return DI_SUCCESS;
 }
 
+// lea rax, [rip+X], adr x0, X: the address of X is taken, X may be outside the module
+static
+int SaveRelativeAddressTaken(DianaAnalyzeSession * pSession,
+                             Diana_Instruction * pInstruction,
+                             OPERAND_SIZE target)
+{
+    DianaAnalyzeAddressResult_type result = diaJumpInvalid;
+    OPERAND_SIZE offset = 0;
+    DI_CHECK(pSession->pObserver->m_pAnalyzeAddress(pSession->pObserver,
+                                                    target,
+                                                    0,
+                                                    &offset,
+                                                    &result));
+    switch (result)
+    {
+    case diaJumpNormal:
+        return SaveNewRoute(pSession, pInstruction, offset, DI_ROUTE_QUESTIONABLE, DI_XREF_ADDRESS_TAKEN);
+    case diaJumpExternal:
+        return SaveNewExternalRoute(pSession, pInstruction, offset, 0, DI_XREF_ADDRESS_TAKEN);
+    default:
+        return DI_SUCCESS;
+    }
+}
+
 // lea takes the address of its memory operand, every other instruction reads or writes it
 static
 int IsLea(DianaAnalyzeSession * pSession)
@@ -599,11 +623,7 @@ int DispatchMode64(DianaAnalyzeSession * pSession,
                 pInstruction->m_flags |= DI_INSTRUCTION_USES_RIP;
                 if (IsLea(pSession))
                 {
-                    DI_CHECK(SaveNewRoute(pSession,
-                                          pInstruction,
-                                          target,
-                                          DI_ROUTE_QUESTIONABLE,
-                                          DI_XREF_ADDRESS_TAKEN));
+                    DI_CHECK(SaveRelativeAddressTaken(pSession, pInstruction, target));
                     break;
                 }
                 DI_CHECK(SaveDataAccess(pSession, pInstruction, target, 0));
@@ -647,11 +667,9 @@ int DispatchArm64(DianaAnalyzeSession * pSession,
     case diana_rel:
         // adr: relative to the next instruction like branches
         pInstruction->m_flags |= DI_INSTRUCTION_USES_RIP;
-        return SaveNewRoute(pSession,
-                            pInstruction,
-                            nextInstructionOffset + pOp->value.rel.m_value,
-                            DI_ROUTE_QUESTIONABLE,
-                            DI_XREF_ADDRESS_TAKEN);
+        return SaveRelativeAddressTaken(pSession,
+                                        pInstruction,
+                                        nextInstructionOffset + pOp->value.rel.m_value);
     case diana_index:
         if (pOp->value.rmIndex.reg == reg_A64_PC)
         {

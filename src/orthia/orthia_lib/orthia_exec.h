@@ -38,6 +38,14 @@ int Exec(orthia::IMemoryReader * pMemoryReader,
           orthia::Ptr<IAPIHandler> pAPIHandler,
           std::vector<OPERAND_SIZE> * pCallStack = 0);
 
+// The return addresses of a thread from its registers, walked by the x86 emulator in the memory of pMemoryReader.
+// The 64-bit walk needs only RIP and RSP, the 32-bit one EBP
+int QueryThreadCallStack(orthia::IMemoryReader * pMemoryReader,
+                         int mode,
+                         unsigned int pageSize,
+                         const _Diana_Processor_Registers_Context * pContext,
+                         int framesCount,
+                         std::vector<OPERAND_SIZE> * pCallStack);
 
 }
 

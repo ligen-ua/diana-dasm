@@ -41,6 +41,41 @@ namespace orthia
                 values.push_back(std::move(value));
             }
         };
+
+        // the slot each function is reported at (ReportInfo, just before the call), and its name
+        struct SlotsCollector : public diana::CBasePeLinkImportsObserver
+        {
+            struct Slot
+            {
+                OPERAND_SIZE slot = 0;
+                OPERAND_SIZE value = 0;
+                std::string name;
+            };
+            std::vector<Slot> slots;
+
+            void QueryFunctionByOrdinal(const char* pDllName,
+                DI_UINT32 ordinal,
+                OPERAND_SIZE* pAddress) override
+            {
+                QueryFunctionByName(pDllName, ("$ordinal_" + ToAnsiStringAsHex(ordinal)).c_str(), 0, pAddress);
+            }
+            void QueryFunctionByName(const char* pDllName,
+                const char* pFunctionName,
+                DI_UINT32,
+                OPERAND_SIZE* pAddress) override
+            {
+                // *pAddress stays: the ELF walk writes a value it gets back into the GOT slot
+                Slot slot;
+                slot.slot = GetLastAddress();
+                slot.value = pAddress ? *pAddress : 0;
+                if (pDllName && *pDllName)
+                {
+                    slot.name = std::string(pDllName) + "!";
+                }
+                slot.name += pFunctionName ? pFunctionName : "";
+                slots.push_back(std::move(slot));
+            }
+        };
     }
 
     // CDianaModuleImage
@@ -143,6 +178,111 @@ namespace orthia
             // already the target's address: the slot holds what the loader put there
             AddName(out, NameInfo::flags_Import, value.value, value.name);
         }
+    }
+
+    void CDianaModuleImage::QueryPointerSlots(std::vector<PointerSlotInfo>& out)
+    {
+        const int pointerSize = m_exe.dianaMode == DIANA_MODE64 ? 8 : 4;
+        const Address_type mask = pointerSize == 8 ? ~(Address_type)0 : (Address_type)0xFFFFFFFFULL;
+        auto readPointer = [&](Address_type address, Address_type& value) {
+            DI_UINT64 raw = 0;
+            OPERAND_SIZE readBytes = 0;
+            if (m_stream.parent.pRandomRead(&m_stream, address, &raw, pointerSize, &readBytes,
+                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE) || readBytes != (OPERAND_SIZE)pointerSize)
+            {
+                return false;
+            }
+            value = (Address_type)raw;
+            return true;
+        };
+
+        // imports: the slots are absolute; what they hold is read here, the same for PE and ELF
+        {
+            SlotsCollector collector;
+            std::vector<char> page(0x1000);
+            int status = DianaExecutable_QueryImports(&m_exe,
+                m_base,
+                &m_stream,
+                page.data(),
+                (int)page.size(),
+                collector.GetParent(),
+                DIANA_ANALYZE_RANDOM_READ_ABSOLUTE,
+                DIANA_LINK_IMPORT_READ_FULL_INFO);
+            if (status && status != DI_END)
+            {
+                ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "QueryPointerSlots imports: ", CLogParamEx(m_base, 16), " ->", (long)status);
+            }
+            for (auto& slot : collector.slots)
+            {
+                PointerSlotInfo info;
+                info.slot = (Address_type)slot.slot;
+                if (!info.slot || info.slot - m_base >= m_size || !readPointer(info.slot, info.value))
+                {
+                    continue;
+                }
+                info.value = (Address_type)GetDianaInstructionAddress(info.value & mask, m_exe.arch);
+                info.kind = PointerSlotInfo::kind_import;
+                info.name = std::move(slot.name);
+                out.push_back(std::move(info));
+            }
+        }
+
+        // exports: PE only (ELF reports an export at its name); the entry holds an RVA.
+        // TODO: ELF symbols whose value was rewritten (docs/orthia.md, Floating code)
+        if (m_exe.type == DIANA_EXECUTABLE_TYPE_PE)
+        {
+            SlotsCollector collector;
+            std::vector<char> page(0x4000);
+            int status = DianaExecutable_QueryExports(&m_exe, &m_stream.parent, page.data(), (int)page.size(), collector.GetParent(), 0);
+            if (status && status != DI_END)
+            {
+                ORTHIA_DEV_LOG(orthia::LogSeverity::Debug, "QueryPointerSlots exports: ", CLogParamEx(m_base, 16), " ->", (long)status);
+            }
+            for (auto& slot : collector.slots)
+            {
+                // a forwarder has no address
+                if (!slot.value || slot.name.empty())
+                {
+                    continue;
+                }
+                PointerSlotInfo info;
+                info.slot = m_base + (Address_type)slot.slot;
+                info.value = (Address_type)GetDianaInstructionAddress(ToAbsolute(slot.value) & mask, m_exe.arch);
+                info.kind = PointerSlotInfo::kind_export;
+                info.name = std::move(slot.name);
+                out.push_back(std::move(info));
+            }
+        }
+    }
+
+    bool CDianaModuleImage::QueryIdentity(ImageIdentity& identity)
+    {
+        identity = ImageIdentity();
+        if (m_exe.type == DIANA_EXECUTABLE_TYPE_PE)
+        {
+            // the headers are mapped as they are in the file
+            std::vector<char> header((size_t)std::min<Address_type>(m_size, 0x1000));
+            OPERAND_SIZE readBytes = 0;
+            if (header.empty() || m_stream.parent.pRandomRead(&m_stream, 0, header.data(), (int)header.size(), &readBytes, 0) ||
+                readBytes != (OPERAND_SIZE)header.size())
+            {
+                return false;
+            }
+            return QueryPeHeaderIdentity(header.data(), header.size(), identity);
+        }
+        if (m_exe.type == DIANA_EXECUTABLE_TYPE_ELF)
+        {
+            DI_UINT8 buffer[256] = { 0, };
+            DI_UINT32 size = 0;
+            if (DianaElfFile_QueryBuildId(&m_exe.u.elfFile, &m_stream.parent, 0, buffer, sizeof(buffer), &size) || !size)
+            {
+                return false;
+            }
+            identity.format = ImageIdentity::format_Elf;
+            identity.buildIdHex = BytesToHex(buffer, size);
+            return true;
+        }
+        return false;
     }
 
     // CDianaImageFormat

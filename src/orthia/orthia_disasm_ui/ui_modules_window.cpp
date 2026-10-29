@@ -6,6 +6,7 @@
 #include "orthia_helpers.h"
 #include "oui_menu.h"
 #include <ctime>
+#include <algorithm>
 
 struct ModuleItemContextTag :public oui::ListBoxItemTag
 {
@@ -108,6 +109,14 @@ CModulesWindow::CModulesWindow(std::function<oui::String()> getCaption,
     RegisterSwitchParent(parentTabSwitcher);
 
     m_verticalScroll->SetDragHandler([this](const oui::Point& point) { VertScroll_OnStartDrag(point); });
+}
+
+// the floating modules are listed by lmf, not here. TODO: a view of their own
+static void QueryShownModules(const std::shared_ptr<orthia::IWorkPlaceItem>& item, std::vector<orthia::ModuleInfo>& modules)
+{
+    item->GetModules(modules);
+    modules.erase(std::remove_if(modules.begin(), modules.end(),
+        [](const orthia::ModuleInfo& mod) { return mod.IsFloating(); }), modules.end());
 }
 
 void CModulesWindow::VertScroll_OnStartDrag(const oui::Point& point)
@@ -214,7 +223,8 @@ int CModulesWindow::Modules_GetTotalCount() const
     std::vector<orthia::ModuleInfo> items;
     if (activeItem)
     {
-        return activeItem->GetModulesCount();
+        QueryShownModules(activeItem, items);
+        return (int)items.size();
     }
     return 0;
 }
@@ -269,7 +279,7 @@ void CModulesWindow::UpdateVisibleItems()
     auto activeItem = m_model->GetActiveItem();
     if (activeItem)
     {
-        activeItem->GetModules(m_lastModules);
+        QueryShownModules(activeItem, m_lastModules);
     }
     else
     {
@@ -409,7 +419,7 @@ void CModulesWindow::Modules_ShiftViewWindow(int newOffset)
     auto activeItem = m_model->GetActiveItem();
     if (activeItem)
     {
-        activeItem->GetModules(m_lastModules);
+        QueryShownModules(activeItem, m_lastModules);
     }
  
     DefaultShiftViewWindow(m_modulesBox, newOffset, m_lastModules.size());

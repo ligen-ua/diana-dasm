@@ -123,6 +123,13 @@ void CDatabase::DoUpdate_3_4()
         "CREATE INDEX IF NOT EXISTS idx_metainfo_type_addr ON tbl_metainfo(meta_type, meta_address)"),
         "Can't create index on tbl_metainfo");
 }
+void CDatabase::DoUpdate_4_5()
+{
+    // what a reference does with its target (orthia::ReferenceKind); the rows saved before are 0, unknown
+    ORTHIA_CHECK_SQLITE(SQLiteExec_Wrapper(m_pDatabase->Get(),
+        "ALTER TABLE tbl_references ADD COLUMN ref_kind INTEGER NOT NULL DEFAULT 0"),
+        "Can't add the reference kind to tbl_references");
+}
 void CDatabase::DoVersionScripts()
 {
     CSQLTransaction transaction(m_pDatabase->Get());
@@ -134,7 +141,7 @@ void CDatabase::DoVersionScripts()
 
     int version = m_dbVersion.GetDBVersion();
 
-#define ORTHIA_CURRENT_DB_VERSION_INT       4
+#define ORTHIA_CURRENT_DB_VERSION_INT       5
     if (version != ORTHIA_CURRENT_DB_VERSION_INT)
     {
         switch(version)
@@ -152,6 +159,9 @@ void CDatabase::DoVersionScripts()
         case 3:
             DoUpdate_3_4();
             m_dbVersion.AddDBVersion(4);
+        case 4:
+            DoUpdate_4_5();
+            m_dbVersion.AddDBVersion(5);
         case ORTHIA_CURRENT_DB_VERSION_INT:
             ;
         }

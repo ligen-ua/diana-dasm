@@ -14,14 +14,17 @@ namespace orthia
     };
     static const CommandHelpItem g_commandHelpItems[] = {
         { "x [/a|/n] [/v] <mask>", "Examine symbols (/a: by address, /n: by name, /v: show type)" },
+        { "xr [/a] <address> [L<length>]", "References to the address, or into the range (/a: addresses only)" },
         { "u <address> [L<length>]", "Unassemble address" },
         { "lm", "List loaded modules" },
+        { "lmf [/v]", "List floating code modules (found by .analyze); /v: what leads to each" },
         { "d[b,w,d,q,p,ps]", "Display memory" },
         { "threads", "Display threads" },
         { "cls", "Clear screen" },
         { "exit", "Exit program" },
         { ".reload [<module>]", "Reload symbols for module" },
-        { ".analyze <module>", "Analyze module" },
+        { ".analyze [/f] <module|mask>", "Analyze modules (k*, *) and the floating code they lead to (/f: analyze again)" },
+        { ".capture", "Save the memory of the process (all regions, threads) into its folder" },
         { ".symfix [<path>]", "Set symbols directory" },
         { "modinfo <module>", "Show PE/debug info for module" },
         { "sections [-v] <module|address>", "List sections of module (-v: all header fields)" },

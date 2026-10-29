@@ -15,6 +15,8 @@ Orthia opens executable files and running processes, analyzes their code, and le
 - runs on Windows and Linux, on x86-64 and ARM64 machines;
 - cross-references, PDB symbols, comments, navigation history;
 - analysis results and comments are kept in a database for each file, so files reopen quickly; `.database list | delete | cleanup` manages them;
+- in a process, finds floating code: executable memory outside any module that the analysis leads to, such as hooks and JIT code (`lmf`);
+- a process folder can be reopened after the process exited (`--proc-folder`, *File > Open saved process*), and `.capture` / `--capture` save the memory of the process into it;
 - `--cmd` mode runs commands without the UI, for scripting.
 
 Path: src/orthia/orthia_disasm_ui
@@ -80,7 +82,10 @@ orthia --pid 1234
 Run commands without the UI:
 ```
 orthia --file /bin/ls --cmd lm --cmd 'u ls!$entrypoint L5'
-orthia --file ntoskrnl.exe --analyze --cmd 'x nt!KeBugCheck*'
+orthia --file ntoskrnl.exe --cmd 'x nt!KeBugCheck*'
+orthia --file ntoskrnl.exe --no-analysis --no-symbols --cmd lm
+orthia --pid 1234 --cmd '.analyze *' --cmd 'lmf /v' --cmd .capture
+orthia --proc-folder 1234 --cmd lm --cmd lmf
 ```
 
 Command-line options, commands, hotkeys and symbol setup: see [docs/orthia.md](docs/orthia.md).

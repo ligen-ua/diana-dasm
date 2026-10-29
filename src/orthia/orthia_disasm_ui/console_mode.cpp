@@ -4,6 +4,7 @@
 #include "orthia_commands.h"
 #include "formats/orthia_image_format.h"
 #include "orthia_diana_arch.h"
+#include "orthia_saved_process.h"
 #include "diana_core_cpp.h"
 #include <cstdio>
 #include <climits>
@@ -194,6 +195,15 @@ namespace
         fflush(stdout);
     }
 
+    // no one to ask: what the command line says (--no-analysis, --no-symbols), for every database
+    OpenOptions GetConsoleOpenOptions(const std::shared_ptr<CProgramModel>& model)
+    {
+        OpenOptions options;
+        options.policy = AutoTasksPolicy::Fixed;
+        options.tasks = model->GetConfig()->GetCliAutoTasks();
+        return options;
+    }
+
     // Mirrors CMainWindow::AsyncOpenFile/AsyncOpenProcess: the model call itself runs
     // on the file system pool, the completion handler comes back on the pump thread.
     template<class CompleteHandler_type, class Submit_type>
@@ -254,7 +264,8 @@ namespace
         }
         return OpenTargetAndWait<oui::fsui::FileCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::FileCompleteHandler_type>> handler) {
-                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler, fileFormat]() {
+                const OpenOptions openOptions = GetConsoleOpenOptions(model);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [file, model, handler, fileFormat, openOptions]() {
                     // ParseFileFormatOptions checked the format and its parameters
                     const IImageFormat* format = nullptr;
                     MapFileParameters params;
@@ -268,7 +279,7 @@ namespace
                             params.dianaArch = fileFormat.dianaArch;
                         }
                     }
-                    model->AddExecutable(file, handler, format, params);
+                    model->AddExecutable(file, handler, openOptions, format, params);
                 });
             });
     }
@@ -294,8 +305,32 @@ namespace
         }
         return OpenTargetAndWait<oui::fsui::ProcessCompleteHandler_type>(pump, model,
             [&](std::shared_ptr<oui::Operation<oui::fsui::ProcessCompleteHandler_type>> handler) {
-                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler]() {
-                    model->AddProcess(process, handler);
+                const OpenOptions openOptions = GetConsoleOpenOptions(model);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler, openOptions]() {
+                    model->AddProcess(process, handler, openOptions);
+                });
+            });
+    }
+
+    bool OpenSavedProcessFolder(CHeadlessPump& pump,
+        const std::shared_ptr<CProgramModel>& model,
+        const PlatformString_type& argument)
+    {
+        std::shared_ptr<CSavedProcess> process;
+        try
+        {
+            process = model->OpenSavedProcessFolder(argument);
+        }
+        catch (const std::exception& e)
+        {
+            WriteLine(stderr, ORTHIA_TCSTR("Can't open the saved process folder: ") + Utf8ToPlatformString(e.what()));
+            return false;
+        }
+        return OpenTargetAndWait<oui::fsui::ProcessCompleteHandler_type>(pump, model,
+            [&](std::shared_ptr<oui::Operation<oui::fsui::ProcessCompleteHandler_type>> handler) {
+                const OpenOptions openOptions = GetConsoleOpenOptions(model);
+                model->GetFileSystem()->AsyncExecute(pump.GetThread(), [process, model, handler, openOptions]() {
+                    model->AddSavedProcess(process, handler, openOptions);
                 });
             });
     }
@@ -353,8 +388,8 @@ namespace
 #endif
         CHeadlessPump pump;
 
-        // before anything is opened: AddExecutable/AddProcess and the analyzer read it
-        model->GetConfig()->SetDeepAnalysis(options.analyze);
+        // no UI to draw the output: the pump drains it as fast as it comes
+        model->GetCommandProcessor()->SetOutputPause(false);
 
         auto log = std::make_shared<CConsoleLog>();
         model->SetUILog(log);   // also initializes the analyzer
@@ -379,7 +414,7 @@ namespace
             WriteLine(stderr, ORTHIA_TCSTR("--format applies to --file only"));
             return consoleExit_Usage;
         }
-        if (options.files.empty() && options.pids.empty())
+        if (options.files.empty() && options.pids.empty() && options.procFolders.empty())
         {
             // the data folder commands (.database) need no target
             bool allTargetless = true;
@@ -389,7 +424,7 @@ namespace
             }
             if (!allTargetless)
             {
-                WriteLine(stderr, ORTHIA_TCSTR("No target: --file or --pid is required"));
+                WriteLine(stderr, ORTHIA_TCSTR("No target: --file, --pid or --proc-folder is required"));
                 return consoleExit_OpenFail;
             }
             int result = consoleExit_Ok;
@@ -413,6 +448,13 @@ namespace
         for (auto& pid : options.pids)
         {
             if (!OpenProcess(pump, model, pid))
+            {
+                return consoleExit_OpenFail;
+            }
+        }
+        for (auto& folder : options.procFolders)
+        {
+            if (!OpenSavedProcessFolder(pump, model, folder))
             {
                 return consoleExit_OpenFail;
             }

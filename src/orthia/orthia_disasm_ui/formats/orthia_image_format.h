@@ -51,6 +51,11 @@ namespace orthia
         // flags_Import, address = the value in the import slot, name = the function name,
         // "$ordinal_XXXX" or empty; the caller resolves the target's own name
         virtual void QueryImports(std::vector<NameInfo>& out) = 0;
+        // the import slots and export entries with what they hold now; none for a format without them
+        virtual void QueryPointerSlots(std::vector<PointerSlotInfo>& out) { (void)out; }
+        // what tells the build of its file, from the headers as mapped (PE: timestamp and size,
+        // ELF: build-id); false when they don't tell
+        virtual bool QueryIdentity(ImageIdentity& identity) { (void)identity; return false; }
     };
 
     // Gives every format the same order and the same $entrypoint rule

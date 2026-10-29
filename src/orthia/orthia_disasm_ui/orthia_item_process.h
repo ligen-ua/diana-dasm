@@ -2,6 +2,7 @@
 #include "oui_processes.h"
 #include "orthia_module_symbols.h"
 #include "orthia_module_names.h"
+#include "orthia_saved_process.h"
 
 namespace orthia
 {
@@ -13,11 +14,27 @@ namespace orthia
         int m_dianaMode = 0;
         int m_dianaArch = DIANA_ARCH_X86;
         PlatformString_type m_procFolder;
+        // opened from a saved folder (CSavedProcess): the folder is never removed, modules.xml never written
+        bool m_savedView = false;
+        // --capture: a module's memory goes into the folder when its analysis is done
+        bool m_captureModules = false;
+        // what modules.xml says, from the last ReloadModules; written by the live view
+        SavedModuleList m_savedModules;
+        std::mutex m_saveLock;
+        void SaveModuleList();
+        // the identity modules.xml has for the module; invalid when none
+        ImageIdentity QuerySavedIdentity(Address_type moduleAddress) const;
 
+        // the OS modules and the floating ones, by address
         std::vector<orthia::ModuleInfo> m_modules;
         std::map<orthia::Address_type, int> m_modulesIndex;
         std::map<orthia::Address_type, int> m_moduleFlags;
         orthia::flat_map<orthia::Address_type, NameInfo> m_exports;
+        // what the OS reports, and the floating modules found by the analysis
+        std::vector<orthia::ModuleInfo> m_osModules;
+        orthia::flat_map<orthia::Address_type, NameInfo> m_osExports;
+        std::map<orthia::Address_type, orthia::ModuleInfo> m_floatingModules;
+        void RebuildModulesNoLock();
 
         Address_type m_processModuleAddress = 0;
         std::shared_ptr<CModuleManager> m_moduleManager;
@@ -39,13 +56,31 @@ namespace orthia
             int dianaArch,
             std::shared_ptr<IPeristentItemStorage> persistentStorage);
 
+        // live view: writes modules.xml there now and after each ReloadModules
         void SetProcFolder(const PlatformString_type& folder);
+        // before SetProcFolder: the item shows a saved folder, not a running process
+        void SetSavedView() { m_savedView = true; }
+        bool IsSavedView() const { return m_savedView; }
+        void SetCaptureModules(bool value) { m_captureModules = value; }
         void Init(std::shared_ptr<CModuleManager> moduleManager,
             std::shared_ptr<CFilePersistentItemStorage> persistentItemStorage,
             std::shared_ptr<ModuleStorage> moduleStorage);
         // after Init, on a database reused from an earlier open of the same process: the
-        // analysis flags of the modules that are still the same
+        // analysis flags of the modules that are still the same (SyncDatabaseModules)
         void LoadSavedModuleFlags();
+        // The database against the module list, after Init and after each ReloadModules:
+        // - a module that unloaded keeps its rows (evidence; the same build loading again reuses them)
+        // - a module that is there again, the same file and build at the same place, gets its saved flags back
+        // - a row that another module now covers (another name, size, place or build) is dropped with its
+        //   references and metainfo; a saved view drops nothing
+        // Comments stay: they belong to addresses, not modules
+        void SyncDatabaseModules();
+        // before LoadSavedModuleFlags, on a reused database: the floating modules found then,
+        // stale when their memory changed. TODO: the same check on demand in an open process, and a
+        // way to drop a stale module
+        void LoadSavedFloatingModules();
+        void SetFloatingModule(std::shared_ptr<const FloatingRegionInfo> info) override;
+        void RemoveFloatingModule(Address_type address) override;
 
         void ReloadModules() override;
         WorkAddressData ReadData(Address_type address, Address_type size) override;

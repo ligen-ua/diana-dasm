@@ -1783,7 +1783,8 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
                 }
                 if (pObserver->reportInfo_fnc)
                 {
-                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionValue));
+                    /* an export is reported at its slot in AddressOfFunctions, as an import at its IAT slot */
+                    DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionPtr));
                 }
                 DI_CHECK_GOTO(pObserver->queryFunctionByName(pObserver, 0, pPage, hint, &address));
             }
@@ -1845,7 +1846,7 @@ int DianaPeFile_QueryExports(/* in */ Diana_PeFile* pPeFile,
 
             if (pObserver->reportInfo_fnc)
             {
-                DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionValue));
+                DI_CHECK_GOTO(pObserver->reportInfo_fnc(pObserver, functionPtr));
             }
 
             {

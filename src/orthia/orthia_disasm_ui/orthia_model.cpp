@@ -12,6 +12,8 @@
 #include "orthia_common_format.h"
 #include "orthia_databases.h"
 #include "formats/orthia_image_format.h"
+#include "orthia_saved_process.h"
+#include "orthia_floating_code.h"
 
 namespace orthia
 {
@@ -234,12 +236,14 @@ namespace orthia
     }
 
 
-    void CProgramModel::CreateProcItemFS(std::shared_ptr<oui::IProcess> proc,
+    bool CProgramModel::CreateProcItemFS(std::shared_ptr<oui::IProcess> proc,
         oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
         intrusive_ptr<CTextNode> mainNode,
         intrusive_ptr<CTextNode> errorNode,
-        std::shared_ptr<CProcessWorkplaceItem> info)
+        std::shared_ptr<CProcessWorkplaceItem> info,
+        FolderMeta& savedMeta)
     {
+        bool reuse = false;
         try
         {
             // the start in the name: a later process with the same pid gets its own folder
@@ -248,6 +252,16 @@ namespace orthia
             auto folderName = GetFileSystem()->SyncSanitizeName(oui::String(
                 MakeProcFolderName(processName.native, startInfo.IsKnown() ? startInfo.unixSeconds : 0)));
             auto dbFolder = m_config->GetProcDBFolder() + AddSlash2(folderName.native);
+            // an earlier open of this process may have named its folder a second apart
+            if (!m_config->GetOverwriteDatabases() && startInfo.IsKnown())
+            {
+                const auto existing = FindProcFolderByStart(m_config->GetProcDBFolder(),
+                    ParseProcFolderPid(processName.native), startInfo.key);
+                if (!existing.empty())
+                {
+                    dbFolder = AddSlash2(existing);
+                }
+            }
             auto dbFileName = dbFolder + m_config->GetDBFileName();
             auto readmeFileName = dbFolder + m_config->GetReadmeFileName();
             auto metaFileName = dbFolder + m_config->GetMetaFileName();
@@ -256,7 +270,6 @@ namespace orthia
 
             // the database of an earlier open is reused only for the same process: the folder
             // name has the start in seconds, meta.xml has it exactly
-            bool reuse = false;
             if (!m_config->GetOverwriteDatabases() && startInfo.IsKnown() && IsFileExist(dbFileName))
             {
                 FolderMeta saved;
@@ -264,6 +277,10 @@ namespace orthia
                     IsFolderReadable(saved) &&
                     saved.kind == g_folderKindProcess &&
                     saved.startKey == startInfo.key;
+                if (reuse)
+                {
+                    savedMeta = saved;
+                }
             }
 
             // save readme file 
@@ -313,7 +330,9 @@ namespace orthia
             persistentItemStorage->CPersistentItemStorage::Init(info);
             if (reuse)
             {
-                // the analysis saved by the earlier open, for the modules that are still the same
+                // the analysis saved by the earlier open, for the modules that are still the same;
+                // the floating modules first, their flags are saved the same way
+                info->LoadSavedFloatingModules();
                 info->LoadSavedModuleFlags();
             }
         }
@@ -323,7 +342,9 @@ namespace orthia
                 proc->GetFullFileNameForUI()));
 
             WriteLog(completeHandler->GetThread(), oui::String(orthia::Utf8ToPlatformString(e.what())));
+            reuse = false;
         }
+        return reuse;
     }
     // "x64", "arm64", "thumb", ... for the line logged when a target is opened
     static oui::String GetArchNameForUI(int dianaMode, int dianaArch)
@@ -353,7 +374,8 @@ namespace orthia
     }
 
     void CProgramModel::AddProcess(std::shared_ptr<oui::IProcess> proc,
-        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler)
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+        const OpenOptions& options)
     {
         auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
         auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
@@ -378,11 +400,102 @@ namespace orthia
         auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
         auto info = std::make_shared<CProcessWorkplaceItem>(proc, proc->GetFullFileNameForUI(), dianaMode, dianaArch,
             persistentItemStorage);
+        info->SetCaptureModules(m_config->GetCaptureModules());
         info->ReloadModules();
         persistentItemStorage->Init(info);
 
-        CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info);
+        FolderMeta savedMeta;
+        const bool reused = CreateProcItemFS(proc, completeHandler, mainNode, errorNode, info, savedMeta);
+        FinishProcessOpen(info, completeHandler, mainNode, result, options, !reused, reused ? &savedMeta : nullptr);
+    }
 
+    void CProgramModel::AddSavedProcess(std::shared_ptr<CSavedProcess> proc,
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+        const OpenOptions& options)
+    {
+        auto mainNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("ui.dialog.main"));
+        auto errorNode = g_textManager->QueryNodeDef(ORTHIA_TCSTR("model.errors"));
+        oui::fsui::OpenResult result;
+        result.error = errorNode->QueryValue(ORTHIA_TCSTR("unknown"));
+        oui::ScopedGuard handlerGuard([&]() {
+            completeHandler->Reply(completeHandler, proc, result);
+        });
+
+        const auto folder = proc->GetFolder();
+        WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("opening-saved")),
+            oui::String(folder)));
+        if (!proc->HasModuleList())
+        {
+            WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("saved-no-modules")));
+        }
+
+        auto persistentItemStorage = std::make_shared<CPersistentItemStorage>();
+        auto info = std::make_shared<CProcessWorkplaceItem>(proc,
+            oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("saved-name")), proc->GetFullFileNameForUI()),
+            proc->GetDianaMode(), proc->GetDianaArch(), persistentItemStorage);
+        info->SetSavedView();
+        // the module files are read here: exports, and which of them are still the same build
+        info->ReloadModules();
+        persistentItemStorage->Init(info);
+
+        // never new: what was chosen when the database was made
+        FolderMeta savedMeta;
+        const bool hasMeta = ReadFolderMeta(AddSlash2(folder) + m_config->GetMetaFileName(), savedMeta);
+        try
+        {
+            const auto dbFileName = AddSlash2(folder) + m_config->GetDBFileName();
+            info->SetProcFolder(folder);
+            WriteLog(completeHandler->GetThread(), oui::PassParameter1(mainNode->QueryValue(ORTHIA_TCSTR("database-file")),
+                dbFileName));
+
+            auto filePersistentStorage = std::make_shared<CFilePersistentItemStorage>();
+            auto moduleManager = std::make_shared<CModuleManager>();
+            moduleManager->Reinit(dbFileName, false);
+            filePersistentStorage->Init(moduleManager->QueryDatabaseManager());
+            auto moduleStorage = std::make_shared<ModuleStorage>(
+                moduleManager->QueryDatabaseManager()->GetClassicDatabase());
+            info->Init(moduleManager, filePersistentStorage, moduleStorage);
+            filePersistentStorage->CPersistentItemStorage::Init(info);
+
+            // the floating code reads from its snapshots
+            for (const auto& region : LoadFloatingRegions(*moduleManager))
+            {
+                proc->AddSnapshot(*region);
+            }
+            info->LoadSavedFloatingModules();
+            info->LoadSavedModuleFlags();
+        }
+        catch (const std::exception& e)
+        {
+            result.error = oui::String(Utf8ToPlatformString(e.what()));
+            return;
+        }
+        FinishProcessOpen(info, completeHandler, mainNode, result, options, false, hasMeta ? &savedMeta : nullptr);
+    }
+
+    std::shared_ptr<CSavedProcess> CProgramModel::OpenSavedProcessFolder(const PlatformString_type& argument)
+    {
+        const auto folder = ResolveSavedProcessFolder(EnumerateDatabases(*m_config), argument);
+        // the folder a live item has open would get two writers
+        const auto open = QueryOpenDatabaseFolders();
+        auto it = open.find(folder);
+        if (it != open.end())
+        {
+            throw std::runtime_error("The folder is open as " + PlatformStringToUtf8(it->second));
+        }
+        return OpenSavedProcess(folder);
+    }
+
+    void CProgramModel::FinishProcessOpen(std::shared_ptr<CProcessWorkplaceItem> info,
+        oui::OperationPtr_type<oui::fsui::ProcessCompleteHandler_type> completeHandler,
+        intrusive_ptr<CTextNode> mainNode,
+        oui::fsui::OpenResult& result,
+        const OpenOptions& options,
+        bool isNewDb,
+        const FolderMeta* savedMeta)
+    {
+        const int dianaMode = info->GetDianaMode();
+        const int dianaArch = info->GetDianaArch();
         WorkAddressRangeInfo mainModule;
         int mainModuleFlags = 0;
         if (auto address = info->GetMainModuleAddress())
@@ -414,7 +527,100 @@ namespace orthia
         // OK
         result.error.native.clear();
 
-        EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->GetMainModuleAddress(), info);
+        StartOrAskAutoTasks(completeHandler->GetThread(), workspaceId, info, info->GetMainModuleAddress(), true,
+            options, isNewDb, savedMeta, result);
+    }
+
+    AutoTasks ResolveAutoTasks(const OpenOptions& options, bool isNewDb, const FolderMeta* meta, bool* ask)
+    {
+        *ask = false;
+        if (options.policy == AutoTasksPolicy::Fixed)
+        {
+            return options.tasks;
+        }
+        if (isNewDb)
+        {
+            *ask = true;
+            AutoTasks none;
+            none.analyze = false;
+            none.symbols = false;
+            return none;
+        }
+        // a folder from before the choice existed, or made by --cmd: everything, as it was
+        return meta ? GetFolderAutoTasks(*meta) : AutoTasks();
+    }
+
+    void CProgramModel::StartOrAskAutoTasks(std::shared_ptr<oui::CWindowThread> uiThread,
+        int workspaceId,
+        std::shared_ptr<IWorkPlaceItem> item,
+        Address_type mainAddr,
+        bool isProcess,
+        const OpenOptions& options,
+        bool isNewDb,
+        const FolderMeta* savedMeta,
+        oui::fsui::OpenResult& result)
+    {
+        bool ask = false;
+        const AutoTasks tasks = ResolveAutoTasks(options, isNewDb, savedMeta, &ask);
+        if (ask)
+        {
+            PendingAutoTasks pending;
+            pending.uiThread = uiThread;
+            pending.mainAddr = mainAddr;
+            pending.isProcess = isProcess;
+            {
+                std::unique_lock<std::mutex> lock(m_lock);
+                m_pendingAutoTasks[workspaceId] = pending;
+            }
+            result.extraInfo[model_OpenResult_extraInfo_AskAutoTasks] = std::any(true);
+            return;
+        }
+        EnqueueAnalysisOps(uiThread, workspaceId, item, mainAddr, isProcess, tasks);
+    }
+
+    void CProgramModel::StartAutoTasks(int workspaceId, const AutoTasks& tasks)
+    {
+        PendingAutoTasks pending;
+        std::shared_ptr<IWorkPlaceItem> item;
+        {
+            std::unique_lock<std::mutex> lock(m_lock);
+            auto it = m_pendingAutoTasks.find(workspaceId);
+            if (it == m_pendingAutoTasks.end())
+            {
+                return;
+            }
+            pending = it->second;
+            m_pendingAutoTasks.erase(it);
+            auto itemIt = m_items.find(workspaceId);
+            if (itemIt != m_items.end())
+            {
+                item = itemIt->second;
+            }
+        }
+        if (!item || item->IsDeletePending())
+        {
+            return;
+        }
+        // the next opens of this database do the same without asking
+        const auto folder = item->GetDatabaseFolder();
+        if (!folder.empty())
+        {
+            const auto metaFileName = AddSlash2(folder) + m_config->GetMetaFileName();
+            FolderMeta meta;
+            if (ReadFolderMeta(metaFileName, meta))
+            {
+                SetFolderAutoTasks(meta, tasks);
+                try
+                {
+                    WriteFolderMeta(metaFileName, meta);
+                }
+                catch (const std::exception& e)
+                {
+                    m_analyzer.WriteLog(oui::String(Utf8ToPlatformString(e.what())));
+                }
+            }
+        }
+        EnqueueAnalysisOps(pending.uiThread, workspaceId, item, pending.mainAddr, pending.isProcess, tasks);
     }
     void CProgramModel::NotifyWorkspaceDataRefreshed(std::shared_ptr<oui::CWindowThread> uiThread, int workspaceId)
     {
@@ -434,19 +640,17 @@ namespace orthia
         int workspaceId,
         std::shared_ptr<IWorkPlaceItem> item,
         Address_type mainAddr,
-        std::shared_ptr<CProcessWorkplaceItem> procItem)
+        bool isProcess,
+        const AutoTasks& tasks)
     {
-        if (!m_config->GetDeepAnalysis())
+        // what is off still works on demand: .analyze and .reload
+        if (tasks.analyze)
         {
-            // quick open (--cmd without --analyze): .analyze and .reload still work on demand
-            return;
-        }
-        if (procItem)
-        {
-            // Phase 1 (process only): disassemble the main module and log a completion message.
+            // Phase 1: disassemble the main module (skipped when it is analyzed already) and log a
+            // completion message.
             auto bgOp = std::make_shared<oui::BaseOperation>(uiThread);
-            m_analyzer.EnqueueAnalyze(procItem, bgOp, mainAddr, workspaceId,
-                [uiThread, uiLog = m_uiLog]() {
+            m_analyzer.EnqueueAnalyze(item, bgOp, mainAddr, workspaceId,
+                [this, uiThread, workspaceId, uiLog = m_uiLog]() {
                     uiThread->AddTask([uiLog]() {
                         if (auto log = uiLog.lock())
                         {
@@ -454,16 +658,27 @@ namespace orthia
                             log->WriteLog(node->QueryValue(ORTHIA_TCSTR("analysis-complete")));
                         }
                     });
+                    // the view was shown before the analysis: its references and names are new
+                    NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
                 });
         }
+        if (!tasks.symbols)
+        {
+            return;
+        }
 
-        // Phase 2: load debug symbols; on completion, re-analyze with private symbols,
-        // then notify all UI subscribers that the workspace item changed.
+        // Phase 2: load debug symbols; on completion, re-analyze with private symbols (only
+        // when the analysis is on), then notify all UI subscribers that the workspace item changed.
         auto symOp = std::make_shared<oui::BaseOperation>(uiThread);
+        const bool reanalyze = tasks.analyze;
         m_analyzer.EnqueueLoadSymbols(item, symOp, workspaceId,
-            [this, uiThread, workspaceId, mainAddr, item]() {
+            [this, uiThread, workspaceId, mainAddr, item, reanalyze]() {
 
                 NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
+                if (!reanalyze)
+                {
+                    return;
+                }
 
                 auto reanalyzeOp = std::make_shared<oui::BaseOperation>(uiThread);
                 m_analyzer.EnqueueAnalyzePrivateSymbols(item, reanalyzeOp, mainAddr, workspaceId,
@@ -474,22 +689,9 @@ namespace orthia
             [this, uiThread, workspaceId]() {
                 NotifyWorkspaceDataRefreshed(uiThread, workspaceId);
             },
-            procItem ? Address_type{0} : mainAddr);
+            isProcess ? Address_type{0} : mainAddr);
     }
 
-    static bool IsModuleAnalyzed(const std::shared_ptr<IWorkPlaceItem>& item, Address_type moduleAddress)
-    {
-        std::vector<ModuleInfo> modules;
-        item->GetModules(modules);
-        for (const auto& mod : modules)
-        {
-            if (mod.address == moduleAddress)
-            {
-                return (mod.flags & ModuleInfo::flags_analyzeDone) != 0;
-            }
-        }
-        return false;
-    }
 
     // The format and MapFileParameters of a file opened by hand (raw code), saved next to its
     // database so that a reopen doesn't ask again. A file without "format" is from before
@@ -554,6 +756,7 @@ namespace orthia
 
     void CProgramModel::AddExecutable(std::shared_ptr<oui::IFile2> file,
         oui::OperationPtr_type<oui::fsui::FileCompleteHandler_type> completeHandler,
+        const OpenOptions& options,
         const IImageFormat* forcedFormat,
         MapFileParameters params)
     {
@@ -692,6 +895,7 @@ namespace orthia
             }
             info->moduleManager = std::make_shared<CModuleManager>();
             info->moduleManager->Reinit(dbFileName, overwrite);
+            InstallExternalTargetFilter(info);
             persistentItemStorage->Init(info->moduleManager->QueryDatabaseManager());
 
             if (info->shortName.native == m_config->GetBinFileName())
@@ -721,9 +925,7 @@ namespace orthia
             CMemoryReaderOnLoadedData reader(info->file->GetImageBase(), mappedFile.data(), mappedFile.size());
 
             const Address_type imageBase = info->file->GetImageBase();
-            const bool deepAnalysis = m_config->GetDeepAnalysis();
             const bool firstOpen = !info->moduleManager->QueryDatabaseManager()->GetClassicDatabase()->IsModuleExists(imageBase);
-            const bool needsAnalysis = deepAnalysis && (firstOpen || !IsModuleAnalyzed(info, imageBase));
             if (firstOpen || !hasMeta)
             {
                 FolderMeta meta;
@@ -742,12 +944,9 @@ namespace orthia
             {
                 extraBuiltInFlags = mainImage->GetExtraBuiltInFlags();
             }
-            if (firstOpen || needsAnalysis)
-            {
-                // warn user it may take quite a time
-                WriteLog(completeHandler->GetThread(), mainNode->QueryValue(ORTHIA_TCSTR("analyzing-file")));
-            }
-
+            // the code analysis is not done here: it is a background task (EnqueueAnalysisOps), so the
+            // view opens at once. Formats with nothing to find the code from (raw) analyze here
+            bool analyzedOnRegister = false;
             if (firstOpen)
             {
                 bool importsKeyedBySlot = false;
@@ -760,7 +959,8 @@ namespace orthia
                         importsKeyedBySlot = dependencies->ImportsKeyedBySlot();
                     }
 
-                    analyzed = format->RegisterMainModule(*info->moduleManager, *mappedExe, reader, info->shortName.native, deepAnalysis);
+                    analyzed = format->RegisterMainModule(*info->moduleManager, *mappedExe, reader, info->shortName.native, false);
+                    analyzedOnRegister = analyzed;
 
                     if (dependencies)
                     {
@@ -793,14 +993,9 @@ namespace orthia
                             return true;
                         });
                 }
-                // the dependencies are not loaded again: the linked IAT comes from the database
+                // the dependencies are not loaded again: the linked IAT comes from the database.
+                // A module opened before without the analysis gets it from EnqueueAnalysisOps
                 info->ApplyLinkedImports();
-                if (needsAnalysis)
-                {
-                    // opened before without --analyze
-                    info->moduleManager->AnalyzeRegisteredModule(imageBase, &reader, info->shortName.native, 0);
-                    info->UpdateModuleFlags(imageBase, ModuleInfo::flags_analyzeDone, 0);
-                }
             }
             info->InitImageSources(format);
 
@@ -821,8 +1016,11 @@ namespace orthia
             // OK
             result.error.native.clear();
 
-            // kick off symbol loading and notify UI when complete
-            EnqueueAnalysisOps(completeHandler->GetThread(), workspaceId, info, info->file->GetImageBase(), nullptr);
+            // kick off the analysis and the symbol loading, or ask the UI first. A database the
+            // format analyzed already (raw) has nothing to ask about
+            const bool askable = firstOpen && !analyzedOnRegister;
+            StartOrAskAutoTasks(completeHandler->GetThread(), workspaceId, info, imageBase, false,
+                options, askable, (!firstOpen && hasMeta) ? &savedMeta : nullptr, result);
         }
         catch (std::exception& e)
         {
@@ -905,6 +1103,7 @@ namespace orthia
                 itemName = it->second->GetShortName();
                 it->second->SetDeletePending();
             }
+            m_pendingAutoTasks.erase(uid);
         }
         if (!itemName.native.empty())
         {

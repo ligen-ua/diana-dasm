@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orthia_utils.h"
+#include "orthia_config.h"
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -39,7 +40,16 @@ namespace orthia
         PlatformString_type name;           // "[pid] name"
         long long startUnix = 0;            // see oui::ProcessStartInfo
         std::string startKey;
+
+        // what the user chose to start when the database was made (AutoTasks):
+        // -1 not chosen (made by --cmd, or before the choice existed), 0 off, 1 on
+        int autoAnalysis = -1;
+        int autoSymbols = -1;
     };
+
+    // the tasks chosen for the folder: the ones not chosen are on
+    AutoTasks GetFolderAutoTasks(const FolderMeta& meta);
+    void SetFolderAutoTasks(FolderMeta& meta, const AutoTasks& tasks);
 
     // the layout of a folder: data.db, target.bin, DIRINFO, parameters.xml, meta.xml.
     // Raise it when a folder made by this version can't be used by an older one, and raise
@@ -79,6 +89,10 @@ namespace orthia
         std::string startKey;               // processes only, from meta.xml; empty when unknown
         bool hasDataDb = false;
         bool pendingDelete = false;         // left by a delete that failed half way
+        // processes only: snapshots of floating code, evidence. No cleanup removes it, .database delete does
+        bool hasFloatingSnapshots = false;
+        // processes only: a .capture or --capture, evidence as the snapshots are
+        bool hasCapture = false;
     };
 
     // What data.db says; read with a read-only connection, so unknown fields stay unset.
@@ -114,6 +128,15 @@ namespace orthia
 
     std::vector<DatabaseInfo> EnumerateDatabases(const CConfigOptionsStorage& config);
     std::vector<DatabaseInfo> EnumerateProcDatabases(const PlatformString_type& procFolderWithSlash);
+    // "512 B", "12.2 MB"
+    PlatformString_type FormatSize(unsigned long long size);
+    // "2026-10-27 16:56" in local time; "?" for file_time_type::min()
+    PlatformString_type FormatFileTime(std::filesystem::file_time_type time);
+    // the proc/ folder of an earlier open of the same process, by its pid and exact start key (meta.xml);
+    // empty when there is none. The name has the start in seconds, which can move between two opens
+    // (Linux computes it from the boot time, and the clock may be set in between)
+    PlatformString_type FindProcFolderByStart(const PlatformString_type& procFolderWithSlash,
+        unsigned long long pid, const std::string& startKey);
     DatabaseDetails QueryDatabaseDetails(const CConfigOptionsStorage& config, const DatabaseInfo& info);
 
     // Selectors: a sha1 prefix (6+ hex digits), a pid (decimal) or a file name (anything else,

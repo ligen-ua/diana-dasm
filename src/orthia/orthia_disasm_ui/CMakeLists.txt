@@ -15,6 +15,11 @@ set(SOURCES
     orthia_databases.cpp
     orthia_helpers.cpp
     orthia_external_symbols.cpp
+    orthia_floating_code.cpp
+    orthia_sha256.cpp
+    orthia_saved_process.cpp
+    orthia_capture.cpp
+    oui_open_saved_dialog.cpp
     orthia_image_source.cpp
     orthia_item_file.cpp
     orthia_module_names.cpp
@@ -31,9 +36,11 @@ set(SOURCES
     formats/orthia_format_elf.cpp
     orthia_module_analyzer.cpp
     orthia_process_adapter.cpp
+    orthia_stack_walk.cpp
     oui_disasm_colors.cpp
     oui_goto_dialog.cpp
     oui_shellcode_dialog.cpp
+    oui_auto_tasks_dialog.cpp
     oui_open_process_dialog.cpp
     oui_processes.cpp
     ui_command_window.cpp
@@ -48,6 +55,10 @@ set(SOURCES
     ui_sections_window.cpp
     ui_output_window.cpp
     ui_tests.cpp
+    ui_tests_saved_process.cpp
+    ui_tests_capture.cpp
+    ui_tests_memory_changes.cpp
+    ui_tests_references.cpp
     ui_workspace_window.cpp
 )
 

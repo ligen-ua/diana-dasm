@@ -155,8 +155,6 @@ namespace orthia
         std::vector<GotoItem> items;
         for (auto& ref : refs)
         {
-            if (ref.external)
-                continue;
             if (!filterLowercase.empty())
             {
                 auto text = orthia::Downcase(orthia::ToWideStringAsHex(ref.address));

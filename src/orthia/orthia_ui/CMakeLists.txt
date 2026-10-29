@@ -7,6 +7,7 @@ add_library(${PROJECT_NAME} SHARED
 oui_app.cpp
 oui_base.cpp
 oui_button.cpp
+oui_checkbox.cpp
 oui_color.cpp
 oui_console.cpp
 oui_containers.cpp

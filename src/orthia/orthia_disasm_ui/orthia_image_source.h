@@ -21,7 +21,7 @@ namespace orthia
         Main = 1,         // the opened file itself (target.bin)
         LinkedFile = 2,   // the dependency file on disk, loaded lazily if its identity still matches
         Captured = 3,     // reserved: raw file bytes from the shared image store (phase 2)
-        MemoryImage = 4   // reserved: an image captured from a live process (phase 3)
+        MemoryImage = 4   // an image captured from a live process (.capture, --capture)
     };
 
     enum class ImageState : int

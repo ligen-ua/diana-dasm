@@ -449,6 +449,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\test_patchers_arm.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\test_push.cpp"
 				>
 			</File>

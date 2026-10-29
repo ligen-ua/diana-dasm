@@ -537,11 +537,11 @@ ORTHIA_DECLARE_API(xr)
 
             if (displacement)
             {
-                dprintf("    %I64lx     %s+%I64lx\n", it2->address, &nameBuffer.front(), displacement);
+                dprintf("    %I64lx  %-4s  %s+%I64lx\n", it2->address, orthia::GetReferenceKindName(it2->kind), &nameBuffer.front(), displacement);
             }
             else
             {
-                dprintf("    %I64lx     %s\n", it2->address, &nameBuffer.front());
+                dprintf("    %I64lx  %-4s  %s\n", it2->address, orthia::GetReferenceKindName(it2->kind), &nameBuffer.front());
             }
         }
     }   
@@ -601,11 +601,11 @@ ORTHIA_DECLARE_API(x)
 
             if (displacement)
             {
-                dprintf("%I64lx     %s+%I64lx\n", it->address, &nameBuffer.front(), displacement);
+                dprintf("%I64lx  %-4s  %s+%I64lx\n", it->address, orthia::GetReferenceKindName(it->kind), &nameBuffer.front(), displacement);
             }
             else
             {
-                dprintf("%I64lx     %s\n", it->address, &nameBuffer.front());
+                dprintf("%I64lx  %-4s  %s\n", it->address, orthia::GetReferenceKindName(it->kind), &nameBuffer.front());
             }
         }
         else
@@ -810,11 +810,11 @@ ORTHIA_DECLARE_API(u)
 
             if (displacement)
             {
-                dprintf("    %I64lx     %s+%I64lx\n", it2->address, &nameBuffer.front(), displacement);
+                dprintf("    %I64lx  %-4s  %s+%I64lx\n", it2->address, orthia::GetReferenceKindName(it2->kind), &nameBuffer.front(), displacement);
             }
             else
             {
-                dprintf("    %I64lx     %s\n", it2->address, &nameBuffer.front());
+                dprintf("    %I64lx  %-4s  %s\n", it2->address, orthia::GetReferenceKindName(it2->kind), &nameBuffer.front());
             }
         }
     }

@@ -282,10 +282,51 @@ protected:
             DI_CHECK_CPP(Diana_AnalyzeScanThrough(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
         }
     }
+    // from the entry points (absolute addresses) instead of the start: floating code. No entry
+    // point inside the range: from the start, as AnalyzeImpl. AArch32: bit 0 of an entry selects T32
     void AnalyzeWithHintsImpl(int analyserFlags,
-                              const std::vector<Address_type>&) override
+                              const std::vector<Address_type>& extraEntryPoints) override
     {
-        AnalyzeImpl(analyserFlags);
+        std::vector<Address_type> offsets;
+        for (auto addr : extraEntryPoints)
+        {
+            if (addr >= m_env.m_moduleStart && addr - m_env.m_moduleStart < m_env.m_moduleSize)
+                offsets.push_back(addr - m_env.m_moduleStart);
+        }
+        if (offsets.empty())
+        {
+            AnalyzeImpl(analyserFlags);
+            return;
+        }
+        m_cache.Init(m_env.m_moduleStart,
+                     m_env.m_moduleSize);
+        DI_CHECK_CPP(Diana_InstructionsOwner_Init(&m_owner,
+                                              m_env.m_moduleSize,
+                                              0x10000));
+        m_instructionsOwnerGuard.reset(&m_owner);
+
+        const bool aarch32 = m_dianaArch == DIANA_ARCH_ARM32 || m_dianaArch == DIANA_ARCH_THUMB;
+        DianaAnalyzeParams params;
+        DianaAnalyzeParams_Init(&params, m_dianaArch);
+        params.imageBase = m_env.m_moduleStart;
+        CAnalyzeStack stack;
+        const OPERAND_SIZE size = m_env.m_moduleSize;
+        for (auto offset : offsets)
+        {
+            DianaAnalyzeParams entryParams = params;
+            if (aarch32)
+            {
+                const int thumb = (int)((m_env.m_moduleStart + offset) & 1);
+                entryParams.arch = thumb ? DIANA_ARCH_THUMB : DIANA_ARCH_ARM32;
+                offset &= ~(Address_type)1;
+            }
+            DI_CHECK_CPP(Diana_AnalyzeCodeEx2(&m_owner, &m_env, m_dianaMode, offset, size, stack.Get(), 0, &entryParams));
+        }
+        DI_CHECK_CPP(Diana_AnalyzeLandingPads(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
+        if (analyserFlags & DI_ANALYSE_PE_FILE_SCAN_THROUGH)
+        {
+            DI_CHECK_CPP(Diana_AnalyzeScanThrough(&m_owner, &m_env, m_dianaMode, 0, size, size, stack.Get(), &params));
+        }
     }
 public:
     CDianaModuleImpl_Range(Address_type offset,
@@ -467,11 +508,22 @@ Address_type CDianaInstructionIterator::GetInstructionOffset()
 
     return m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction].m_offset;
 }
+static int GetReferenceKind(const Diana_XRef * pXRef)
+{
+    // the target is data: read or written, or its address taken (lea rcx, [rip+string]); such a target
+    // never starts a route
+    if (pXRef->m_flags & DI_XREF_DATA)
+        return reference_data;
+    if (pXRef->m_flags & DI_XREF_ADDRESS_TAKEN)
+        return reference_address;
+    return reference_code;
+}
 void CDianaInstructionIterator::QueryRefsToCurrentInstuction(std::vector<CommonReferenceInfo> * pInfo)
 {
     if (IsEmpty())
         throw std::runtime_error("Internal error");
 
+    const Address_type base = m_pModule->GetModuleAddress();
     Diana_Instruction * pInstruction = &m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction];
     const Diana_FList_List * pRefs = &pInstruction->m_referencesToThisInstruction;
     Diana_SubXRef * pSubRef = (Diana_SubXRef * )Diana_FList_First(pRefs);
@@ -482,8 +534,9 @@ void CDianaInstructionIterator::QueryRefsToCurrentInstuction(std::vector<CommonR
         // from a rolled back route
         if (!(pCurXRef->m_flags & DI_XREF_INVALID))
         {
-            pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[0].m_pInstruction->m_offset,
-                                    (pCurXRef->m_flags & DI_XREF_EXTERNAL)?true:false));
+            // the source is an instruction of the module: relative
+            pInfo->push_back(CommonReferenceInfo(base + pCurXRef->m_subrefs[0].m_pInstruction->m_offset,
+                                                 GetReferenceKind(pCurXRef)));
         }
         pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
     }
@@ -493,17 +546,28 @@ void CDianaInstructionIterator::QueryRefsFromCurrentInstruction(std::vector<Comm
     if (IsEmpty())
         throw std::runtime_error("Internal error");
 
+    const Address_type base = m_pModule->GetModuleAddress();
     Diana_Instruction * pInstruction = &m_pModule->m_impl->m_owner.m_pInstructionsVec[m_currentInstruction];
     const Diana_FList_List * pRefs = &pInstruction->m_referencesFromThisInstruction;
     Diana_SubXRef * pSubRef = (Diana_SubXRef * )Diana_FList_First(pRefs);
     pInfo->clear();
     while(pSubRef)
     {
-        Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 1);     
-        if ((pCurXRef->m_flags & DI_XREF_EXTERNAL) && !(pCurXRef->m_flags & DI_XREF_INVALID))
+        Diana_XRef * pCurXRef = Diana_CastXREF(&pSubRef->m_instructionEntry, 1);
+        // only the targets that are no instruction of the module, the others come with their
+        // QueryRefsToCurrentInstuction: outside the module (absolute) and data in it (relative)
+        if (!(pCurXRef->m_flags & DI_XREF_INVALID))
         {
-            // save only externals to avoid duplicate with save_refs_to
-            pInfo->push_back(CommonReferenceInfo(pCurXRef->m_subrefs[1].m_pInstruction->m_offset, true));
+            const Address_type target = pCurXRef->m_subrefs[1].m_pInstruction->m_offset;
+            if (pCurXRef->m_flags & DI_XREF_EXTERNAL)
+            {
+                pInfo->push_back(CommonReferenceInfo(target, GetReferenceKind(pCurXRef)));
+            }
+            else
+            if (pCurXRef->m_flags & DI_XREF_DATA)
+            {
+                pInfo->push_back(CommonReferenceInfo(base + target, GetReferenceKind(pCurXRef)));
+            }
         }
         pSubRef = (Diana_SubXRef *)Diana_FList_Next(pRefs, &pSubRef->m_instructionEntry);
     }

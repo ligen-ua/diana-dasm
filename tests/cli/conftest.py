@@ -85,30 +85,30 @@ def empty_symbols(tmp_path_factory) -> Path:
     return tmp_path_factory.mktemp("no-symbols")
 
 
-# Every fixture has its own home: an --analyze open upgrades the DB and loaded
+# Every fixture has its own home: a full open upgrades the DB and loaded
 # symbols persist in it, so sharing a home would make results depend on test order.
 
 @pytest.fixture(scope="session")
 def orthia(orthia_exe, tmp_path_factory, empty_symbols) -> Orthia:
-    """Quick open (the --cmd default), no symbols. Most tests use this."""
+    """Quick open (--no-analysis --no-symbols), no symbols. Most tests use this."""
     return Orthia(orthia_exe, tmp_path_factory.mktemp("home"), empty_symbols)
 
 
 @pytest.fixture(scope="session")
 def orthia_full(orthia_exe, tmp_path_factory, empty_symbols) -> Orthia:
-    """--analyze (deep code analysis), no symbols available."""
+    """Full open (deep code analysis, the --cmd default), no symbols available."""
     return Orthia(orthia_exe, tmp_path_factory.mktemp("home-full"), empty_symbols, analyze=True)
 
 
 @pytest.fixture(scope="session")
 def orthia_pdb(orthia_exe, tmp_path_factory, data) -> Orthia:
-    """--analyze with the ntoskrnl PDB on the symbol path."""
+    """Full open with the ntoskrnl PDB on the symbol path."""
     return Orthia(orthia_exe, tmp_path_factory.mktemp("home-pdb"), data.nt_symbols, analyze=True)
 
 
 @pytest.fixture(scope="session")
 def orthia_self_pdb(orthia_exe, tmp_path_factory, data) -> Orthia:
-    """--analyze with the PDB of the binary under test on the symbol path (Windows builds)."""
+    """Full open with the PDB of the binary under test on the symbol path (Windows builds)."""
     return Orthia(orthia_exe, tmp_path_factory.mktemp("home-self-pdb"), data.self_symbols, analyze=True)
 
 

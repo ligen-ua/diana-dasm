@@ -34,6 +34,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_ui", "orthia\orthia_
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_win32_host", "orthia\orthia_win32_host\orthia_win32_host.vcxproj", "{906F6446-F5F3-476F-8DA1-2E33D0D1BDDC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_floating_helper", "orthia\orthia_floating_helper\orthia_floating_helper.vcxproj", "{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orthia_floating_helper_lib", "orthia\orthia_floating_helper_lib\orthia_floating_helper_lib.vcxproj", "{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -156,6 +160,30 @@ Global
 		{6029401C-5785-47EC-B34B-B7771835ACEA}.Release|x64.Build.0 = Release|x64
 		{6029401C-5785-47EC-B34B-B7771835ACEA}.Debug|ARM64.ActiveCfg = Debug|x64
 		{6029401C-5785-47EC-B34B-B7771835ACEA}.Release|ARM64.ActiveCfg = Release|x64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Debug|Win32.Build.0 = Debug|Win32
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Debug|x64.ActiveCfg = Debug|x64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Debug|x64.Build.0 = Debug|x64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Debug|ARM64.Build.0 = Debug|ARM64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Release|Win32.ActiveCfg = Release|Win32
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Release|Win32.Build.0 = Release|Win32
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Release|x64.ActiveCfg = Release|x64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Release|x64.Build.0 = Release|x64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Release|ARM64.ActiveCfg = Release|ARM64
+		{FA75C69D-68DC-5E13-8D8A-FCF7183D371D}.Release|ARM64.Build.0 = Release|ARM64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Debug|Win32.Build.0 = Debug|Win32
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Debug|x64.ActiveCfg = Debug|x64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Debug|x64.Build.0 = Debug|x64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Debug|ARM64.Build.0 = Debug|ARM64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Release|Win32.ActiveCfg = Release|Win32
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Release|Win32.Build.0 = Release|Win32
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Release|x64.ActiveCfg = Release|x64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Release|x64.Build.0 = Release|x64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Release|ARM64.ActiveCfg = Release|ARM64
+		{4B4C50E1-A35D-40FF-8A1D-5073486A9A33}.Release|ARM64.Build.0 = Release|ARM64
 		{5EB9577C-A040-4B42-AC41-C9D1CA94934F}.Debug|Win32.ActiveCfg = Debug|Win32
 		{5EB9577C-A040-4B42-AC41-C9D1CA94934F}.Debug|Win32.Build.0 = Debug|Win32
 		{5EB9577C-A040-4B42-AC41-C9D1CA94934F}.Debug|x64.ActiveCfg = Debug|x64

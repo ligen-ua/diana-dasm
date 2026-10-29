@@ -28,6 +28,7 @@ test_mov_spec.cpp
 test_new.cpp
 test_or.cpp
 test_patchers.cpp
+test_patchers_arm.cpp
 test_push.cpp
 test_flist.cpp
 test_stack.cpp
