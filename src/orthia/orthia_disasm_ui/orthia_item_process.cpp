@@ -13,39 +13,9 @@
 #include "orthia_databases.h"
 #include "formats/orthia_image_format.h"
 #include "orthia_floating_code.h"
-#ifndef DIANA_HAS_WIN32
-#include <unistd.h>
-#endif
 
 namespace orthia
 {
-
-    static unsigned long long GetOwnPid()
-    {
-#ifdef DIANA_HAS_WIN32
-        return GetCurrentProcessId();
-#else
-        return (unsigned long long)getpid();
-#endif
-    }
-
-    // A folder is kept for the next open of the same process: only while it runs, and only when
-    // its start is known (the folder name and meta.xml tell this process from a later one).
-    // A folder with floating code snapshots is evidence and stays after the process exits.
-    // Orthia itself exits right after closing it
-    static bool KeepProcFolder(const std::shared_ptr<oui::IProcess>& proc, const PlatformString_type& folder)
-    {
-        const auto name = std::filesystem::path(folder).filename().native();
-        if (ParseProcFolderPid(name) == GetOwnPid())
-        {
-            return false;
-        }
-        if (HasFloatingSnapshots(folder) || HasCapture(folder))
-        {
-            return true;
-        }
-        return proc && proc->GetStartInfo().IsKnown() && proc->IsRunning();
-    }
 
     static const PlatformString_type& GetSavedModuleName(const ModuleInfo& module)
     {
@@ -58,12 +28,8 @@ namespace orthia
         m_moduleManager = nullptr;
         m_persistentStorage = nullptr;
         m_moduleStorage = nullptr;
-
-        if (!m_procFolder.empty() && !m_savedView && !KeepProcFolder(m_proc, m_procFolder))
-        {
-            std::error_code ec;
-            std::filesystem::remove_all(std::filesystem::path(m_procFolder), ec);
-        }
+        // the folder stays: the next open of the same process reuses it, an exited one is a
+        // saved process. CleanupExpiredProcFolders and .database cleanup remove folders
     }
     void CProcessWorkplaceItem::SetProcFolder(const PlatformString_type& folder)
     {

@@ -60,14 +60,16 @@ The folder name has the start in seconds only; `meta.xml` has it exactly (the cr
 the boot id and start ticks on Linux), and a database is reused only when that matches.
 `--overwrite-db` starts with a new, empty database instead.
 
-The folder is deleted when the process item is closed after the process has exited, and when Orthia
-opened itself (`--pid self`). At start Orthia removes any `proc/` folder that has not been written for
-48 hours. `.database cleanup` removes folders at once, as soon as their process has exited
-(see [Managing databases](#managing-databases)).
+Closing the process item, or Orthia, never deletes the folder: a later `--cmd` run or the UI opens the same
+database while the process runs, and after it exits the folder is a [saved process](orthia.md#saved-process-folders).
+Folders go in two places only: at start Orthia removes any `proc/` folder that has not been written for
+48 hours, and `.database cleanup` removes folders at once, as soon as their process has exited
+(see [Managing databases](#managing-databases)). An Orthia that opened itself (`--pid self`) leaves a folder
+too; every run has its own pid, so it is never reused and expires like the others.
 
-A folder with snapshots of floating code (`floating/*.bin`) is evidence: it stays when the process exits,
-neither the start nor `.database cleanup` removes it, and `.database list` marks it `(floating code saved)`.
-Only `.database delete` removes it. `--pid self` still removes its folder.
+A folder with snapshots of floating code (`floating/*.bin`) is evidence: neither the start nor
+`.database cleanup` removes it, and `.database list` marks it `(floating code saved)`.
+Only `.database delete` removes it.
 
 The code analysis and the comments go into that database, and the analysis flags of each module
 (`flags` in its metainfo, with its name, size and the `id_*` identity of its build). The database follows

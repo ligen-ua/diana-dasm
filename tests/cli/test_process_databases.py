@@ -105,9 +105,12 @@ def test_folder_of_exited_process_is_cleaned_up(orthia_cold, child):
     assert not folder.exists()
 
 
-def test_own_process_folder_is_removed_on_close(orthia_cold):
+def test_own_process_folder_is_kept_on_close(orthia_cold):
+    # closing never deletes a folder, Orthia's own neither: each run is a new process, so the
+    # folder is never reused, and the start removes it once it is 48 hours old
     orthia_cold.run("lm", pid="self").assert_ok()
-    assert proc_folders(orthia_cold) == []
+    folder = only_folder(orthia_cold)
+    assert (folder / "data.db").is_file()
 
 
 def test_file_meta_and_overwrite(orthia_cold, data):

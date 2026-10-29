@@ -275,7 +275,7 @@ only: data written next to the code doesn't make a module stale, a change of pro
 
 The bytes of each floating module are saved when it is found: `floating/<base>_<sha256 prefix>.bin` in the
 process database folder (up to 16 MB of the allocation, unreadable pages zero filled). `modinfo` prints the
-file and its SHA-256. The folder is then kept after the process exits, and only `.database delete` removes
+file and its SHA-256. The folder then never expires, and only `.database delete` removes
 it (see [databases.md](databases.md#processes-procpid-name-start)). `--proc-folder` opens such a folder after the
 process exited (see [Saved process folders](#saved-process-folders)).
 

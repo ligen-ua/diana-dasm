@@ -1871,7 +1871,7 @@ TEST(FloatingCode, Snapshot)
         EXPECT_NE(std::string::npos, text.find(info.snapshotFile + " (1000 bytes)")) << text;
         EXPECT_NE(std::string::npos, text.find("SHA-256: " + info.sha256)) << text;
     }
-    // the fake process doesn't run: without the snapshots the folder would be gone
+    // closing never removes the folder; the snapshots also keep it from expiring
     ASSERT_TRUE(fs::is_directory(folder));
 
     // reopened: the snapshot is in the saved record. A changed and refreshed: a second file, the first stays
@@ -1890,14 +1890,15 @@ TEST(FloatingCode, Snapshot)
         EXPECT_TRUE(fs::exists(folder / orthia::g_floatingSnapshotFolder / orthia::Utf8ToPlatformString(refreshed.floating->snapshotFile)));
     }
 
-    // a folder without snapshots goes when its process is gone, as before
+    // a folder without snapshots stays too, although its process is gone: it is a saved process
+    // until it expires or .database cleanup removes it
     const fs::path other = fixture.root / ORTHIA_TCSTR("[2] fake");
     fs::create_directories(other);
     {
         auto item = fixture.OpenItem();
         item->SetProcFolder(other.native());
     }
-    EXPECT_FALSE(fs::exists(other));
+    EXPECT_TRUE(fs::exists(other));
 }
 
 int RunTests()

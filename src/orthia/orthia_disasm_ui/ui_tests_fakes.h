@@ -274,8 +274,7 @@ namespace orthia_tests
                 meta.dianaArch = DIANA_ARCH_X86;
                 meta.pid = 1;
                 meta.name = ORTHIA_TCSTR("[1] fake");
-                // a live item that closes removes the folder unless a capture or a snapshot is in it
-                // (the fake has no start time, so it doesn't count as running)
+                // closing a live item leaves the folder; a saved view opens it after
                 orthia::WriteFolderMeta((root / ORTHIA_TCSTR("meta.xml")).native(), meta);
             }
             moduleManager->Reinit((root / (processFolder ? ORTHIA_TCSTR("data.db") : ORTHIA_TCSTR("db.sqlite"))).native(), true);

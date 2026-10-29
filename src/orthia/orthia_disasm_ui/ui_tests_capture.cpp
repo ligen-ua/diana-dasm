@@ -291,7 +291,7 @@ TEST(Capture, FolderIsKept)
     process->regions.push_back(DataRegion(0x20000000, 0x11, c_rw));
     orthia::CaptureProcess(*process, procFolder.native(), nullptr);
     {
-        // the fake process is not running: a folder without evidence would be removed here
+        // the fake process is not running; closing never removes the folder
         orthia::CProcessWorkplaceItem item(process, process->GetFullFileNameForUI(),
             process->GetDianaMode(), process->GetDianaArch(), nullptr);
         item.SetProcFolder(procFolder.native());
