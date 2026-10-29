@@ -13,9 +13,13 @@
 // leads to a thunk in an allocation of its own, which jumps on to the function. On Windows the
 // export table entry of floating_exported_function leads to another thunk.
 //
+// And a second module leads into the handler allocation: it loads orthia_floating_helper_lib from
+// its own folder and writes a jump over floating_lib_function to code at handler + 40h.
+//
 // Prints "ready target=<hex> stub=<hex> handler=<hex> calls=<n> result=<n> bits=<32|64>
-// slot=<hex> thunk=<hex> import=<name> export_slot=<hex> export_thunk=<hex>" (a slot is 0 when it
-// isn't hooked) and waits until its stdin is closed ("change" on stdin changes the handler allocation).
+// slot=<hex> thunk=<hex> import=<name> export_slot=<hex> export_thunk=<hex> lib_function=<hex>
+// lib_entry=<hex>" (a slot or the lib is 0 when it isn't hooked) and waits until its stdin is
+// closed ("change" on stdin changes the handler allocation).
 
 #include <cstddef>
 #include <cstdio>
@@ -35,6 +39,7 @@ extern "C"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
+#include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
 #include <sys/mman.h>
@@ -314,6 +319,129 @@ namespace
 #endif
     }
 
+    // written at code: a jump to function through a register loaded with its address, which the
+    // analysis takes as a reference to it (a jmp [rip] only reads a pointer). thumb: Thumb code (ARM32)
+    size_t MakeAbsoluteJump(unsigned char* code, unsigned long long function, bool thumb)
+    {
+        (void)thumb;
+#if defined(_M_X64) || defined(__x86_64__)
+        code[0] = 0x48;                                                         // mov rax, <function>
+        code[1] = 0xB8;
+        std::memcpy(code + 2, &function, 8);
+        code[10] = 0xFF;                                                        // jmp rax
+        code[11] = 0xE0;
+        return 12;
+#elif defined(_M_IX86) || defined(__i386__)
+        const unsigned int value = (unsigned int)function;
+        code[0] = 0xB8;                                                         // mov eax, <function>
+        std::memcpy(code + 1, &value, 4);
+        code[5] = 0xFF;                                                         // jmp eax
+        code[6] = 0xE0;
+        return 7;
+#elif defined(_M_ARM64) || defined(__aarch64__)
+        return MakeThunk(code, function);                                       // ldr x16, #8; br x16
+#elif defined(_M_ARM) || defined(__arm__)
+        const unsigned int value = (unsigned int)function;
+        if (thumb)
+        {
+            size_t size = 0;
+            if ((uintptr_t)code & 2)
+            {
+                code[0] = 0x00;                                                 // nop: the literal 4-aligned
+                code[1] = 0xBF;
+                size = 2;
+            }
+            const unsigned char jump[] = { 0xDF, 0xF8, 0x00, 0xF0 };            // ldr.w pc, [pc]
+            std::memcpy(code + size, jump, sizeof(jump));
+            std::memcpy(code + size + sizeof(jump), &value, 4);
+            return size + sizeof(jump) + 4;
+        }
+        const unsigned char jump[] = { 0x04, 0xF0, 0x1F, 0xE5 };                // ldr pc, [pc, #-4]
+        std::memcpy(code, jump, sizeof(jump));
+        std::memcpy(code + sizeof(jump), &value, 4);
+        return sizeof(jump) + 4;
+#else
+        (void)code;
+        (void)function;
+        return 0;
+#endif
+    }
+
+    // what floating_lib_function runs once it jumps into the handler allocation: return value + 5
+#if defined(_M_X64) || defined(__x86_64__)
+#ifdef _WIN32
+    const unsigned char g_libEntry[] = { 0x8D, 0x41, 0x05, 0xC3 };              // lea eax, [rcx+5]; ret
+#else
+    const unsigned char g_libEntry[] = { 0x8D, 0x47, 0x05, 0xC3 };              // lea eax, [rdi+5]; ret
+#endif
+#elif defined(_M_IX86) || defined(__i386__)
+    const unsigned char g_libEntry[] = { 0x8B, 0x44, 0x24, 0x04,                // mov eax, [esp+4]
+                                         0x83, 0xC0, 0x05, 0xC3 };              // add eax, 5; ret
+#elif defined(_M_ARM64) || defined(__aarch64__)
+    const unsigned char g_libEntry[] = { 0x00, 0x14, 0x00, 0x11,                // add w0, w0, #5
+                                         0xC0, 0x03, 0x5F, 0xD6 };              // ret
+#elif defined(_M_ARM) || defined(__arm__)
+    const unsigned char g_libEntry[] = { 0x40, 0x1D,                            // adds r0, r0, #5 (Thumb)
+                                         0x70, 0x47 };                          // bx lr
+#else
+    const unsigned char g_libEntry[] = { 0 };
+#endif
+    const size_t c_libEntryOffset = 0x40;
+
+    // floating_lib_function of orthia_floating_helper_lib next to this executable; nullptr when
+    // the library isn't there
+    void* LoadLibraryFunction()
+    {
+#ifdef _WIN32
+        wchar_t path[MAX_PATH];
+        const DWORD size = GetModuleFileNameW(nullptr, path, MAX_PATH);
+        if (!size || size >= MAX_PATH)
+            return nullptr;
+        std::wstring file(path, size);
+        file = file.substr(0, file.find_last_of(L"\\/") + 1) + L"orthia_floating_helper_lib.dll";
+        HMODULE module = LoadLibraryW(file.c_str());
+        return module ? (void*)GetProcAddress(module, "floating_lib_function") : nullptr;
+#else
+        char path[4096];
+        const ssize_t size = readlink("/proc/self/exe", path, sizeof(path) - 1);
+        if (size <= 0)
+            return nullptr;
+        std::string file(path, (size_t)size);
+        file = file.substr(0, file.find_last_of('/') + 1) + "orthia_floating_helper_lib.so";
+        void* module = dlopen(file.c_str(), RTLD_NOW);
+        return module ? dlsym(module, "floating_lib_function") : nullptr;
+#endif
+    }
+
+    // the library function jumps to code at handler + 40h; false when the library isn't there
+    bool LeadLibraryToHandler(unsigned char* handler, unsigned long long& functionAddress, unsigned long long& entryAddress)
+    {
+        void* function = LoadLibraryFunction();
+        if (!function)
+            return false;
+        unsigned char* entry = handler + c_libEntryOffset;
+        std::memcpy(entry, g_libEntry, sizeof(g_libEntry));
+        FlushCode(entry, sizeof(g_libEntry));
+
+        bool thumb = false;
+        unsigned long long target = (unsigned long long)(uintptr_t)entry;
+#if defined(_M_ARM) || defined(__arm__)
+        thumb = ((uintptr_t)function & 1) != 0;
+        // the entry is Thumb code
+        target |= 1;
+#endif
+        auto* code = (unsigned char*)((uintptr_t)function & ~(uintptr_t)1);
+        if (!MakeWritable(code, 32))
+            return false;
+        const size_t size = MakeAbsoluteJump(code, target, thumb);
+        if (!size)
+            return false;
+        FlushCode(code, size);
+        functionAddress = (unsigned long long)(uintptr_t)code;
+        entryAddress = (unsigned long long)(uintptr_t)entry;
+        return true;
+    }
+
     // the import slot leads to a thunk of its own; false when the slot isn't found
     bool HookImport(unsigned long long target, unsigned long long& slotAddress, unsigned long long& thunkAddress)
     {
@@ -523,10 +651,23 @@ int main()
     }
 #endif
 
+    // a second module that leads into the handler allocation; the call goes through the jump
+    unsigned long long libFunction = 0;
+    unsigned long long libEntry = 0;
+    if (LeadLibraryToHandler((unsigned char*)handler, libFunction, libEntry))
+    {
+        auto viaLibrary = (int (*)(int))LoadLibraryFunction();
+        if (viaLibrary(1) != 6)
+        {
+            std::printf("error: the library function doesn't lead to its code in the handler allocation\n");
+            return 1;
+        }
+    }
+
     std::printf("ready target=%llx stub=%llx handler=%llx calls=%llu result=%d bits=%d slot=%llx thunk=%llx import=%s "
-        "export_slot=%llx export_thunk=%llx\n",
+        "export_slot=%llx export_thunk=%llx lib_function=%llx lib_entry=%llx\n",
         target, g_lastStub, (unsigned long long)(uintptr_t)handler, (unsigned long long)calls, result,
-        (int)sizeof(void*) * 8, importSlot, importThunk, g_importName, exportSlot, exportThunk);
+        (int)sizeof(void*) * 8, importSlot, importThunk, g_importName, exportSlot, exportThunk, libFunction, libEntry);
     std::fflush(stdout);
 
     // until the test closes stdin. "change": a byte of the handler allocation changes (past the

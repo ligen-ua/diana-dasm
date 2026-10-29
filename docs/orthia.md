@@ -240,15 +240,16 @@ Each one is then analyzed from its entry points in the background, after the res
 code it leads to is found the same way.
 
 A floating module works like any other: `u fl_7ff7a5d70000`, `x fl_7ff7a5d70000!*` (its entry points are
-`$entry_0001`, `$entry_0002`, ... by address), `modinfo fl_7ff7a5d70000`, `.analyze fl_7ff7a5d70000`.
+named by their offset in the allocation: `$entry_00h`, `$entry_20h`, `$entry_0800h`; a name stays the same
+when the analysis of another module adds an entry), `modinfo fl_7ff7a5d70000`, `.analyze fl_7ff7a5d70000`.
 `lm` and the Modules window leave them out; `lmf` lists them.
 
 `lmf /v` also lists what leads to the floating code, one line per instruction and entry point, by address:
 
 ```
 Referrers:
-  fl_7ff74e840000!$entry_0001+1fh   -> fl_7ff74e850000!$entry_0001  RWX private
-  ntdll!NtProtectVirtualMemory      -> fl_7ff74e840000!$entry_0001  RWX private [function start]
+  fl_7ff74e840000!$entry_00h+1fh  -> fl_7ff74e850000!$entry_00h  RWX private
+  ntdll!NtProtectVirtualMemory    -> fl_7ff74e840000!$entry_00h  RWX private [function start]
 ```
 
 The import slots (IAT, the GOT on Linux) and the export table entries (PE) of the module are looked at too,
@@ -256,7 +257,7 @@ as they are in memory now: a slot that leads into such memory makes an entry poi
 what leads to it. That is how an import or export hook looks:
 
 ```
-  orthia_floating_helper.exe+2f020h -> fl_7ff604970000!$entry_0001  RWX private [import slot: KERNEL32.dll!GetCurrentProcessId]
+  orthia_floating_helper.exe+2f020h -> fl_7ff604970000!$entry_00h  RWX private [import slot: KERNEL32.dll!GetCurrentProcessId]
 ```
 
 `[export: <name>]` marks an export table entry. `modinfo` lists the slots after the instructions:

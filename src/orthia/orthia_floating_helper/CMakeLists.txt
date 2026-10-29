@@ -9,7 +9,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ../../diana_core/diana_core
     ../../diana_core/diana_core/diana_patchers)
 
-target_link_libraries(${PROJECT_NAME} diana_core)
+# dlopen (libdl before glibc 2.34); orthia_floating_helper_lib is loaded at run time, built along
+target_link_libraries(${PROJECT_NAME} diana_core ${CMAKE_DL_LIBS})
+add_dependencies(${PROJECT_NAME} orthia_floating_helper_lib)
 
 # next to the orthia binary, where the tests look for it
 set_target_properties(${PROJECT_NAME} PROPERTIES

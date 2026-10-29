@@ -232,6 +232,12 @@
     <ProjectReference Include="..\..\diana_core\diana_core\diana_core_14_0.vcxproj">
       <Project>{ddee4514-39a8-4303-b80c-74d83d71d91a}</Project>
     </ProjectReference>
+    <!-- loaded at run time from the same folder: built along, not linked -->
+    <ProjectReference Include="..\orthia_floating_helper_lib\orthia_floating_helper_lib.vcxproj">
+      <Project>{4b4c50e1-a35d-40ff-8a1d-5073486a9a33}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

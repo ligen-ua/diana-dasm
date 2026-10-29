@@ -248,6 +248,8 @@ namespace orthia_tests
         static constexpr orthia::Address_type otherModule = 0x10200000;
         static constexpr orthia::Address_type regionData = 0x10300000;  // RW-
         static constexpr orthia::Address_type regionD = 0x10400000;     // RWX, A jumps there
+        // not mapped by default: AddSecondModule
+        static constexpr orthia::Address_type secondModule = 0x10500000;
 
         std::filesystem::path root;
         // a process folder (meta.xml, data.db, modules.xml) that live items write and a saved view opens
@@ -358,12 +360,32 @@ namespace orthia_tests
             item->LoadSavedModuleFlags();
             return item;
         }
+        // before OpenItem: "second" at secondModule, which calls into A too: the entry the first module
+        // calls, and a new one below the first module's other entry
+        void AddSecondModule()
+        {
+            CFakeProcess::Image second;
+            second.format = orthia::FindFormatById("raw");
+            second.base = secondModule;
+            second.name = ORTHIA_TCSTR("second");
+            second.data.assign(0x1000, (char)0xCC);
+            PutRel32(second.data, 0, 0xE8, secondModule, regionA);
+            PutRel32(second.data, 5, 0xE8, secondModule, regionA + 0x10);
+            second.data[10] = (char)0xC3;
+            process->images.push_back(second);
+            // A's code at the new entry
+            for (auto& region : process->regions)
+            {
+                if (region.base == regionA)
+                    region.data[0x10] = (char)0xC3;
+            }
+        }
         // the module analyzed, as .analyze leaves it
-        void AnalyzeModule(orthia::CProcessWorkplaceItem& item)
+        void AnalyzeModule(orthia::CProcessWorkplaceItem& item, orthia::Address_type base = moduleBase)
         {
             orthia::ProcessReaderAdapter reader(process.get());
-            moduleManager->ReloadRange(moduleBase, 0x1000, &reader, DIANA_MODE64, DIANA_ARCH_X86, 0);
-            item.UpdateModuleFlags(moduleBase, orthia::ModuleInfo::flags_analyzeDone, 0);
+            moduleManager->ReloadRange(base, 0x1000, &reader, DIANA_MODE64, DIANA_ARCH_X86, 0);
+            item.UpdateModuleFlags(base, orthia::ModuleInfo::flags_analyzeDone, 0);
         }
         static orthia::ModuleInfo FindModule(const orthia::IWorkPlaceItem& item, orthia::Address_type address)
         {

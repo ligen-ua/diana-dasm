@@ -105,7 +105,7 @@ namespace orthia
     // .analyze /f on a stale floating module: checks it against the memory again
     FloatingRefresh RefreshStaleFloatingModule(IWorkPlaceItem& item, ModuleInfo& module);
 
-    // names for x: $entry_0001, ... by address
+    // names for x, by the offset of the entry in the allocation: $entry_00h, $entry_20h, $entry_0800h
     void QueryFloatingNames(const FloatingRegionInfo& info, std::vector<NameInfo>& names);
 
     struct FloatingDiscovery
@@ -139,7 +139,7 @@ namespace orthia
     // `modinfo` lines of a floating module; referrers named through the item
     void DescribeFloatingModule(const IWorkPlaceItem& item, const ModuleInfo& module, std::vector<PlatformString_type>& lines);
     // `lmf /v`: what leads to the floating code of the item, one line per referrer and entry, by the
-    // referrer's address: "<referrer> -> fl_..!$entry_0001  RWX private [function start]". "function
+    // referrer's address: "<referrer> -> fl_..!$entry_00h  RWX private [function start]". "function
     // start": the referrer is at a name (an export, a symbol), as an inline hook over a prologue is.
     // A slot: "<slot> -> ...  RWX private [import slot: KERNEL32.dll!CreateFileW]", or [export: ...]
     void DescribeFloatingReferrers(const IWorkPlaceItem& item, std::vector<PlatformString_type>& lines);

@@ -754,11 +754,14 @@ namespace orthia
 
     void QueryFloatingNames(const FloatingRegionInfo& info, std::vector<NameInfo>& names)
     {
-        int index = 0;
         for (const auto& entry : info.entries)
         {
-            char buffer[32];
-            snprintf(buffer, sizeof(buffer), "$entry_%04d", ++index);
+            // the offset in the allocation, as module+05h prints it: a name another module's entry
+            // found later doesn't change
+            const unsigned long long offset = entry.address - info.allocationBase;
+            const int width = offset > 0xFFFFFFFFULL ? 16 : offset > 0xFFFF ? 8 : offset > 0xFF ? 4 : 2;
+            char buffer[48];
+            snprintf(buffer, sizeof(buffer), "$entry_%0*llxh", width, offset);
             NameInfo name;
             name.flags = NameInfo::flags_Export;
             name.address = entry.address;
@@ -1292,6 +1295,31 @@ namespace orthia
         return !QueryPendingFloatingModules(item).empty();
     }
 
+    // the region of the floating module at address as the item has it now; nullptr when none
+    static std::shared_ptr<const FloatingRegionInfo> QueryCurrentFloatingRegion(const IWorkPlaceItem& item, Address_type address)
+    {
+        std::vector<ModuleInfo> modules;
+        item.GetModules(modules);
+        for (const auto& mod : modules)
+        {
+            if (mod.address == address && mod.IsFloating())
+            {
+                return mod.floating;
+            }
+        }
+        return nullptr;
+    }
+
+    static std::vector<Address_type> QueryEntryAddresses(const FloatingRegionInfo& info)
+    {
+        std::vector<Address_type> entries;
+        for (const auto& entry : info.entries)
+        {
+            entries.push_back(entry.address);
+        }
+        return entries;
+    }
+
     void AnalyzeFloatingModule(IWorkPlaceItem& item, const ModuleInfo& module)
     {
         auto moduleManager = item.GetModuleManager();
@@ -1300,12 +1328,11 @@ namespace orthia
         {
             return;
         }
-        const auto& info = *module.floating;
-        std::vector<Address_type> entries;
-        for (const auto& entry : info.entries)
-        {
-            entries.push_back(entry.address);
-        }
+        // the caller's copy may be older: the analysis of another floating module in the same pass
+        // may have added entries since (two modules that lead into one region)
+        const auto current = QueryCurrentFloatingRegion(item, module.address);
+        const auto& info = current ? *current : *module.floating;
+        const auto entries = QueryEntryAddresses(info);
         // a big allocation: the part from the first entry on.
         // TODO: ARM32 saves its code map (metainfo type 5) under start, which has no tbl_modules row
         // when start is not the allocation base; the foreign key refuses it
@@ -1323,12 +1350,18 @@ namespace orthia
         const auto extent = moduleManager->AnalyzeRange(start, size, reader.get(), module.dianaMode, module.dianaArch,
             0, entries, module.name);
 
-        auto updated = std::make_shared<FloatingRegionInfo>(info);
+        // on top of the region as it is now, so that entries found meanwhile stay; with new entries
+        // the module waits for another pass
+        const auto latest = QueryCurrentFloatingRegion(item, module.address);
+        auto updated = std::make_shared<FloatingRegionInfo>(latest ? *latest : info);
         updated->codeStart = extent.first;
         updated->codeLast = extent.second;
         SaveFloatingRegion(*moduleManager, *updated);
         item.SetFloatingModule(updated);
-        item.UpdateModuleFlags(module.address, ModuleInfo::flags_analyzeDone, 0);
+        if (QueryEntryAddresses(*updated) == entries)
+        {
+            item.UpdateModuleFlags(module.address, ModuleInfo::flags_analyzeDone, 0);
+        }
         item.InvalidateNames(module.address);
     }
 

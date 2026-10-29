@@ -17,6 +17,7 @@ import pytest
 pytestmark = pytest.mark.process
 
 HELPER_NAME = "orthia_floating_helper"
+LIB_NAME = "orthia_floating_helper_lib"
 # Orthia.raw adds nothing: what Orthia.run gives orthia_cold, a quick open (no analysis, no symbols)
 QUICK = ("--no-analysis", "--no-symbols")
 # "00007ff7`a5d70000  00007ff7`a5d71000   fl_7ff7a5d70000   RWX      1        analyzed"
@@ -41,6 +42,10 @@ class Helper:
         self.import_name = values.get("import", "")
         self.export_slot = int(values.get("export_slot", "0"), 16)
         self.export_thunk = int(values.get("export_thunk", "0"), 16)
+        # orthia_floating_helper_lib jumps from lib_function to lib_entry in the handler allocation;
+        # 0 when the helper didn't find the library
+        self.lib_function = int(values.get("lib_function", "0"), 16)
+        self.lib_entry = int(values.get("lib_entry", "0"), 16)
 
     def address_text(self, address: int) -> str:
         """The way orthia prints an address of this process: 00007ff7`a5d91ec0 or 00401000."""
@@ -84,15 +89,15 @@ def lmf_row(res, address: int):
     return match.group(3), int(match.group(4)), match.group(5)
 
 
-def assert_found(res, helper, address: int, status: str = "analyzed"):
+def assert_found(res, helper, address: int, status: str = "analyzed", entries: int = 1):
     """The floating module at address: RWX, analyzed, one entry. A 32-bit process may show more:
     the analysis takes an imm32 that falls into the allocation for an address (push 6A0004h)"""
-    protect, entries, actual_status = lmf_row(res, address)
+    protect, actual_entries, actual_status = lmf_row(res, address)
     assert (protect, actual_status) == ("RWX", status), res
     if helper.bits == 64:
-        assert entries == 1, res
+        assert actual_entries == entries, res
     else:
-        assert entries >= 1, res
+        assert actual_entries >= entries, res
 
 
 def test_analyze_finds_the_hook(orthia, helper):
@@ -112,9 +117,9 @@ def test_lm_without_analyze_has_no_floating_code(orthia, helper):
 
 def test_names_and_disassembly(orthia, helper):
     stub = floating_name(helper.stub)
-    res = orthia.run(f".analyze {HELPER_NAME}", f"x {stub}!*", f"u {stub}!$entry_0001 L2",
+    res = orthia.run(f".analyze {HELPER_NAME}", f"x {stub}!*", f"u {stub}!$entry_00h L2",
                      pid=helper.pid).assert_ok()
-    assert res.symbols[f"{stub}!$entry_0001"] == [helper.stub], res
+    assert res.symbols[f"{stub}!$entry_00h"] == [helper.stub], res
     # the hooked function leads here, and the stub starts by saving registers (ARM64: the stack for them)
     res.assert_line(rf"<--\s+{re.escape(helper.address_text(helper.target))}")
     stub_text = re.escape(helper.address_text(helper.stub))
@@ -128,7 +133,7 @@ def test_modinfo(orthia, helper):
     res.assert_line(r"^Floating code: RWX, private$")
     res.assert_line(r"^Entries: 1$" if helper.bits == 64 else r"^Entries: \d+$")
     # the referrer: the hooked function of the helper, named after the module or its nearest symbol
-    res.assert_line(rf"\$entry_0001\s+from {HELPER_NAME}(\.exe)?[+!]")
+    res.assert_line(rf"\$entry_00h\s+from {HELPER_NAME}(\.exe)?[+!]")
 
 
 def test_lmf_verbose_lists_referrers(orthia, helper):
@@ -137,8 +142,8 @@ def test_lmf_verbose_lists_referrers(orthia, helper):
     res = orthia.run(f".analyze {HELPER_NAME}", "lmf /v", pid=helper.pid).assert_ok()
     res.assert_line(r"^Referrers:$")
     # the hooked function of the helper leads to the stub, the stub to the handler
-    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\S*\s+-> {stub}!\$entry_0001\s+RWX private")
-    res.assert_line(rf"^  {stub}!\S+\s+-> {handler}!\$entry_0001\s+RWX private")
+    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\S*\s+-> {stub}!\$entry_00h\s+RWX private")
+    res.assert_line(rf"^  {stub}!\S+\s+-> {handler}!\$entry_00h\s+RWX private")
 
 
 def test_xr_lists_the_hook(orthia, helper):
@@ -157,9 +162,9 @@ def test_import_slot_hook(orthia, helper):
     assert_found(res, helper, helper.thunk)
     # the slot of the helper leads to the thunk, named by the import
     name = re.escape(helper.import_name)
-    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\+[0-9a-f]+h\s+-> {thunk}!\$entry_0001\s+RWX private "
+    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\+[0-9a-f]+h\s+-> {thunk}!\$entry_00h\s+RWX private "
                     rf"\[import slot: (\S+!)?{name}\]$")
-    res.assert_line(rf"\$entry_0001\s+from .*{HELPER_NAME}(\.exe)?\+[0-9a-f]+h \(import slot: (\S+!)?{name}\)")
+    res.assert_line(rf"\$entry_00h\s+from .*{HELPER_NAME}(\.exe)?\+[0-9a-f]+h \(import slot: (\S+!)?{name}\)")
 
 
 def test_export_slot_hook(orthia, helper):
@@ -169,8 +174,40 @@ def test_export_slot_hook(orthia, helper):
     thunk = floating_name(helper.export_thunk)
     res = orthia.run(f".analyze {HELPER_NAME}", "lmf", "lmf /v", pid=helper.pid).assert_ok()
     assert_found(res, helper, helper.export_thunk)
-    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\+[0-9a-f]+h\s+-> {thunk}!\$entry_0001\s+RWX private "
+    res.assert_line(rf"^  {HELPER_NAME}(\.exe)?\+[0-9a-f]+h\s+-> {thunk}!\$entry_00h\s+RWX private "
                     rf"\[export: floating_exported_function\]$")
+
+
+def test_two_modules_one_region(orthia, helper):
+    """The library and the helper's hook stub lead into the handler allocation. The library is
+    analyzed first: its entry (40h) keeps its name when the helper's analysis adds a lower one (00h)"""
+    if not helper.lib_entry:
+        pytest.skip(f"the helper didn't load {LIB_NAME}")
+    stub = floating_name(helper.stub)
+    handler = floating_name(helper.handler)
+    lib = rf"{LIB_NAME}(\.dll|\.so)?"
+    assert helper.lib_entry == helper.handler + 0x40
+
+    res = orthia.run(f".analyze {LIB_NAME}", "lmf", f"x {handler}!*", pid=helper.pid).assert_ok()
+    assert_found(res, helper, helper.handler)
+    assert res.symbols == {f"{handler}!$entry_40h": [helper.lib_entry]}, res
+
+    res = orthia.run(f".analyze {HELPER_NAME}", "lmf", f"x {handler}!*", "lmf /v", f"modinfo {handler}",
+                     f"xr {handler}!$entry_40h", f"u {handler}!$entry_40h L1", pid=helper.pid).assert_ok()
+    assert_found(res, helper, helper.handler, entries=2)
+    symbols = res.symbols
+    assert symbols[f"{handler}!$entry_00h"] == [helper.handler], res
+    assert symbols[f"{handler}!$entry_40h"] == [helper.lib_entry], res
+    # one row per module that leads there
+    res.assert_line(rf"^  {stub}!\S+\s+-> {handler}!\$entry_00h\s+RWX private")
+    res.assert_line(rf"^  {lib}!floating_lib_function\s+-> {handler}!\$entry_40h\s+RWX private \[function start\]")
+    res.assert_line(r"^Entries: 2$" if helper.bits == 64 else r"^Entries: \d+$")
+    res.assert_line(rf"\$entry_40h\s+from {lib}!floating_lib_function\b")
+    # the jump of the library function: an address taken (mov rax/eax, ldr x16) or a jump
+    lib_function = re.escape(helper.address_text(helper.lib_function))
+    res.assert_line(rf"^{lib_function}\s+(code|addr)\s+{lib}!floating_lib_function")
+    entry = re.escape(helper.address_text(helper.lib_entry))
+    res.assert_line(rf"(?i)^{entry}\s+[0-9a-f]+\s+(lea|mov|add|adds)\b")
 
 
 def test_lm_has_no_verbose_option(orthia, helper):
@@ -205,11 +242,12 @@ def test_analyze_usage(orthia, helper):
 
 
 def test_analyze_mask(orthia, helper):
-    # a mask queues every module it matches; the floating code follows as with a name
+    # a mask queues every module it matches (the helper and its library); the floating code follows
+    # as with a name, and the library leads into the handler allocation too
     res = orthia.run(".analyze orthia_floating_h*", "lmf", pid=helper.pid).assert_ok()
-    res.assert_line(r"^Modules queued: 1$")
+    res.assert_line(rf"^Modules queued: {2 if helper.lib_entry else 1}$")
     assert_found(res, helper, helper.stub)
-    assert_found(res, helper, helper.handler)
+    assert_found(res, helper, helper.handler, entries=2 if helper.lib_entry else 1)
 
 
 def test_analyze_mask_matches_nothing(orthia, helper):
@@ -275,7 +313,7 @@ def test_saved_folder_after_exit(orthia_cold, helper):
     helper.proc.wait(timeout=30)
 
     res = orthia_cold.raw(*QUICK, "--proc-folder", helper.pid, "--cmd", "lm", "--cmd", "lmf",
-                          "--cmd", f"u {stub}!$entry_0001 L1",
+                          "--cmd", f"u {stub}!$entry_00h L1",
                           "--cmd", f"modinfo {HELPER_NAME}").assert_ok()
     assert_found(res, helper, helper.stub)
     assert_found(res, helper, helper.handler)

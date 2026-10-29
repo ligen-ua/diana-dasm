@@ -1245,13 +1245,13 @@ TEST(FloatingCode, DiscoveryAndAnalysis)
     EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::moduleBase + 5 }), a.floating->entries[1].referrers);
     EXPECT_FALSE(a.flags & orthia::ModuleInfo::flags_analyzeDone);
 
-    // the names: x fl_10100000!*, and the address of fl_10100000!$entry_0002
+    // the names: x fl_10100000!*, and the address of fl_10100000!$entry_20h
     std::vector<orthia::NameInfo> names;
     item->QueryNames(a.address, orthia::NameSelectionKey(), 10, names);
     ASSERT_EQ(2u, names.size());
-    EXPECT_EQ(ORTHIA_TCSTR("$entry_0001"), names[0].name.native);
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_00h"), names[0].name.native);
     EXPECT_EQ(FloatingFixture::regionA + 0x20, names[1].address);
-    EXPECT_EQ(FloatingFixture::regionA + 0x20, item->QueryAddressByName(oui::String(ORTHIA_TCSTR("fl_10100000!$entry_0002")), 0));
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, item->QueryAddressByName(oui::String(ORTHIA_TCSTR("fl_10100000!$entry_20h")), 0));
     EXPECT_EQ(FloatingFixture::regionA, item->QueryAddressByName(oui::String(ORTHIA_TCSTR("fl_10100000")), 0));
     EXPECT_EQ(FloatingFixture::regionA, item->GetRangeInfo(FloatingFixture::regionA + 0x10).address);
 
@@ -1280,7 +1280,7 @@ TEST(FloatingCode, DiscoveryAndAnalysis)
         text += orthia::PlatformStringToUtf8(line) + "\n";
     }
     EXPECT_NE(std::string::npos, text.find("Floating code: RWX, private")) << text;
-    EXPECT_NE(std::string::npos, text.find("$entry_0002")) << text;
+    EXPECT_NE(std::string::npos, text.find("$entry_20h")) << text;
     EXPECT_NE(std::string::npos, text.find("from ")) << text;
     EXPECT_NE(std::string::npos, text.find("Entries: 2")) << text;
 
@@ -1290,13 +1290,132 @@ TEST(FloatingCode, DiscoveryAndAnalysis)
     ASSERT_EQ(4u, lines.size());
     EXPECT_EQ(ORTHIA_TCSTR("Referrers:"), lines[0]);
     auto row = [&](size_t i) { return orthia::PlatformStringToUtf8(lines[i]); };
-    EXPECT_NE(std::string::npos, row(1).find("-> fl_10100000!$entry_0001")) << row(1);
+    EXPECT_NE(std::string::npos, row(1).find("-> fl_10100000!$entry_00h")) << row(1);
     EXPECT_NE(std::string::npos, row(1).find("RWX private [function start]")) << row(1);
     EXPECT_NE(std::string::npos, row(2).find("module+05h")) << row(2);
-    EXPECT_NE(std::string::npos, row(2).find("-> fl_10100000!$entry_0002")) << row(2);
+    EXPECT_NE(std::string::npos, row(2).find("-> fl_10100000!$entry_20h")) << row(2);
     EXPECT_EQ(std::string::npos, row(2).find("[function start]")) << row(2);
-    EXPECT_EQ(0u, row(3).find("  fl_10100000!$entry_0001")) << row(3);
-    EXPECT_NE(std::string::npos, row(3).find("-> fl_10400000!$entry_0001")) << row(3);
+    EXPECT_EQ(0u, row(3).find("  fl_10100000!$entry_00h")) << row(3);
+    EXPECT_NE(std::string::npos, row(3).find("-> fl_10400000!$entry_00h")) << row(3);
+}
+
+// two modules call into one region: the entry both call has one name and both referrers, and the
+// entry the later module adds below another one leaves that one's name as it was
+TEST(FloatingCode, TwoModulesOneRegion)
+{
+    FloatingFixture fixture;
+    fixture.AddSecondModule();
+    auto item = fixture.OpenItem();
+    const auto entry20 = oui::String(ORTHIA_TCSTR("fl_10100000!$entry_20h"));
+
+    // the first module: entries at 0 and 20h
+    fixture.AnalyzeModule(*item);
+    EXPECT_TRUE(orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase)));
+    std::vector<orthia::NameInfo> names;
+    item->QueryNames(FloatingFixture::regionA, orthia::NameSelectionKey(), 10, names);
+    ASSERT_EQ(2u, names.size());
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_00h"), names[0].name.native);
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_20h"), names[1].name.native);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, item->QueryAddressByName(entry20, 0));
+    FloatingFixture::AnalyzePending(*item);
+    EXPECT_TRUE(orthia::QueryPendingFloatingModules(*item).empty());
+
+    // the second module: the entry at 0 again, and a new one at 10h
+    fixture.AnalyzeModule(*item, FloatingFixture::secondModule);
+    const auto second = FloatingFixture::FindModule(*item, FloatingFixture::secondModule);
+    ASSERT_EQ(FloatingFixture::secondModule, second.address);
+    EXPECT_TRUE(orthia::DiscoverFloatingCode(*item, second));
+
+    const auto a = FloatingFixture::FindModule(*item, FloatingFixture::regionA);
+    ASSERT_TRUE(a.floating);
+    ASSERT_EQ(3u, a.floating->entries.size());
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::moduleBase, FloatingFixture::secondModule }),
+        a.floating->entries[0].referrers);
+    EXPECT_EQ(FloatingFixture::regionA + 0x10, a.floating->entries[1].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::secondModule + 5 }), a.floating->entries[1].referrers);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, a.floating->entries[2].address);
+
+    // the names by offset: 20h is still 20h, the new entry is 10h
+    names.clear();
+    item->QueryNames(FloatingFixture::regionA, orthia::NameSelectionKey(), 10, names);
+    ASSERT_EQ(3u, names.size());
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_00h"), names[0].name.native);
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_10h"), names[1].name.native);
+    EXPECT_EQ(ORTHIA_TCSTR("$entry_20h"), names[2].name.native);
+    EXPECT_EQ(FloatingFixture::regionA + 0x20, item->QueryAddressByName(entry20, 0));
+    EXPECT_EQ(FloatingFixture::regionA + 0x10, item->QueryAddressByName(oui::String(ORTHIA_TCSTR("fl_10100000!$entry_10h")), 0));
+
+    // a new entry: A waits for its analysis again
+    const auto pending = orthia::QueryPendingFloatingModules(*item);
+    ASSERT_EQ(1u, pending.size());
+    EXPECT_EQ(FloatingFixture::regionA, pending[0].address);
+    FloatingFixture::AnalyzePending(*item);
+
+    std::vector<orthia::PlatformString_type> lines;
+    orthia::DescribeFloatingModule(*item, FloatingFixture::FindModule(*item, FloatingFixture::regionA), lines);
+    std::string text;
+    for (const auto& line : lines)
+    {
+        text += orthia::PlatformStringToUtf8(line) + "\n";
+    }
+    EXPECT_NE(std::string::npos, text.find("Entries: 3")) << text;
+    const auto entry0 = text.find("$entry_00h  from module");
+    ASSERT_NE(std::string::npos, entry0) << text;
+    EXPECT_NE(std::string::npos, text.find(", second", entry0)) << text;
+    EXPECT_NE(std::string::npos, text.find("$entry_10h  from second+05h")) << text;
+
+    // lmf /v: by referrer, each module's rows to the entry at 0
+    lines.clear();
+    orthia::DescribeFloatingReferrers(*item, lines);
+    std::vector<std::string> toEntry0;
+    for (const auto& line : lines)
+    {
+        const auto row = orthia::PlatformStringToUtf8(line);
+        if (row.find("-> fl_10100000!$entry_00h") != std::string::npos)
+            toEntry0.push_back(row);
+    }
+    ASSERT_EQ(2u, toEntry0.size());
+    EXPECT_EQ(0u, toEntry0[0].find("  module ")) << toEntry0[0];
+    EXPECT_EQ(0u, toEntry0[1].find("  second ")) << toEntry0[1];
+}
+
+// a pass of the floating task works on copies of the pending modules taken before it. A, analyzed
+// first, adds an entry to D, which waits in the same pass with the second module's entry only: the
+// entry A added stays, and D is analyzed from it too
+TEST(FloatingCode, EntryAddedInTheSamePass)
+{
+    FloatingFixture fixture;
+    CFakeProcess::Image second;
+    second.format = orthia::FindFormatById("raw");
+    second.base = FloatingFixture::secondModule;
+    second.name = ORTHIA_TCSTR("second");
+    second.data.assign(0x1000, (char)0xCC);
+    PutRel32(second.data, 0, 0xE8, FloatingFixture::secondModule, FloatingFixture::regionD + 0x10);
+    second.data[5] = (char)0xC3;
+    fixture.process->images.push_back(second);
+    auto item = fixture.OpenItem();
+
+    fixture.AnalyzeModule(*item);
+    fixture.AnalyzeModule(*item, FloatingFixture::secondModule);
+    orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::moduleBase));
+    orthia::DiscoverFloatingCode(*item, FloatingFixture::FindModule(*item, FloatingFixture::secondModule));
+    const auto pending = orthia::QueryPendingFloatingModules(*item);
+    ASSERT_EQ(2u, pending.size());
+    EXPECT_EQ(FloatingFixture::regionA, pending[0].address);
+    EXPECT_EQ(FloatingFixture::regionD, pending[1].address);
+    ASSERT_EQ(1u, pending[1].floating->entries.size());
+
+    FloatingFixture::AnalyzePending(*item);
+    const auto d = FloatingFixture::FindModule(*item, FloatingFixture::regionD);
+    ASSERT_TRUE(d.floating);
+    ASSERT_EQ(2u, d.floating->entries.size());
+    EXPECT_EQ(FloatingFixture::regionD, d.floating->entries[0].address);
+    EXPECT_EQ((std::vector<orthia::Address_type>{ FloatingFixture::regionA }), d.floating->entries[0].referrers);
+    EXPECT_EQ(FloatingFixture::regionD + 0x10, d.floating->entries[1].address);
+    EXPECT_TRUE(d.flags & orthia::ModuleInfo::flags_analyzeDone);
+    EXPECT_EQ(FloatingFixture::regionD, d.floating->codeStart);
+    EXPECT_EQ(FloatingFixture::regionD + 0x10, d.floating->codeLast);
+    EXPECT_TRUE(orthia::QueryPendingFloatingModules(*item).empty());
 }
 
 // an import slot of the module that leads into memory no module owns: an entry with the slot,
@@ -1361,7 +1480,7 @@ TEST(FloatingCode, PointerSlots)
         text += orthia::PlatformStringToUtf8(line) + "\n";
     }
     EXPECT_NE(std::string::npos, text.find("module+0800h")) << text;
-    EXPECT_NE(std::string::npos, text.find("-> fl_10400000!$entry_0001")) << text;
+    EXPECT_NE(std::string::npos, text.find("-> fl_10400000!$entry_10h")) << text;
     EXPECT_NE(std::string::npos, text.find("RWX private [import slot: KERNEL32.dll!CreateFileW]")) << text;
 
     lines.clear();
